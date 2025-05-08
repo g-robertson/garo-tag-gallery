@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "target": "es2023",
+    "outDir":"dist"
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

@@ -1,0 +1,89 @@
+:root {
+    --foreground: #fff;
+    --accent-foreground: #bbb;
+    --hover-accent-foreground: #fff;
+    --background: #222;
+    --hover-background: #555;
+}
+
+body {
+    margin: 0;
+    color: var(--foreground);
+    background-color: var(--background);
+    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+}
+
+div {
+    background-color: var(--background);
+}
+
+.navbar {
+    height: 3%;
+    border-bottom: 1px solid var(--accent-foreground);
+}
+
+.topbar-dropdown-options {
+    border-top: 1px solid var(--accent-foreground);
+    position: absolute;
+}
+
+.topbar-dropdown {
+    display: inline-block;
+}
+
+.topbar-dropdown-title {
+    display: inline-block;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-right: 1px solid var(--accent-foreground);
+}
+
+.topbar-dropdown-title:hover {
+    background-color: var(--hover-background);
+    color: var(--hover-accent-foreground);
+}
+
+
+.topbar-dropdown-option {
+    margin-left: -1px;
+    padding: 4px 10px;
+    border: 0 solid var(--accent-foreground);
+    border-width: 0 1px 1px 1px;
+    cursor: pointer;
+}
+
+.topbar-dropdown-option:hover {
+    background-color: var(--hover-background);
+    color: var(--hover-accent-foreground);
+}
+
+.modal {
+    position: absolute;
+    left: 10vw;
+    top: 10vh;
+    border: 2px solid var(--foreground);
+    width: 80vw;
+    height: 80vh;
+}
+
+.modal-topbar {
+    contain: layout;
+    border-bottom: 1px solid var(--accent-foreground);
+}
+
+.modal-title {
+    padding: 6px 0 4px 10px;
+    width: 90%;
+    float: left;
+}
+.modal-cancel {
+    padding: 6px 10px 4px 0;
+    color: #a00;
+    width: 5%;
+    float: right;
+    text-align: right;
+    cursor: pointer;
+}
+.modal-cancel:hover {
+    color: #f00;
+}
