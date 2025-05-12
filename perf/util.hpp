@@ -7,6 +7,7 @@ namespace util {
     uint64_t deserializeUInt64(std::string_view str);
     void writeFile(const std::filesystem::path& filePath, std::string_view data);
     std::string readFile(const std::filesystem::path& filePath);
+    void removeFile(const std::filesystem::path& filePath);
 
     template <class T, class TContainer>
     void toggle(TContainer& container, const T& item) {

@@ -39,6 +39,8 @@ int main() {
             tfm.toggleFiles(input);
         } else if (op == "delete_files") {
             tfm.deleteFiles(input);
+        } else if (op == "read_files") {
+            tfm.readFiles();
         } else if (op == "insert_tag_pairings") {
             tfm.insertPairings(input);
         } else if (op == "toggle_tag_pairings") {

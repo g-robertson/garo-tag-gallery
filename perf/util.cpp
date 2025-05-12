@@ -43,9 +43,8 @@ void util::writeFile(const std::filesystem::path& filePath, std::string_view dat
     if (std::filesystem::exists(unfinishedFilePath)) {
         throw std::logic_error(std::string("Unfinished file path ") + unfinishedFilePath.generic_string() + "existed for file " + filePath.generic_string());
     }
-    if (!std::filesystem::exists(absoluteFilePath.parent_path())) {
-        std::filesystem::create_directories(absoluteFilePath.parent_path());
-    }
+
+    std::filesystem::create_directories(absoluteFilePath.parent_path());
 
     std::ofstream file;
     file.open(unfinishedFilePath);
@@ -67,4 +66,9 @@ std::string util::readFile(const std::filesystem::path& filePath) {
     file.read(buffer.data(), size);
 
     return buffer;
+}
+
+void util::removeFile(const std::filesystem::path& filePath) {
+    std::filesystem::path absoluteFilePath = std::filesystem::absolute(filePath);
+    std::filesystem::remove(absoluteFilePath);
 }

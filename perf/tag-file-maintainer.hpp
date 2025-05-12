@@ -41,6 +41,7 @@ class TagFileMaintainer {
         void insertFiles(std::string_view input);
         void toggleFiles(std::string_view input);
         void deleteFiles(std::string_view input);
+        void readFiles();
         void insertPairings(std::string_view input);
         void togglePairings(std::string_view input);
         void deletePairings(std::string_view input);
@@ -52,6 +53,7 @@ class TagFileMaintainer {
     private:
         void readCacheFile();
         void writeCacheFile();
+        std::pair<std::string_view, SetEvaluation> search_(std::string_view input);
         unsigned short getBucketIndex(uint64_t item) const;
         const PairingBucket& getTagBucket(uint64_t tag) const;
         PairingBucket& getTagBucket(uint64_t tag);

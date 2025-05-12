@@ -2,7 +2,9 @@
 
 #include <fstream>
 #include <istream>
+#include <algorithm>
 
+#include "set-evaluation.hpp"
 #include "atomic-ofstream.hpp"
 #include "util.hpp"
 
@@ -30,6 +32,18 @@ namespace {
         tagPairingsStr.resize(location);
 
         return tagPairingsStr;
+    }
+
+    std::string serializeFiles(const std::unordered_set<uint64_t>& contents) {
+        std::string filesStr;
+
+        filesStr.resize(8 * contents.size());
+        std::size_t location = 0;
+        for (auto file : contents) {
+            util::serializeUInt64(file, filesStr, location);
+        }
+
+        return filesStr;
     }
 
     template <class T>
@@ -128,6 +142,9 @@ void TagFileMaintainer::toggleFiles(std::string_view input) {
 void TagFileMaintainer::deleteFiles(std::string_view input) {
     modifyFiles(input, FileBucket::deleteItem);
 }
+void TagFileMaintainer::readFiles() {
+    util::writeFile("perf-output.txt", serializeFiles(fileBucket->contents()));
+}
 
 void TagFileMaintainer::modifyPairings(std::string_view input, void (PairingBucket::*callback)(std::pair<uint64_t, uint64_t>)) {
     auto modifyPairing = [&callback, this](std::pair<uint64_t, uint64_t> item) {
@@ -183,22 +200,106 @@ void TagFileMaintainer::readFilesTags(std::string_view input) {
 }
 
 // Searches tag file maintainer based on a search string where symbols mean the following:
-// 'T' Tag followed by a tag identifier will yield a file list of 
-// 'F' file
-// 'O' Operation followed by one of the following symbols:
-//   '(' open group
-//   ')' close group
-//   '&' and (intersect)
-//   '|' or (union)
-//   '^' xor (symmetric difference)
-//   'D' difference
-//   '-' not
+// Operators are evaluated left to right in the shortest manner possible
+// 'T' Tag: followed by a tag identifier will yield a file list of all files with that 
+// 'F' Filelist: 
+// '(' open group
+// ')' close group
+// '~' not
+// '^' xor (symmetric difference)
+// '-' difference
+// '&' and (intersect)
+// '|' or (union)
+
+namespace {
+    const char FIRST_OP = '\x00';
+    const char TAG_FILE_LIST = 'T';
+    const char FILE_LIST = 'F';
+    const char OPEN_GROUP = '(';
+    const char CLOSE_GROUP = ')';
+    const char COMPLEMENT_OP = '~';
+    const char RIGHT_HAND_SIDE_OP = '\xFF';
+    const std::unordered_map<char, SetEvaluation(*)(SetEvaluation set1, SetEvaluation set2)> SET_OPERATIONS = {
+        {'^', SetEvaluation::symmetricDifference},
+        {'-', SetEvaluation::difference},
+        {'&', SetEvaluation::intersect},
+        {'|', SetEvaluation::setUnion},
+        {RIGHT_HAND_SIDE_OP, SetEvaluation::rightHandSide}
+    };
+}
+
 void TagFileMaintainer::search(std::string_view input) {
+    auto setEval = search_(input);
+    auto files = setEval.second.releaseResult();
+    util::writeFile("perf-output.txt", serializeFiles(files));
+}
+
+std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::string_view input) {
+    const auto* universe = &fileBucket->contents();
+    auto context = SetEvaluation(false, universe, universe);
+    char op = FIRST_OP;
+    while (input.size() != 0) {
+        if (op == FIRST_OP) {
+            op = RIGHT_HAND_SIDE_OP;
+        } else {
+            op = input[0];
+            input = input.substr(1);
+        }
+
+        bool isComplement = false;
+        if (input[0] == COMPLEMENT_OP) {
+            isComplement = true;
+            input = input.substr(1);
+        }
+
+        if (input[0] == TAG_FILE_LIST) {
+            input = input.substr(1);
+            uint64_t tag = util::deserializeUInt64(input);
+            input = input.substr(8);
+            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, getTagBucket(tag).firstContents(tag)));
+        } else if (input[0] == FILE_LIST) {
+            input = input.substr(1);
+            uint64_t fileCount = util::deserializeUInt64(input);
+            input = input.substr(8);
+            std::unordered_set<uint64_t> files;
+            for (std::size_t i = 0; i < fileCount; ++i) {
+                files.insert(util::deserializeUInt64(input));
+                input = input.substr(8);
+            }
+            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, std::move(files)));
+        } else if (input[0] == OPEN_GROUP) {
+            input = input.substr(1);
+            auto subSearch = search_(input);
+            input = subSearch.first;
+            context = SET_OPERATIONS.at(op)(std::move(context), std::move(subSearch.second));
+        } else if (input[0] == CLOSE_GROUP) {
+            input = input.substr(1);
+            return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
+        }
+    }
+
+    return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
 }
 
 unsigned short TagFileMaintainer::getBucketIndex(uint64_t item) const {
     return static_cast<unsigned short>(item % currentBucketCount);
 }
+
+//uint32_t TagFileMaintainer::getWantedBucketCount() const {
+//    return getWantedBucketSize();
+//}
+//
+//uint32_t TagFileMaintainer::getWantedBucketSize() const {
+//    auto writeBytesPerFile = (Config::getWriteBytesPerSecond() / Config::getWriteFileCountPerSecond()) / 2;
+//    auto readBytesPerFile = (Config::getReadBytesPerSecond() / Config::getReadFileCountPerSecond()) / 2;
+//    auto bucketBytesPerFileUnrounded = std::min(writeBytesPerFile, readBytesPerFile);
+//    auto bucketBytesPerFile = 1;
+//    while (bucketBytesPerFileUnrounded != 0) {
+//        bucketBytesPerFileUnrounded >>= 1;
+//        bucketBytesPerFile <<= 1;
+//    }
+//    return bucketBytesPerFile >> 1;
+//}
 
 PairingBucket& TagFileMaintainer::getTagBucket(uint64_t tag) {
     return tagFileBuckets.at(getBucketIndex(tag));
@@ -239,7 +340,7 @@ PairingBucket::PairingBucket(std::filesystem::path bucketPath, std::size_t size)
 const std::unordered_set<uint64_t>* PairingBucket::firstContents(uint64_t first) {
     init();
 
-    return contents.firstContents(first);
+    return contents_.firstContents(first);
 }
 
 std::pair<uint64_t, uint64_t> PairingBucket::FAKER() {
@@ -273,13 +374,5 @@ void FileBucket::deserialize(std::string_view str, void(*callback)(Bucket<uint64
 }
 
 std::string FileBucket::serialize(const std::unordered_set<uint64_t>& contents) {
-    std::string filesStr;
-
-    filesStr.resize(8 * contents.size());
-    std::size_t location = 0;
-    for (auto file : contents) {
-        util::serializeUInt64(file, filesStr, location);
-    }
-
-    return filesStr;
+    return serializeFiles(contents);
 }

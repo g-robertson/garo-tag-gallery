@@ -7,14 +7,27 @@ class Bucket {
         : mainFileName(bucketPath / "bucket.tbd"), toggleFileName(bucketPath / "bucket.ta"), startingSize_(size)
         {}
         
-        std::size_t size() {
-            return contents.size();
+        const TContainer& contents() {
+            init();
+            return contents_;
+        }
+
+        std::size_t size() const {
+            if (isRead) {
+                return contents_.size();
+            } else {
+                return startingSize_;
+            }
+        }
+
+        const std::filesystem::path& mainFileLocation() const {
+            return mainFileName;
         }
 
         void insertItem(T item) {
             init();
         
-            if (contents.insert(item).second) {
+            if (contents_.insert(item).second) {
                 contentsIsDirty = true;
                 util::toggle(toggleContents, item);
                 toggleContentsIsDirty = true;
@@ -25,7 +38,7 @@ class Bucket {
         void toggleItem(T item) {
             init();
 
-            util::toggle(contents, item);
+            util::toggle(contents_, item);
             contentsIsDirty = true;
             util::toggle(toggleContents, item);
             toggleContentsIsDirty = true;
@@ -34,7 +47,7 @@ class Bucket {
         void deleteItem(T item) {
             init();
         
-            if (contents.erase(item) == 1) {
+            if (contents_.erase(item) == 1) {
                 contentsIsDirty = true;
                 util::toggle(toggleContents, item);
                 toggleContentsIsDirty = true;
@@ -46,8 +59,8 @@ class Bucket {
                 return;
             }
             
-            if (contents.size() == startingSize_) {
-                util::toggle(contents, FAKER());
+            if (contents_.size() == startingSize_) {
+                util::toggle(contents_, FAKER());
                 util::toggle(toggleContents, FAKER());
             }
         
@@ -60,8 +73,8 @@ class Bucket {
                 return;
             }
         
-            util::writeFile(mainFileName, serialize(contents));
-            startingSize_ = contents.size();
+            util::writeFile(mainFileName, serialize(contents_));
+            startingSize_ = contents_.size();
             toggleContents.clear();
             toggleContentsIsDirty = false;
             contentsIsDirty = false;
@@ -73,10 +86,10 @@ class Bucket {
 
     private:
         static void insertContentsFn(Bucket& bucket, T item) {
-            bucket.contents.insert(item);
+            bucket.contents_.insert(item);
         }
         static void toggleContentsFn(Bucket& bucket, T item) {
-            util::toggle(bucket.contents, item);
+            util::toggle(bucket.contents_, item);
         }
 
     protected:
@@ -87,7 +100,7 @@ class Bucket {
         bool toggleDirty = false;
         bool isRead = false;
         std::size_t startingSize_;
-        TContainer contents;
+        TContainer contents_;
         bool contentsIsDirty = false;
         TContainer toggleContents;
         bool toggleContentsIsDirty = false;
@@ -111,14 +124,14 @@ class Bucket {
             }
             deserialize(mainContents, insertContentsFn);
         
-            if (contents.size() == startingSize_) {
+            if (contents_.size() == startingSize_) {
                 return;
             }
 
             std::string toggleContentsStr = util::readFile(toggleFileName);
             deserialize(toggleContentsStr, toggleContentsFn);
         
-            if (contents.size() != startingSize_) {
+            if (contents_.size() != startingSize_) {
                 // TODO: allow user intervention while showing both before and after toggles, 
                 throw std::logic_error(std::string("With toggle contents included, contents size is still not the same as expected, something unforgiveable must have happened. This should never occur"));
             }
