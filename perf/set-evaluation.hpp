@@ -2,6 +2,7 @@
 
 #include <unordered_set>
 #include <optional>
+#include <cstdint>
 
 class SetEvaluation {
     public:
@@ -11,6 +12,7 @@ class SetEvaluation {
         // Note: this will invalidate the SetEvaluation that the result was moved from
         std::unordered_set<uint64_t> releaseResult();
 
+        void complement();
         static SetEvaluation rightHandSide(SetEvaluation lhsSet, SetEvaluation rhsSet);
         static SetEvaluation symmetricDifference(SetEvaluation lhsSet, SetEvaluation rhsSet);
         static SetEvaluation difference(SetEvaluation lhsSet, SetEvaluation rhsSet);

@@ -4,37 +4,13 @@
 #include <istream>
 #include <algorithm>
 
-#include "set-evaluation.hpp"
 #include "atomic-ofstream.hpp"
 #include "util.hpp"
 
 const int TagFileMaintainer::VERSION = 1;
 
 namespace {
-    std::string serializePairings(const IdPairContainer& tagPairings) {
-        std::string tagPairingsStr;
-        std::size_t tagPairingsSize;
-
-        tagPairingsStr.resize((8 * tagPairings.size()) + (16 * tagPairings.allContents().size()));
-        std::size_t location = 0;
-        for (auto tag : tagPairings.allContents()) {
-            if (tag.second.size() == 0) {
-                continue;
-            }
-            
-            util::serializeUInt64(tag.first, tagPairingsStr, location);
-            util::serializeUInt64(tag.second.size(), tagPairingsStr, location);
-            for (auto file : tag.second) {
-                util::serializeUInt64(file, tagPairingsStr, location);
-            }
-        }
-
-        tagPairingsStr.resize(location);
-
-        return tagPairingsStr;
-    }
-
-    std::string serializeFiles(const std::unordered_set<uint64_t>& contents) {
+    std::string serializeSingles(const std::unordered_set<uint64_t>& contents) {
         std::string filesStr;
 
         filesStr.resize(8 * contents.size());
@@ -47,33 +23,14 @@ namespace {
     }
 
     template <class T>
-    void processFiles(std::string_view str, T callback) {
+    void processSingles(std::string_view str, T callback) {
         if (str.size() % 8 != 0) {
             throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
         }
         while (str.size() > 0) {
-            uint64_t file = util::deserializeUInt64(str);
+            uint64_t single = util::deserializeUInt64(str);
             str = str.substr(8);
-            callback(file);
-        }
-    }
-
-    template <class T>
-    void processPairings(std::string_view str, T callback) {
-        if (str.size() % 8 != 0) {
-            throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
-        }
-        while (str.size() > 0) {
-            uint64_t first = util::deserializeUInt64(str);
-            str = str.substr(8);
-            uint64_t count = util::deserializeUInt64(str);
-            str = str.substr(8);
-            std::cout << '"' << first << '"'<< std::endl;
-            for (std::size_t i = 0; i < count; ++i) {
-                uint64_t second = util::deserializeUInt64(str);
-                str = str.substr(8);
-                callback(std::pair<uint64_t, uint64_t>(first, second));
-            }
+            callback(single);
         }
     }
 }
@@ -93,71 +50,140 @@ TagFileMaintainer::~TagFileMaintainer() {
 
 void TagFileMaintainer::readCacheFile() {
     auto cacheFile = std::ifstream(cacheFilePath_);
-    int version;
-    cacheFile >> version;
-    cacheFile >> currentBucketCount;
+    int version = VERSION;
+    std::size_t totalFiles = 0;
+    std::size_t totalTags = 0;
+
+    if (!cacheFile.fail()) {
+        cacheFile >> version;
+        cacheFile >> totalFiles;
+        cacheFile >> totalTags;
+        cacheFile >> currentBucketCount;
+    }
+
+    fileBucket = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "file-bucket", totalFiles);
+    tagBucket = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "tag-bucket", totalTags);
+
     for (std::size_t i = 0; i < currentBucketCount; ++i) {
-        std::size_t bucketTotalTagsToFiles;
-        std::size_t bucketTotalFilesToTags;
-        cacheFile >> bucketTotalTagsToFiles;
-        cacheFile >> bucketTotalFilesToTags;
+        std::size_t bucketTotalTagsToFiles = 0;
+        std::size_t bucketTagsToFilesComplementCount = 0;
+        std::size_t bucketTotalFilesToTags = 0;
+        std::size_t bucketFilesToTagsComplementCount = 0;
+        if (!cacheFile.fail()) {
+            cacheFile >> bucketTotalTagsToFiles;
+            cacheFile >> bucketTagsToFilesComplementCount;
+            cacheFile >> bucketTotalFilesToTags;
+            cacheFile >> bucketFilesToTagsComplementCount;
+        }
 
         std::string tagFileFolderName = std::string("tag-to-file-") + std::to_string(i);
         std::string fileTagFolderName = std::string("file-to-tag-") + std::to_string(i);
-        tagFileBuckets.push_back(PairingBucket(folderPath_ / "buckets" / tagFileFolderName, bucketTotalTagsToFiles));
-        fileTagBuckets.push_back(PairingBucket(folderPath_ / "buckets" / fileTagFolderName, bucketTotalFilesToTags));
+        tagFileBuckets.push_back(PairingBucket(folderPath_ / "buckets" / tagFileFolderName, bucketTotalTagsToFiles, bucketTagsToFilesComplementCount, &fileBucket->contents()));
+        fileTagBuckets.push_back(PairingBucket(folderPath_ / "buckets" / fileTagFolderName, bucketTotalFilesToTags, bucketFilesToTagsComplementCount, &tagBucket->contents()));
     }
-
-    std::size_t totalFiles;
-    cacheFile >> totalFiles;
-
-    fileBucket = std::make_unique<FileBucket>(folderPath_ / "buckets" / "file-bucket", totalFiles);
 }
 
 void TagFileMaintainer::writeCacheFile() {
     auto cacheFile = AtomicOfstream(cacheFilePath_);
-    cacheFile << VERSION << ' ' << currentBucketCount;
+    cacheFile << VERSION
+              << ' ' << fileBucket->size()
+              << ' ' << tagBucket->size()
+              << ' ' << currentBucketCount;
+    
     for (int i = 0; i < currentBucketCount; ++i) {
-        cacheFile << ' ' << tagFileBuckets.at(i).size();
-        cacheFile << ' ' << fileTagBuckets.at(i).size();
+        cacheFile << ' ' << tagFileBuckets.at(i).size()
+                  << ' ' << tagFileBuckets.at(i).startingComplementCount()
+                  << ' ' << fileTagBuckets.at(i).size()
+                  << ' ' << fileTagBuckets.at(i).startingComplementCount();
     }
-    cacheFile << ' ' << fileBucket->size();
 }
 
-void TagFileMaintainer::modifyFiles(std::string_view input,  void (FileBucket::*callback)(uint64_t)) {
+void TagFileMaintainer::modifyFiles(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
     auto modifyFile = [&callback, this](uint64_t file) {
         (*fileBucket.*callback)(file);
+        for (auto& bucket : tagFileBuckets) {
+            bucket.insertComplement(file);
+        }
     };
-    processFiles(input, modifyFile);
-    fileBucket->toggleAhead();
+    processSingles(input, modifyFile);
+
+    for (auto& bucket : tagFileBuckets) {
+        bucket.diffAhead();
+    }
+
+    fileBucket->diffAhead();
     writeCacheFile();
 }
 
 void TagFileMaintainer::insertFiles(std::string_view input) {
-    modifyFiles(input, FileBucket::insertItem);
+    modifyFiles(input, SingleBucket::insertItem);
 }
 void TagFileMaintainer::toggleFiles(std::string_view input) {
-    modifyFiles(input, FileBucket::toggleItem);
+    modifyFiles(input, SingleBucket::toggleItem);
 }
 void TagFileMaintainer::deleteFiles(std::string_view input) {
-    modifyFiles(input, FileBucket::deleteItem);
+    modifyFiles(input, SingleBucket::deleteItem);
 }
 void TagFileMaintainer::readFiles() {
-    util::writeFile("perf-output.txt", serializeFiles(fileBucket->contents()));
+    util::writeFile("perf-output.txt", serializeSingles(fileBucket->contents()));
 }
 
-void TagFileMaintainer::modifyPairings(std::string_view input, void (PairingBucket::*callback)(std::pair<uint64_t, uint64_t>)) {
-    auto modifyPairing = [&callback, this](std::pair<uint64_t, uint64_t> item) {
-        (getTagBucket(item.first).*callback)(std::pair<uint64_t, uint64_t>(item.first, item.second));
-        (getFileBucket(item.second).*callback)(std::pair<uint64_t, uint64_t>(item.second, item.first));
+void TagFileMaintainer::modifyTags(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
+    auto modifyTag = [&callback, this](uint64_t tag) {
+        (*tagBucket.*callback)(tag);
+        for (auto& bucket : fileTagBuckets) {
+            bucket.insertComplement(tag);
+        }
     };
-    processPairings(input, modifyPairing);
+    processSingles(input, modifyTag);
+
+    for (auto& bucket : fileTagBuckets) {
+        bucket.diffAhead();
+    }
+
+    tagBucket->diffAhead();
+    writeCacheFile();
+}
+
+void TagFileMaintainer::insertTags(std::string_view input) {
+    modifyTags(input, SingleBucket::insertItem);
+}
+void TagFileMaintainer::toggleTags(std::string_view input) {
+    modifyTags(input, SingleBucket::toggleItem);
+}
+void TagFileMaintainer::deleteTags(std::string_view input) {
+    modifyTags(input, SingleBucket::deleteItem);
+}
+void TagFileMaintainer::readTags() {
+    util::writeFile("perf-output.txt", serializeSingles(tagBucket->contents()));
+}
+
+#include <iostream>
+
+void TagFileMaintainer::modifyPairings(std::string_view input, void (PairingBucket::*callback)(std::pair<uint64_t, uint64_t>)) {
+    if (input.size() % 8 != 0) {
+        throw std::logic_error("Pairing input was not a multiple of 8");
+    }
+
+    while (input.size() != 0) {
+        auto tag = util::deserializeUInt64(input);
+        input = input.substr(8);
+        auto fileCount = util::deserializeUInt64(input);
+        input = input.substr(8);
+        for (std::size_t i = 0; i < fileCount; ++i) {
+            auto file = util::deserializeUInt64(input);
+            input = input.substr(8);
+            (getTagBucket(tag).*callback)(std::pair<uint64_t, uint64_t>(tag, file));
+            (getFileBucket(file).*callback)(std::pair<uint64_t, uint64_t>(file, tag));
+        }
+    }
+    
 
     for (auto& bucket : tagFileBuckets) {
-        bucket.toggleAhead();
+        bucket.diffAhead();
     }
     for (auto& bucket : fileTagBuckets) {
-        bucket.toggleAhead();
+        bucket.diffAhead();
     }
     writeCacheFile();
 }
@@ -186,13 +212,17 @@ void TagFileMaintainer::readFilesTags(std::string_view input) {
         input = input.substr(8);
         auto& fileBucket = getFileBucket(file);
         const auto* fileTags = fileBucket.firstContents(file);
-        if (fileTags != nullptr && fileTags->size() != 0) {
+        if (fileTags != nullptr) {
             util::serializeUInt64(file, output, location);
             util::serializeUInt64(fileTags->size(), output, location);
             
-            for (auto tag : *fileTags) {
+            auto serializeTag = [&output, &location](uint64_t tag) {
                 util::serializeUInt64(tag, output, location);
-            }
+            };
+            fileTags->forEach(serializeTag);
+        } else {
+            util::serializeUInt64(file, output, location);
+            util::serializeUInt64(0, output, location);
         }
     }
 
@@ -231,7 +261,7 @@ namespace {
 void TagFileMaintainer::search(std::string_view input) {
     auto setEval = search_(input);
     auto files = setEval.second.releaseResult();
-    util::writeFile("perf-output.txt", serializeFiles(files));
+    util::writeFile("perf-output.txt", serializeSingles(files));
 }
 
 std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::string_view input) {
@@ -256,7 +286,8 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
             input = input.substr(1);
             uint64_t tag = util::deserializeUInt64(input);
             input = input.substr(8);
-            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, getTagBucket(tag).firstContents(tag)));
+            const auto* files = getTagBucket(tag).firstContents(tag);
+            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(files->isComplement(), universe, &files->physicalContents()));
         } else if (input[0] == FILE_LIST) {
             input = input.substr(1);
             uint64_t fileCount = util::deserializeUInt64(input);
@@ -267,11 +298,17 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
                 input = input.substr(8);
             }
             context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, std::move(files)));
+            if (isComplement) {
+                context.complement();
+            }
         } else if (input[0] == OPEN_GROUP) {
             input = input.substr(1);
             auto subSearch = search_(input);
             input = subSearch.first;
             context = SET_OPERATIONS.at(op)(std::move(context), std::move(subSearch.second));
+            if (isComplement) {
+                context.complement();
+            }
         } else if (input[0] == CLOSE_GROUP) {
             input = input.substr(1);
             return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
@@ -330,49 +367,112 @@ void TagFileMaintainer::close() {
         bucket.close();
     }
     fileBucket->close();
+    tagBucket->close();
     closed_ = true;
 }
 
-PairingBucket::PairingBucket(std::filesystem::path bucketPath, std::size_t size)
-    : Bucket(bucketPath, size)
-{}
+PairingBucket::PairingBucket(std::filesystem::path bucketPath, std::size_t startingSize, std::size_t startingComplementCount, const std::unordered_set<uint64_t>* secondUniverse)
+    : Bucket(bucketPath, startingSize), startingComplementCount_(startingComplementCount), secondUniverse(secondUniverse)
+{
+    contents_ = IdPairContainer(secondUniverse);
+}
 
-const std::unordered_set<uint64_t>* PairingBucket::firstContents(uint64_t first) {
+void PairingBucket::insertComplement(uint64_t second) {
+    if (startingComplementCount_ != 0) {
+        diffContentsIsDirty = true;
+        init();
+    }
+
+    // need to update only the diffs for those that start with complement
+    for (auto first : startingFirstComplements) {
+        diffContents.insert(std::pair<uint64_t, uint64_t>(first, second));
+    }
+
+    const auto& firstComplements = contents_.firstComplements();
+    if (firstComplements.size() != 0) {
+        contentsIsDirty = true;
+    }
+    contents_.insertComplement(second);
+}
+std::size_t PairingBucket::startingComplementCount() const {
+    return startingComplementCount_;
+}
+
+const IdPairSecond* PairingBucket::firstContents(uint64_t first) {
     init();
 
     return contents_.firstContents(first);
 }
-
-std::pair<uint64_t, uint64_t> PairingBucket::FAKER() {
+std::pair<uint64_t, uint64_t> PairingBucket::FAKER() const {
     return {0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF};
 }
 
-void PairingBucket::deserialize(std::string_view str, void(*callback)(Bucket<std::pair<uint64_t, uint64_t>, IdPairContainer>& bucket, std::pair<uint64_t, uint64_t> item)) {
-    auto processor = [&callback, this](std::pair<uint64_t, uint64_t> item) {
-        callback(*this, item);
-    };
-    processPairings(str, processor);
-}
-std::string PairingBucket::serialize(const IdPairContainer& contents) {
-    return serializePairings(contents);
+IdPairContainer PairingBucket::deserialize(std::string_view str) const  {
+    return IdPairContainer::deserialize(str, secondUniverse);
 }
 
+IdPairDiffContainer PairingBucket::deserializeDiff(std::string_view str) const  {
+    return IdPairDiffContainer::deserialize(str, secondUniverse);
+}
 
-FileBucket::FileBucket(std::filesystem::path bucketPath, std::size_t startingSize)
+std::string PairingBucket::serialize(const IdPairContainer& contents) const {
+    return contents.serialize();
+}
+
+std::string PairingBucket::serializeDiff(const IdPairDiffContainer& diffContents) const {
+    return diffContents.serialize();
+}
+
+bool PairingBucket::isErased(const IdPairInsertReturnType& eraseReturn) const {
+    return eraseReturn.second;
+}
+
+void PairingBucket::applyDiff(const IdPairDiffContainer& diffContents) {
+    for (const auto& pair : diffContents.allContents()) {
+        auto first = pair.first;
+        for (auto second : pair.second) {
+            util::toggle(contents_, std::pair<uint64_t, uint64_t>(first, second));
+        }
+    }
+}
+
+void PairingBucket::postContentsMatchFile() {
+    startingFirstComplements = contents_.firstComplements();
+    startingComplementCount_ = startingFirstComplements.size();
+}
+
+SingleBucket::SingleBucket(std::filesystem::path bucketPath, std::size_t startingSize)
     : Bucket(bucketPath, startingSize)
 {}
 
-uint64_t FileBucket::FAKER() {
+uint64_t SingleBucket::FAKER() const {
     return 0xFFFFFFFFFFFFFFFF;
 }
 
-void FileBucket::deserialize(std::string_view str, void(*callback)(Bucket<uint64_t, std::unordered_set<uint64_t>>& bucket, uint64_t item)) {
-    auto processor = [&callback, this](uint64_t item) {
-        callback(*this, item);
+std::unordered_set<uint64_t> SingleBucket::deserialize(std::string_view str) const {
+    std::unordered_set<uint64_t> deserializedContents;
+    auto processor = [this, &deserializedContents](uint64_t item) {
+        deserializedContents.insert(item);
     };
-    processFiles(str, processor);
+    processSingles(str, processor);
+
+    return deserializedContents;
+}
+std::unordered_set<uint64_t> SingleBucket::deserializeDiff(std::string_view str) const {
+    return deserialize(str);
 }
 
-std::string FileBucket::serialize(const std::unordered_set<uint64_t>& contents) {
-    return serializeFiles(contents);
+std::string SingleBucket::serialize(const std::unordered_set<uint64_t>& contents) const {
+    return serializeSingles(contents);
+}
+
+std::string SingleBucket::serializeDiff(const std::unordered_set<uint64_t>& diffContents) const {
+    return serialize(diffContents);
+}
+
+bool SingleBucket::isErased(const std::size_t& eraseReturn) const {
+    return defaultIsErased(eraseReturn);
+}
+void SingleBucket::applyDiff(const std::unordered_set<uint64_t>& diffContents) {
+    defaultApplyDiff(*this, diffContents);
 }

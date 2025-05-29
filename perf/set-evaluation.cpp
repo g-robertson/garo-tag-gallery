@@ -26,6 +26,10 @@ std::unordered_set<uint64_t> SetEvaluation::releaseResult() {
     }
 }
 
+void SetEvaluation::complement() {
+    isComplement = !isComplement;
+}
+
 SetEvaluation SetEvaluation::rightHandSide(SetEvaluation lhsSet, SetEvaluation rhsSet) {
     return std::move(rhsSet);
 }

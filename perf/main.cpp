@@ -25,9 +25,10 @@ unsigned short wantedBucketCount() {
 
 int main() {
     auto tfm = TagFileMaintainer("tag-pairings");
-
+    std::cerr << "new run" << std::endl;
     std::string op;
     while (op != "exit") {
+        bool badCommand = false;
         std::getline(std::cin, op);
         std::ifstream file("perf-input.txt");
         std::stringstream buffer;
@@ -35,13 +36,9 @@ int main() {
         std::string input = buffer.str();
         if (op == "insert_files") {
             tfm.insertFiles(input);
-        } else if (op == "toggle_files") {
-            tfm.toggleFiles(input);
-        } else if (op == "delete_files") {
-            tfm.deleteFiles(input);
-        } else if (op == "read_files") {
-            tfm.readFiles();
-        } else if (op == "insert_tag_pairings") {
+        } else if (op == "insert_tags") {
+            tfm.insertTags(input);
+        }  else if (op == "insert_tag_pairings") {
             tfm.insertPairings(input);
         } else if (op == "toggle_tag_pairings") {
             tfm.togglePairings(input);
@@ -51,9 +48,15 @@ int main() {
             tfm.readFilesTags(input);
         } else if (op == "search") {
             tfm.search(input);
+        } else if (op == "exit") {
+        } else {
+            std::cout << "BAD COMMAND!" << std::endl;
+            badCommand = true;
         }
 
-        std::cout << "OK!" << std::endl;
+        if (!badCommand) {
+            std::cout << "OK!" << std::endl;
+        }
     }
     
     if (tfm.needsMaintenance()) {

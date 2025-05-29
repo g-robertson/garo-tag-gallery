@@ -1,13 +1,17 @@
 #pragma once
 
-template <class T, class TContainer>
+#include "util.hpp"
+
+template <class T, class TMainContainer, class TDiffContainer>
 class Bucket {
     public:
         Bucket(std::filesystem::path bucketPath, std::size_t size)
-        : mainFileName(bucketPath / "bucket.tbd"), toggleFileName(bucketPath / "bucket.ta"), startingSize_(size)
+        : mainFileName(bucketPath / "bucket.tbd"), diffFileName(bucketPath / "bucket.ta"), startingSize_(size)
         {}
         
-        const TContainer& contents() {
+        virtual ~Bucket() = default;
+
+        const TMainContainer& contents() {
             init();
             return contents_;
         }
@@ -27,83 +31,85 @@ class Bucket {
         void insertItem(T item) {
             init();
         
-            if (contents_.insert(item).second) {
+            auto insertReturn = contents_.insert(item);
+            if (insertReturn.second) {
                 contentsIsDirty = true;
-                util::toggle(toggleContents, item);
-                toggleContentsIsDirty = true;
+                util::toggle(diffContents, item);
+                diffContentsIsDirty = true;
             }
-            
         }
 
         void toggleItem(T item) {
             init();
 
-            util::toggle(contents_, item);
+            auto toggleReturn = util::toggle(contents_, item);
             contentsIsDirty = true;
-            util::toggle(toggleContents, item);
-            toggleContentsIsDirty = true;
+            util::toggle(diffContents, item);
+            diffContentsIsDirty = true;
         }
 
         void deleteItem(T item) {
             init();
         
-            if (contents_.erase(item) == 1) {
+            auto eraseReturn = contents_.erase(item);
+            if (isErased(eraseReturn)) {
                 contentsIsDirty = true;
-                util::toggle(toggleContents, item);
-                toggleContentsIsDirty = true;
+                util::toggle(diffContents, item);
+                diffContentsIsDirty = true;
             }
         }
 
-        void toggleAhead() {
-            if (!toggleContentsIsDirty) {
+        bool contains(T item) {
+            init();
+
+            return contents_.contains(item);
+        }
+
+        void diffAhead() {
+            if (!diffContentsIsDirty) {
                 return;
             }
             
             if (contents_.size() == startingSize_) {
                 util::toggle(contents_, FAKER());
-                util::toggle(toggleContents, FAKER());
+                util::toggle(diffContents, FAKER());
+                diffContentsIsDirty = true;
             }
         
-            util::writeFile(toggleFileName, serialize(toggleContents));
-            toggleContentsIsDirty = false;
+            util::writeFile(diffFileName, serializeDiff(diffContents));
+            diffContentsIsDirty = false;
         }
 
         void write() {
             if (!contentsIsDirty) {
+                std::cerr << "contents were not dirty so did not write" << std::endl;
                 return;
             }
+            std::cerr << "contents were dirty so write" << std::endl;
         
             util::writeFile(mainFileName, serialize(contents_));
             startingSize_ = contents_.size();
-            toggleContents.clear();
-            toggleContentsIsDirty = false;
+            diffContents.clear();
+            diffContentsIsDirty = false;
             contentsIsDirty = false;
+            postContentsMatchFile();
         }
 
         void close() {
             write();
         }
 
-    private:
-        static void insertContentsFn(Bucket& bucket, T item) {
-            bucket.contents_.insert(item);
-        }
-        static void toggleContentsFn(Bucket& bucket, T item) {
-            util::toggle(bucket.contents_, item);
-        }
-
     protected:
-    
         std::filesystem::path mainFileName;
         bool mainDirty = false;
-        std::filesystem::path toggleFileName;
-        bool toggleDirty = false;
+        std::filesystem::path diffFileName;
+        bool diffDirty = false;
         bool isRead = false;
         std::size_t startingSize_;
-        TContainer contents_;
+        TMainContainer contents_;
         bool contentsIsDirty = false;
-        TContainer toggleContents;
-        bool toggleContentsIsDirty = false;
+        TDiffContainer diffContents;
+        bool diffContentsIsDirty = false;
 
         void init() {
             if (isRead) {
@@ -120,28 +126,45 @@ class Bucket {
             try {
                 mainContents = util::readFile(mainFileName);
             } catch(std::logic_error& err) {
-                // do nothing, file not opening is fine, is indicative of only toggle file
+                // do nothing, file not opening is fine, is indicative of only diff file
             }
-            deserialize(mainContents, insertContentsFn);
-        
+            contents_ = deserialize(mainContents);
+
             if (contents_.size() == startingSize_) {
+                postContentsMatchFile();
                 return;
             }
 
-            std::string toggleContentsStr = util::readFile(toggleFileName);
-            deserialize(toggleContentsStr, toggleContentsFn);
-        
+            std::cerr << "needs diff" << std::endl;
+            applyDiff(deserializeDiff(util::readFile(diffFileName)));
+            contentsIsDirty = true;
             if (contents_.size() != startingSize_) {
-                // TODO: allow user intervention while showing both before and after toggles, 
-                throw std::logic_error(std::string("With toggle contents included, contents size is still not the same as expected, something unforgiveable must have happened. This should never occur"));
+                // TODO: allow user intervention while showing both before and after diff, 
+                throw std::logic_error(std::string("With diff contents included, contents size is still not the same as expected, something unforgiveable must have happened. This should never occur"));
             }
         
-            // if toggle contents were needed, then we need to write immediately to prevent overwriting toggles
-            contentsIsDirty = true;
+            // if diff contents were needed, then we need to write immediately to prevent overwriting diffs
+            std::cerr << "applying diff so writing" << std::endl;
             write();
         }
 
-        virtual T FAKER() = 0;
-        virtual void deserialize(std::string_view str, void(*callback)(Bucket<T, TContainer>& bucket, T item)) = 0;
-        virtual std::string serialize(const TContainer& contents) = 0;
+        virtual T FAKER() const = 0;
+        virtual TMainContainer deserialize(std::string_view str) const = 0;
+        virtual TDiffContainer deserializeDiff(std::string_view str) const = 0;
+        virtual std::string serialize(const TMainContainer& contents) const = 0;
+        virtual std::string serializeDiff(const TDiffContainer& contents) const = 0;
+        static bool defaultIsErased(std::size_t count) {
+            return count == 1;
+        }
+        virtual bool isErased(const util::EraseReturnType<TMainContainer>& eraseReturn) const = 0;
+
+        template <class InnerT, class InnerTMainContainer, class InnerTDiffContainer>
+        static void defaultApplyDiff(Bucket<InnerT, InnerTMainContainer, InnerTDiffContainer>& bucket, const TDiffContainer& contents) {
+            for (const auto& item : contents) {
+                util::toggle(bucket.contents_, item);
+            }
+        }
+
+        virtual void applyDiff(const TDiffContainer& diffContents) = 0;
+        virtual void postContentsMatchFile() {}
 };

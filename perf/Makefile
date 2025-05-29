@@ -5,4 +5,5 @@ util.o:
 		atomic-ofstream.cpp \
 		tag-file-maintainer.cpp \
 		id-pair-container.cpp \
+		set-evaluation.cpp \
 		-o perftags

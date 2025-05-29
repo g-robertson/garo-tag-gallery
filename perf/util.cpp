@@ -36,6 +36,18 @@ uint64_t util::deserializeUInt64(std::string_view str) {
     return i;
 }
 
+void util::serializeChar(char c, std::string& str, std::size_t& location) {
+    if (location + 1 > str.size()) {
+        str.resize(location + 1);
+    }
+    str[location] = c;
+    ++location;
+}
+
+char util::deserializeChar(std::string_view str) {
+    return str[0];
+}
+
 void util::writeFile(const std::filesystem::path& filePath, std::string_view data) {
     std::filesystem::path absoluteFilePath = std::filesystem::absolute(filePath);
     std::filesystem::path unfinishedFilePath = absoluteFilePath;
