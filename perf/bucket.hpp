@@ -93,6 +93,12 @@ class Bucket {
             postContentsMatchFile();
         }
 
+        void purgeUnusedFiles() const {
+            if (diffContents.empty()) {
+                util::removeFile(diffFileName);
+            }
+        }
+
         void close() {
             write();
         }

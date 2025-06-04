@@ -109,6 +109,10 @@ std::size_t IdPairDiffContainer::size() const {
     return size_;
 }
 
+bool IdPairDiffContainer::empty() const {
+    return size_ == 0;
+}
+
 void IdPairDiffContainer::clear() {
     contents_.clear();
     size_ = 0;
@@ -128,6 +132,11 @@ IdPairSecond::IdPairSecond(const std::unordered_set<uint64_t>* universe, bool is
 
 IdPairInsertReturnType IdPairSecond::insert(uint64_t second) {
     auto inserted = insert_(second);
+
+    if (inserted) {
+        updateComplement();
+    }
+
     return IdPairInsertReturnType {.second = inserted};
 }
 
@@ -148,6 +157,11 @@ bool IdPairSecond::insert_(uint64_t second) {
 
 IdPairInsertReturnType IdPairSecond::erase(uint64_t second) {
     auto erased = erase_(second);
+    
+    if (erased) {
+        updateComplement();
+    }
+
     return IdPairInsertReturnType {.second = erased};
 }
 bool IdPairSecond::erase_(uint64_t second) {
@@ -163,6 +177,23 @@ bool IdPairSecond::erase_(uint64_t second) {
     }
 
     return false;
+}
+
+void IdPairSecond::updateComplement() {
+    if (contents_.size() > 0.6 * universe_->size()) {
+        flipComplement();
+    }
+}
+void IdPairSecond::flipComplement() {
+    std::unordered_set<uint64_t> newContents;
+    for (auto item : *universe_) {
+        if (!contents_.contains(item)) {
+            newContents.insert(item);
+        }
+    }
+
+    contents_ = std::move(newContents);
+    isComplement_ = !isComplement_;
 }
 
 IdPairInsertReturnType IdPairSecond::insertComplement(uint64_t second) {
@@ -247,6 +278,7 @@ IdPairInsertReturnType IdPairContainer::insert(std::pair<uint64_t, uint64_t> ite
     physicalSize_ -= firstIt->second.physicalSize();
     auto inserted = firstIt->second.insert(item.second);
     if (inserted.second) {
+        updateComplement(item.first);
         ++size_;
     }
     physicalSize_ += firstIt->second.physicalSize();
@@ -271,6 +303,7 @@ IdPairInsertReturnType IdPairContainer::erase(std::pair<uint64_t, uint64_t> item
     physicalSize_ -= firstIt->second.physicalSize();
     auto erased = firstIt->second.erase(item.second);
     if (erased.second) {
+        updateComplement(item.first);
         --size_;
     }
     physicalSize_ += firstIt->second.physicalSize();
@@ -329,6 +362,15 @@ const IdPairSecond* IdPairContainer::firstContents(uint64_t first) const {
         return nullptr;
     }
     return &it->second;
+}
+
+void IdPairContainer::updateComplement(uint64_t first) {
+    auto firstIsComplement = container.at(first).isComplement();
+    if (firstIsComplement && !firstComplements_.contains(first)) {
+        firstComplements_.insert(first);
+    } else if (!firstIsComplement && firstComplements_.contains(first)) {
+        firstComplements_.erase(first);
+    }
 }
 
 const std::unordered_set<uint64_t>& IdPairContainer::firstComplements() const {

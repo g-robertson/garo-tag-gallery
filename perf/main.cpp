@@ -66,6 +66,10 @@ int main(int argc, const char** argv) {
             tfm.readFilesTags(input, outputFileWriter);
         } else if (op == "search") {
             tfm.search(input, outputFileWriter);
+        } else if (op == "flush_files") {
+            tfm.flushFiles();
+        } else if (op == "purge_unused_files") {
+            tfm.purgeUnusedFiles();
         } else if (op == "exit") {
             if (tfm.needsMaintenance()) {
                 std::cout << "DO MAINTENANCE?" << std::endl;

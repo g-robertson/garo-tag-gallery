@@ -71,6 +71,8 @@ class TagFileMaintainer {
         void deletePairings(std::string_view input);
         void readFilesTags(std::string_view input, void (*writer)(const std::string&));
         void search(std::string_view input, void (*writer)(const std::string&));
+        void flushFiles();
+        void purgeUnusedFiles() const;
         bool needsMaintenance();
         void doMaintenance();
         void close();

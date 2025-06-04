@@ -319,6 +319,28 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
     return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
 }
 
+void TagFileMaintainer::flushFiles() {
+    for (auto& tagFileBucket : tagFileBuckets) {
+        tagFileBucket.write();
+    }
+    for (auto& fileTagBucket : fileTagBuckets) {
+        fileTagBucket.write();
+    }
+    fileBucket->write();
+    tagBucket->write();
+}
+
+void TagFileMaintainer::purgeUnusedFiles() const {
+    for (const auto& tagFileBucket : tagFileBuckets) {
+        tagFileBucket.purgeUnusedFiles();
+    }
+    for (const auto& fileTagBucket : fileTagBuckets) {
+        fileTagBucket.purgeUnusedFiles();
+    }
+    fileBucket->purgeUnusedFiles();
+    tagBucket->purgeUnusedFiles();
+}
+
 unsigned short TagFileMaintainer::getBucketIndex(uint64_t item) const {
     return static_cast<unsigned short>(item % currentBucketCount);
 }
@@ -373,7 +395,6 @@ void TagFileMaintainer::close() {
     }
     fileBucket->close();
     tagBucket->close();
-    std::cerr << "everything closed!" << std::endl;
     closed_ = true;
 }
 

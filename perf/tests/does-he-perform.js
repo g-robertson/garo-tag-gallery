@@ -298,38 +298,39 @@ const TESTS = {
             throw "File pairings file0001 lacks one of the placed tags";
         }
     },
-    //"complements_make_size_smaller": async (createPerfTags) => {
-    //    let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
-    //    const strFilePairings = {};
-    //    let totalFileCount = 200;
-    //    let totalTagCount = 8000;
-    //    for (let i = 0; i < totalFileCount; ++i) {
-    //        const tags = [];
-    //        for (let i = 0; i < totalTagCount; ++i) {
-    //            tags.push(`tag${i.toString().padStart(5, "0")}`);
-    //        }
-//
-    //        const file = `file${i.toString().padStart(4, "0")}`;
-    //        strFilePairings[file] = tags;
-    //    }
-    //    const tagPairings = getPairingsFromStrPairings(strFilePairingsToStrTagPairings(strFilePairings));
-//
-    //    await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
-    //    await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
-    //    await perfTags.insertTagPairings(tagPairings);
-    //    if (await perfTags.close() === false) {
-    //        throw "Perf tags timed out on close";
-    //    }
-//
-    //    // * 2 inside for accounting for tag bucket + tag buckets, file bucket + file buckets storages
-    //    // * 9 inside for 64 bit entries + complement bit
-    //    // * 2 in addition to that as wiggle room
-    //    const MAX_ACCEPTABLE_FILE_SIZE = (9 * (totalFileCount + totalTagCount) * 2) * 2;
-//
-    //    const realDirectorySize = getTotalDirectoryBytes("test-dir/database-dir");
-    //    if (realDirectorySize > MAX_ACCEPTABLE_FILE_SIZE) {
-    //        throw `Directory size with only completely dense tags was ${realDirectorySize} bytes > ${MAX_ACCEPTABLE_FILE_SIZE} bytes indicating that complements are not implemented`;
-    //    }
-    //}
+    "complements_make_size_smaller": async (createPerfTags) => {
+        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const strFilePairings = {};
+        let totalFileCount = 200;
+        let totalTagCount = 8000;
+        for (let i = 0; i < totalFileCount; ++i) {
+            const tags = [];
+            for (let i = 0; i < totalTagCount; ++i) {
+                tags.push(`tag${i.toString().padStart(5, "0")}`);
+            }
+
+            const file = `file${i.toString().padStart(4, "0")}`;
+            strFilePairings[file] = tags;
+        }
+        const tagPairings = getPairingsFromStrPairings(strFilePairingsToStrTagPairings(strFilePairings));
+
+        await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
+        await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
+        await perfTags.insertTagPairings(tagPairings);
+        await perfTags.__flushAndPurgeUnusedFiles();
+        if (await perfTags.close() === false) {
+            throw "Perf tags timed out on close";
+        }
+
+        // * 2 inside for accounting for tag bucket + tag buckets, file bucket + file buckets storages
+        // * 9 inside for 64 bit entries + complement bit
+        // * 2 in addition to that as wiggle room
+        const MAX_ACCEPTABLE_FILE_SIZE = (9 * (totalFileCount + totalTagCount) * 2) * 2;
+        console.log(MAX_ACCEPTABLE_FILE_SIZE);
+        const realDirectorySize = getTotalDirectoryBytes("test-dir/database-dir");
+        if (realDirectorySize > MAX_ACCEPTABLE_FILE_SIZE) {
+            throw `Directory size with only completely dense tags was ${realDirectorySize} bytes > ${MAX_ACCEPTABLE_FILE_SIZE} bytes indicating that complements are not implemented`;
+        }
+    }
 };
 export default TESTS;

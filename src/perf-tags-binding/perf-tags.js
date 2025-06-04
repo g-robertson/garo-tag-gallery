@@ -263,6 +263,12 @@ export default class PerfTags {
         this.#perfTags.stdin.write(data);
     }
 
+    async __flushAndPurgeUnusedFiles() {
+        this.#perfTags.stdin.write("flush_files\r\n");
+        await this.__dataOrTimeout("OK!\r\n", 100);
+        this.#perfTags.stdin.write("purge_unused_files\r\n");
+        return await this.__dataOrTimeout("OK!\r\n", 100);
+    }
 
     __kill() {
         this.#expectingError = true;

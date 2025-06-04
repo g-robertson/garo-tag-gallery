@@ -24,6 +24,7 @@ class IdPairDiffContainer {
 
         bool contains(std::pair<uint64_t, uint64_t> item) const;
         std::size_t size() const;
+        bool empty() const;
         void clear();
 
         const std::unordered_map<uint64_t, std::unordered_set<uint64_t>>& allContents() const;
@@ -77,6 +78,8 @@ class IdPairSecond {
         bool insert_(uint64_t second);
         bool erase_(uint64_t second);
         bool insertComplement_(uint64_t second);
+        void updateComplement();
+        void flipComplement();
 
         bool isComplement_ = false;
         std::unordered_set<uint64_t> contents_;
@@ -93,8 +96,6 @@ class IdPairContainer {
         static IdPairContainer deserialize(std::string_view str, const std::unordered_set<uint64_t>* secondUniverse);
 
         IdPairInsertReturnType insert(std::pair<uint64_t, uint64_t> item);
-        // Returns the first id's that had their complement status flipped by this insertion
-        // Note: You must finish using the return of the previous call before calling again, to do otherwise will yield undefined behavior
         void insertComplement(uint64_t second);
         IdPairInsertReturnType erase(std::pair<uint64_t, uint64_t> item);
         bool contains(std::pair<uint64_t, uint64_t> item) const;
@@ -107,6 +108,7 @@ class IdPairContainer {
         void clear();
     private:
         IdPairContainer(const std::unordered_set<uint64_t>* secondUniverse, std::unordered_map<uint64_t, IdPairSecond> container);
+        void updateComplement(uint64_t first);
 
         std::unordered_set<uint64_t> firstComplements_;
         const std::unordered_set<uint64_t>* secondUniverse;
