@@ -1,4 +1,6 @@
-export default async function get() {
+import { fjsonParse } from "../../client/js/client-util.js";
+
+export default async function getMe() {
     const me = await fetch("/api/get/me");
-    return await me.json();
+    return await fjsonParse(me);
 }

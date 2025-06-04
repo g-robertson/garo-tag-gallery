@@ -1,8 +1,8 @@
-import { rmSync } from "fs";
-import { exitCurrentPerfTags, resetCurrentPerfTags } from "./tests/helpers.js";
+import { appendFileSync, rmSync } from "fs";
 
 import DOES_NOT_CRASH_TESTS from "./tests/does-not-crash.js";
 import DOES_HE_PERFORM_TESTS from "./tests/does-he-perform.js";
+import PerfTags from "../src/perf-tags-binding/perf-tags.js";
 
 const TESTS = {
     ...DOES_NOT_CRASH_TESTS,
@@ -10,14 +10,28 @@ const TESTS = {
 };
 
 async function main() {
-    for (const test in TESTS) {
-        rmSync("tag-pairings", {'recursive': true, 'force': true})
-        rmSync("perf-output.txt", {"force": true});
-        await TESTS[test]();
-        console.log(`Test case "${test}" passed`);
-        resetCurrentPerfTags();
+    /** @type {PerfTags[]} */
+    let PERF_TAGS = [];
+    /**
+     * @param {(...args: ConstructorParameters<typeof PerfTags>)}
+     */
+    const createPerfTags = (...args) => {
+        const perfTags = new PerfTags(...args);
+        perfTags.__addStderrListener((data) => {
+            appendFileSync("test-err.log", data);
+        });
+        PERF_TAGS.push(perfTags);
+        return perfTags;
     }
-    await exitCurrentPerfTags();
+    for (const test in TESTS) {
+        rmSync("test-dir", {'recursive': true, 'force': true});
+        await TESTS[test](createPerfTags);
+        for (const perfTags of PERF_TAGS) {
+            await perfTags.close();
+        }
+        PERF_TAGS = [];
+        console.log(`Test case "${test}" passed`);
+    }
 }
 
 main();

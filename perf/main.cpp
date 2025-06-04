@@ -23,14 +23,32 @@ unsigned short wantedBucketCount() {
     }
 }
 
-int main() {
-    auto tfm = TagFileMaintainer("tag-pairings");
-    std::cerr << "new run" << std::endl;
+namespace {
+    std::string Output_File_Name = "perf-output.txt";
+    void outputFileWriter(const std::string& outputData) {
+        util::writeFile(Output_File_Name, outputData);
+    }
+};
+
+int main(int argc, const char** argv) {
+    std::string inputFileName = "perf-input.txt";
+    std::string dataStorageDirectory = "tag-pairings";
+    if (argc > 1) {
+        inputFileName = argv[1];
+    }
+    if (argc > 2) {
+        Output_File_Name = argv[2];
+    }
+    if (argc > 3) {
+        dataStorageDirectory = argv[3];
+    }
+    
+    auto tfm = TagFileMaintainer(dataStorageDirectory);
     std::string op;
     while (op != "exit") {
         bool badCommand = false;
         std::getline(std::cin, op);
-        std::ifstream file("perf-input.txt");
+        std::ifstream file(inputFileName);
         std::stringstream buffer;
         buffer << file.rdbuf();
         std::string input = buffer.str();
@@ -45,10 +63,19 @@ int main() {
         } else if (op == "delete_tag_pairings") {
             tfm.deletePairings(input);
         } else if (op == "read_files_tags") {
-            tfm.readFilesTags(input);
+            tfm.readFilesTags(input, outputFileWriter);
         } else if (op == "search") {
-            tfm.search(input);
+            tfm.search(input, outputFileWriter);
         } else if (op == "exit") {
+            if (tfm.needsMaintenance()) {
+                std::cout << "DO MAINTENANCE?" << std::endl;
+                std::getline(std::cin, op);
+                if (op == "OK") {
+                    tfm.doMaintenance();
+                }
+            }
+
+            tfm.close();
         } else {
             std::cout << "BAD COMMAND!" << std::endl;
             badCommand = true;
@@ -59,11 +86,4 @@ int main() {
         }
     }
     
-    if (tfm.needsMaintenance()) {
-        std::cout << "DO MAINTENANCE?" << std::endl;
-        std::getline(std::cin, op);
-        if (op == "OK") {
-            tfm.doMaintenance();
-        }
-    }
 }

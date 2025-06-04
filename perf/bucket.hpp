@@ -82,10 +82,8 @@ class Bucket {
 
         void write() {
             if (!contentsIsDirty) {
-                std::cerr << "contents were not dirty so did not write" << std::endl;
                 return;
             }
-            std::cerr << "contents were dirty so write" << std::endl;
         
             util::writeFile(mainFileName, serialize(contents_));
             startingSize_ = contents_.size();
@@ -135,7 +133,6 @@ class Bucket {
                 return;
             }
 
-            std::cerr << "needs diff" << std::endl;
             applyDiff(deserializeDiff(util::readFile(diffFileName)));
             contentsIsDirty = true;
             if (contents_.size() != startingSize_) {
@@ -144,7 +141,6 @@ class Bucket {
             }
         
             // if diff contents were needed, then we need to write immediately to prevent overwriting diffs
-            std::cerr << "applying diff so writing" << std::endl;
             write();
         }
 

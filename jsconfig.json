@@ -2,9 +2,15 @@
   "compilerOptions": {
     "allowJs": true,
     "target": "es2023",
-    "outDir":"dist"
+    "outDir":"dist",
+    "module":"Node16",
+    "moduleResolution": "node16"
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "server.js",
+    "perf/**/*.js",
+    "perf/tests/does-he-perform.js", 
+    "perf/tests/helpers.js"
   ]
 }

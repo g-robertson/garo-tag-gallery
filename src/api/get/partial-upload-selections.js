@@ -1,8 +1,11 @@
+import {readdirSync} from "fs";
+
 /**
  * @import {APIFunction} from "../api-types.js"
  */
 
 import { PERMISSIONS } from "../../client/js/user.js";
+import { NOT_A_PARTIAL_UPLOAD } from "../client-get/partial-upload-selections.js";
 
 export const PERMISSIONS_REQUIRED = PERMISSIONS.NONE;
 export async function checkPermission() {
@@ -11,5 +14,5 @@ export async function checkPermission() {
 
 /** @type {APIFunction} */
 export default async function get(dbs, req, res) {
-    res.send(req.user.toJSON());
+    res.send([NOT_A_PARTIAL_UPLOAD, ...readdirSync("./partial-zips")]);
 }

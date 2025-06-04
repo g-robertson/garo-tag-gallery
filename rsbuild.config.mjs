@@ -4,6 +4,16 @@ import { pluginReact } from '@rsbuild/plugin-react';
 export default defineConfig({
   plugins: [pluginReact()],
   output: {
-    minify: false
+    minify: false,
+    distPath: {
+      root: "../../dist"
+    },
+    cleanDistPath: true
+  },
+  root: "./src/client",
+  source: {
+    entry: {
+      index: "./index.jsx"
+    }
   }
 });

@@ -1,5 +1,5 @@
 perf-input.txt
 perf-output.txt
 perftags.exe
-tag-pairings/**/*
-err.log
+test-dir
+test-err.log

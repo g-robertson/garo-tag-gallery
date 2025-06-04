@@ -124,8 +124,8 @@ void TagFileMaintainer::toggleFiles(std::string_view input) {
 void TagFileMaintainer::deleteFiles(std::string_view input) {
     modifyFiles(input, SingleBucket::deleteItem);
 }
-void TagFileMaintainer::readFiles() {
-    util::writeFile("perf-output.txt", serializeSingles(fileBucket->contents()));
+void TagFileMaintainer::readFiles(void (*writer)(const std::string&)) {
+    writer(serializeSingles(fileBucket->contents()));
 }
 
 void TagFileMaintainer::modifyTags(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
@@ -154,8 +154,8 @@ void TagFileMaintainer::toggleTags(std::string_view input) {
 void TagFileMaintainer::deleteTags(std::string_view input) {
     modifyTags(input, SingleBucket::deleteItem);
 }
-void TagFileMaintainer::readTags() {
-    util::writeFile("perf-output.txt", serializeSingles(tagBucket->contents()));
+void TagFileMaintainer::readTags(void (*writer)(const std::string&)) {
+    writer(serializeSingles(tagBucket->contents()));
 }
 
 #include <iostream>
@@ -200,7 +200,7 @@ void TagFileMaintainer::deletePairings(std::string_view input) {
     modifyPairings(input, PairingBucket::deleteItem);
 }
 
-void TagFileMaintainer::readFilesTags(std::string_view input) {
+void TagFileMaintainer::readFilesTags(std::string_view input, void (*writer)(const std::string&)) {
     std::string output;
     std::size_t location = 0;
     
@@ -226,7 +226,7 @@ void TagFileMaintainer::readFilesTags(std::string_view input) {
         }
     }
 
-    util::writeFile("perf-output.txt", output);
+    writer(output);
 }
 
 // Searches tag file maintainer based on a search string where symbols mean the following:
@@ -258,10 +258,11 @@ namespace {
     };
 }
 
-void TagFileMaintainer::search(std::string_view input) {
+void TagFileMaintainer::search(std::string_view input, void (*writer)(const std::string&)) {
     auto setEval = search_(input);
     auto files = setEval.second.releaseResult();
-    util::writeFile("perf-output.txt", serializeSingles(files));
+
+    writer(serializeSingles(files));
 }
 
 std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::string_view input) {
@@ -360,6 +361,10 @@ void TagFileMaintainer::doMaintenance() {
 }
 
 void TagFileMaintainer::close() {
+    if (closed_) {
+        return;
+    }
+    
     for (auto& bucket : tagFileBuckets) {
         bucket.close();
     }
@@ -368,6 +373,7 @@ void TagFileMaintainer::close() {
     }
     fileBucket->close();
     tagBucket->close();
+    std::cerr << "everything closed!" << std::endl;
     closed_ = true;
 }
 

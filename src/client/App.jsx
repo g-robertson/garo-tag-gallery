@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import './global.css';
 import Navbar from './navbar';
-import Modal from './modal/modal';
-import getMe from './api/client-get/me';
-import { User } from './js/user';
+import Modal from './modal/modal.jsx';
+import getMe from '../api/client-get/me.js';
+import { User } from './js/user.js';
 
 const App = () => {
     /** @type [string[], (activeModals: string[])=>void] */
@@ -11,10 +11,11 @@ const App = () => {
     const [user, setUser] = useState(User.EMPTY_USER);
     useEffect(() => {
         (async () => {
-            setUser(await getMe());
+            setUser(new User(await getMe()));
         })();
     }, []);
 
+    console.log(user.toJSON());
     const pushModal = (modalName) => {
         setActiveModals([...activeModals, modalName]);
     }

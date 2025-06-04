@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import '../global.css';
 
-import ImportFiles, { MODAL_NAME as IMPORT_FILES_MODAL_NAME, MODAL_DISPLAY_NAME as IMPORT_FILES_MODAL_DISPLAY_NAME } from '../import-files/import-files';
+import ImportFiles, { MODAL_NAME as IMPORT_FILES_MODAL_NAME, MODAL_DISPLAY_NAME as IMPORT_FILES_MODAL_DISPLAY_NAME } from './modals/import-files-from-hydrus';
 const MODALS = {
     [IMPORT_FILES_MODAL_NAME]: {
         component: ImportFiles,
