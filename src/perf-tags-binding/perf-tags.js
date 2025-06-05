@@ -1,24 +1,25 @@
 import { spawn } from 'child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
+
+const THIRTY_MINUTES = 30 * 60 * 1000;
 
 export default class PerfTags {
     #closed = false;
     #closing = false;
     #perfTags;
+    #path;
     #inputFileName;
     #outputFileName;
     #databaseDirectory;
+    #archiveDirectory;
+    #stdinWrites = 0;
     #data = "";
 
-    constructor(path, inputFileName, outputFileName, databaseDirectory) {
-        path ??= "perftags.exe";
-
-        this.#inputFileName = inputFileName ?? "perf-input.txt";
-        this.#outputFileName = outputFileName ?? "perf-output.txt";
-        this.#databaseDirectory = databaseDirectory ?? "database/tag-pairings";
-        
-        this.#perfTags = spawn(path, [this.#inputFileName, this.#outputFileName, this.#databaseDirectory]);
+    __open() {
+        this.#closed = false;
+        this.#closing = false;
+        this.#perfTags = spawn(this.#path, [this.#inputFileName, this.#outputFileName, this.#databaseDirectory]);
 
         this.#perfTags.stdout.on("data", (chunk) => {
             this.#data += chunk;
@@ -46,6 +47,21 @@ export default class PerfTags {
             this.#dataCallback();
             this.#exitCallback();
         });
+    }
+
+    async reopen() {
+        await this.close();
+        this.__open();
+    }
+
+    constructor(path, inputFileName, outputFileName, databaseDirectory, archiveDirectory) {
+        this.#path = path ?? "perftags.exe";
+        this.#inputFileName = inputFileName ?? "perf-input.txt";
+        this.#outputFileName = outputFileName ?? "perf-output.txt";
+        this.#databaseDirectory = databaseDirectory ?? "database/tag-pairings";
+        this.#archiveDirectory = archiveDirectory;
+        
+        this.__open();
     }
 
     #errorCount = 0;
@@ -112,8 +128,8 @@ export default class PerfTags {
      */
     async insertFiles(files) {
         this.__writeToInputFile(PerfTags.#serializeSingles(files));
-        this.#perfTags.stdin.write("insert_files\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", 1000);
+        this.__writeToStdin("insert_files\r\n");
+        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
     
     /**
@@ -121,8 +137,8 @@ export default class PerfTags {
      */
     async insertTags(tags) {
         this.__writeToInputFile(PerfTags.#serializeSingles(tags));
-        this.#perfTags.stdin.write("insert_tags\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", 1000);
+        this.__writeToStdin("insert_tags\r\n");
+        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
     /**
@@ -150,18 +166,36 @@ export default class PerfTags {
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async insertTagPairings(tagPairings) {
+        await this.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
+        await this.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
+        return await this.__insertTagPairings(tagPairings);
+    }
+
+    /**
+     * @param {Map<bigint, bigint[]>} tagPairings
+     */
+    async __insertTagPairings(tagPairings) {
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
-        this.#perfTags.stdin.write("insert_tag_pairings\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", 100);
+        this.__writeToStdin("insert_tag_pairings\r\n");
+        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
     /**
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async toggleTagPairings(tagPairings) {
+        await this.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
+        await this.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
+        return await this.__toggleTagPairings(tagPairings);
+    }
+    
+    /**
+     * @param {Map<bigint, bigint[]>} tagPairings 
+     */
+    async __toggleTagPairings(tagPairings) {
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
-        this.#perfTags.stdin.write("toggle_tag_pairings\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", 100);
+        this.__writeToStdin("toggle_tag_pairings\r\n");
+        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
     /**
@@ -170,7 +204,7 @@ export default class PerfTags {
     async deleteTagPairings(tagPairings) {
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
         this.#perfTags.stdin.write("delete_tag_pairings\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", 100);
+        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
     /**
@@ -178,8 +212,8 @@ export default class PerfTags {
      */
     async readFilesTags(files) {
         this.__writeToInputFile(PerfTags.#serializeSingles(files));
-        this.#perfTags.stdin.write("read_files_tags\r\n");
-        const ok = await this.__dataOrTimeout("OK!\r\n", 100);
+        this.__writeToStdin("read_files_tags\r\n");
+        const ok = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
         let filesTagsStr = this.__readFromOutputFile();
         /** @type {Map<bigint, bigint[]>} */
         const filePairings = new Map();
@@ -235,10 +269,10 @@ export default class PerfTags {
         }
         this.#closing = true;
 
-        this.#perfTags.stdin.write("exit\r\n");
-        await this.__dataOrTimeout("OK!\r\n", 60000 * 30);
+        this.__writeToStdin("exit\r\n");
+        await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
         this.#closed = true;
-        return await this.__nonErrorExitOrTimeout(10000);
+        return await this.__nonErrorExitOrTimeout(THIRTY_MINUTES);
     }
 
     __process() {
@@ -260,14 +294,24 @@ export default class PerfTags {
      * @param {string} data 
      */
     __writeToStdin(data) {
+        ++this.#stdinWrites;
+        if (this.#archiveDirectory !== undefined) {
+            mkdirSync(this.#archiveDirectory, {recursive: true});
+            writeFileSync(path.join(this.#archiveDirectory, `command-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), data);
+            if (existsSync(this.#inputFileName)) {
+                writeFileSync(path.join(this.#archiveDirectory, `perf-input-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), readFileSync(this.#inputFileName));
+            } else {
+                writeFileSync(path.join(this.#archiveDirectory, `perf-input-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), "");
+            }
+        }
         this.#perfTags.stdin.write(data);
     }
 
     async __flushAndPurgeUnusedFiles() {
-        this.#perfTags.stdin.write("flush_files\r\n");
-        await this.__dataOrTimeout("OK!\r\n", 100);
-        this.#perfTags.stdin.write("purge_unused_files\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", 100);
+        this.__writeToStdin("flush_files\r\n");
+        await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        this.__writeToStdin("purge_unused_files\r\n");
+        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
     __kill() {
@@ -276,6 +320,9 @@ export default class PerfTags {
     }
 
     #stderrListeners = new Set();
+    /**
+     * @param {(data: any) => void} listener 
+     */
     __addStderrListener(listener) {
         this.#stderrListeners.add(listener);
     }
@@ -286,7 +333,6 @@ export default class PerfTags {
     }
 
     /**
-     * 
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     static getFilesFromTagPairings(tagPairings) {
@@ -302,10 +348,26 @@ export default class PerfTags {
     }
     
     /**
-     * 
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     static getTagsFromTagPairings(tagPairings) {
         return [...tagPairings.keys()];
+    }
+
+    /**
+     * @param {Map<bigint, bigint[]} filePairings 
+     */
+    static getTagPairingsFromFilePairings(filePairings) {
+        /** @type {Map<bigint, bigint[]>} */
+        const tagPairings = new Map();
+        for (const [file, tags] of filePairings) {
+            for (const tag of tags) {
+                if (tagPairings.get(tag) === undefined) {
+                    tagPairings.set(tag, []);
+                }
+                tagPairings.get(tag).push(file);
+            }
+        }
+        return tagPairings;
     }
 }

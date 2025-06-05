@@ -54,10 +54,15 @@ void TagFileMaintainer::readCacheFile() {
     std::size_t totalFiles = 0;
     std::size_t totalTags = 0;
 
+    std::string fillerNull;
+
     if (!cacheFile.fail()) {
         cacheFile >> version;
+        cacheFile >> fillerNull;
         cacheFile >> totalFiles;
+        cacheFile >> fillerNull;
         cacheFile >> totalTags;
+        cacheFile >> fillerNull;
         cacheFile >> currentBucketCount;
     }
 
@@ -70,9 +75,13 @@ void TagFileMaintainer::readCacheFile() {
         std::size_t bucketTotalFilesToTags = 0;
         std::size_t bucketFilesToTagsComplementCount = 0;
         if (!cacheFile.fail()) {
+            cacheFile >> fillerNull;
             cacheFile >> bucketTotalTagsToFiles;
+            cacheFile >> fillerNull;
             cacheFile >> bucketTagsToFilesComplementCount;
+            cacheFile >> fillerNull;
             cacheFile >> bucketTotalFilesToTags;
+            cacheFile >> fillerNull;
             cacheFile >> bucketFilesToTagsComplementCount;
         }
 
@@ -86,24 +95,31 @@ void TagFileMaintainer::readCacheFile() {
 void TagFileMaintainer::writeCacheFile() {
     auto cacheFile = AtomicOfstream(cacheFilePath_);
     cacheFile << VERSION
-              << ' ' << fileBucket->size()
-              << ' ' << tagBucket->size()
-              << ' ' << currentBucketCount;
+              << " fileBucketSize "
+              << fileBucket->size()
+              << " tagBucketSize "
+              << tagBucket->size()
+              << " currentBucketCount "
+              << currentBucketCount;
     
     for (int i = 0; i < currentBucketCount; ++i) {
-        cacheFile << ' ' << tagFileBuckets.at(i).size()
-                  << ' ' << tagFileBuckets.at(i).startingComplementCount()
-                  << ' ' << fileTagBuckets.at(i).size()
-                  << ' ' << fileTagBuckets.at(i).startingComplementCount();
+        cacheFile << " tagFileBucket" << i << "Size "
+                  << tagFileBuckets.at(i).size()
+                  << " tagFileBucket" << i << "StartingComplementCount "
+                  << tagFileBuckets.at(i).startingComplementCount()
+                  << " fileTagBucket" << i << "Size "
+                  << fileTagBuckets.at(i).size()
+                  << " fileTagBucket" << i << "StartingComplementCount "
+                  << fileTagBuckets.at(i).startingComplementCount();
     }
 }
 
 void TagFileMaintainer::modifyFiles(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
     auto modifyFile = [&callback, this](uint64_t file) {
-        (*fileBucket.*callback)(file);
         for (auto& bucket : tagFileBuckets) {
             bucket.insertComplement(file);
         }
+        (*fileBucket.*callback)(file);
     };
     processSingles(input, modifyFile);
 
@@ -130,10 +146,10 @@ void TagFileMaintainer::readFiles(void (*writer)(const std::string&)) {
 
 void TagFileMaintainer::modifyTags(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
     auto modifyTag = [&callback, this](uint64_t tag) {
-        (*tagBucket.*callback)(tag);
         for (auto& bucket : fileTagBuckets) {
             bucket.insertComplement(tag);
         }
+        (*tagBucket.*callback)(tag);
     };
     processSingles(input, modifyTag);
 
@@ -395,6 +411,7 @@ void TagFileMaintainer::close() {
     }
     fileBucket->close();
     tagBucket->close();
+    writeCacheFile();
     closed_ = true;
 }
 
@@ -405,6 +422,9 @@ PairingBucket::PairingBucket(std::filesystem::path bucketPath, std::size_t start
 }
 
 void PairingBucket::insertComplement(uint64_t second) {
+    if (secondUniverse->contains(second)) {
+        return;
+    }
     if (startingComplementCount_ != 0) {
         diffContentsIsDirty = true;
         init();

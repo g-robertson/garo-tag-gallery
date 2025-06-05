@@ -179,6 +179,7 @@ bool IdPairSecond::erase_(uint64_t second) {
     return false;
 }
 
+#include <iostream>
 void IdPairSecond::updateComplement() {
     if (contents_.size() > 0.6 * universe_->size()) {
         flipComplement();
@@ -385,6 +386,7 @@ std::string IdPairContainer::serialize() const {
     // 8 bytes for each second, + 17 bytes for each (first + length + complement indicator)
     pairingsStr.resize((8 * physicalSize()) + (17 * container.size()));
     std::size_t location = 0;
+    std::size_t complementsSerialized = 0;
     for (const auto& pair : container) {
         if (pair.second.size() == 0) {
             continue;
@@ -394,6 +396,9 @@ std::string IdPairContainer::serialize() const {
         util::serializeUInt64(pair.first, pairingsStr, location);
         // {complement}
         util::serializeChar(pair.second.complementIndicator(), pairingsStr, location);
+        if (pair.second.complementIndicator() == IdPairSecond::IS_COMPLEMENT) {
+            ++complementsSerialized;
+        }
         // {physical size}
         util::serializeUInt64(pair.second.physicalSize(), pairingsStr, location);
 

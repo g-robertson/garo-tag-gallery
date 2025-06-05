@@ -1,25 +1,33 @@
 import sqlite3 from "sqlite3";
 import crypto from "crypto";
+import PerfTags from "../perf-tags-binding/perf-tags.js";
+import { FileStorage } from "./file-storage.js";
 
 /**
  * @typedef {0 | 1} DBBoolean
  * @typedef {Object} Databases
- * @property {Databases} sqlite3
- * @property {ChildProcess} perfTags
+ * @property {sqlite3.Database} sqlite3
+ * @property {PerfTags} perfTags
+ * @property {FileStorage} fileStorage
  */
 
 /**
  * @param {Databases} dbs
  * @param {string} sql
  * @param {any} params
- * @returns {Promise<Error | null>}
  */
 export async function dbrun(dbs, sql, params) {
-    return await new Promise(resolve => {
+    const err = await new Promise(resolve => {
         dbs.sqlite3.run(sql, params, err => {
             resolve(err);
         });
     });
+
+    if (err !== null) {
+        throw err;
+    }
+
+    return;
 }
 
 /**
@@ -27,14 +35,19 @@ export async function dbrun(dbs, sql, params) {
  * @param {Databases} dbs
  * @param {string} sql 
  * @param {any} params
- * @returns {Promise<{err: Error | null, row: any[]}>}
  */
 export async function dbget(dbs, sql, params) {
-    return await new Promise(resolve => {
+    const {err, row} = await new Promise(resolve => {
         dbs.sqlite3.get(sql, params, (err, row) => {
             resolve({err, row});
         });
-    })
+    });
+
+    if (err !== null) {
+        throw err;
+    }
+
+    return row;
 }
 
 /**
@@ -42,14 +55,57 @@ export async function dbget(dbs, sql, params) {
  * @param {Databases} dbs
  * @param {string} sql 
  * @param {any} params
- * @returns {Promise<{err: Error | null, rows: any[]}>}
  */
 export async function dball(dbs, sql, params) {
-    return await new Promise(resolve => {
+    const {err, rows} = await new Promise(resolve => {
         dbs.sqlite3.all(sql, params, (err, rows) => {
             resolve({err, rows});
         });
-    })
+    });
+
+    if (err !== null) {
+        throw err;
+    }
+
+    return rows;
+}
+
+export function dbvariablelist(rows) {
+    let list = "(?";
+    for (let i = 1; i < rows; ++i) {
+        list += ",?";
+    }
+    list += ")";
+    return list;
+}
+
+export function dbtuples(rows, columns) {
+    columns ??= 1;
+    let tuple = "?"
+    for (let i = 1; i < columns; ++i) {
+        tuple += ",?";
+    }
+    tuple = `(${tuple})`;
+
+    let tuples = tuple;
+    for (let i = 1; i < rows; ++i) {
+        tuples += `,${tuple}`;
+    }
+    return tuples;
+}
+
+/**
+ * @param {Databases} dbs 
+ */
+export async function dbBeginTransaction(dbs) {
+    await dbrun(dbs, "BEGIN TRANSACTION;");
+}
+
+/**
+ * @param {Databases} dbs 
+ */
+export async function dbEndTransaction(dbs) {
+    await dbrun(dbs, "COMMIT;");
 }
 
 export function dbsqlcommand(sql, params) {
@@ -59,10 +115,49 @@ export function dbsqlcommand(sql, params) {
     };
 }
 
+/**
+ * @param {string} tableName 
+ * @param {number} reserveSequenceCount 
+ */
+export function dbreserveseq(tableName, reserveSequenceCount) {
+    return [
+        dbsqlcommand(
+            `UPDATE sqlite_sequence SET seq = $reserveSequenceCount WHERE name = $tableName`,
+            {
+                $reserveSequenceCount: reserveSequenceCount,
+                $tableName: tableName
+            }
+        ),
+        dbsqlcommand(
+            `INSERT INTO sqlite_sequence (name,seq) SELECT $tableName, $reserveSequenceCount WHERE NOT EXISTS 
+             (SELECT changes() AS change FROM sqlite_sequence WHERE change <> 0);
+            `,
+            {
+                $reserveSequenceCount: reserveSequenceCount,
+                $tableName: tableName
+            }
+        )
+    ];
+}
+
 function dbGenerateCryptoText(length) {
     return crypto.randomBytes(length).toString("hex");
 }
 
 export function dbGenerateAccessKey() {
     return dbGenerateCryptoText(128);
+}
+
+/**
+ * @template T, R
+ * @param {T[]} data 
+ * @param {number} increment 
+ * @param {(sliced: T[]) => R} callback 
+ */
+export async function asyncDataSlicer(data, increment, callback) {
+    const results = []
+    for (let i = 0; i < data.length; i += increment) {
+        results.push(await callback(data.slice(i, i + increment)));
+    }
+    return results;
 }

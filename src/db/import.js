@@ -1,8 +1,17 @@
-import { appendFileSync, createReadStream } from "fs";
 import path from "path";
-import { extractWith7Z, getAllFileEntries } from "../util.js";
+import { extractWith7Z, getAllFileEntries, sha256 } from "../util.js";
+import { dbBeginTransaction, dbEndTransaction } from "./db-util.js";
+import { readFileSync } from "fs";
+import { addTagsToTaggables, updateTagsNamespaces, upsertFileExtensions, upsertNamespaces, upsertTags, upsertURLAssociations, upsertURLs, urlAssociationPKHash } from "./tags.js";
+import { HAS_NOTES_TAG, HAS_URL_TAG, IS_FILE_TAG, normalPreInsertTag, tagsPKHash } from "../client/js/tags.js";
+import { insertFiles, updateTaggablesCreatedDate, updateTaggablesDeletedDate, updateTaggablesLastModifiedDate, updateTaggablesLastViewedDate } from "./taggables.js";
+import { addNotesToTaggables } from "./notes.js";
+import PerfTags from "../perf-tags-binding/perf-tags.js";
 /**
  * @import {Databases} from "./db-util.js"
+ * @import {PreInsertTag, DBFileExtension} from "./tags.js"
+ * @import {PreInsertFile} from "./taggables.js"
+ * @import {PreInsertNote} from "./notes.js"
  */
 
 /**
@@ -22,7 +31,7 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
             }
         }
     }
-
+    
     if (leadFilePath === undefined) {
         return "No valid ZIP file found to import from";
     }
@@ -37,6 +46,7 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
         name: extension,
         extension: `.${extension}.txt`
     }));
+    /** @type {Map<string, Record<string, string>>} */
     const fileInfos = new Map();
     for (const fileEntry of allFileEntries) {
         const baseName = path.basename(fileEntry);
@@ -53,8 +63,257 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
 
         if (!isSidecar) {
             if (fileInfos.get(baseName) === undefined) { fileInfos.set(baseName, {}); }
-            fileInfos.get(baseName).taggable = fileEntry;
+            fileInfos.get(baseName).fileLocation = fileEntry;
         }
     }
-    console.log(fileInfos);
+
+    const newImportChunks = () => {
+        return {
+            length: 0,
+            /** @type {Map<string, Omit<PreInsertFile, keyof DBFileExtension> & {File_Extension: string}} */
+            filePairings: new Map(),
+            /** @type {Map<string, {URL: string, URL_Association: string}[]} */
+            urlPairings: new Map(),
+            /** @type {Map<string, PreInsertNote[]} */
+            notePairings: new Map(),
+            /** @type {Map<string, (PreInsertTag & {Namespace_Names: string[]})[]} */
+            tagPairings: new Map(),
+            /** @type {Map<string, number>} */
+            modifiedTimePairings: new Map(),
+            /** @type {Map<string, number>} */
+            importedTimePairings: new Map(),
+            /** @type {Map<string, number>} */
+            deletedTimePairings: new Map(),
+            /** @type {Map<string, number>} */
+            lastViewedTimePairings: new Map(),
+            /** @type {Set<string>} */
+            usedFiles: new Set()
+        }
+    }
+
+    let importChunks = newImportChunks();
+
+    
+    const insertImportChunks = async () => {
+        await dbBeginTransaction(dbs);
+        const allUrls = [];
+        
+        for (const urls of importChunks.urlPairings.values()) {
+            for (const url of urls) {
+                allUrls.push(url);
+            }
+        }
+        
+        // insert all urls
+        const dbURLMap = new Map((await upsertURLs(dbs, allUrls.map(url => url.URL))).map(dbURL => [dbURL.URL, dbURL]));
+        const dbURLAssociationMap = new Map((await upsertURLAssociations(dbs, allUrls.map(url => ({
+            ...dbURLMap.get(url.URL),
+            URL_Association: url.URL_Association
+        })))).map(dbUrlAssociation => [dbUrlAssociation.URL_Associations_PK_Hash, dbUrlAssociation]));
+
+        // insert file extensions
+        const fileExtensionsSet = new Set();
+        for (const value of importChunks.filePairings.values()) {
+            fileExtensionsSet.add(value.File_Extension);
+        }
+
+        const fileExtensionMap = new Map((await upsertFileExtensions(dbs, [...fileExtensionsSet])).map(dbFileExtension => [dbFileExtension.File_Extension, dbFileExtension]));
+
+        // insert file info
+        /** @type {PreInsertFile[]} */
+        const files = [];
+        for (const file of importChunks.filePairings.values()) {
+            files.push({
+                ...file,
+                ...fileExtensionMap.get(file.File_Extension)
+            });
+        }
+
+        const {dbFiles, finalizeFileMove} = await insertFiles(dbs, files);
+        const dbFilesMap = new Map(dbFiles.map(dbFile => [dbFile.File_Name, dbFile]));
+
+        // insert notes
+        /** @type {Map<bigint, PreInsertNote[]>} */
+        const notePairings = new Map();
+
+        for (const [fileName, notes] of importChunks.notePairings) {
+            notePairings.set(dbFilesMap.get(fileName).Taggable_ID, notes);
+        }
+        addNotesToTaggables(dbs, notePairings);
+
+        // insert dates
+        const createdDatePairings = new Map();
+        for (const [fileName, createdDate] of importChunks.importedTimePairings) {
+            createdDatePairings.set(dbFilesMap.get(fileName).Taggable_ID, createdDate);
+        }
+        await updateTaggablesCreatedDate(dbs, createdDatePairings);
+        const lastModifiedDatePairings = new Map();
+        for (const [fileName, lastModifiedDate] of importChunks.modifiedTimePairings) {
+            lastModifiedDatePairings.set(dbFilesMap.get(fileName).Taggable_ID, lastModifiedDate);
+        }
+        await updateTaggablesLastModifiedDate(dbs, lastModifiedDatePairings);
+        const lastViewedDatePairings = new Map();
+        for (const [fileName, lastViewedDate] of importChunks.lastViewedTimePairings) {
+            lastViewedDatePairings.set(dbFilesMap.get(fileName).Taggable_ID, lastViewedDate);
+        }
+        await updateTaggablesLastViewedDate(dbs, lastViewedDatePairings);
+        const deletedDatePairings = new Map();
+        for (const [fileName, deletedDate] of importChunks.deletedTimePairings) {
+            deletedDatePairings.set(dbFilesMap.get(fileName).Taggable_ID, deletedDate);
+        }
+        await updateTaggablesDeletedDate(dbs, deletedDatePairings);
+
+        /** @type {PreInsertTag[]} */
+        const allTags = [];
+        /** @type {Set<string>} */
+        const allNamespacesSet = new Set();
+        for (const tags of importChunks.tagPairings.values()) {
+            for (const tag of tags) {
+                allTags.push(tag);
+                for (const namespace of tag.Namespace_Names ?? []) {
+                    allNamespacesSet.add(namespace);
+                }
+            }
+        }
+        // upsert namespaces
+        const dbNamespacesMap = new Map((await upsertNamespaces(dbs, [...allNamespacesSet])).map(dbNamespace => [dbNamespace.Namespace_Name, dbNamespace]));
+
+        // upsert tags
+        const dbTagsMap = new Map((await upsertTags(dbs, allTags)).map(dbTag => [dbTag.Tags_PK_Hash, dbTag]));
+
+        /** @type {Map<bigint, bigint[]>} */
+        const filePairings = new Map();
+        for (const fileName of importChunks.filePairings.keys()) {
+            const taggableId = dbFilesMap.get(fileName).Taggable_ID;
+            if (taggableId === undefined) {
+                throw taggableId;
+            }
+            filePairings.set(taggableId, []);
+        }
+
+        // update tags namespaces
+        /** @type {Map<bigint, Set<number>>} */
+        const tagsNamespaces = new Map();
+        for (const tags of importChunks.tagPairings.values()) {
+            for (const tag of tags) {
+                const dbTag = dbTagsMap.get(tagsPKHash(tag.Lookup_Name, tag.Source_Name));
+                if (tag.Namespace_Names !== undefined && tag.Namespace_Names.length !== 0) {
+                    if (tagsNamespaces.get(dbTag.Tag_ID) === undefined) {
+                        tagsNamespaces.set(dbTag.Tag_ID, new Set());
+                    }
+                    const tagNamespaces = tagsNamespaces.get(dbTag.Tag_ID)
+                    for (const namespace of tag.Namespace_Names) {
+                        tagNamespaces.add(dbNamespacesMap.get(namespace).Namespace_ID);
+                    }
+                }
+            }
+        }
+
+        await updateTagsNamespaces(dbs, tagsNamespaces);
+        
+        // assign all system tag pairings
+        for (const [fileName, file] of importChunks.filePairings.entries()) {
+            filePairings.get(dbFilesMap.get(fileName).Taggable_ID).push(fileExtensionMap.get(file.File_Extension).Has_File_Extension_Tag_ID);
+        }
+        for (const dbFile of dbFilesMap.values()) {
+            filePairings.get(dbFile.Taggable_ID).push(dbFile.Has_File_Hash_Tag_ID);
+        }
+        for (const [fileName, urls] of importChunks.urlPairings.entries()) {
+            for (const url of urls) {
+                const dbURL = {
+                    ...dbURLMap.get(url.URL),
+                    URL_Association: url.URL_Association
+                };
+                const dbURLAssociation = dbURLAssociationMap.get(urlAssociationPKHash(dbURL).toString());
+                filePairings.get(dbFilesMap.get(fileName).Taggable_ID).push(dbURLAssociation.Has_URL_Tag_ID);
+                filePairings.get(dbFilesMap.get(fileName).Taggable_ID).push(dbURLAssociation.Has_URL_With_Association_Tag_ID);
+            }
+        }
+        // assign all normal tags
+        for (const [fileName, tags] of importChunks.tagPairings.entries()) {
+            filePairings.get(dbFilesMap.get(fileName).Taggable_ID).push(...tags.map(tag => dbTagsMap.get(tagsPKHash(tag.Lookup_Name, tag.Source_Name)).Tag_ID));
+        }
+
+        await dbEndTransaction(dbs);
+        await addTagsToTaggables(dbs, PerfTags.getTagPairingsFromFilePairings(filePairings));
+        finalizeFileMove();
+        await dbs.perfTags.reopen();
+    }
+
+    for (const [fileName, fileInfoEntry] of fileInfos.entries()) {
+        if (fileInfoEntry['fileLocation'] === undefined) {
+            continue;
+        }
+        ++importChunks.length;
+
+        importChunks.filePairings.set(fileName, {
+            File_Hash: sha256(readFileSync(fileInfoEntry['fileLocation'])),
+            File_Name: fileName,
+            Taggable_Name: fileName,
+            File_Extension: path.extname(fileName),
+            sourceLocation: fileInfoEntry['fileLocation']
+        });
+
+        /** @type {ReturnType<typeof importChunks.tagPairings.get>} */
+        const fileTags = [IS_FILE_TAG];
+        if (fileInfoEntry['urls'] !== undefined) {
+            fileTags.push(HAS_URL_TAG);
+            const urlObjects = [];
+            for (const url of readFileSync(fileInfoEntry['urls']).toString().split('\n')) {
+                urlObjects.push({
+                    URL: url,
+                    URL_Association: "Imported from hydrus"
+                });
+            }
+            importChunks.urlPairings.set(fileName, urlObjects);
+        }
+
+        if (fileInfoEntry['notes'] !== undefined) {
+            fileTags.push(HAS_NOTES_TAG);
+            const noteObjects = [];
+            for (const note of readFileSync(fileInfoEntry['notes']).toString().split('\n')) {
+                noteObjects.push({
+                    Note: note,
+                    Note_Association: "Imported from hydrus"
+                });
+            }
+            importChunks.notePairings.set(fileName, noteObjects);
+        }
+
+        if (fileInfoEntry['tags'] !== undefined) {
+            for (const tag of readFileSync(fileInfoEntry['tags']).toString().split('\n')) {
+                const firstColon = tag.indexOf(":")
+                if (firstColon === -1 || firstColon === 0) {
+                    fileTags.push(normalPreInsertTag(tag, "Imported from hydrus"));
+                } else {
+                    fileTags.push({
+                        ...normalPreInsertTag(tag.slice(firstColon + 1), "Imported from hydrus"),
+                        Namespace_Names: [tag.slice(0, firstColon)]
+                    });
+                }
+            }
+        }
+        if (fileInfoEntry['modtime'] !== undefined) {
+            importChunks.modifiedTimePairings.set(fileName, parseInt(readFileSync(fileInfoEntry['modtime']).toString()));
+        }
+        if (fileInfoEntry['imptime'] !== undefined) {
+            importChunks.importedTimePairings.set(fileName, parseInt(readFileSync(fileInfoEntry['imptime']).toString()));
+        }
+        if (fileInfoEntry['deltime'] !== undefined) {
+            importChunks.deletedTimePairings.set(fileName, parseInt(readFileSync(fileInfoEntry['deltime']).toString()));
+        }
+        if (fileInfoEntry['lavtime'] !== undefined) {
+            importChunks.lastViewedTimePairings.set(fileName, parseInt(readFileSync(fileInfoEntry['lavtime']).toString()));
+        }
+        importChunks.tagPairings.set(fileName, fileTags);
+        if (importChunks.length > 500) {
+            await insertImportChunks();
+            importChunks = newImportChunks();
+        }
+    }
+
+    await insertImportChunks();
+    importChunks = newImportChunks();
+
+    console.log("Finished importing from hydrus");
 }

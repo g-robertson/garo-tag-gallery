@@ -12,8 +12,6 @@ const TESTS = {
     "read_file_tags": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strFilePairingsToStrTagPairings({'file0001': ['tag00001','tag00002','tag00003','tag00004']}));
-        await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
-        await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         await perfTags.insertTagPairings(tagPairings);
         const {ok, filePairings} = await perfTags.readFilesTags(PerfTags.getFilesFromTagPairings(tagPairings));
         const strFilePairings = getStrPairingsFromPairings(filePairings);
@@ -30,8 +28,6 @@ const TESTS = {
     "read_file_tags_after_exit": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strFilePairingsToStrTagPairings({'file0001': ['tag00001','tag00002','tag00003','tag00004']}));
-        await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
-        await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         await perfTags.insertTagPairings(tagPairings);
         await perfTags.close();
         perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
@@ -53,8 +49,6 @@ const TESTS = {
     "read_file_tags_after_kill": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strFilePairingsToStrTagPairings({'file0001': ['tag00001','tag00002','tag00003','tag00004']}));
-        await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
-        await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         await perfTags.insertTagPairings(tagPairings);
         perfTags.__kill();
         perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
@@ -73,11 +67,27 @@ const TESTS = {
             throw "File pairings file0001 lacks one of the placed tags";
         }
     },
-    "read_toggled_tag_pairings": async (createPerfTags) => {
+    "insert_tags between toggle tag pairings should not cause problem": async (createPerfTags) => {
+        appendFileSync("test-err.log", "Problem run started:\r\n");
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strFilePairingsToStrTagPairings({'file0001': ['tag00001','tag00002','tag00003','tag00004']}));
         await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
         await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
+        await perfTags.__toggleTagPairings(tagPairings);
+        await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
+        await perfTags.__toggleTagPairings(tagPairings);
+        const {filePairings} = await perfTags.readFilesTags(PerfTags.getFilesFromTagPairings(tagPairings));
+        const strFilePairings = getStrPairingsFromPairings(filePairings);
+        if (strFilePairings['file0001'] === undefined) {
+            throw "File pairings does not have file0001";
+        }
+        if (strFilePairings['file0001'].length !== 0) {
+            throw "File pairings file0001 does not have 0 tags";
+        }
+    },
+    "read_toggled_tag_pairings": async (createPerfTags) => {
+        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const tagPairings = getPairingsFromStrPairings(strFilePairingsToStrTagPairings({'file0001': ['tag00001','tag00002','tag00003','tag00004']}));
         await perfTags.toggleTagPairings(tagPairings);
         await perfTags.toggleTagPairings(tagPairings);
         const {filePairings} = await perfTags.readFilesTags(PerfTags.getFilesFromTagPairings(tagPairings));
@@ -162,13 +172,13 @@ const TESTS = {
         await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings2));
         await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings3));
         await perfTags.toggleTagPairings(tagPairings);
-        perfTags.close();
+        await perfTags.close();
         perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings2);
-        perfTags.close();
+        await perfTags.close();
         perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings3);
-        perfTags.close();
+        await perfTags.close();
         perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {filePairings} = await perfTags.readFilesTags(PerfTags.getFilesFromTagPairings(tagPairings));
         const strFilePairings = getStrPairingsFromPairings(filePairings);

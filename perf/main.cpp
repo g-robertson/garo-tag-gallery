@@ -42,16 +42,18 @@ int main(int argc, const char** argv) {
     if (argc > 3) {
         dataStorageDirectory = argv[3];
     }
-    
+
     auto tfm = TagFileMaintainer(dataStorageDirectory);
     std::string op;
     while (op != "exit") {
         bool badCommand = false;
         std::getline(std::cin, op);
-        std::ifstream file(inputFileName);
+
+        std::ifstream file(inputFileName, std::ios::in | std::ios::binary);
         std::stringstream buffer;
         buffer << file.rdbuf();
         std::string input = buffer.str();
+
         if (op == "insert_files") {
             tfm.insertFiles(input);
         } else if (op == "insert_tags") {

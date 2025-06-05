@@ -28,7 +28,7 @@ const TESTS = {
     "tag_pairings_without_parents_fails": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         perfTags.__expectError();
-        const ok = await perfTags.insertTagPairings(getPairingsFromStrPairings({'tag00001': ['file0001']}));
+        const ok = await perfTags.__insertTagPairings(getPairingsFromStrPairings({'tag00001': ['file0001']}));
 
         if (ok) {
             throw `Test case failed, no error on insert_tag_pairings without parents`;
@@ -40,7 +40,7 @@ const TESTS = {
         await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
 
         perfTags.__expectError();
-        const ok = await perfTags.insertTagPairings(tagPairings);
+        const ok = await perfTags.__insertTagPairings(tagPairings);
 
         if (ok) {
             throw `Test case failed, no error on insert_tag_pairings without file parents`;
@@ -51,7 +51,7 @@ const TESTS = {
         const tagPairings = getPairingsFromStrPairings({'tag00001': ['file0001']});
         await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         perfTags.__expectError();
-        const ok = await perfTags.insertTagPairings(tagPairings);
+        const ok = await perfTags.__insertTagPairings(tagPairings);
 
         if (ok) {
             throw `Test case failed, no error on insert_tag_pairings without tag parents`;
@@ -60,8 +60,6 @@ const TESTS = {
     "insert_tag_pairings": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings({'tag00001': ['file0001']});
-        await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
-        await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         const ok = await perfTags.insertTagPairings(tagPairings);
 
         if (!ok) {
@@ -85,6 +83,31 @@ const TESTS = {
         if (!existsSync("test-dir/iodir/perf-input.txt") || !existsSync("test-dir/iodir/perf-output.txt") || !existsSync("test-dir/database-dir/perftag-dir")) {
             throw "Test case failed, one of the specified input locations was not found";
         }
+    },
+    "0x1A_input_does_not_fail": async(createPerfTags) => {
+        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        // will fail here if 0x1A (SUB) input gets read wrong
+        let files = [0x1An];
+        await perfTags.insertFiles(files);
+        await perfTags.close();
+    },
+    "carriage_return_input_does_not_save_newline": async(createPerfTags) => {
+        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let files = [BigInt('\r'.charCodeAt(0))];
+        await perfTags.insertFiles(files);
+        await perfTags.close();
+        // will fail here if \n input gets saved wrong
+        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.close();
+    },
+    "newline_input_does_not_save_carriage_return": async(createPerfTags) => {
+        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let files = [BigInt('\n'.charCodeAt(0))];
+        await perfTags.insertFiles(files);
+        await perfTags.close();
+        // will fail here if \n input gets saved wrong
+        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.close();
     }
 };
 export default TESTS;

@@ -59,14 +59,14 @@ void util::writeFile(const std::filesystem::path& filePath, std::string_view dat
     std::filesystem::create_directories(absoluteFilePath.parent_path());
 
     std::ofstream file;
-    file.open(unfinishedFilePath);
+    file.open(unfinishedFilePath, std::ios::out | std::ios::binary);
     file.write(data.data(), data.size());
     file.close();
 
     std::filesystem::rename(unfinishedFilePath, absoluteFilePath);
 }
 std::string util::readFile(const std::filesystem::path& filePath) {
-    std::ifstream file(filePath);
+    std::ifstream file(filePath, std::ios::in | std::ios::binary);
     if (file.fail()) {
         throw std::logic_error(std::string("File ") + filePath.generic_string() + " failed to open");
     }

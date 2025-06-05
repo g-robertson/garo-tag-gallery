@@ -6,29 +6,32 @@ import migrate from "./src/migrations/migrate.js";
 import { getDefaultAdminUser, getUserByAccessKey } from './src/db/user.js';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { readdirSync, renameSync } from 'fs';
+import { appendFileSync, readdirSync, renameSync } from 'fs';
 import { PERMISSIONS } from './src/client/js/user.js';
 import PerfTags from './src/perf-tags-binding/perf-tags.js';
 import { randomBytes } from 'crypto';
 import { rootedPath } from './src/util.js';
 import multer from 'multer';
+import { FileStorage } from './src/db/file-storage.js';
 /** @import {User} from "./src/client/js/user.js" */
 /** @import {APIEndpoint} from "./src/api/api-types.js" */
 
 const ONE_YEAR = 86400000 * 365;
 
 async function main() {
-  const sqlite3Db = new sqlite3.Database("database/garo.db", err => {
-    if (err) {
-      throw `Database failed to initialize: ${err.message}`;
-    }
-  });
-  const perfTags = new PerfTags("perf/perftags.exe");
-
   const dbs = {
-    sqlite3: sqlite3Db,
-    perfTags
+    sqlite3: new sqlite3.Database("database/garo.db", err => {
+      if (err) {
+        throw `Database failed to initialize: ${err.message}`;
+      }
+    }),
+    perfTags: new PerfTags("perf/perftags.exe", "database/perf-input.txt", "database/perf-output.txt", "database/perf-tags"),
+    fileStorage: new FileStorage("database/file-storage")
   };
+
+  dbs.perfTags.__addStderrListener((data) => {
+    appendFileSync("database/perf-tags-stderr.log", data);
+  });
 
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA foreign_keys = OFF;", () => resolve()));
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA journal_mode = WAL;", () => resolve()));
@@ -37,6 +40,7 @@ async function main() {
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA mmap_size=100000000;", () => resolve()));
 
   await migrate(dbs);
+  
 
   console.log(`The default administrator user access key is: ${(await getDefaultAdminUser(dbs))['Access_Key']}`);
 
@@ -82,7 +86,6 @@ async function main() {
     if (req.url === "/accessKeySubmission" && req.method === "POST") {
       const newAccessKey = req.body?.accessKey;
       if (newAccessKey !== undefined) {
-          console.log("cookie???", newAccessKey);
           res.cookie("access-key", newAccessKey, {"httpOnly": true, "sameSite": true, maxAge: ONE_YEAR});
           res.redirect("/");
       }

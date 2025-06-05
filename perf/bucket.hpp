@@ -143,7 +143,10 @@ class Bucket {
             contentsIsDirty = true;
             if (contents_.size() != startingSize_) {
                 // TODO: allow user intervention while showing both before and after diff, 
-                throw std::logic_error(std::string("With diff contents included, contents size is still not the same as expected, something unforgiveable must have happened. This should never occur"));
+                throw std::logic_error(std::string(
+                    "With diff contents included, contents size of ") + mainFileName.generic_string() + " ("
+                    + std::to_string(contents_.size()) + ") is still not the same as expected starting size ("
+                    + std::to_string(startingSize_) + "), something unforgiveable must have happened. This should never occur");
             }
         
             // if diff contents were needed, then we need to write immediately to prevent overwriting diffs

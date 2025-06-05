@@ -1,5 +1,6 @@
 import { spawnSync } from "child_process";
 import { existsSync, readdirSync, statSync, writeFileSync } from "fs";
+import { createHash } from "crypto";
 import path from "path";
 import process from "process";
 
@@ -44,6 +45,7 @@ export function extractWith7Z(archiveName, outputDirectory) {
  * @param {{recursive: boolean}} options 
  */
 export function getAllFileEntries(directory, options) {
+    options ??= {};
     options.recursive ??= false;
 
     /** @type {string[]} */
@@ -64,4 +66,12 @@ export function getAllFileEntries(directory, options) {
     }
 
     return entries;
+}
+
+/**
+ * @param {Buffer | string} input 
+ * @returns 
+ */
+export function sha256(input) {
+    return createHash('sha256').update(input).digest();
 }

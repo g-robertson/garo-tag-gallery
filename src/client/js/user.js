@@ -75,7 +75,7 @@ export class User {
      */
     constructor(json) {
         this.#name = json.User_Name;
-        this.#createdDate = json.Created_Date;
+        this.#createdDate = json.User_Created_Date;
         this.#userManagementPermission = json.User_Management_Permission;
         this.#localFileServicesPermission = json.Local_File_Services_Permission;
         this.#globalFileServicesPermission = json.Global_File_Services_Permission;
@@ -173,7 +173,7 @@ export class User {
     toJSON() {
         return {
             User_Name: this.#name,
-            Created_Date: this.#createdDate,
+            User_Created_Date: this.#createdDate,
             Local_File_Services_Permission: this.#localFileServicesPermission,
             Global_File_Services_Permission: this.#globalFileServicesPermission,
             Local_Rating_Services_Permission: this.#localRatingServicesPermission,

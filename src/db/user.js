@@ -4,8 +4,8 @@ import { dbget } from "./db-util.js";
  * @import {DBBoolean} from "./db-util.js"
  * @import {PermissionInt} from "../client/js/user.js"
  */
-export const DEFAULT_ADMINISTRATOR_USER_ID = 0xFFFFFFFF;
-export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0xFFFFFFFF;
+export const DEFAULT_ADMINISTRATOR_USER_ID = 0;
+export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
 
 /**
  * @typedef {Object} DBPermissionSet
@@ -51,13 +51,12 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0xFFFFFFFF;
  * @property {DBBoolean} Is_Administrator
  * @property {string} Access_Key
  * @property {number} Permission_Set_ID
- * @property {number} Created_Date
+ * @property {number} User_Created_Date
  */
 
 /**
  * @typedef {DBUser & DBPermissionSet} DBJoinedUser
  */
-
 
 /**
  * 
@@ -66,7 +65,7 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0xFFFFFFFF;
  * @returns {Promise<DBUser>}
  */
 async function getUserById(dbs, userId) {
-    return (await dbget(dbs, "SELECT * FROM Users WHERE User_ID = ?;", [userId])).row;
+    return (await dbget(dbs, "SELECT * FROM Users WHERE User_ID = ?;", [userId]));
 }
 
 /**
@@ -76,17 +75,18 @@ async function getUserById(dbs, userId) {
  * @returns {Promise<User>}
  */
 export async function getUserByAccessKey(dbs, accessKey) {
-    const row = (await dbget(dbs, `
+    const user = await dbget(dbs, `
         SELECT *
         FROM Users
         JOIN Permission_Sets ON Users.Permission_Set_ID = Permission_Sets.Permission_Set_ID
         WHERE Users.Access_Key = ?;
-    `, [accessKey])).row;
-
-    if (row === undefined) {
-        return;
+    `, [accessKey]);
+    
+    if (user === undefined) {
+        return undefined;
+    } else {
+        return new User(user);
     }
-    return new User(row);
 }
 
 /**
