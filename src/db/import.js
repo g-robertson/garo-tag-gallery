@@ -224,12 +224,16 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
         
         // assign all system tag pairings
         for (const [fileName, file] of importChunks.filePairings.entries()) {
+            taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(IS_FILE_TAG.Tag_ID);
             taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(fileExtensionMap.get(file.File_Extension).Has_File_Extension_Tag_ID);
         }
         for (const dbLocalFile of dbLocalFilesMap.values()) {
             taggablePairings.get(dbLocalFile.Taggable_ID).push(dbLocalFile.Has_File_Hash_Tag_ID);
         }
         for (const [fileName, urls] of importChunks.urlPairings.entries()) {
+            if (urls.length !== 0) {
+                taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(HAS_URL_TAG.Tag_ID);
+            }
             for (const url of urls) {
                 const dbURL = {
                     ...dbURLMap.get(url.URL),
@@ -240,6 +244,12 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
                 taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(dbURLAssociation.Has_URL_With_Association_Tag_ID);
             }
         }
+        for (const [fileName, notes] of importChunks.notePairings.entries()) {
+            if (notes.length !== 0) {
+                taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(HAS_NOTES_TAG.Tag_ID);
+            }
+        }
+
         // assign all normal tags
         for (const [fileName, tags] of importChunks.tagPairings.entries()) {
             taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(...tags.map(tag => dbLocalTagsMap.get(localTagsPKHash(tag.Lookup_Name, tag.Source_Name)).Tag_ID));
@@ -265,9 +275,7 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
         });
 
         /** @type {ReturnType<typeof importChunks.tagPairings.get>} */
-        const fileTags = [IS_FILE_TAG];
         if (fileInfoEntry['urls'] !== undefined) {
-            fileTags.push(HAS_URL_TAG);
             const urlObjects = [];
             for (const url of readFileSync(fileInfoEntry['urls']).toString().split('\n')) {
                 urlObjects.push({
@@ -279,7 +287,6 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
         }
 
         if (fileInfoEntry['notes'] !== undefined) {
-            fileTags.push(HAS_NOTES_TAG);
             const noteObjects = [];
             for (const note of readFileSync(fileInfoEntry['notes']).toString().split('\n')) {
                 noteObjects.push({
@@ -290,6 +297,7 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
             importChunks.notePairings.set(fileName, noteObjects);
         }
 
+        const fileTags = [];
         if (fileInfoEntry['tags'] !== undefined) {
             for (const tag of readFileSync(fileInfoEntry['tags']).toString().split('\n')) {
                 const firstColon = tag.indexOf(":")

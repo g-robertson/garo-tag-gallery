@@ -341,7 +341,8 @@ async function upsertFiles(dbs, files) {
     const dbFiles = await selectFiles(dbs, files.map(file => file.File_Hash));
     const dbFilesExisting = new Set(dbFiles.map(dbFile => dbFile.File_Hash.toString("hex")));
     const filesToInsert = files.filter(file => !dbFilesExisting.has(file.File_Hash.toString("hex")));
-    const dbFilesInserted = await insertFiles(dbs, filesToInsert);
+    const filesToInsertDeduped = [...(new Map(filesToInsert.map(file => [file.File_Hash.toString("hex"), file]))).values()];
+    const dbFilesInserted = await insertFiles(dbs, filesToInsertDeduped);
     return {
         dbFiles: [...dbFiles, ...dbFilesInserted.dbFiles],
         finalizeFileMove: dbFilesInserted.finalizeFileMove
