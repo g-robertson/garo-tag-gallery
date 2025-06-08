@@ -1,5 +1,4 @@
 /**
- * 
  * @param {Response} response 
  */
 export async function fjsonParse(response) {
@@ -10,6 +9,19 @@ export async function fjsonParse(response) {
         console.error(`${err}: JSON Text was "${text}" for response from "${response.url}"`);
     }
 }
+
+/**
+ * @param {Response} response 
+ */
+export async function fbjsonParse(response) {
+    const text = await response.text();
+    try {
+        return bjsonParse(text);
+    } catch (err) {
+        console.error(`${err}: JSON Text was "${text}" for response from "${response.url}"`);
+    }
+}
+
 
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz";
 /**
@@ -24,6 +36,31 @@ export function randomID(size) {
     }
 
     return id;
+}
+
+
+const BIG_INT_IDENTIFIER = "BigInt_fuihi873ohr87hnfuidwnfufh3e2oi8fwefa";
+
+export function bjsonStringify(obj) {
+    return JSON.stringify(obj, (key, value) => {
+        if (typeof value === "bigint") {
+            return {
+                [BIG_INT_IDENTIFIER]: value.toString()
+            }
+        } else {
+            return value;
+        }
+    })
+}
+
+export function bjsonParse(json) {
+    return JSON.parse(json, (key, value) => {
+        if (typeof value === "object" && value[BIG_INT_IDENTIFIER] !== undefined) {
+            return BigInt(value[BIG_INT_IDENTIFIER]);
+        } else {
+            return value;
+        }
+    })
 }
 
 /**

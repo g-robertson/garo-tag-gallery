@@ -1,6 +1,7 @@
 #include "set-evaluation.hpp"
 
 #include <stdexcept>
+#include <iostream>
 
 SetEvaluation::SetEvaluation(bool isComplement, const std::unordered_set<uint64_t>* universe, std::unordered_set<uint64_t> items)
     : isComplement(isComplement), universe(universe), items(std::move(items)), itemsPtr(&this->items.value())
@@ -9,6 +10,32 @@ SetEvaluation::SetEvaluation(bool isComplement, const std::unordered_set<uint64_
 SetEvaluation::SetEvaluation(bool isComplement, const std::unordered_set<uint64_t>* universe, const std::unordered_set<uint64_t>* items)
     : isComplement(isComplement), universe(universe), itemsPtr(items)
 {}
+
+SetEvaluation::SetEvaluation(SetEvaluation&& setEvaluation) {
+    if (setEvaluation.items.has_value()) {
+        items = std::move(setEvaluation.items);
+        itemsPtr = &items.value();
+    } else {
+        itemsPtr = setEvaluation.itemsPtr;
+    }
+    
+    universe = setEvaluation.universe;
+    isComplement = setEvaluation.isComplement;
+}
+
+SetEvaluation& SetEvaluation::operator=(SetEvaluation&& setEvaluation) {
+    if (setEvaluation.items.has_value()) {
+        items = std::move(setEvaluation.items);
+        itemsPtr = &items.value();
+    } else {
+        itemsPtr = setEvaluation.itemsPtr;
+    }
+    
+    universe = setEvaluation.universe;
+    isComplement = setEvaluation.isComplement;
+
+    return *this;
+}
 
 std::unordered_set<uint64_t> SetEvaluation::releaseResult() {
     if (isComplement) {
@@ -30,8 +57,17 @@ void SetEvaluation::complement() {
     isComplement = !isComplement;
 }
 
+std::size_t SetEvaluation::size() const {
+    if (isComplement) {
+        return universe->size() - itemsPtr->size();
+    } else {
+        return itemsPtr->size();
+    }
+}
+
 SetEvaluation SetEvaluation::rightHandSide(SetEvaluation lhsSet, SetEvaluation rhsSet) {
-    return std::move(rhsSet);
+    auto postMove = std::move(rhsSet);
+    return std::move(postMove);
 }
 SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation lhsSet, SetEvaluation rhsSet) {
     if (lhsSet.universe != rhsSet.universe) {

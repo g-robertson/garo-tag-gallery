@@ -38,10 +38,25 @@ export class FileStorage {
         readFileSync(fileEndLocation);
     }
 
-    extractAllTo(folder) {
+    /**
+     * 
+     * @param {string} folder 
+     * @param {(originalFileName: string) => string} modifyFileName
+     * @param {{doNotMove: boolean}} options 
+     */
+    extractAllTo(folder, modifyFileName, options) {
+        modifyFileName ??= (originalFileName) => originalFileName;
+        options ??= {};
+        options.doNotMove ??= false;
+
         for (const fileEntry of getAllFileEntries(this.#directory, {recursive: true})) {
             const fileName = basename(fileEntry);
-            renameSync(fileEntry, path.join(folder, fileName));
+            const modifiedFileName = modifyFileName(fileName);
+            if (!options.doNotMove) {
+                renameSync(fileEntry, path.join(folder, modifiedFileName));
+            } else {
+                console.log(`Would have moved ${fileEntry} to ${path.join(folder, modifiedFileName)}`);
+            }
         }
 
     }

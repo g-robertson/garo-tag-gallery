@@ -25,13 +25,14 @@ async function main() {
         throw `Database failed to initialize: ${err.message}`;
       }
     }),
-    perfTags: new PerfTags("perf/perftags.exe", "database/perf-input.txt", "database/perf-output.txt", "database/perf-tags"),
+    perfTags: new PerfTags("perf/perftags.exe", "database/perf-input.txt", "database/perf-output.txt", "database/perf-tags", "archive-commands"),
     fileStorage: new FileStorage("database/file-storage")
   };
 
   dbs.perfTags.__addStderrListener((data) => {
     appendFileSync("database/perf-tags-stderr.log", data);
   });
+  dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
 
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA foreign_keys = OFF;", () => resolve()));
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA journal_mode = WAL;", () => resolve()));
@@ -162,12 +163,9 @@ async function main() {
   app.use((req, res) => {
     /** @type {User} */
     const user = req.user;
-    
     // Allow for admins to override missing permissions by sudo
-    const sudo = req.body.sudo;
-    let canPerformAction = false;
-    if (req.user.Is_Administrator && sudo === true) {
-      canPerformAction = true;
+    if (user.isAdmin() && req.cookies['sudo'] !== undefined) {
+      user.setSudo(true);
     }
 
     if (req.normalizedUrl.startsWith("/api/")) {
@@ -186,6 +184,7 @@ async function main() {
         return res.redirect("/400");
       }
 
+      let canPerformAction = false;
       canPerformAction ||= user.hasPermissions(req.method, api.PERMISSIONS_REQUIRED);
       canPerformAction ||= api.checkPermission(dbs, req, res);
 
@@ -235,6 +234,18 @@ async function main() {
       req.next();
     }
   });
+
+  app.use((req, res) => {
+    if (req.url === "/400") {
+      res.status(400);
+    } else if (req.url === "/401") {
+      res.status(401);
+    } else if (req.url === "/403") {
+      res.status(403);
+    }
+
+    req.next();
+  })
 
   app.use(serveStatic("dist", {index: ["index.htm", "index.html"], extensions: ['html', 'htm']}));
 

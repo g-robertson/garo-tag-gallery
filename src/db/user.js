@@ -1,8 +1,13 @@
 import { User } from "../client/js/user.js";
 import { dbget } from "./db-util.js";
+import { userSelectAllLocalTagServices } from "./tags.js";
+import { userSelectAllLocalTaggableServices } from "./taggables.js";
+
 /**
  * @import {DBBoolean} from "./db-util.js"
  * @import {PermissionInt} from "../client/js/user.js"
+ * @import {DBPermissionedLocalTagService} from "./tags.js"
+ * @import {DBPermissionedLocalTaggableService} from "./taggables.js"
  */
 export const DEFAULT_ADMINISTRATOR_USER_ID = 0;
 export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
@@ -12,10 +17,10 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @property {number} Permission_Set_ID
  * @property {string} Permission_Set_Name
  * @property {PermissionInt} User_Management_Permission
- * @property {PermissionInt} Local_File_Services_Permission
- * @property {number | null} Local_File_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_File_Services_Permission
- * @property {number | null} Global_File_Services_Byte_Transfer_Limit
+ * @property {PermissionInt} Local_Taggable_Services_Permission
+ * @property {number | null} Local_Taggable_Services_Byte_Transfer_Limit
+ * @property {PermissionInt} Global_Taggable_Services_Permission
+ * @property {number | null} Global_Taggable_Services_Byte_Transfer_Limit
  * @property {PermissionInt} Local_Rating_Services_Permission
  * @property {number | null} Local_Rating_Services_Byte_Transfer_Limit
  * @property {PermissionInt} Global_Rating_Services_Permission
@@ -55,7 +60,13 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  */
 
 /**
- * @typedef {DBUser & DBPermissionSet} DBJoinedUser
+ * @typedef {DBUser &
+ *           DBPermissionSet &
+ *          {
+ *              Local_Tag_Services: (DBPermissionedLocalTagService)[],
+ *              Local_Taggable_Services: (DBPermissionedLocalTaggableService)[]
+ *          }
+ * } DBJoinedUser
  */
 
 /**
@@ -70,6 +81,17 @@ async function getUserById(dbs, userId) {
 
 /**
  * 
+ * @param {Databases} dbs 
+ * @param {User} user 
+ */
+export async function joinUsersPermittedObjects(dbs, user) {
+    user.setLocalTagServices(await userSelectAllLocalTagServices(dbs, user));
+    user.setLocalTaggableServices(await userSelectAllLocalTaggableServices(dbs, user));
+    
+    return user;
+}
+
+/**
  * @param {Databases} dbs
  * @param {string} accessKey
  * @returns {Promise<User>}

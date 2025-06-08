@@ -25,10 +25,10 @@ const TESTS = {
             throw `Test case failed, no BAD COMMAND! returned from exiT`;
         }
     },
-    "tag_pairings_without_parents_fails": async (createPerfTags) => {
+    "insert_tag_pairings_without_parents_fails": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         perfTags.__expectError();
-        const ok = await perfTags.__insertTagPairings(getPairingsFromStrPairings({'tag00001': ['file0001']}));
+        const ok = await perfTags.__insertTagPairings(getPairingsFromStrPairings({'tag00001': ['tgbl0001']}));
 
         if (ok) {
             throw `Test case failed, no error on insert_tag_pairings without parents`;
@@ -36,8 +36,8 @@ const TESTS = {
     },
     "insert_tag_pairings_without_file_parents": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
-        const tagPairings = getPairingsFromStrPairings({'tag00001': ['file0001']});
-        await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
+        const tagPairings = getPairingsFromStrPairings({'tag00001': ['tgbl0001']});
+        await perfTags.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
 
         perfTags.__expectError();
         const ok = await perfTags.__insertTagPairings(tagPairings);
@@ -48,7 +48,7 @@ const TESTS = {
     },
     "insert_tag_pairings_without_tag_parents": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
-        const tagPairings = getPairingsFromStrPairings({'tag00001': ['file0001']});
+        const tagPairings = getPairingsFromStrPairings({'tag00001': ['tgbl0001']});
         await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         perfTags.__expectError();
         const ok = await perfTags.__insertTagPairings(tagPairings);
@@ -59,7 +59,7 @@ const TESTS = {
     },
     "insert_tag_pairings": async (createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
-        const tagPairings = getPairingsFromStrPairings({'tag00001': ['file0001']});
+        const tagPairings = getPairingsFromStrPairings({'tag00001': ['tgbl0001']});
         const ok = await perfTags.insertTagPairings(tagPairings);
 
         if (!ok) {
@@ -68,15 +68,15 @@ const TESTS = {
     },
     "uses_specified_input_locations": async(createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", "test-dir/iodir/perf-input.txt", "test-dir/iodir/perf-output.txt", "test-dir/database-dir/perftag-dir");
-        const tagPairings = getPairingsFromStrPairings({'tag00001': ['file0001']});
-        await perfTags.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
+        const tagPairings = getPairingsFromStrPairings({'tag00001': ['tgbl0001']});
+        await perfTags.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
         await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         await perfTags.insertTagPairings(tagPairings);
         await perfTags.close();
         perfTags = createPerfTags("perftags.exe", "test-dir/iodir/perf-input.txt", "test-dir/iodir/perf-output.txt", "test-dir/database-dir/perftag-dir");
-        const {filePairings} = await perfTags.readFilesTags(PerfTags.getFilesFromTagPairings(tagPairings));
-        const strFileTags = getStrPairingsFromPairings(filePairings);
-        if (strFileTags['file0001'] === undefined || strFileTags['file0001'].length !== 1 || strFileTags['file0001'][0] !== "tag00001") {
+        const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
+        const strFileTags = getStrPairingsFromPairings(taggablePairings);
+        if (strFileTags['tgbl0001'] === undefined || strFileTags['tgbl0001'].length !== 1 || strFileTags['tgbl0001'][0] !== "tag00001") {
             throw "Test case failed, file tags not found after writing";
         }
 
@@ -88,13 +88,13 @@ const TESTS = {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         // will fail here if 0x1A (SUB) input gets read wrong
         let files = [0x1An];
-        await perfTags.insertFiles(files);
+        await perfTags.insertTaggables(files);
         await perfTags.close();
     },
     "carriage_return_input_does_not_save_newline": async(createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         let files = [BigInt('\r'.charCodeAt(0))];
-        await perfTags.insertFiles(files);
+        await perfTags.insertTaggables(files);
         await perfTags.close();
         // will fail here if \n input gets saved wrong
         perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
@@ -103,11 +103,21 @@ const TESTS = {
     "newline_input_does_not_save_carriage_return": async(createPerfTags) => {
         let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         let files = [BigInt('\n'.charCodeAt(0))];
-        await perfTags.insertFiles(files);
+        await perfTags.insertTaggables(files);
         await perfTags.close();
         // will fail here if \n input gets saved wrong
         perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.close();
+    },
+    "search_will_not_crash_with_nonexistent_tag": async(createPerfTags) => {
+        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.search(PerfTags.searchTag(5n));
+    },
+    "unended_transactional_insert_should_not_cause_crash": async(createPerfTags) => {
+        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.beginTransaction();
+        await perfTags.insertTags([0n,1n,2n,3n]);
+        await perfTags.reopen();
     }
 };
 export default TESTS;

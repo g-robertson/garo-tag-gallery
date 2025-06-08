@@ -124,11 +124,11 @@ export default class PerfTags {
     }
 
     /**
-     * @param {bigint[]} files 
+     * @param {bigint[]} taggables 
      */
-    async insertFiles(files) {
-        this.__writeToInputFile(PerfTags.#serializeSingles(files));
-        this.__writeToStdin("insert_files\r\n");
+    async insertTaggables(taggables) {
+        this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
+        this.__writeToStdin("insert_taggables\r\n");
         return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
     
@@ -146,17 +146,17 @@ export default class PerfTags {
      */
     static #serializeTagPairings(tagPairings) {
         let bufSize = 0;
-        for (const fileSet of tagPairings.values()) {
-            bufSize += 8 * (fileSet.length + 2);
+        for (const taggableSet of tagPairings.values()) {
+            bufSize += 8 * (taggableSet.length + 2);
         }
         let buffer = Buffer.allocUnsafe(bufSize);
         let offset = 0;
-        for (const [tag, fileSet] of tagPairings.entries()) {
+        for (const [tag, taggableSet] of tagPairings.entries()) {
 
             offset = buffer.writeBigUInt64BE(tag, offset);
-            offset = buffer.writeBigUInt64BE(BigInt(fileSet.length), offset);
-            for (const file of fileSet) {
-                offset = buffer.writeBigUInt64BE(file, offset);
+            offset = buffer.writeBigUInt64BE(BigInt(taggableSet.length), offset);
+            for (const taggable of taggableSet) {
+                offset = buffer.writeBigUInt64BE(taggable, offset);
             }
         }
         return buffer;
@@ -166,7 +166,7 @@ export default class PerfTags {
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async insertTagPairings(tagPairings) {
-        await this.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
+        await this.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
         await this.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         return await this.__insertTagPairings(tagPairings);
     }
@@ -184,7 +184,7 @@ export default class PerfTags {
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async toggleTagPairings(tagPairings) {
-        await this.insertFiles(PerfTags.getFilesFromTagPairings(tagPairings));
+        await this.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
         await this.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         return await this.__toggleTagPairings(tagPairings);
     }
@@ -208,30 +208,99 @@ export default class PerfTags {
     }
 
     /**
-     * @param {bigint[]} files
+     * @param {bigint[]} taggables
      */
-    async readFilesTags(files) {
-        this.__writeToInputFile(PerfTags.#serializeSingles(files));
-        this.__writeToStdin("read_files_tags\r\n");
+    async readTaggablesTags(taggables) {
+        this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
+        this.__writeToStdin("read_taggables_tags\r\n");
         const ok = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
-        let filesTagsStr = this.__readFromOutputFile();
+        let taggablesTagsStr = this.__readFromOutputFile();
         /** @type {Map<bigint, bigint[]>} */
-        const filePairings = new Map();
-        for (let i = 0; i < filesTagsStr.length;) {
-            const file = filesTagsStr.readBigUInt64BE(i)
+        const taggablePairings = new Map();
+        for (let i = 0; i < taggablesTagsStr.length;) {
+            const taggable = taggablesTagsStr.readBigUInt64BE(i)
             i += 8;
-            const tagCount = filesTagsStr.readBigUInt64BE(i);
+            const tagCount = taggablesTagsStr.readBigUInt64BE(i);
             i += 8;
             const tags = [];
             for (let j = 0; j < tagCount; ++j) {
-                const tag = filesTagsStr.readBigUInt64BE(i);
+                const tag = taggablesTagsStr.readBigUInt64BE(i);
                 i += 8;
 
                 tags.push(tag);
             }
-            filePairings.set(file, tags);
+            taggablePairings.set(taggable, tags);
         }
-        return {ok, filePairings};
+        return {ok, taggablePairings};
+    }
+
+    /**
+     * @param {string} searchCriteria
+     */
+    async search(searchCriteria) {
+        this.__writeToInputFile(Buffer.from(searchCriteria, 'binary'));
+        this.__writeToStdin("search\r\n");
+        const ok = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        let taggablesStr = this.__readFromOutputFile();
+        /** @type {bigint[]} */
+        const taggables = [];
+        for (let i = 0; i  < taggablesStr.length; i += 8) {
+            taggables.push(taggablesStr.readBigUInt64BE(i));
+        }
+
+        return {ok, taggables};
+    }
+
+    /**
+     * @param {bigint} tag
+     */
+    static searchTag(tag) {
+        return `T${PerfTags.#serializeSingles([tag]).toString("binary")}`;
+    }
+
+    /**
+     * @param {string[]} expressions
+     */
+    static searchUnion(expressions) {
+        for (const expression of expressions) {
+            if (typeof expression !== "string") {
+                throw "Expression in search union was not a string";
+            }
+        }
+
+        if (expressions.length === 1) {
+            return expressions[0];
+        }
+
+        
+        return `(${expressions.join('|')})`;
+    }
+
+    /**
+     * @param {string[]} expressions
+     */
+    static searchIntersect(expressions) {
+        for (const expression of expressions) {
+            if (typeof expression !== "string") {
+                throw "Expression in search intersect was not a string";
+            }
+        }
+        
+        if (expressions.length === 1) {
+            return expressions[0];
+        }
+
+        return `(${expressions.join('&')})`;
+    }
+
+    async beginTransaction() {
+        this.__writeToStdin("begin_transaction\r\n");
+        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+    }
+
+    async endTransaction() {
+        this.__writeToStdin("end_transaction\r\n");
+        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
     #exitCount = 0;
@@ -335,16 +404,16 @@ export default class PerfTags {
     /**
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
-    static getFilesFromTagPairings(tagPairings) {
+    static getTaggablesFromTagPairings(tagPairings) {
         /** @type {Set<bigint>} */
-        const files = new Set();
-        for (const fileSet of tagPairings.values()) {
-            for (const file of fileSet) {
-                files.add(file);
+        const taggables = new Set();
+        for (const taggableSet of tagPairings.values()) {
+            for (const taggable of taggableSet) {
+                taggables.add(taggable);
             }
         }
 
-        return [...files];
+        return [...taggables];
     }
     
     /**
@@ -355,17 +424,17 @@ export default class PerfTags {
     }
 
     /**
-     * @param {Map<bigint, bigint[]} filePairings 
+     * @param {Map<bigint, bigint[]} taggablePairings 
      */
-    static getTagPairingsFromFilePairings(filePairings) {
+    static getTagPairingsFromTaggablePairings(taggablePairings) {
         /** @type {Map<bigint, bigint[]>} */
         const tagPairings = new Map();
-        for (const [file, tags] of filePairings) {
+        for (const [taggable, tags] of taggablePairings) {
             for (const tag of tags) {
                 if (tagPairings.get(tag) === undefined) {
                     tagPairings.set(tag, []);
                 }
-                tagPairings.get(tag).push(file);
+                tagPairings.get(tag).push(taggable);
             }
         }
         return tagPairings;

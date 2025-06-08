@@ -58,10 +58,10 @@ class TagFileMaintainer {
         TagFileMaintainer(std::string folderName);
         ~TagFileMaintainer();
 
-        void insertFiles(std::string_view input);
-        void toggleFiles(std::string_view input);
-        void deleteFiles(std::string_view input);
-        void readFiles(void (*writer)(const std::string&));
+        void insertTaggables(std::string_view input);
+        void toggleTaggables(std::string_view input);
+        void deleteTaggables(std::string_view input);
+        void readTaggables(void (*writer)(const std::string&));
         void insertTags(std::string_view input);
         void toggleTags(std::string_view input);
         void deleteTags(std::string_view input);
@@ -69,10 +69,12 @@ class TagFileMaintainer {
         void insertPairings(std::string_view input);
         void togglePairings(std::string_view input);
         void deletePairings(std::string_view input);
-        void readFilesTags(std::string_view input, void (*writer)(const std::string&));
+        void readTaggablesTags(std::string_view input, void (*writer)(const std::string&));
         void search(std::string_view input, void (*writer)(const std::string&));
         void flushFiles();
         void purgeUnusedFiles() const;
+        void beginTransaction();
+        void endTransaction();
         bool needsMaintenance();
         void doMaintenance();
         void close();
@@ -83,21 +85,22 @@ class TagFileMaintainer {
         unsigned short getBucketIndex(uint64_t item) const;
         const PairingBucket& getTagBucket(uint64_t tag) const;
         PairingBucket& getTagBucket(uint64_t tag);
-        const PairingBucket& getFileBucket(uint64_t file) const;
-        PairingBucket& getFileBucket(uint64_t file);
+        const PairingBucket& getTaggableBucket(uint64_t file) const;
+        PairingBucket& getTaggableBucket(uint64_t file);
 
-        void modifyFiles(std::string_view input, void (SingleBucket::*callback)(uint64_t));
+        void modifyTaggables(std::string_view input, void (SingleBucket::*callback)(uint64_t));
         void modifyTags(std::string_view input, void (SingleBucket::*callback)(uint64_t));
         void modifyPairings(std::string_view input, void (PairingBucket::*callback)(std::pair<uint64_t, uint64_t>));
 
         const static int VERSION;
 
         bool closed_ = false;
+        bool inTransaction = false;
         std::filesystem::path folderPath_;
         std::filesystem::path cacheFilePath_;
         unsigned short currentBucketCount = 16;
-        std::vector<PairingBucket> tagFileBuckets;
-        std::vector<PairingBucket> fileTagBuckets;
-        std::unique_ptr<SingleBucket> fileBucket;
+        std::vector<PairingBucket> tagTaggableBuckets;
+        std::vector<PairingBucket> taggableTagBuckets;
+        std::unique_ptr<SingleBucket> taggableBucket;
         std::unique_ptr<SingleBucket> tagBucket;
 };

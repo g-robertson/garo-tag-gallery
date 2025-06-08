@@ -1,69 +1,63 @@
 import { randomID } from "./client-util.js";
 
-export const SYSTEM_TAG_TYPE = 0xFF;
-export const URL_TAG_TYPE = 0xFE;
-export const URL_ASSOCIATION_TAG_TYPE = 0xFD;
-export const FILE_EXTENSION_TAG_TYPE = 0xFC;
-export const FILE_HASH_TAG_TYPE = 0xFB;
-export const NORMAL_TAG_TAG_TYPE = 0x00;
-
 /**
  * 
  * @param {bigint} Tag_ID 
- * @param {PreInsertTag} preInsertTag
+ * @param {PreInsertLocalTag} preInsertLocalTag
  */
-function createSystemTag(Tag_ID, preInsertTag) {
+export function createSystemTag(Tag_ID, preInsertLocalTag) {
     return Object.freeze({
         Tag_ID,
-        ...preInsertTag,
-        Tags_PK_Hash: tagsPKHash(preInsertTag.Lookup_Name, preInsertTag.Source_Name)
+        ...preInsertLocalTag,
+        Tags_PK_Hash: localTagsPKHash(preInsertLocalTag.Lookup_Name, preInsertLocalTag.Source_Name)
     });
 }
+
+export const SYSTEM_LOCAL_TAG_SERVICE = {
+    Service_ID: 0,
+    Local_Tag_Service_ID: 0,
+    Service_Name: "System local tags"
+};
+export const DEFAULT_LOCAL_TAG_SERVICE = {
+    Service_ID: 1,
+    Local_Tag_Service_ID: 1,
+    Service_Name: "Default local tags"
+};
 
 export const HAS_NOTES_TAG = createSystemTag(0n, {
     Source_Name: "System generated",
     Display_Name: "system:has notes",
     Lookup_Name: "system:has notes",
-    Tag_Type: SYSTEM_TAG_TYPE,
-    User_Editable: 0
 });
 export const HAS_URL_TAG = createSystemTag(1n, {
     Source_Name: "System generated",
     Display_Name: "system:has url",
-    Lookup_Name: "system:has url",
-    Tag_Type: SYSTEM_TAG_TYPE,
-    User_Editable: 0
+    Lookup_Name: "system:has url"
 });
 export const IS_FILE_TAG = createSystemTag(2n, {
     Source_Name: "System generated",
     Display_Name: "system:is file",
-    Lookup_Name: "system:is file",
-    Tag_Type: SYSTEM_TAG_TYPE,
-    User_Editable: 0
+    Lookup_Name: "system:is file"
 });
 export const LAST_SYSTEM_TAG = createSystemTag(0xFFFFn, {
     Source_Name: "System generated",
     Display_Name: "system:reserved:user should not see",
-    Lookup_Name: randomID(64),
-    Tag_Type: SYSTEM_TAG_TYPE,
-    User_Editable: 0
+    Lookup_Name: randomID(64)
 });
 
-/** @import {PreInsertTag} from "../../db/tags.js" */
+/** @import {PreInsertLocalTag} from "../../db/tags.js" */
 
 /**
  * 
  * @param {string} tagName
- * @param {string} sourceName
- * @returns {PreInsertTag}
+ * @param {string} Source_Name
+ * @returns {PreInsertLocalTag}
  */
-export function normalPreInsertTag(tagName, sourceName, ) {
+export function normalPreInsertLocalTag(tagName, Source_Name) {
     return {
         Display_Name: tagName,
         Lookup_Name: tagName,
-        Source_Name: sourceName,
-        Tag_Type: NORMAL_TAG_TAG_TYPE,
-        User_Editable: 1
+        Source_Name,
     };
 }
 
@@ -72,6 +66,6 @@ export function normalPreInsertTag(tagName, sourceName, ) {
  * @param {string} lookupName 
  * @param {string} sourceName 
  */
-export function tagsPKHash(lookupName, sourceName) {
+export function localTagsPKHash(lookupName, sourceName) {
     return `${lookupName}\x01${sourceName}`;
 }

@@ -2,31 +2,35 @@ import { useState } from 'react';
 import '../../global.css';
 import { User } from '../js/user.js';
 import PartialUploadSelector from '../../components/partial-upload-selector.jsx';
+import LocalTaggableServiceSelector from '../../components/local-taggable-service-selector.jsx';
+import LocalTagServiceSelector from '../../components/local-tag-service-selector.jsx';
 
 /** 
  * @param {{
  *  user: User
  * }}
 */
-const ImportFilesFromHydrus = () => {
-    const [firstRun, setFirstRun] = useState(true);
+const ImportFilesFromHydrus = ({user}) => {
+    const [finishedImportingText, setFinishedImportingText] = useState("");
 
-    const {PartialSelector, PartialSubmitButton} = PartialUploadSelector({text: "Select hydrus ZIP file (parts) you wish to import:"});
+    const {PartialSelector, PartialSubmitButton} = PartialUploadSelector({text: "Select hydrus ZIP file (parts) you wish to import:", onSubmit: () => {
+        setFinishedImportingText("");
+    }, onFinish: () => {
+        setFinishedImportingText("Finished importing from hydrus");
+    }, onError: (err) => {
+        setFinishedImportingText(`Error occured while importing from hydrus: ${err}`)
+    }});
 
     return (
         <div>
-            <form action="/api/post/import-files-from-hydrus" target="frame" method="POST" onSubmit={() => false}>
+            <form action="/api/post/import-files-from-hydrus" target="frame" method="POST">
                 {PartialSelector}
+                <LocalTaggableServiceSelector user={user} />
+                <LocalTagServiceSelector user={user} />
                 {PartialSubmitButton}
             </form>
-            <iframe name="frame" style={{display: "none"}} onLoad={() => {
-                if (firstRun) {
-                    setFirstRun(false);
-                    return;
-                }
-
-                console.log("file submission finished");
-            }}></iframe>
+            <p style={{color: "green"}}>{finishedImportingText}</p>
+            <iframe name="frame" style={{display: "none"}}></iframe>
         </div>
     );
 };

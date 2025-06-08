@@ -4,6 +4,8 @@
     --hover-accent-foreground: #fff;
     --background: #222;
     --hover-background: #555;
+    --background-layered: #444;
+    --accent-background-layered: #6e6b4a;
 }
 
 body {
@@ -66,24 +68,31 @@ div {
     height: 80vh;
 }
 
+.modal-topbar * {
+    background-color: var(--accent-background-layered);
+}
 .modal-topbar {
     contain: layout;
-    border-bottom: 1px solid var(--accent-foreground);
+    background-color: var(--accent-background-layered);
+    border-bottom: 1px solid var(--foreground);
 }
-
+.modal, .modal-content, .modal-content :not(input, select, option) {
+    background-color: var(--background-layered);
+}
 .modal-title {
-    padding: 6px 0 4px 10px;
+    padding: 8px 0 4px 10px;
     width: 90%;
     float: left;
 }
 .modal-cancel {
     padding: 6px 10px 4px 0;
-    color: #a00;
+    color: #f44;
     width: 5%;
     float: right;
     text-align: right;
     cursor: pointer;
+    font-weight: 1000;
 }
 .modal-cancel:hover {
-    color: #f00;
+    color: #d00;
 }

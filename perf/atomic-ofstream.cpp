@@ -1,4 +1,5 @@
 #include "atomic-ofstream.hpp"
+#include <iostream>
 
 AtomicOfstream::AtomicOfstream(const std::filesystem::path& path) {
     path_ = std::filesystem::absolute(path);
@@ -21,5 +22,17 @@ void AtomicOfstream::close() {
 
     ofstream_.close();
     isClosed_ = true;
-    std::filesystem::rename(tempPath_, path_);
+    for (int i = 0; i < 10; ++i) {
+        bool caught = false;
+        try {
+            std::filesystem::rename(tempPath_, path_);
+        } catch (...) {
+            caught = true;
+        }
+        if (!caught) {
+            break;
+        } else {
+            std::cerr << "Caught filesystem exception while renaming " + tempPath_.generic_string() << " retrying attempt #" + std::to_string(i) << std::endl;
+        }
+    }
 }

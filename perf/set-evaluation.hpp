@@ -8,11 +8,15 @@ class SetEvaluation {
     public:
         SetEvaluation(bool isComplement, const std::unordered_set<uint64_t>* universe, std::unordered_set<uint64_t> items);
         SetEvaluation(bool isComplement, const std::unordered_set<uint64_t>* universe, const std::unordered_set<uint64_t>* items);
-
+        SetEvaluation(const SetEvaluation& setEvaluation) = delete;
+        SetEvaluation operator=(const SetEvaluation& setEvaluation) = delete;
+        SetEvaluation(SetEvaluation&& setEvaluation);
+        SetEvaluation& operator=(SetEvaluation&& setEvaluation);
         // Note: this will invalidate the SetEvaluation that the result was moved from
         std::unordered_set<uint64_t> releaseResult();
 
         void complement();
+        std::size_t size() const;
         static SetEvaluation rightHandSide(SetEvaluation lhsSet, SetEvaluation rhsSet);
         static SetEvaluation symmetricDifference(SetEvaluation lhsSet, SetEvaluation rhsSet);
         static SetEvaluation difference(SetEvaluation lhsSet, SetEvaluation rhsSet);

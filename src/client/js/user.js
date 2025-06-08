@@ -1,13 +1,11 @@
-import { LocalTagService } from "./services/local-tag-service.js";
-import { Service } from "./services/service.js";
-import { TagService } from "./services/tag-service.js";
+import {bjsonStringify} from "./client-util.js"
 /** @import {DBJoinedUser} from "../../db/user.js" */
 
 export const PERMISSIONS = Object.freeze({
     NONE: "NONE",
     USER_MANAGEMENT: "USER_MANAGEMENT",
-    LOCAL_FILE_SERVICES: "LOCAL_FILE_SERVICES",
-    GLOBAL_FILE_SERVICES: "GLOBAL_FILE_SERVICES",
+    LOCAL_TAGGABLE_SERVICES: "LOCAL_TAGGABLE_SERVICES",
+    GLOBAL_TAGGABLE_SERVICES: "GLOBAL_TAGGABLE_SERVICES",
     LOCAL_RATING_SERVICES: "LOCAL_RATING_SERVICES",
     GLOBAL_RATING_SERVICES: "GLOBAL_RATING_SERVICES",
     LOCAL_TAG_SERVICES: "LOCAL_TAG_SERVICES",
@@ -22,6 +20,7 @@ export const PERMISSIONS = Object.freeze({
     GLOBAL_PARSER_SERVICES: "GLOBAL_PARSER_SERVICES",
     SETTINGS: "SETTINGS",
     ADVANCED_SETTINGS: "ADVANCED_SETTINGS",
+    IS_ADMIN: "IS_ADMIN"
 });
 
 /**
@@ -30,6 +29,7 @@ export const PERMISSIONS = Object.freeze({
  */
 
 export const PERMISSION_BITS = Object.freeze({
+    ALL: 15,
     CREATE: 8,
     READ: 4,
     UPDATE: 2,
@@ -45,8 +45,13 @@ export const METHOD_TO_PERMISSION_BIT = Object.freeze({
 /** @typedef {"GET" | "POST" | "PUT" | "DELETE"} HTTPMethod */
 
 export class User {
+    #id;
     #name;
+    #isAdmin = false;
     #createdDate;
+    #localTaggableServices;
+    #localTagServices;
+
     #userManagementPermission;
     #localFileServicesPermission;
     #globalFileServicesPermission;
@@ -64,21 +69,22 @@ export class User {
     #globalParserServicesPermission;
     #settingsPermission;
     #advancedSettingsPermission;
-    /** @type {Page[]} */
-    #pages;
-    /** @type {Service[]} */
-    #services;
+    #sudo = false;
 
     /**
      * 
      * @param {DBJoinedUser} json 
      */
     constructor(json) {
+        this.#id = json.User_ID;
         this.#name = json.User_Name;
         this.#createdDate = json.User_Created_Date;
+        this.#isAdmin = json.Is_Administrator;
+        this.#localTagServices = json.Local_Tag_Services;
+        this.#localTaggableServices = json.Local_Taggable_Services;
         this.#userManagementPermission = json.User_Management_Permission;
-        this.#localFileServicesPermission = json.Local_File_Services_Permission;
-        this.#globalFileServicesPermission = json.Global_File_Services_Permission;
+        this.#localFileServicesPermission = json.Local_Taggable_Services_Permission;
+        this.#globalFileServicesPermission = json.Global_Taggable_Services_Permission;
         this.#localRatingServicesPermission = json.Local_Rating_Services_Permission;
         this.#globalRatingServicesPermission = json.Global_Rating_Services_Permission;
         this.#localTagServicesPermission = json.Local_Tag_Services_Permission;
@@ -93,28 +99,68 @@ export class User {
         this.#globalParserServicesPermission = json.Global_Parser_Services_Permission;
         this.#settingsPermission = json.Settings_Permission;
         this.#advancedSettingsPermission = json.Advanced_Settings_Permission;
-        this.#pages = json['pages'] ?? [];
-        this.#services = json['services'] ?? [];
     }
 
-    /** @returns {TagService[]} */
-    get tagServices() {
-        return this.#services.filter(service => (service instanceof LocalTagService));
+    id() {
+        return this.#id;
+    }
+
+    isAdmin() {
+        return this.#isAdmin;
+    }
+
+    isSudo() {
+        return this.#sudo;
     }
 
     /**
-     * 
-     * @param {HTTPMethod} method 
+     * @param {boolean} value 
+     */
+    setSudo(value) {
+        this.#sudo = value;
+    }
+
+    localTagServices() {
+        return this.#localTagServices;
+    }
+
+    /**
+     * @param {ReturnType<typeof this.localTagServices>} localTagServices 
+     */
+    setLocalTagServices(localTagServices) {
+        this.#localTagServices = localTagServices;
+    }
+
+    localTaggableServices() {
+        return this.#localTaggableServices;
+    }
+
+    /**
+     * @param {ReturnType<typeof this.localTaggableServices>} localTaggableServices 
+     */
+    setLocalTaggableServices(localTaggableServices) {
+        this.#localTaggableServices = localTaggableServices;
+    }
+
+    /**
+     * @param {HTTPMethod | PermissionInt} permissionBitsToCheck 
      * @param {PermissionType | PermissionType[]} permissionTypes
      */
-    hasPermissions(method, permissionTypes) {
-        const permissionBitToCheck = METHOD_TO_PERMISSION_BIT[method];
+    hasPermissions(permissionBitsToCheck, permissionTypes) {
+        if (this.#sudo) {
+            return true;
+        }
+
+        if (typeof permissionBitsToCheck !== "number") {
+            permissionBitsToCheck = METHOD_TO_PERMISSION_BIT[permissionBitsToCheck];
+        }
+        
         if (!(permissionTypes instanceof Array)) {
             permissionTypes = [permissionTypes];
         }
 
         for (const permissionType of permissionTypes) {
-            if ((this.getPermission(permissionType) & permissionBitToCheck) === 0) {
+            if ((this.getPermission(permissionType) & permissionBitsToCheck) !== permissionBitsToCheck) {
                 return false;
             }
         }
@@ -130,11 +176,13 @@ export class User {
     getPermission(permissionType) {
         if (permissionType === PERMISSIONS.NONE) {
             return 15;
+        } else if (permissionType === PERMISSIONS.IS_ADMIN) {
+            return this.#isAdmin ? 15 : 0;  
         } else if (permissionType === PERMISSIONS.USER_MANAGEMENT) {
             return this.#userManagementPermission;
-        } else if (permissionType === PERMISSIONS.LOCAL_FILE_SERVICES) {
+        } else if (permissionType === PERMISSIONS.LOCAL_TAGGABLE_SERVICES) {
             return this.#localFileServicesPermission;
-        } else if (permissionType === PERMISSIONS.GLOBAL_FILE_SERVICES) {
+        } else if (permissionType === PERMISSIONS.GLOBAL_TAGGABLE_SERVICES) {
             return this.#globalFileServicesPermission;
         } else if (permissionType === PERMISSIONS.LOCAL_RATING_SERVICES) {
             return this.#localRatingServicesPermission;
@@ -172,10 +220,14 @@ export class User {
      */
     toJSON() {
         return {
+            User_ID: this.#id,
             User_Name: this.#name,
             User_Created_Date: this.#createdDate,
-            Local_File_Services_Permission: this.#localFileServicesPermission,
-            Global_File_Services_Permission: this.#globalFileServicesPermission,
+            Is_Administrator: this.#isAdmin,
+            Local_Tag_Services: this.#localTagServices,
+            Local_Taggable_Services: this.#localTaggableServices,
+            Local_Taggable_Services_Permission: this.#localFileServicesPermission,
+            Global_Taggable_Services_Permission: this.#globalFileServicesPermission,
             Local_Rating_Services_Permission: this.#localRatingServicesPermission,
             Global_Rating_Services_Permission: this.#globalRatingServicesPermission,
             Local_Tag_Services_Permission: this.#localTagServicesPermission,
@@ -190,7 +242,7 @@ export class User {
             Global_Parser_Services_Permission: this.#globalParserServicesPermission,
             Settings_Permission: this.#settingsPermission,
             Advanced_Settings_Permission: this.#advancedSettingsPermission,
-        }
+        };
     }
 
     static EMPTY_USER = new User({});

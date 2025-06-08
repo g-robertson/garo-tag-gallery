@@ -1,55 +1,87 @@
-import { FILE_EXTENSION_TAG_TYPE, tagsPKHash, URL_ASSOCIATION_TAG_TYPE, URL_TAG_TYPE } from "../client/js/tags.js";
-import {asyncDataSlicer, dball, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
+import { SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash } from "../client/js/tags.js";
+import { PERMISSIONS, User } from "../client/js/user.js";
+import {asyncDataSlicer, dball, dbget, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
+import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
 
+/** @import {DBService} from "./services.js" */
+/** @import {PermissionInt} from "../client/js/user.js" */
 /** @import {Databases} from "./db-util.js" */
 
 /**
- * @param {DBTag} systemTag 
+ * @param {PreInsertLocalTag & {Tag_ID: bigint}} systemTag 
  */
 export function insertsystemtag(systemTag) {
-    return dbsqlcommand(`
-        INSERT INTO Tags(
-            Tag_ID,
-            Display_Name,
-            Lookup_Name,
-            Tag_Type,
-            User_Editable,
-            Tags_PK_Hash
-        ) VALUES (
-            $systemTagID,
-            $systemTagDisplayName,
-            $systemTagLookupName,
-            $systemTagType,
-            0,
-            $systemTagPKHash
-        );
-    `, {
-        $systemTagID: Number(systemTag.Tag_ID),
-        $systemTagDisplayName: systemTag.Display_Name,
-        $systemTagLookupName: systemTag.Lookup_Name,
-        $systemTagType: systemTag.Tag_Type,
-        $systemTagPKHash: systemTag.Tags_PK_Hash
-    });
+    return [
+        dbsqlcommand(`
+            INSERT INTO Tags(
+                Tag_ID
+            ) VALUES (
+                $systemTagID
+            );
+        `, {
+            $systemTagID: Number(systemTag.Tag_ID),
+        }),
+        dbsqlcommand(`
+            INSERT INTO Local_Tags(
+                Tag_ID,
+                Local_Tag_Service_ID,
+                Lookup_Name,
+                Source_Name,
+                Local_Tags_PK_Hash,
+                Display_Name
+            ) VALUES (
+                $systemTagID,
+                $systemLocalTagServiceID,
+                $systemTagLookupName,
+                $systemTagSourceName,
+                $systemTagPKHash,
+                $systemTagDisplayName
+            );
+        `, {
+            $systemTagID: Number(systemTag.Tag_ID),
+            $systemLocalTagServiceID: SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
+            $systemTagLookupName: systemTag.Lookup_Name,
+            $systemTagSourceName: systemTag.Source_Name,
+            $systemTagPKHash: localTagsPKHash(systemTag.Lookup_Name, systemTag.Source_Name),
+            $systemTagDisplayName: systemTag.Display_Name,
+        })
+    ];
 }
 
 /**
- * @typedef {Object} PreInsertTag
+ * @typedef {Object} PreInsertLocalTag
+ * @property {string} Lookup_Name
  * @property {string} Source_Name
  * @property {string} Display_Name
- * @property {string} Lookup_Name
- * @property {number} Tag_Type
+ */
+
+/**
+ * @typedef {Object} DBLocalTagService
+ * @property {number} Local_Tag_Service_ID
+ * @property {number} Tag_Service_ID
  * @property {number} User_Editable
  */
 
 /**
+ * @typedef {DBLocalTagService & DBService} DBJoinedLocalTagService
+ */
+/** @typedef {DBJoinedLocalTagService & {Permission_Extent: PermissionInt}} DBPermissionedLocalTagService */
+
+/**
  * @typedef {Object} DBTag
  * @property {bigint} Tag_ID
- * @property {string} Source_Name
- * @property {string} Tags_PK_Hash
- * @property {string} Display_Name
+ * @property {number} Tag_Created_Date
+ */
+
+/**
+ * @typedef {Object} DBLocalTag
+ * @property {number} Local_Tag_ID,
+ * @property {bigint} Tag_ID
+ * @property {number} Local_Tag_Service_ID
  * @property {string} Lookup_Name
- * @property {string} Tag_Type
- * @property {string} User_Editable
+ * @property {string} Source_Name
+ * @property {string} Local_Tags_PK_Hash
+ * @property {string} Display_Name
  */
 
 /**
@@ -106,21 +138,97 @@ export async function addTagsToTaggables(dbs, tagPairings) {
     }
 }
 
+/**
+ * @param {Databases} dbs 
+ * @param {number} localTagServiceID 
+ * @returns {Promise<DBJoinedLocalTagService>}
+ */
+export async function selectLocalTagService(dbs, localTagServiceID) {
+    return await dbget(dbs, `
+        SELECT *
+          FROM Local_Tag_Services LTS
+          JOIN Services S ON LTS.Service_ID = S.Service_ID
+          WHERE Local_Tag_Service_ID = ?;
+        `, localTagServiceID
+    );
+
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {User} user
+ * @param {PermissionInt} permissionBitsToCheck
+ * @param {number} localTagServiceID
+ * @returns {Promise<DBJoinedLocalTagService>}
+ */
+export async function userSelectLocalTagService(dbs, user, permissionBitsToCheck, localTagServiceID) {
+    if (user.isSudo() || user.hasPermissions(permissionBitsToCheck, PERMISSIONS.LOCAL_TAG_SERVICES)) {
+        return await selectLocalTagService(dbs, localTagServiceID);
+    }
+
+    return await dbget(dbs, `
+        SELECT LTS.*, S.*
+          FROM Local_Tag_Services LTS
+          JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
+          JOIN Services S ON LTS.Service_ID = S.Service_ID
+         WHERE LTS.Local_Tag_Service_ID = $localTagServiceID
+           AND SUP.User_ID = $userID
+           AND (SUP.Permission_Extent & $permissionBitsToCheck) = $permissionBitsToCheck;
+    `, {
+        $localTagServiceID: localTagServiceID,
+        $userID: user.id(),
+        $permissionBitsToCheck: permissionBitsToCheck
+    });
+}
+
+/** @returns {Promise<DBJoinedLocalTagService[]>} */
+export async function selectAllLocalTagServices(dbs) {
+    return await dball(dbs, `
+        SELECT *
+          FROM Local_Tag_Services LTS
+          JOIN Services S ON LTS.Service_ID = S.Service_ID;
+    `);
+}
 
 /**
  * 
  * @param {Databases} dbs 
- * @param {{Lookup_Name: string, Source_Name: string}[]} tagLookups 
+ * @param {User} user 
  */
-async function selectTags(dbs, tagLookups) {
+export async function userSelectAllLocalTagServices(dbs, user) {
+    const userSelectedPermissionedLocalTagServices = await userSelectAllSpecificTypedServicesHelper(
+        dbs,
+        user,
+        PERMISSIONS.LOCAL_TAG_SERVICES,
+        selectAllLocalTagServices,
+        async () => {
+            return await dball(dbs, `
+                SELECT SUP.Permission_Extent, LTS.*, S.*
+                  FROM Local_Tag_Services LTS
+                  JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
+                  JOIN Services S ON LTS.Service_ID = S.Service_ID
+                 WHERE SUP.User_ID = $userID;
+            `, {$userID: user.id()});
+        }
+    );
+
+    return userSelectedPermissionedLocalTagServices.filter(dbLocalTagService => dbLocalTagService.User_Editable !== 0);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {{Lookup_Name: string, Source_Name: string}[]} tagLookups 
+ * @param {number} localTagServiceID
+ */
+async function selectLocalTags(dbs, tagLookups, localTagServiceID) {
     if (tagLookups.length === 0) {
         return [];
     }
 
-    const tagPKHashes = tagLookups.map(tagLookup => tagsPKHash(tagLookup.Lookup_Name, tagLookup.Source_Name));
+    const tagPKHashes = tagLookups.map(tagLookup => localTagsPKHash(tagLookup.Lookup_Name, tagLookup.Source_Name));
 
-    /** @type {DBTag[]} */
-    const dbTags = await dball(dbs, `SELECT * FROM Tags WHERE Tags_PK_Hash IN ${dbvariablelist(tagPKHashes.length)};`, tagPKHashes);
+    /** @type {DBLocalTag[]} */
+    const dbTags = await dball(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = ? AND Local_Tags_PK_Hash IN ${dbvariablelist(tagPKHashes.length)};`, [localTagServiceID, ...tagPKHashes]);
     return dbTags.map(dbTag => ({
         ...dbTag,
         Tag_ID: BigInt(dbTag.Tag_ID)
@@ -128,61 +236,86 @@ async function selectTags(dbs, tagLookups) {
 }
 
 /**
+ * 
  * @param {Databases} dbs 
- * @param {PreInsertTag[]} tags 
- * @returns {Promise<DBTag[]>}
+ * @param {number} amount 
  */
-async function insertTags(dbs, tags) {
-    if (tags.length === 0) {
-        return [];
-    }
-    if (tags.length > 2000) {
-        return (await asyncDataSlicer(tags, 2000, sliced => insertTags(dbs, sliced))).flat();
+async function insertTags(dbs, amount) {
+    const now = Math.floor(Date.now() / 1000);
+    const nows = [];
+    for (let i = 0; i < amount; ++i) {
+        nows.push(now);
     }
     
-    const tagInsertionParams = [];
-    for (const tag of tags) {
-        tagInsertionParams.push(tag.Source_Name);
-        tagInsertionParams.push(tag.Display_Name);
-        tagInsertionParams.push(tag.Lookup_Name);
-        tagInsertionParams.push(tag.Tag_Type);
-        tagInsertionParams.push(tag.User_Editable);
-        tagInsertionParams.push(tagsPKHash(tag.Lookup_Name, tag.Source_Name));
-    }
-
     /** @type {DBTag[]} */
-    const dbTags = await dball(dbs, `
-        INSERT INTO Tags(
-            Source_Name,
-            Display_Name,
-            Lookup_Name,
-            Tag_Type,
-            User_Editable,
-            Tags_PK_Hash
-        ) VALUES ${dbtuples(tags.length, 6)} RETURNING *;
-        `, tagInsertionParams
-    );
+    const dbTags = await dball(dbs, `INSERT INTO Tags(Tag_Created_Date) VALUES ${dbtuples(amount, 1)} RETURNING *;`, nows);
     return dbTags.map(dbTag => ({
         ...dbTag,
         Tag_ID: BigInt(dbTag.Tag_ID)
+    }))
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {PreInsertLocalTag[]} localTags 
+ * @param {number} localTagServiceID
+ * @returns {Promise<DBLocalTag[]>}
+ */
+export async function insertLocalTags(dbs, localTags, localTagServiceID) {
+    if (localTags.length === 0) {
+        return [];
+    }
+    if (localTags.length > 2000) {
+        return (await asyncDataSlicer(localTags, 2000, sliced => insertLocalTags(dbs, sliced, localTagServiceID))).flat();
+    }
+    
+    const dbTags = await insertTags(dbs, localTags.length);
+
+    const tagInsertionParams = [];
+    for (let i = 0; i < localTags.length; ++i) {
+        const localTag = localTags[i];
+        tagInsertionParams.push(Number(dbTags[i].Tag_ID));
+        tagInsertionParams.push(localTagServiceID);
+        tagInsertionParams.push(localTag.Lookup_Name);
+        tagInsertionParams.push(localTag.Source_Name);
+        tagInsertionParams.push(localTagsPKHash(localTag.Lookup_Name, localTag.Source_Name));
+        tagInsertionParams.push(localTag.Display_Name);
+    }
+
+    /** @type {DBLocalTag[]} */
+    const dbLocalTags = await dball(dbs, `
+        INSERT INTO Local_Tags(
+            Tag_ID,
+            Local_Tag_Service_ID,
+            Lookup_Name,
+            Source_Name,
+            Local_Tags_PK_Hash,
+            Display_Name
+        ) VALUES ${dbtuples(localTags.length, 6)} RETURNING *;
+        `, tagInsertionParams
+    );
+    return dbLocalTags.map(dbLocalTag => ({
+        ...dbLocalTag,
+        Tag_ID: BigInt(dbLocalTag.Tag_ID)
     }));
 }
 
 /**
  * @param {Databases} dbs 
- * @param {PreInsertTag[]} tags 
+ * @param {PreInsertLocalTag[]} localTags
+ * @param {number} localTagServiceID
  */
-export async function upsertTags(dbs, tags) {
-    if (tags.length === 0) {
+export async function upsertLocalTags(dbs, localTags, localTagServiceID) {
+    if (localTags.length === 0) {
         return [];
     }
 
-    const dbTags = await selectTags(dbs, tags);
-    const dbTagsExisting = new Set(dbTags.map(dbTag => dbTag.Lookup_Name));
-    const tagsToInsert = tags.filter(tag => !dbTagsExisting.has(tag.Lookup_Name));
-    const insertedDBTags = await insertTags(dbs, tagsToInsert); 
+    const dbLocalTags = await selectLocalTags(dbs, localTags, localTagServiceID);
+    const dbLocalTagsExisting = new Set(dbLocalTags.map(dbTag => dbTag.Local_Tags_PK_Hash));
+    const tagsToInsert = localTags.filter(localTag => !dbLocalTagsExisting.has(localTagsPKHash(localTag.Lookup_Name, localTag.Source_Name)));
+    const insertedDBTags = await insertLocalTags(dbs, tagsToInsert, localTagServiceID); 
 
-    return [...dbTags, ...insertedDBTags];
+    return [...dbLocalTags, ...insertedDBTags];
 }
 
 
@@ -268,13 +401,11 @@ export async function upsertFileExtensions(dbs, fileExtensions) {
     /** @type {DBFileExtension[]} */
     let insertedDBFileExtensions = []
     if (fileExtensionsToInsert.length !== 0) {
-        const insertedHasFileExtensionTags = await insertTags(dbs, fileExtensionsToInsert.map(fileExtension => ({
+        const insertedHasFileExtensionTags = await insertLocalTags(dbs, fileExtensionsToInsert.map(fileExtension => ({
             Source_Name: "System generated",
             Display_Name: `system:has file extension:${fileExtension}`,
-            Lookup_Name: `system:has file extension:${fileExtension}`,
-            Tag_Type: FILE_EXTENSION_TAG_TYPE,
-            User_Editable: 0
-        })));
+            Lookup_Name: `system:has file extension:${fileExtension}`
+        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
         const fileExtensionInsertionParams = [];
         for (let i = 0; i < fileExtensionsToInsert.length; ++i) {
@@ -329,7 +460,7 @@ export async function upsertNamespaces(dbs, namespaces) {
  * @param {Databases} dbs
  * @param {string[]} urls 
  */
-export async function upsertURLs(dbs, urls) {
+export async function upsertURLs(dbs, urls, localTagServiceID) {
     if (urls.length === 0) {
         return [];
     }
@@ -342,13 +473,11 @@ export async function upsertURLs(dbs, urls) {
     /** @type {DBURL[]} */
     let insertedDBURLs = [];
     if (urlsToInsert.length !== 0) {
-        const insertedHasURLTags = await insertTags(dbs, urlsToInsert.map(url => ({
+        const insertedHasURLTags = await insertLocalTags(dbs, urlsToInsert.map(url => ({
             Source_Name: "System generated",
             Display_Name: `system:has url:${url}`,
-            Lookup_Name: `system:has url:${url}`,
-            Tag_Type: URL_TAG_TYPE,
-            User_Editable: 0
-        })));
+            Lookup_Name: `system:has url:${url}`
+        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
         const urlInsertionParams = [];
         for (let i = 0; i < urlsToInsert.length; ++i) {
@@ -411,13 +540,11 @@ export async function upsertURLAssociations(dbs, urlAssociations) {
     /** @type {DBURLAssociation[]} */
     let insertedDBURLAssociations = [];
     if (urlAssociationsToInsert.length !== 0) {
-        const insertedHasURLAssociationTags = await insertTags(dbs, urlAssociationsToInsert.map(urlAssociation => ({
+        const insertedHasURLAssociationTags = await insertLocalTags(dbs, urlAssociationsToInsert.map(urlAssociation => ({
             Source_Name: "System generated",
             Display_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`,
-            Lookup_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`,
-            Tag_Type: URL_ASSOCIATION_TAG_TYPE,
-            User_Editable: 0
-        })));
+            Lookup_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`
+        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
         const urlAssociationInsertionParams = [];
         for (let i = 0; i < urlAssociationsToInsert.length; ++i) {

@@ -59,7 +59,7 @@ export function getTotalDirectoryBytes(directory) {
 /**
  * @param {Record<string, string[]} filePairings 
  */
-export function strFilePairingsToStrTagPairings(filePairings) {
+export function strTaggablePairingsToStrTagPairings(filePairings) {
     /** @type {Record<string, string[]} */
     const strTagPairings = {};
     for (const file in filePairings) {

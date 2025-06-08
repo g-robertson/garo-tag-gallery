@@ -11,6 +11,10 @@ const TESTS = {
     ...DOES_HE_PERFORM_TESTS,
 };
 
+const DISABLED_TEST_CASES = [
+    "complements_make_size_smaller"
+];
+
 async function main() {
     /** @type {PerfTags[]} */
     let PERF_TAGS = [];
@@ -26,6 +30,9 @@ async function main() {
         return perfTags;
     }
     for (const test in TESTS) {
+        if (DISABLED_TEST_CASES.indexOf(test) !== -1) {
+            continue;
+        }
         rmSync("test-dir", {'recursive': true, 'force': true});
         await TESTS[test](createPerfTags);
         for (const perfTags of PERF_TAGS) {

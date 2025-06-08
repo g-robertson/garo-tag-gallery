@@ -66,7 +66,7 @@ class Bucket {
         }
 
         void diffAhead() {
-            if (!diffContentsIsDirty) {
+            if (inTransaction || !diffContentsIsDirty) {
                 return;
             }
             
@@ -81,7 +81,7 @@ class Bucket {
         }
 
         void write() {
-            if (!contentsIsDirty) {
+            if (inTransaction || !contentsIsDirty) {
                 return;
             }
         
@@ -103,6 +103,14 @@ class Bucket {
             write();
         }
 
+        void beginTransaction() {
+            inTransaction = true;
+        }
+        
+        void endTransaction() {
+            inTransaction = false;
+            diffAhead();
+        }
     protected:
         std::filesystem::path mainFileName;
         bool mainDirty = false;
@@ -114,6 +122,7 @@ class Bucket {
         bool contentsIsDirty = false;
         TDiffContainer diffContents;
         bool diffContentsIsDirty = false;
+        bool inTransaction = false;
 
         void init() {
             if (isRead) {
@@ -150,7 +159,13 @@ class Bucket {
             }
         
             // if diff contents were needed, then we need to write immediately to prevent overwriting diffs
-            write();
+            if (inTransaction) {
+                inTransaction = false;
+                write();
+                inTransaction = true;
+            } else {
+                write();
+            }
         }
 
         virtual T FAKER() const = 0;

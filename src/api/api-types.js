@@ -1,7 +1,7 @@
 import sqlite3 from "sqlite3";
 import { ChildProcess } from "child_process"
+import { User } from "../client/js/user.js";
 /** 
- * @import { User } from "../client/js/user.js";
  * @import express from "@types/express"
  * @import {PermissionType} from "../db/user.js"
  **/

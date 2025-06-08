@@ -54,8 +54,8 @@ int main(int argc, const char** argv) {
         buffer << file.rdbuf();
         std::string input = buffer.str();
 
-        if (op == "insert_files") {
-            tfm.insertFiles(input);
+        if (op == "insert_taggables") {
+            tfm.insertTaggables(input);
         } else if (op == "insert_tags") {
             tfm.insertTags(input);
         }  else if (op == "insert_tag_pairings") {
@@ -64,14 +64,18 @@ int main(int argc, const char** argv) {
             tfm.togglePairings(input);
         } else if (op == "delete_tag_pairings") {
             tfm.deletePairings(input);
-        } else if (op == "read_files_tags") {
-            tfm.readFilesTags(input, outputFileWriter);
+        } else if (op == "read_taggables_tags") {
+            tfm.readTaggablesTags(input, outputFileWriter);
         } else if (op == "search") {
             tfm.search(input, outputFileWriter);
         } else if (op == "flush_files") {
             tfm.flushFiles();
         } else if (op == "purge_unused_files") {
             tfm.purgeUnusedFiles();
+        } else if (op == "begin_transaction") {
+            tfm.beginTransaction();
+        } else if (op == "end_transaction") {
+            tfm.endTransaction();
         } else if (op == "exit") {
             if (tfm.needsMaintenance()) {
                 std::cout << "DO MAINTENANCE?" << std::endl;

@@ -1,1 +1,1 @@
-insert_files
+insert_taggables

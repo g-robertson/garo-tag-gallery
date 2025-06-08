@@ -26,7 +26,7 @@ const Navbar = ({pushModal}) => {
             </div>
             
             <div className="topbar-dropdown">
-                <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(FILE_MENU_2)}>File2</div>
+                <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(FILE_MENU_2)}>Pages</div>
                 <div className="topbar-dropdown-options" style={{display: menuOpened === FILE_MENU_2 ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_NAME)

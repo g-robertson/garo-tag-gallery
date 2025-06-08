@@ -66,94 +66,98 @@ void TagFileMaintainer::readCacheFile() {
         cacheFile >> currentBucketCount;
     }
 
-    fileBucket = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "file-bucket", totalFiles);
+    taggableBucket = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "taggable-bucket", totalFiles);
     tagBucket = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "tag-bucket", totalTags);
 
     for (std::size_t i = 0; i < currentBucketCount; ++i) {
-        std::size_t bucketTotalTagsToFiles = 0;
-        std::size_t bucketTagsToFilesComplementCount = 0;
-        std::size_t bucketTotalFilesToTags = 0;
-        std::size_t bucketFilesToTagsComplementCount = 0;
+        std::size_t bucketTotalTagsToTaggables = 0;
+        std::size_t bucketTagsToTaggablesComplementCount = 0;
+        std::size_t bucketTotalTaggablesToTags = 0;
+        std::size_t bucketTaggablesToTagsComplementCount = 0;
         if (!cacheFile.fail()) {
             cacheFile >> fillerNull;
-            cacheFile >> bucketTotalTagsToFiles;
+            cacheFile >> bucketTotalTagsToTaggables;
             cacheFile >> fillerNull;
-            cacheFile >> bucketTagsToFilesComplementCount;
+            cacheFile >> bucketTagsToTaggablesComplementCount;
             cacheFile >> fillerNull;
-            cacheFile >> bucketTotalFilesToTags;
+            cacheFile >> bucketTotalTaggablesToTags;
             cacheFile >> fillerNull;
-            cacheFile >> bucketFilesToTagsComplementCount;
+            cacheFile >> bucketTaggablesToTagsComplementCount;
         }
 
-        std::string tagFileFolderName = std::string("tag-to-file-") + std::to_string(i);
-        std::string fileTagFolderName = std::string("file-to-tag-") + std::to_string(i);
-        tagFileBuckets.push_back(PairingBucket(folderPath_ / "buckets" / tagFileFolderName, bucketTotalTagsToFiles, bucketTagsToFilesComplementCount, &fileBucket->contents()));
-        fileTagBuckets.push_back(PairingBucket(folderPath_ / "buckets" / fileTagFolderName, bucketTotalFilesToTags, bucketFilesToTagsComplementCount, &tagBucket->contents()));
+        std::string tagTaggableFolderName = std::string("tag-to-taggable-") + std::to_string(i);
+        std::string taggableTagFolderName = std::string("taggable-to-tag-") + std::to_string(i);
+        tagTaggableBuckets.push_back(PairingBucket(folderPath_ / "buckets" / tagTaggableFolderName, bucketTotalTagsToTaggables, bucketTagsToTaggablesComplementCount, &taggableBucket->contents()));
+        taggableTagBuckets.push_back(PairingBucket(folderPath_ / "buckets" / taggableTagFolderName, bucketTotalTaggablesToTags, bucketTaggablesToTagsComplementCount, &tagBucket->contents()));
     }
 }
 
 void TagFileMaintainer::writeCacheFile() {
+    if (inTransaction) {
+        return;
+    }
+
     auto cacheFile = AtomicOfstream(cacheFilePath_);
     cacheFile << VERSION
-              << " fileBucketSize "
-              << fileBucket->size()
+              << " taggableBucketSize "
+              << taggableBucket->size()
               << " tagBucketSize "
               << tagBucket->size()
               << " currentBucketCount "
               << currentBucketCount;
     
     for (int i = 0; i < currentBucketCount; ++i) {
-        cacheFile << " tagFileBucket" << i << "Size "
-                  << tagFileBuckets.at(i).size()
-                  << " tagFileBucket" << i << "StartingComplementCount "
-                  << tagFileBuckets.at(i).startingComplementCount()
-                  << " fileTagBucket" << i << "Size "
-                  << fileTagBuckets.at(i).size()
-                  << " fileTagBucket" << i << "StartingComplementCount "
-                  << fileTagBuckets.at(i).startingComplementCount();
+        cacheFile << " tagTaggableBucket" << i << "Size "
+                  << tagTaggableBuckets.at(i).size()
+                  << " tagTaggableBucket" << i << "StartingComplementCount "
+                  << tagTaggableBuckets.at(i).startingComplementCount()
+                  << " taggableTagBucket" << i << "Size "
+                  << taggableTagBuckets.at(i).size()
+                  << " taggableTagBucket" << i << "StartingComplementCount "
+                  << taggableTagBuckets.at(i).startingComplementCount();
     }
 }
 
-void TagFileMaintainer::modifyFiles(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
-    auto modifyFile = [&callback, this](uint64_t file) {
-        for (auto& bucket : tagFileBuckets) {
-            bucket.insertComplement(file);
+void TagFileMaintainer::modifyTaggables(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
+    auto modifyTaggable = [&callback, this](uint64_t taggable) {
+        for (auto& bucket : tagTaggableBuckets) {
+            bucket.insertComplement(taggable);
         }
-        (*fileBucket.*callback)(file);
+        (*taggableBucket.*callback)(taggable);
     };
-    processSingles(input, modifyFile);
+    processSingles(input, modifyTaggable);
 
-    for (auto& bucket : tagFileBuckets) {
+    for (auto& bucket : tagTaggableBuckets) {
         bucket.diffAhead();
     }
 
-    fileBucket->diffAhead();
+    taggableBucket->diffAhead();
     writeCacheFile();
 }
 
-void TagFileMaintainer::insertFiles(std::string_view input) {
-    modifyFiles(input, SingleBucket::insertItem);
+void TagFileMaintainer::insertTaggables(std::string_view input) {
+    modifyTaggables(input, SingleBucket::insertItem);
 }
-void TagFileMaintainer::toggleFiles(std::string_view input) {
-    modifyFiles(input, SingleBucket::toggleItem);
+void TagFileMaintainer::toggleTaggables(std::string_view input) {
+    modifyTaggables(input, SingleBucket::toggleItem);
 }
-void TagFileMaintainer::deleteFiles(std::string_view input) {
-    modifyFiles(input, SingleBucket::deleteItem);
+void TagFileMaintainer::deleteTaggables(std::string_view input) {
+    modifyTaggables(input, SingleBucket::deleteItem);
 }
-void TagFileMaintainer::readFiles(void (*writer)(const std::string&)) {
-    writer(serializeSingles(fileBucket->contents()));
+void TagFileMaintainer::readTaggables(void (*writer)(const std::string&)) {
+    writer(serializeSingles(taggableBucket->contents()));
 }
 
 void TagFileMaintainer::modifyTags(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
     auto modifyTag = [&callback, this](uint64_t tag) {
-        for (auto& bucket : fileTagBuckets) {
+        for (auto& bucket : taggableTagBuckets) {
             bucket.insertComplement(tag);
         }
         (*tagBucket.*callback)(tag);
     };
     processSingles(input, modifyTag);
 
-    for (auto& bucket : fileTagBuckets) {
+    for (auto& bucket : taggableTagBuckets) {
         bucket.diffAhead();
     }
 
@@ -184,21 +188,21 @@ void TagFileMaintainer::modifyPairings(std::string_view input, void (PairingBuck
     while (input.size() != 0) {
         auto tag = util::deserializeUInt64(input);
         input = input.substr(8);
-        auto fileCount = util::deserializeUInt64(input);
+        auto taggableCount = util::deserializeUInt64(input);
         input = input.substr(8);
-        for (std::size_t i = 0; i < fileCount; ++i) {
-            auto file = util::deserializeUInt64(input);
+        for (std::size_t i = 0; i < taggableCount; ++i) {
+            auto taggable = util::deserializeUInt64(input);
             input = input.substr(8);
-            (getTagBucket(tag).*callback)(std::pair<uint64_t, uint64_t>(tag, file));
-            (getFileBucket(file).*callback)(std::pair<uint64_t, uint64_t>(file, tag));
+            (getTagBucket(tag).*callback)(std::pair<uint64_t, uint64_t>(tag, taggable));
+            (getTaggableBucket(taggable).*callback)(std::pair<uint64_t, uint64_t>(taggable, tag));
         }
     }
     
 
-    for (auto& bucket : tagFileBuckets) {
+    for (auto& bucket : tagTaggableBuckets) {
         bucket.diffAhead();
     }
-    for (auto& bucket : fileTagBuckets) {
+    for (auto& bucket : taggableTagBuckets) {
         bucket.diffAhead();
     }
     writeCacheFile();
@@ -216,7 +220,7 @@ void TagFileMaintainer::deletePairings(std::string_view input) {
     modifyPairings(input, PairingBucket::deleteItem);
 }
 
-void TagFileMaintainer::readFilesTags(std::string_view input, void (*writer)(const std::string&)) {
+void TagFileMaintainer::readTaggablesTags(std::string_view input, void (*writer)(const std::string&)) {
     std::string output;
     std::size_t location = 0;
     
@@ -224,20 +228,20 @@ void TagFileMaintainer::readFilesTags(std::string_view input, void (*writer)(con
         throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
     }
     while (input.size() > 0) {
-        uint64_t file = util::deserializeUInt64(input);
+        uint64_t taggable = util::deserializeUInt64(input);
         input = input.substr(8);
-        auto& fileBucket = getFileBucket(file);
-        const auto* fileTags = fileBucket.firstContents(file);
-        if (fileTags != nullptr) {
-            util::serializeUInt64(file, output, location);
-            util::serializeUInt64(fileTags->size(), output, location);
+        auto& taggableBucket = getTaggableBucket(taggable);
+        const auto* taggableTags = taggableBucket.firstContents(taggable);
+        if (taggableTags != nullptr) {
+            util::serializeUInt64(taggable, output, location);
+            util::serializeUInt64(taggableTags->size(), output, location);
             
             auto serializeTag = [&output, &location](uint64_t tag) {
                 util::serializeUInt64(tag, output, location);
             };
-            fileTags->forEach(serializeTag);
+            taggableTags->forEach(serializeTag);
         } else {
-            util::serializeUInt64(file, output, location);
+            util::serializeUInt64(taggable, output, location);
             util::serializeUInt64(0, output, location);
         }
     }
@@ -247,8 +251,8 @@ void TagFileMaintainer::readFilesTags(std::string_view input, void (*writer)(con
 
 // Searches tag file maintainer based on a search string where symbols mean the following:
 // Operators are evaluated left to right in the shortest manner possible
-// 'T' Tag: followed by a tag identifier will yield a file list of all files with that 
-// 'F' Filelist: 
+// 'T' Tag: followed by a tag identifier will yield a taggable list of all taggables with that tag
+// 'L' Taggable list: 
 // '(' open group
 // ')' close group
 // '~' not
@@ -259,8 +263,8 @@ void TagFileMaintainer::readFilesTags(std::string_view input, void (*writer)(con
 
 namespace {
     const char FIRST_OP = '\x00';
-    const char TAG_FILE_LIST = 'T';
-    const char FILE_LIST = 'F';
+    const char TAG_TAGGABLE_LIST = 'T';
+    const char TAGGABLE_LIST = 'L';
     const char OPEN_GROUP = '(';
     const char CLOSE_GROUP = ')';
     const char COMPLEMENT_OP = '~';
@@ -276,13 +280,14 @@ namespace {
 
 void TagFileMaintainer::search(std::string_view input, void (*writer)(const std::string&)) {
     auto setEval = search_(input);
-    auto files = setEval.second.releaseResult();
-
-    writer(serializeSingles(files));
+    auto taggables = setEval.second.releaseResult();
+    writer(serializeSingles(taggables));
 }
 
+
 std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::string_view input) {
-    const auto* universe = &fileBucket->contents();
+    static auto EMPTY_TAGGABLES = IdPairSecond(&taggableBucket->contents());
+    const auto* universe = &taggableBucket->contents();
     auto context = SetEvaluation(false, universe, universe);
     char op = FIRST_OP;
     while (input.size() != 0) {
@@ -293,28 +298,36 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
             input = input.substr(1);
         }
 
+        if (op == CLOSE_GROUP) {
+            return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
+        }
+
         bool isComplement = false;
         if (input[0] == COMPLEMENT_OP) {
             isComplement = true;
             input = input.substr(1);
         }
 
-        if (input[0] == TAG_FILE_LIST) {
+
+        if (input[0] == TAG_TAGGABLE_LIST) {
             input = input.substr(1);
             uint64_t tag = util::deserializeUInt64(input);
             input = input.substr(8);
-            const auto* files = getTagBucket(tag).firstContents(tag);
-            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(files->isComplement(), universe, &files->physicalContents()));
-        } else if (input[0] == FILE_LIST) {
+            const auto* taggables = getTagBucket(tag).firstContents(tag);
+            if (taggables == nullptr) {
+                taggables = &EMPTY_TAGGABLES;
+            }
+            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(taggables->isComplement(), universe, &taggables->physicalContents()));
+        } else if (input[0] == TAGGABLE_LIST) {
             input = input.substr(1);
-            uint64_t fileCount = util::deserializeUInt64(input);
+            uint64_t taggableCount = util::deserializeUInt64(input);
             input = input.substr(8);
-            std::unordered_set<uint64_t> files;
-            for (std::size_t i = 0; i < fileCount; ++i) {
-                files.insert(util::deserializeUInt64(input));
+            std::unordered_set<uint64_t> taggables;
+            for (std::size_t i = 0; i < taggableCount; ++i) {
+                taggables.insert(util::deserializeUInt64(input));
                 input = input.substr(8);
             }
-            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, std::move(files)));
+            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, std::move(taggables)));
             if (isComplement) {
                 context.complement();
             }
@@ -326,9 +339,6 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
             if (isComplement) {
                 context.complement();
             }
-        } else if (input[0] == CLOSE_GROUP) {
-            input = input.substr(1);
-            return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
         }
     }
 
@@ -336,24 +346,24 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
 }
 
 void TagFileMaintainer::flushFiles() {
-    for (auto& tagFileBucket : tagFileBuckets) {
-        tagFileBucket.write();
+    for (auto& tagTaggableBucket : tagTaggableBuckets) {
+        tagTaggableBucket.write();
     }
-    for (auto& fileTagBucket : fileTagBuckets) {
-        fileTagBucket.write();
+    for (auto& taggableTagBucket : taggableTagBuckets) {
+        taggableTagBucket.write();
     }
-    fileBucket->write();
+    taggableBucket->write();
     tagBucket->write();
 }
 
 void TagFileMaintainer::purgeUnusedFiles() const {
-    for (const auto& tagFileBucket : tagFileBuckets) {
-        tagFileBucket.purgeUnusedFiles();
+    for (const auto& tagTaggableBucket : tagTaggableBuckets) {
+        tagTaggableBucket.purgeUnusedFiles();
     }
-    for (const auto& fileTagBucket : fileTagBuckets) {
-        fileTagBucket.purgeUnusedFiles();
+    for (const auto& taggableTagBucket : taggableTagBuckets) {
+        taggableTagBucket.purgeUnusedFiles();
     }
-    fileBucket->purgeUnusedFiles();
+    taggableBucket->purgeUnusedFiles();
     tagBucket->purgeUnusedFiles();
 }
 
@@ -378,16 +388,40 @@ unsigned short TagFileMaintainer::getBucketIndex(uint64_t item) const {
 //}
 
 PairingBucket& TagFileMaintainer::getTagBucket(uint64_t tag) {
-    return tagFileBuckets.at(getBucketIndex(tag));
+    return tagTaggableBuckets.at(getBucketIndex(tag));
 }
 const PairingBucket& TagFileMaintainer::getTagBucket(uint64_t tag) const {
-    return tagFileBuckets.at(getBucketIndex(tag));
+    return tagTaggableBuckets.at(getBucketIndex(tag));
 }
-PairingBucket& TagFileMaintainer::getFileBucket(uint64_t file) {
-    return fileTagBuckets.at(getBucketIndex(file));
+PairingBucket& TagFileMaintainer::getTaggableBucket(uint64_t file) {
+    return taggableTagBuckets.at(getBucketIndex(file));
 }
-const PairingBucket& TagFileMaintainer::getFileBucket(uint64_t file) const {
-    return fileTagBuckets.at(getBucketIndex(file));
+const PairingBucket& TagFileMaintainer::getTaggableBucket(uint64_t file) const {
+    return taggableTagBuckets.at(getBucketIndex(file));
+}
+
+void TagFileMaintainer::beginTransaction() {
+    for (auto& tagTaggableBucket : tagTaggableBuckets) {
+        tagTaggableBucket.beginTransaction();
+    }
+    for (auto& taggableTagBucket : taggableTagBuckets) {
+        taggableTagBucket.beginTransaction();
+    }
+    taggableBucket->beginTransaction();
+    tagBucket->beginTransaction();
+    inTransaction = true;
+}
+void TagFileMaintainer::endTransaction() {
+    for (auto& tagTaggableBucket : tagTaggableBuckets) {
+        tagTaggableBucket.endTransaction();
+    }
+    for (auto& taggableTagBucket : taggableTagBuckets) {
+        taggableTagBucket.endTransaction();
+    }
+    taggableBucket->endTransaction();
+    tagBucket->endTransaction();
+    inTransaction = false;
+    writeCacheFile();
 }
 
 bool TagFileMaintainer::needsMaintenance() {
@@ -403,13 +437,13 @@ void TagFileMaintainer::close() {
         return;
     }
     
-    for (auto& bucket : tagFileBuckets) {
+    for (auto& bucket : tagTaggableBuckets) {
         bucket.close();
     }
-    for (auto& bucket : fileTagBuckets) {
+    for (auto& bucket : taggableTagBuckets) {
         bucket.close();
     }
-    fileBucket->close();
+    taggableBucket->close();
     tagBucket->close();
     writeCacheFile();
     closed_ = true;
