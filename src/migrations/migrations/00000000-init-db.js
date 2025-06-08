@@ -133,7 +133,9 @@ export const MIGRATION = {
                 User_Name TEXT NOT NULL UNIQUE,
                 Is_Administrator INTEGER NOT NULL DEFAULT FALSE,
                 Access_Key TEXT NOT NULL UNIQUE,
-                Permission_Set_ID INTEGERNOT NULL ,
+                Permission_Set_ID INTEGER NOT NULL,
+                JSON_Pages TEXT NOT NULL DEFAULT '[]',
+                JSON_Preferences TEXT NOT NULL DEFAULT '{}',
                 User_Created_Date INTEGER NOT NULL DEFAULT (unixepoch('now'))
             );
         `),
@@ -348,6 +350,84 @@ export const MIGRATION = {
                 Service_ID INTEGER NOT NULL,
                 User_ID INTEGER NOT NULL,
                 Permission_Extent INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_Metrics_Service(
+                Local_Metric_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Service_ID INTEGER NOT NULL,
+                Has_Metric_From_Local_Metric_Service_Tag_ID INTEGER NOT NULL,
+                User_Editable INTEGER NOT NULL
+            ); 
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_Metrics(
+                Local_Metric_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_Metric_Service_ID INTEGER NOT NULL,
+                Has_Local_Metric_Tag_ID INTEGER NOT NULL,
+                Local_Metric_Name TEXT NOT NULL,
+                Local_Metric_Lower_Bound REAL,
+                Local_Metric_Upper_Bound REAL,
+                Local_Metric_Precision REAL NOT NULL,
+                Local_Metric_Type INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_Applied_Metrics(
+                Local_Applied_Metric_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_Metric_ID INTEGER NOT NULL,
+                User_ID INTEGER,
+                Applied_Value REAL NOT NULL,
+                Local_Applied_Metric_PK_Hash TEXT NOT NULL,
+                Local_Applied_Metric_Tag_ID INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_URL_Generator_Services(
+                Local_URL_Generator_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Service_ID INTEGER NOT NULL,
+                Has_URL_From_Local_URL_Generator_Service_Tag_ID INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_URL_Generators(
+                Local_URL_Generator_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_URL_Generator_Service_ID INTEGER NOT NULL,
+                Has_URL_From_Local_URL_Generator_Tag_ID INTEGER NOT NULL,
+                Local_URL_Generator_Name TEXT NOT NULL,
+                LocaL_URL_Generator_JSON TEXT NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_URL_Classifier_Services(
+                Local_URL_Classifier_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Service_ID INTEGER NOT NULL,
+                Has_URL_From_Local_URL_Classifier_Service_Tag_ID INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_URL_Classifiers(
+                Local_URL_Classifier_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_URL_Classifier_Service_ID INTEGER NOT NULL,
+                Has_URL_From_Local_URL_Classifier_Tag_ID INTEGER NOT NULL,
+                Local_URL_Classifier_Name TEXT NOT NULL,
+                LocaL_URL_Classifier_JSON TEXT NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_Parser_Services(
+                Local_Parser_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Service_ID INTEGER NOT NULL,
+                From_Local_Parser_Service_Tag_ID INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_Parsers(
+                Local_Parser_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_Parser_Service_ID INTEGER NOT NULL,
+                From_Local_Parser_Tag_ID INTEGER NOT NULL,
+                Local_Parser_Name TEXT NOT NULL,
+                LocaL_Parser_JSON TEXT NOT NULL
             );
         `)
     ]

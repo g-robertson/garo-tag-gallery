@@ -308,7 +308,6 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
             input = input.substr(1);
         }
 
-
         if (input[0] == TAG_TAGGABLE_LIST) {
             input = input.substr(1);
             uint64_t tag = util::deserializeUInt64(input);

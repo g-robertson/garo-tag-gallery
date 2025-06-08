@@ -10,7 +10,7 @@ import { appendFileSync, readdirSync, renameSync } from 'fs';
 import { PERMISSIONS } from './src/client/js/user.js';
 import PerfTags from './src/perf-tags-binding/perf-tags.js';
 import { randomBytes } from 'crypto';
-import { rootedPath } from './src/util.js';
+import { extractFirstFrameWithFFMPEG, rootedPath } from './src/util.js';
 import multer from 'multer';
 import { FileStorage } from './src/db/file-storage.js';
 /** @import {User} from "./src/client/js/user.js" */
@@ -25,6 +25,7 @@ async function main() {
         throw `Database failed to initialize: ${err.message}`;
       }
     }),
+    // perf/perftags.exe database/perf-input.txt database/perf-output.txt database/perf-tags
     perfTags: new PerfTags("perf/perftags.exe", "database/perf-input.txt", "database/perf-output.txt", "database/perf-tags", "archive-commands"),
     fileStorage: new FileStorage("database/file-storage")
   };
@@ -32,7 +33,7 @@ async function main() {
   dbs.perfTags.__addStderrListener((data) => {
     appendFileSync("database/perf-tags-stderr.log", data);
   });
-  dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
+  //dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
 
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA foreign_keys = OFF;", () => resolve()));
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA journal_mode = WAL;", () => resolve()));
@@ -41,7 +42,6 @@ async function main() {
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA mmap_size=100000000;", () => resolve()));
 
   await migrate(dbs);
-  
 
   console.log(`The default administrator user access key is: ${(await getDefaultAdminUser(dbs))['Access_Key']}`);
 

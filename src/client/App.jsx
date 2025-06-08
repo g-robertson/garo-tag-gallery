@@ -15,12 +15,14 @@ const App = () => {
         })();
     }, []);
 
-    console.log(user.toJSON());
     const pushModal = (modalName) => {
         setActiveModals([...activeModals, modalName]);
     }
     const popModal = () => {
         setActiveModals([...activeModals.slice(0, -1)]);
+    }
+    const pushAction = (actionName) => {
+
     }
     const mappedModals = activeModals.map((modalName, index) => (
         <div style={{pointerEvents: activeModals.length - 1 === index ? "auto" : "none"}}>
@@ -31,7 +33,7 @@ const App = () => {
     return (
         <div>
             <div style={{pointerEvents: mappedModals.length === 0 ? "auto" : "none"}}>
-                <Navbar pushModal={pushModal} />
+                <Navbar pushModal={pushModal} pushAction={pushAction} />
             </div>
             <div>
                 {mappedModals}

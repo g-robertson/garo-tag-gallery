@@ -39,6 +39,14 @@ export function extractWith7Z(archiveName, outputDirectory) {
     writeFileSync(`${archiveName}.fin`, "");
 }
 
+export async function extractFirstFrameWithFFMPEG(inputFileName, outputFileName) {
+    const ret = spawnSync(".\\extern\\ffmpeg.exe", ['-i', inputFileName, "-vf", "scale=iw*sar:ih,setsar=1", '-vframes', '1', outputFileName]);
+    if (ret.error || ret.status !== 0) {
+        return false;
+    }
+    return true;
+}
+
 /**
  * 
  * @param {string} directory 

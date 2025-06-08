@@ -2,7 +2,7 @@ import path from "path";
 import { extractWith7Z, getAllFileEntries, sha256 } from "../util.js";
 import { dbBeginTransaction, dbEndTransaction } from "./db-util.js";
 import { readFileSync } from "fs";
-import { addTagsToTaggables, updateTagsNamespaces, upsertFileExtensions, upsertLocalTags, upsertNamespaces, upsertURLAssociations, upsertURLs, urlAssociationPKHash } from "./tags.js";
+import { addTagsToTaggables, normalizeFileExtension, updateTagsNamespaces, upsertFileExtensions, upsertLocalTags, upsertNamespaces, upsertURLAssociations, upsertURLs, urlAssociationPKHash } from "./tags.js";
 import { HAS_NOTES_TAG, HAS_URL_TAG, IS_FILE_TAG, normalPreInsertLocalTag, localTagsPKHash } from "../client/js/tags.js";
 import { updateTaggablesCreatedDate, updateTaggablesDeletedDate, updateTaggablesLastModifiedDate, updateTaggablesLastViewedDate, upsertLocalFiles } from "./taggables.js";
 import { addNotesToTaggables } from "./notes.js";
@@ -51,6 +51,9 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
     const fileInfos = new Map();
     for (const fileEntry of allFileEntries) {
         const baseName = path.basename(fileEntry);
+        if (baseName.endsWith(".thumb.jpg") || baseName.endsWith(".prethumb.jpg")) {
+            continue;
+        }
         let isSidecar = false;
         for (const {name: extensionName, extension} of EXTENSIONS) {
             if (baseName.endsWith(extension)) {
@@ -62,8 +65,10 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
             }
         }
 
+
         if (!isSidecar) {
             if (fileInfos.get(baseName) === undefined) { fileInfos.set(baseName, {}); }
+            if (fileInfos.get(baseName).fileLocation) { throw "two files with same basename"; }
             fileInfos.get(baseName).fileLocation = fileEntry;
         }
     }
@@ -242,7 +247,7 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
 
         await addTagsToTaggables(dbs, PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
         await dbEndTransaction(dbs);
-        finalizeFileMove();
+        await finalizeFileMove();
         await dbs.perfTags.reopen();
     }
 
@@ -255,7 +260,7 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
         importChunks.filePairings.set(fileName, {
             File_Hash: sha256(readFileSync(fileInfoEntry['fileLocation'])),
             Taggable_Name: fileName,
-            File_Extension: path.extname(fileName),
+            File_Extension: normalizeFileExtension(path.extname(fileName)),
             sourceLocation: fileInfoEntry['fileLocation']
         });
 

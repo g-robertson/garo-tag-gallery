@@ -385,6 +385,21 @@ export async function updateTagsNamespaces(dbs, tagNamespacePairings) {
 }
 
 /**
+ * @param {string} fileExtension 
+ */
+export function normalizeFileExtension(fileExtension) {
+    fileExtension = fileExtension.toLowerCase();
+    if (fileExtension === ".jpeg") {
+        return ".jpg";
+    }
+    if (fileExtension === ".tif") {
+        return ".tiff";
+    }
+
+    return fileExtension;
+}
+
+/**
  * @param {Databases} dbs
  * @param {string[]} fileExtensions 
  */
@@ -392,6 +407,7 @@ export async function upsertFileExtensions(dbs, fileExtensions) {
     if (fileExtensions.length === 0) {
         return [];
     }
+    fileExtensions = fileExtensions.map(normalizeFileExtension);
 
     /** @type {DBFileExtension[]} */
     const dbFileExtensions = await dball(dbs, `SELECT * FROM File_Extensions WHERE File_Extension IN ${dbvariablelist(fileExtensions.length)};`, fileExtensions);

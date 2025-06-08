@@ -1,9 +1,11 @@
+import sharp from "sharp";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import {dball, dbget, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
 import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
 import {insertLocalTags} from "./tags.js";
+import { extractFirstFrameWithFFMPEG } from "../util.js";
 
 /** @import {DBService} from "./services.js" */
 /** @import {PermissionInt} from "./user.js" */
@@ -231,7 +233,7 @@ async function insertFiles(dbs, files) {
     if (files.length === 0) {
         return {
             dbFiles: [],
-            finalizeFileMove: () => {}
+            finalizeFileMove: async () => {}
         };
     }
 
@@ -262,23 +264,70 @@ async function insertFiles(dbs, files) {
         `, fileInsertionParams
     );
 
+    const thumbnailsGenerated = [];
+    sharp.cache({files: 0});
+    const thumbnailPromises = [];
+    for (let i = 0; i < insertedDBFiles.length; ++i) {
+        thumbnailPromises.push((async () => {
+            const insertedDBFile = insertedDBFiles[i];
+            const SHARP_IMAGE_EXTENSIONS = [".jpg", ".png", ".webp", ".gif", ".avif", ".tiff"];
+            
+            const fileExtension = files[i].File_Extension;
+            if (fileExtension === undefined) {
+                throw "File extension was undefined";
+            }
+
+            const sourceLocation = fileToSourceLocationMap.get(insertedDBFile.File_Hash.toString("hex"));
+            /** @type {string} */
+            let sharpSourceLocation;
+            const sharpOutputLocation = `${sourceLocation}.thumb.jpg`
+            if (SHARP_IMAGE_EXTENSIONS.indexOf(fileExtension.toLowerCase()) !== -1) {
+                sharpSourceLocation = sourceLocation;
+            } else {
+                const success = await extractFirstFrameWithFFMPEG(sourceLocation, `${sourceLocation}.prethumb.jpg`);
+                if (success) {
+                    sharpSourceLocation = `${sourceLocation}.prethumb.jpg`;
+                }
+            }
+
+            if (sharpSourceLocation !== undefined) {
+                await sharp(sharpSourceLocation)
+                .resize(300, 200, {fit: "contain"})
+                .jpeg({force: true})
+                .toFile(sharpOutputLocation);
+                thumbnailsGenerated[i] = sharpOutputLocation;
+            }
+        })());
+    }
+
+    await Promise.all(thumbnailPromises);
+
     return {
         dbFiles: insertedDBFiles.map((insertedDBFile, i) => ({
             ...insertedDBFile,
             ...files[i],
             Has_File_Hash_Tag_ID: BigInt(insertedDBFile.Has_File_Hash_Tag_ID)
         })),
-        finalizeFileMove: () => {
+        finalizeFileMove: async () => {
             for (let i = 0; i < insertedDBFiles.length; ++i) {
-                if (files[i].File_Extension === undefined) {
+                const insertedDBFile = insertedDBFiles[i];
+                const fileExtension = files[i].File_Extension;
+                if (fileExtension === undefined) {
                     throw "File extension was undefined";
                 }
-                const insertedDBFile = insertedDBFiles[i];
-                dbs.fileStorage.move(fileToSourceLocationMap.get(
-                    insertedDBFile.File_Hash.toString("hex")),
-                    `${insertedDBFile.File_Hash.toString("hex")}${files[i].File_Extension}`,
+                
+                const sourceLocation = fileToSourceLocationMap.get(insertedDBFile.File_Hash.toString("hex"));
+
+                dbs.fileStorage.move(sourceLocation,
+                    `${insertedDBFile.File_Hash.toString("hex")}${fileExtension}`,
                     insertedDBFile.File_Hash
                 );
+                if (thumbnailsGenerated[i] !== undefined) {
+                    dbs.fileStorage.move(`${thumbnailsGenerated[i]}`,
+                        `${insertedDBFile.File_Hash.toString("hex")}.thumb.jpg`,
+                        insertedDBFile.File_Hash
+                    );
+                }
             }
         }   
     };
@@ -368,7 +417,7 @@ export async function upsertLocalFiles(dbs, localFiles, dbLocalTaggableService) 
     if (localFiles.length === 0) {
         return {
             dbLocalFiles: [],
-            finalizeFileMove: () => {}
+            finalizeFileMove: async () => {}
         };
     }
     

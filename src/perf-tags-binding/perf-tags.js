@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
+import { serializeUint64 } from '../client/js/client-util.js';
 
 const THIRTY_MINUTES = 30 * 60 * 1000;
 
@@ -291,6 +292,28 @@ export default class PerfTags {
         }
 
         return `(${expressions.join('&')})`;
+    }
+
+    /**
+     * @description Gets all taggables with {tags} where that tag is represented over {occurrences} amount of times within {expression}
+     * @param {string} expression 
+     * @param {bigint[]} tags 
+     * @param {number} occurrences
+     */
+    static searchTagOccurrencesOverNWithinExpression(expression, tags, occurrences) {
+        throw "unimplemented";
+        return `(${expression}C>${serializeUint64(occurrences)}${serializeUint64(tags.length)}${this.#serializeSingles(tags)})`;
+    }
+
+        /**
+     * @description Gets all taggables with {tags} where that tag is represented under {occurrences} amount of times within {expression}
+     * @param {string} expression 
+     * @param {bigint[]} tags 
+     * @param {number} occurrences
+     */
+    static searchTagOccurrencesOverNWithinExpression(expression, tags, occurrences) {
+        throw "unimplemented";
+        return `(${expression}C<${serializeUint64(occurrences)}${serializeUint64(tags.length)}${this.#serializeSingles(tags)})`;
     }
 
     async beginTransaction() {
