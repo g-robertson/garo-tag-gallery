@@ -242,6 +242,7 @@ export const MIGRATION = {
         `),
         dbsqlcommand(`
             CREATE TABLE Tags_Namespaces(
+                Tags_Namespaces_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Tag_ID INTEGER NOT NULL,
                 Namespace_ID INTEGER NOT NULL,
                 Tags_Namespaces_PK_Hash TEXT NOT NULL

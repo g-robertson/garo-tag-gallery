@@ -2,14 +2,14 @@ import path from "path";
 import { extractWith7Z, getAllFileEntries, sha256 } from "../util.js";
 import { dbBeginTransaction, dbEndTransaction } from "./db-util.js";
 import { readFileSync } from "fs";
-import { addTagsToTaggables, normalizeFileExtension, updateTagsNamespaces, upsertFileExtensions, upsertLocalTags, upsertNamespaces, upsertURLAssociations, upsertURLs, urlAssociationPKHash } from "./tags.js";
-import { HAS_NOTES_TAG, HAS_URL_TAG, IS_FILE_TAG, normalPreInsertLocalTag, localTagsPKHash } from "../client/js/tags.js";
-import { updateTaggablesCreatedDate, updateTaggablesDeletedDate, updateTaggablesLastModifiedDate, updateTaggablesLastViewedDate, upsertLocalFiles } from "./taggables.js";
+import { addTagsToTaggables, normalizeFileExtension, upsertTagsNamespaces, upsertFileExtensions, upsertLocalTags, upsertNamespaces, upsertURLAssociations, upsertURLs, preparePreInsertURLAssociation } from "./tags.js";
+import { normalPreInsertLocalTag, localTagsPKHash } from "../client/js/tags.js";
+import { updateTaggablesCreatedDate, updateTaggablesDeletedDate, updateTaggablesLastModifiedDate, updateTaggablesLastViewedDate, upsertLocalFiles, upsertTaggablesURLAssociations } from "./taggables.js";
 import { addNotesToTaggables } from "./notes.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 /**
  * @import {Databases} from "./db-util.js"
- * @import {PreInsertLocalTag, DBFileExtension, DBLocalTagService} from "./tags.js"
+ * @import {PreInsertLocalTag, DBFileExtension, DBLocalTagService, DBJoinedURLAssociation} from "./tags.js"
  * @import {PreInsertLocalFile, DBLocalTaggableService} from "./taggables.js"
  * @import {PreInsertNote} from "./notes.js"
  */
@@ -102,20 +102,6 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
     
     const insertImportChunks = async () => {
         await dbBeginTransaction(dbs);
-        const allUrls = [];
-        
-        for (const urls of importChunks.urlPairings.values()) {
-            for (const url of urls) {
-                allUrls.push(url);
-            }
-        }
-        
-        // insert all urls
-        const dbURLMap = new Map((await upsertURLs(dbs, allUrls.map(url => url.URL))).map(dbURL => [dbURL.URL, dbURL]));
-        const dbURLAssociationMap = new Map((await upsertURLAssociations(dbs, allUrls.map(url => ({
-            ...dbURLMap.get(url.URL),
-            URL_Association: url.URL_Association
-        })))).map(dbUrlAssociation => [dbUrlAssociation.URL_Associations_PK_Hash, dbUrlAssociation]));
 
         // insert file extensions
         const fileExtensionsSet = new Set();
@@ -151,6 +137,44 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
             notePairings.set(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID, notes);
         }
         addNotesToTaggables(dbs, notePairings);
+
+        /** @type {({URL: string, URL_Association: string})[]} */
+        const allUrls = [];
+        for (const urls of importChunks.urlPairings.values()) {
+            for (const url of urls) {
+                allUrls.push(url);
+            }
+        }
+        
+        // insert all urls
+        const dbURLMap = new Map((await upsertURLs(dbs, allUrls.map(url => url.URL))).map(dbURL => [dbURL.URL, dbURL]));
+        const dbJoinedURLAssociationMap = new Map((await upsertURLAssociations(dbs, allUrls.map(url => {
+            return {
+                ...dbURLMap.get(url.URL),
+                URL_Association: url.URL_Association
+            };
+        }))).map(dbUrlAssociation => [dbUrlAssociation.URL_Associations_PK_Hash, dbUrlAssociation]));
+        
+
+        // upsert urls to taggables
+        /** @type {Map<bigint, DBJoinedURLAssociation[]>} */
+        const taggableURLAssociationPairings = new Map();
+        for (const [fileName, urls] of importChunks.urlPairings.entries()) {
+            for (const url of urls) {
+                const preparedURLAssociation = preparePreInsertURLAssociation({
+                    ...dbURLMap.get(url.URL),
+                    URL_Association: url.URL_Association
+                });
+                const dbLocalFileTaggable = dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID;
+
+                const dbJoinedURLAssociation = dbJoinedURLAssociationMap.get(preparedURLAssociation.URL_Associations_PK_Hash);
+                if (taggableURLAssociationPairings.get(dbLocalFileTaggable) === undefined) {
+                    taggableURLAssociationPairings.set(dbLocalFileTaggable, []);
+                }
+                taggableURLAssociationPairings.get(dbLocalFileTaggable).push(dbJoinedURLAssociation);
+            }
+        }
+        await upsertTaggablesURLAssociations(dbs, taggableURLAssociationPairings);
 
         // insert dates
         const createdDatePairings = new Map();
@@ -220,35 +244,7 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
             }
         }
 
-        await updateTagsNamespaces(dbs, tagsNamespaces);
-        
-        // assign all system tag pairings
-        for (const [fileName, file] of importChunks.filePairings.entries()) {
-            taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(IS_FILE_TAG.Tag_ID);
-            taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(fileExtensionMap.get(file.File_Extension).Has_File_Extension_Tag_ID);
-        }
-        for (const dbLocalFile of dbLocalFilesMap.values()) {
-            taggablePairings.get(dbLocalFile.Taggable_ID).push(dbLocalFile.Has_File_Hash_Tag_ID);
-        }
-        for (const [fileName, urls] of importChunks.urlPairings.entries()) {
-            if (urls.length !== 0) {
-                taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(HAS_URL_TAG.Tag_ID);
-            }
-            for (const url of urls) {
-                const dbURL = {
-                    ...dbURLMap.get(url.URL),
-                    URL_Association: url.URL_Association
-                };
-                const dbURLAssociation = dbURLAssociationMap.get(urlAssociationPKHash(dbURL).toString());
-                taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(dbURLAssociation.Has_URL_Tag_ID);
-                taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(dbURLAssociation.Has_URL_With_Association_Tag_ID);
-            }
-        }
-        for (const [fileName, notes] of importChunks.notePairings.entries()) {
-            if (notes.length !== 0) {
-                taggablePairings.get(dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID).push(HAS_NOTES_TAG.Tag_ID);
-            }
-        }
+        await upsertTagsNamespaces(dbs, tagsNamespaces);
 
         // assign all normal tags
         for (const [fileName, tags] of importChunks.tagPairings.entries()) {

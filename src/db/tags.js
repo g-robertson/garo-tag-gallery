@@ -99,31 +99,6 @@ export function insertsystemtag(systemTag) {
  * @property {number} Namespace_Created_Date
  */
 
-/**
- * @typedef {Object} DBTagNamespacePairing
-   @property {bigint} Tag_ID 
-   @property {number} Namespace_ID
-   @property {string} Tags_Namespaces_PK_Hash
- */
-
-/**
- * @typedef {Object} DBURL
- * @property {number} URL_ID
- * @property {string} URL
- * @property {bigint} Has_URL_Tag_ID
- * @property {number} URL_Created_Date
- */
-
-/**
- * @typedef {Object} DBURLAssociation
- * @property {number} URL_Association_ID
- * @property {number} URL_ID
- * @property {string} URL_Association
- * @property {string} URL_Associations_PK_Hash
- * @property {bigint} Has_URL_With_Association_Tag_ID
- * @property {number} URL_Association_Created_Date
- */
-
 /** @typedef {DBURL & DBURLAssociation} DBJoinedURLAssociation */
 
 /**
@@ -309,80 +284,125 @@ export async function upsertLocalTags(dbs, localTags, localTagServiceID) {
     if (localTags.length === 0) {
         return [];
     }
+    // dedupe
+    localTags = [...(new Map(localTags.map(tag => [localTagsPKHash(tag.Lookup_Name, tag.Source_Name), tag]))).values()];
 
     const dbLocalTags = await selectLocalTags(dbs, localTags, localTagServiceID);
     const dbLocalTagsExisting = new Set(dbLocalTags.map(dbTag => dbTag.Local_Tags_PK_Hash));
     const tagsToInsert = localTags.filter(localTag => !dbLocalTagsExisting.has(localTagsPKHash(localTag.Lookup_Name, localTag.Source_Name)));
-    const dedupedTagsToInsert = [...(new Map(tagsToInsert.map(tag => [localTagsPKHash(tag.Lookup_Name, tag.Source_Name), tag]))).values()];
-    const insertedDBTags = await insertLocalTags(dbs, dedupedTagsToInsert, localTagServiceID); 
+    const insertedDBTags = await insertLocalTags(dbs, tagsToInsert, localTagServiceID); 
 
-    return [...dbLocalTags, ...insertedDBTags];
+    return dbLocalTags.concat(insertedDBTags);
 }
 
+/**
+ * @typedef {Object} DBTagNamespace
+ * @property {number} Tags_Namespaces_ID
+   @property {bigint} Tag_ID 
+   @property {number} Namespace_ID
+   @property {string} Tags_Namespaces_PK_Hash
+ */
 
 /**
+ * @typedef {Object} PreInsertTagNamespace
+ * @property {bigint} Tag_ID
+ * @property {number} Namespace_ID
  * 
- * @param {bigint} tagID 
- * @param {number} namespaceID 
- * @returns 
+ * @typedef {PreInsertTagNamespace & {Tags_Namespaces_PK_Hash: string}} PreparedPreInsertTagNamespace
  */
-export function tagNamespacePKHash(tagID, namespaceID) {
-    return `${tagID}\x01${namespaceID}`;
+
+/**
+ * @param {DBTagNamespace} dbTagNamespace 
+ */
+function mapDBTagNamespace(dbTagNamespace) {
+    return {
+        ...dbTagNamespace,
+        Tag_ID: BigInt(dbTagNamespace.Tag_ID)
+    };
+}
+
+/**
+ * @param {PreInsertTagNamespace} preInsertTagNamespace
+ */
+export function preparePreInsertTagNamespace(preInsertTagNamespace) {
+    return {
+        ...preInsertTagNamespace,
+        Tags_Namespaces_PK_Hash: `${preInsertTagNamespace.Tag_ID}\x01${preInsertTagNamespace.Namespace_ID}`
+    };
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {PreparedPreInsertTagNamespace[]} tagsNamespaces 
+ */
+export async function selectTagsNamespaces(dbs, tagsNamespaces) {
+    if (tagsNamespaces.length === 0) {
+        return [];
+    }
+
+    /** @type {DBTagNamespace[]} */
+    const dbTagsNamespaces = await dball(dbs,
+        `SELECT * FROM Tags_Namespaces WHERE Tags_Namespaces_PK_Hash IN ${dbvariablelist(tagsNamespaces.length)};`,
+        tagsNamespaces.map(tagNamespace => tagNamespace.Tags_Namespaces_PK_Hash)
+    );
+    return dbTagsNamespaces.map(mapDBTagNamespace);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {PreparedPreInsertTagNamespace[]} tagsNamespaces 
+ */
+export async function insertTagsNamespaces(dbs, tagsNamespaces) {
+    if (tagsNamespaces.length === 0) {
+        return [];
+    }
+
+    const tagsNamespacesInsertionParams = [];
+    for (const tagNamespace of tagsNamespaces) {
+        tagsNamespacesInsertionParams.push(Number(tagNamespace.Tag_ID));
+        tagsNamespacesInsertionParams.push(tagNamespace.Namespace_ID);
+        tagsNamespacesInsertionParams.push(tagNamespace.Tags_Namespaces_PK_Hash);
+    }
+
+    const insertedDBTagNamespaces = await dball(dbs, `
+        INSERT INTO Tags_Namespaces(
+            Tag_ID,
+            Namespace_ID,
+            Tags_Namespaces_PK_Hash
+        ) VALUES ${dbtuples(tagsNamespaces.length, 3)} RETURNING *;
+        `, tagsNamespacesInsertionParams
+    );
+    return insertedDBTagNamespaces.map(mapDBTagNamespace);
 }
 
 /**
  * @param {Databases} dbs 
  * @param {Map<bigint, Iterable<number>>} tagNamespacePairings 
  */
-export async function updateTagsNamespaces(dbs, tagNamespacePairings) {
-    /** @type {{Tag_ID: bigint, Namespace_ID: number, Tags_Namespaces_PK_Hash: string}[]} */
-    const tagNamespacePairingsWithHash = [];
+export async function upsertTagsNamespaces(dbs, tagNamespacePairings) {
+    /** @type {PreparedPreInsertTagNamespace[]} */
+    let preparedTagsNamespaces = [];
     for (const [Tag_ID, Namespace_IDs] of tagNamespacePairings) {
         for (const Namespace_ID of Namespace_IDs) {
-            const Tags_Namespaces_PK_Hash = tagNamespacePKHash(Tag_ID, Namespace_ID);
-            tagNamespacePairingsWithHash.push({
+            preparedTagsNamespaces.push(preparePreInsertTagNamespace({
                 Tag_ID,
-                Namespace_ID,
-                Tags_Namespaces_PK_Hash
-            });
+                Namespace_ID
+            }));
         }
     }
 
-    /** @type {DBTagNamespacePairing[]} */
-    const dbTagNamespacePairings = await dball(dbs,
-        `SELECT * FROM Tags_Namespaces WHERE Tags_Namespaces_PK_Hash IN ${dbvariablelist(tagNamespacePairingsWithHash.length)};`,
-        tagNamespacePairingsWithHash.map(tagNamespacePairingWithHash => tagNamespacePairingWithHash.Tags_Namespaces_PK_Hash)
-    );
-    const dbTagNamespacePairingsMap = new Map(dbTagNamespacePairings.map(dbTagNamespacePairing => [dbTagNamespacePairing.Tags_Namespaces_PK_Hash, dbTagNamespacePairing]));
-    
-    const tagNamespacePairingInsertionParams = [];
-    for (const tagNamespacePairingWithHash of tagNamespacePairingsWithHash) {
-        if (dbTagNamespacePairingsMap.has(tagNamespacePairingWithHash.Tags_Namespaces_PK_Hash)) {
-            continue;
-        }
+    // dedupe
+    preparedTagsNamespaces = [...(new Map(preparedTagsNamespaces.map(preparedTagNamespace => [preparedTagNamespace.Tags_Namespaces_PK_Hash, preparedTagNamespace]))).values()];
 
-        tagNamespacePairingInsertionParams.push(Number(tagNamespacePairingWithHash.Tag_ID));
-        tagNamespacePairingInsertionParams.push(tagNamespacePairingWithHash.Namespace_ID);
-        tagNamespacePairingInsertionParams.push(tagNamespacePairingWithHash.Tags_Namespaces_PK_Hash);
+    const dbTagsNamespaces = await selectTagsNamespaces(dbs, preparedTagsNamespaces);
+    if (dbTagsNamespaces.length !== 0) {
+        console.log(dbTagsNamespaces);
     }
-    
-    /** @type {DBTagNamespacePairing[]} */
-    let insertedDBTagNamespacePairings = [];
-    if (tagNamespacePairingInsertionParams.length !== 0) {
-        insertedDBTagNamespacePairings = await dball(dbs, `
-            INSERT INTO Tags_Namespaces(
-                Tag_ID,
-                Namespace_ID,
-                Tags_Namespaces_PK_Hash
-            ) VALUES ${dbtuples(tagNamespacePairingInsertionParams.length / 3, 3)} RETURNING *;
-            `, tagNamespacePairingInsertionParams
-        );
-    }
+    const dbTagsNamespacesExisting = new Set(dbTagsNamespaces.map(dbTagNamespace => dbTagNamespace.Tags_Namespaces_PK_Hash));
+    const tagsNamespacesToInsert = preparedTagsNamespaces.filter(tagNamespace => !dbTagsNamespacesExisting.has(tagNamespace.Tags_Namespaces_PK_Hash));
+    const insertedDBTagNamespaces = await insertTagsNamespaces(dbs, tagsNamespacesToInsert);
 
-    return [...dbTagNamespacePairings, ...insertedDBTagNamespacePairings].map(dbTagNamespacePairing => ({
-        ...dbTagNamespacePairing,
-        Tag_ID: BigInt(dbTagNamespacePairing.Tag_ID)
-    }));
+    return dbTagsNamespaces.concat(insertedDBTagNamespaces);
 }
 
 /**
@@ -401,6 +421,59 @@ export function normalizeFileExtension(fileExtension) {
 }
 
 /**
+ * @param {DBFileExtension} dbFileExtension
+ */
+function mapDBFileExtension(dbFileExtension) {
+    return {
+        ...dbFileExtension,
+        Has_File_Extension_Tag_ID: BigInt(dbFileExtension.Has_File_Extension_Tag_ID)
+    };
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {string[]} fileExtensions
+ */
+export async function selectFileExtensions(dbs, fileExtensions) {
+    /** @type {DBFileExtension[]} */
+    const dbFileExtensions = await dball(dbs, `SELECT * FROM File_Extensions WHERE File_Extension IN ${dbvariablelist(fileExtensions.length)};`, fileExtensions);
+    return dbFileExtensions.map(mapDBFileExtension);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {string[]} fileExtensions
+ */
+export async function insertFileExtensions(dbs, fileExtensions) {
+    if (fileExtensions.length === 0) {
+        return [];
+    }
+
+    const insertedHasFileExtensionTags = await insertLocalTags(dbs, fileExtensions.map(fileExtension => ({
+        Source_Name: "System generated",
+        Display_Name: `system:has file extension:${fileExtension}`,
+        Lookup_Name: `system:has file extension:${fileExtension}`
+    })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+
+    const fileExtensionInsertionParams = [];
+    for (let i = 0; i < fileExtensions.length; ++i) {
+        fileExtensionInsertionParams.push(fileExtensions[i]);
+        fileExtensionInsertionParams.push(Number(insertedHasFileExtensionTags[i].Tag_ID));
+    }
+
+    /** @type {DBFileExtension[]} */
+    const insertedDBFileExtensions = await dball(dbs, `
+        INSERT INTO File_Extensions(
+            File_Extension,
+            Has_File_Extension_Tag_ID
+        ) VALUES ${dbtuples(fileExtensions.length, 2)} RETURNING *;
+        `, fileExtensionInsertionParams
+    );
+
+    return insertedDBFileExtensions.map(mapDBFileExtension);
+}
+
+/**
  * @param {Databases} dbs
  * @param {string[]} fileExtensions 
  */
@@ -409,40 +482,45 @@ export async function upsertFileExtensions(dbs, fileExtensions) {
         return [];
     }
     fileExtensions = fileExtensions.map(normalizeFileExtension);
+    // dedupe
+    fileExtensions = [...new Set(fileExtensions)];
 
-    /** @type {DBFileExtension[]} */
-    const dbFileExtensions = await dball(dbs, `SELECT * FROM File_Extensions WHERE File_Extension IN ${dbvariablelist(fileExtensions.length)};`, fileExtensions);
+    const dbFileExtensions = await selectFileExtensions(dbs, fileExtensions);
     const dbFileExtensionsExisting = new Set(dbFileExtensions.map(dbFileExtension => dbFileExtension.File_Extension));
     const fileExtensionsToInsert = fileExtensions.filter(fileExtension => !dbFileExtensionsExisting.has(fileExtension));
+    const insertedDBFileExtensions = await insertFileExtensions(dbs, fileExtensionsToInsert);
 
-    /** @type {DBFileExtension[]} */
-    let insertedDBFileExtensions = []
-    if (fileExtensionsToInsert.length !== 0) {
-        const insertedHasFileExtensionTags = await insertLocalTags(dbs, fileExtensionsToInsert.map(fileExtension => ({
-            Source_Name: "System generated",
-            Display_Name: `system:has file extension:${fileExtension}`,
-            Lookup_Name: `system:has file extension:${fileExtension}`
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+    return dbFileExtensions.concat(insertedDBFileExtensions);
+}
 
-        const fileExtensionInsertionParams = [];
-        for (let i = 0; i < fileExtensionsToInsert.length; ++i) {
-            fileExtensionInsertionParams.push(fileExtensionsToInsert[i]);
-            fileExtensionInsertionParams.push(Number(insertedHasFileExtensionTags[i].Tag_ID));
-        }
-
-        insertedDBFileExtensions = await dball(dbs, `
-            INSERT INTO File_Extensions(
-                File_Extension,
-                Has_File_Extension_Tag_ID
-            ) VALUES ${dbtuples(fileExtensionsToInsert.length, 2)} RETURNING *;
-            `, fileExtensionInsertionParams
-        );
+export async function selectNamespaces(dbs, namespaces) {
+    if (namespaces.length === 0) {
+        return [];
     }
 
-    return [...dbFileExtensions, ...insertedDBFileExtensions].map(dbFileExtension => ({
-        ...dbFileExtension,
-        Has_File_Extension_Tag_ID: BigInt(dbFileExtension.Has_File_Extension_Tag_ID)
-    }));
+    /** @type {DBNamespace[]} */
+    const dbNamespaces = await dball(dbs, `SELECT * FROM Namespaces WHERE Namespace_Name IN ${dbvariablelist(namespaces.length)};`, namespaces);
+    return dbNamespaces;
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {string[]} namespaces 
+ * @returns 
+ */
+export async function insertNamespaces(dbs, namespaces) {
+    if (namespaces.length === 0) {
+        return [];
+    }
+
+    /** @type {DBNamespace[]} */
+    const insertedDBNamespaces = await dball(dbs, `
+        INSERT INTO Namespaces(
+            Namespace_Name
+        ) VALUES ${dbtuples(namespaces.length, 1)} RETURNING *;
+        `, namespaces
+    );
+    return insertedDBNamespaces;
 }
 
 /**
@@ -453,24 +531,81 @@ export async function upsertNamespaces(dbs, namespaces) {
     if (namespaces.length === 0) {
         return [];
     }
+    // dedupe
+    namespaces = [...new Set(namespaces)];
 
-    /** @type {DBNamespace[]} */
-    const dbNamespaces = await dball(dbs, `SELECT * FROM Namespaces WHERE Namespace_Name IN ${dbvariablelist(namespaces.length)};`, namespaces);
+    const dbNamespaces = await selectNamespaces(dbs, namespaces);
     const dbNamespacesExisting = new Set(dbNamespaces.map(dbNamespace => dbNamespace.Namespace_Name));
-    const namespacesToInsertDeduped = [...new Set(namespaces.filter(namespace => !dbNamespacesExisting.has(namespace)))];
+    const namespacesToInsert = namespaces.filter(namespace => !dbNamespacesExisting.has(namespace));
+    const insertedDBNamespaces = await insertNamespaces(dbs, namespacesToInsert);
 
-    /** @type {DBNamespace[]} */
-    let insertedDBNamespaces = []
-    if (namespacesToInsertDeduped.length !== 0) {
-        insertedDBNamespaces = await dball(dbs, `
-            INSERT INTO Namespaces(
-                Namespace_Name
-            ) VALUES ${dbtuples(namespacesToInsertDeduped.length, 1)} RETURNING *;
-            `, namespacesToInsertDeduped
-        );
+    return dbNamespaces.concat(insertedDBNamespaces);
+}
+
+
+/**
+ * @typedef {Object} DBURL
+ * @property {number} URL_ID
+ * @property {string} URL
+ * @property {bigint} Has_URL_Tag_ID
+ * @property {number} URL_Created_Date
+ */
+
+/**
+ * @param {DBURL} dbURL 
+ */
+function mapDBURL(dbURL) {
+    return {
+        ...dbURL,
+        Has_URL_Tag_ID: BigInt(dbURL.Has_URL_Tag_ID)
+    };
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {string[]} urls 
+ */
+export async function selectURLs(dbs, urls) {
+    if (urls.length === 0) {
+        return [];
     }
 
-    return [...dbNamespaces, ...insertedDBNamespaces];
+    /** @type {DBURL[]} */
+    const dbURLs = await dball(dbs, `SELECT * FROM URLs WHERE URL IN ${dbvariablelist(urls.length)};`, urls);
+    return dbURLs.map(mapDBURL);
+}
+
+/**
+ * @param {Databases} dbs
+ * @param {string[]} urls
+ */
+export async function insertURLs(dbs, urls) {
+    if (urls.length === 0) {
+        return [];
+    }
+    
+    const insertedHasURLTags = await insertLocalTags(dbs, urls.map(url => ({
+        Source_Name: "System generated",
+        Display_Name: `system:has url:${url}`,
+        Lookup_Name: `system:has url:${url}`
+    })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+    
+    const urlInsertionParams = [];
+    for (let i = 0; i < urls.length; ++i) {
+        urlInsertionParams.push(urls[i]);
+        urlInsertionParams.push(Number(insertedHasURLTags[i].Tag_ID));
+    }
+
+    /** @type {DBURL[]} */
+    const insertedDBURLs = await dball(dbs, `
+        INSERT INTO URLs(
+            URL,
+            Has_URL_Tag_ID
+        ) VALUES ${dbtuples(urls.length, 2)} RETURNING *;
+        `, urlInsertionParams
+    );
+
+    return insertedDBURLs.map(mapDBURL);
 }
 
 /**
@@ -482,118 +617,130 @@ export async function upsertURLs(dbs, urls) {
         return [];
     }
 
-    /** @type {DBURL[]} */
-    const dbURLs = await dball(dbs, `SELECT * FROM URLs WHERE URL IN ${dbvariablelist(urls.length)};`, urls);
+    // dedupe
+    urls = [...new Set(urls)];
+    
+    const dbURLs = await selectURLs(dbs, urls);
     const dbURLsExisting = new Set(dbURLs.map(dbURL => dbURL.URL));
-    const urlsToInsertDeduped = [...new Set(urls.filter(url => !dbURLsExisting.has(url)))];
-
-    /** @type {DBURL[]} */
-    let insertedDBURLs = [];
-    if (urlsToInsertDeduped.length !== 0) {
-        const insertedHasURLTags = await insertLocalTags(dbs, urlsToInsertDeduped.map(url => ({
-            Source_Name: "System generated",
-            Display_Name: `system:has url:${url}`,
-            Lookup_Name: `system:has url:${url}`
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
-
-        const urlInsertionParams = [];
-        for (let i = 0; i < urlsToInsertDeduped.length; ++i) {
-            urlInsertionParams.push(urlsToInsertDeduped[i]);
-            urlInsertionParams.push(Number(insertedHasURLTags[i].Tag_ID));
-        }
-
-        insertedDBURLs = await dball(dbs, `
-            INSERT INTO URLs(
-                URL,
-                Has_URL_Tag_ID
-            ) VALUES ${dbtuples(urlsToInsertDeduped.length, 2)} RETURNING *;
-            `, urlInsertionParams
-        );
-
-    }
-
-    return [...dbURLs, ...insertedDBURLs].map(dbURL => ({
-        ...dbURL,
-        Has_URL_Tag_ID: BigInt(dbURL.Has_URL_Tag_ID)
-    }));
+    const urlsToInsert = urls.filter(url => !dbURLsExisting.has(url));
+    const insertedDBURLs = await insertURLs(dbs, urlsToInsert);
+    return dbURLs.concat(insertedDBURLs);
 }
 
 /**
- * @param {DBURL & {
- *     URL_Association: string
- * }} urlAssociation
+ * @typedef {Object} DBURLAssociation
+ * @property {number} URL_Association_ID
+ * @property {number} URL_ID
+ * @property {string} URL_Association
+ * @property {string} URL_Associations_PK_Hash
+ * @property {bigint} Has_URL_With_Association_Tag_ID
+ * @property {number} URL_Association_Created_Date
  */
-export function urlAssociationPKHash(urlAssociation) {
-    return `${urlAssociation.URL_ID}\x01${urlAssociation.URL_Association}`;
+
+/**
+ * @typedef {DBURL & {URL_Association: string}} PreInsertURLAssociation
+ * @typedef {PreInsertURLAssociation & {URL_Associations_PK_Hash: string} PreparedPreInsertURLAssociation}
+ */
+
+/**
+ * @param {PreInsertURLAssociation} urlAssociation 
+ * @returns {PreparedPreInsertURLAssociation}
+ */
+export function preparePreInsertURLAssociation(urlAssociation) {
+    return {
+        ...urlAssociation,
+        URL_Associations_PK_Hash: `${urlAssociation.URL_ID}\x01${urlAssociation.URL_Association}`
+    };
+}
+
+/**
+ * @param {DBURLAssociation} dbURLAssociation
+ * @param {PreInsertURLAssociation} preInsertURLAssociation
+ * @returns {DBJoinedURLAssociation}
+ */
+function mapDBURLAssociation(dbURLAssociation, preInsertURLAssociation) {
+    return {
+        ...preInsertURLAssociation,
+        ...dbURLAssociation,
+        Has_URL_With_Association_Tag_ID: BigInt(dbURLAssociation.Has_URL_With_Association_Tag_ID)
+    };
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {PreparedPreInsertURLAssociation[]} urlAssociations 
+ */
+export async function selectURLAssociations(dbs, urlAssociations) {
+    if (urlAssociations.length === 0) {
+        return [];
+    }
+
+    const urlAssociationsMap = new Map(urlAssociations.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]));
+
+    /** @type {DBURLAssociation[]} */
+    const dbURLAssociations = await dball(dbs,
+        `SELECT * FROM URL_Associations WHERE URL_Associations_PK_Hash IN ${dbvariablelist(urlAssociations.length)};`,
+        urlAssociations.map(urlAssociation => urlAssociation.URL_Associations_PK_Hash)
+    );
+    return dbURLAssociations.map(dbURLAssociation => mapDBURLAssociation(dbURLAssociation, urlAssociationsMap.get(dbURLAssociation.URL_Associations_PK_Hash)));
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {PreparedPreInsertURLAssociation[]} urlAssociations 
+ */
+export async function insertURLAssociations(dbs, urlAssociations) {
+    if (urlAssociations.length === 0) {
+        return [];
+    }
+
+    const urlAssociationsMap = new Map(urlAssociations.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]));
+
+    const insertedHasURLAssociationTags = await insertLocalTags(dbs, urlAssociations.map(urlAssociation => ({
+        Source_Name: "System generated",
+        Display_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`,
+        Lookup_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`
+    })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+
+    const urlAssociationInsertionParams = [];
+    for (let i = 0; i < urlAssociations.length; ++i) {
+        urlAssociationInsertionParams.push(urlAssociations[i].URL_ID);
+        urlAssociationInsertionParams.push(urlAssociations[i].URL_Association);
+        urlAssociationInsertionParams.push(urlAssociations[i].URL_Associations_PK_Hash);
+        urlAssociationInsertionParams.push(Number(insertedHasURLAssociationTags[i].Tag_ID));
+    }
+
+    /** @type {DBURLAssociation[]} */
+    const insertedDBURLAssociations = await dball(dbs, `
+        INSERT INTO URL_Associations(
+            URL_ID,
+            URL_Association,
+            URL_Associations_PK_Hash,
+            Has_URL_With_Association_Tag_ID
+        ) VALUES ${dbtuples(urlAssociations.length, 4)} RETURNING *;
+        `, urlAssociationInsertionParams
+    );
+
+
+    return insertedDBURLAssociations.map(dbURLAssociation => mapDBURLAssociation(dbURLAssociation, urlAssociationsMap.get(dbURLAssociation.URL_Associations_PK_Hash)));
 }
 
 /**
  * @param {Databases} dbs
- * @param {(DBURL & {
- *     URL_Association: string
- * })[]} urlAssociations
+ * @param {PreInsertURLAssociation[]} urlAssociations
  */
 export async function upsertURLAssociations(dbs, urlAssociations) {
     if (urlAssociations.length === 0) {
         return [];
     }
 
-    const urlAssociationsWithHash = urlAssociations.map(urlAssociation => {
-        const URL_Associations_PK_Hash = urlAssociationPKHash(urlAssociation);
-        return {
-            ...urlAssociation,
-            URL_Associations_PK_Hash
-        };
-    });
-
-    /** @type {DBURLAssociation[]} */
-    const dbURLAssociations = await dball(dbs,
-        `SELECT * FROM URL_Associations WHERE URL_Associations_PK_Hash IN ${dbvariablelist(urlAssociationsWithHash.length)};`,
-        urlAssociationsWithHash.map(urlAssociationWithHash => urlAssociationWithHash.URL_Associations_PK_Hash)
-    );
-    const dbURLAssociationsMap = new Map(dbURLAssociations.map(dbURLAssociation => [dbURLAssociation.URL_Associations_PK_Hash, dbURLAssociation]));
-    const urlAssociationsToInsert = urlAssociationsWithHash.filter(urlAssociationWithHash => !dbURLAssociationsMap.has(urlAssociationWithHash.URL_Associations_PK_Hash));
-    const urlAssociationsToInsertDeduped = [...(new Map(urlAssociationsToInsert.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]))).values()]
-    /** @type {DBURLAssociation[]} */
-    let insertedDBURLAssociations = [];
-    if (urlAssociationsToInsertDeduped.length !== 0) {
-        const insertedHasURLAssociationTags = await insertLocalTags(dbs, urlAssociationsToInsertDeduped.map(urlAssociation => ({
-            Source_Name: "System generated",
-            Display_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`,
-            Lookup_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
-
-        const urlAssociationInsertionParams = [];
-        for (let i = 0; i < urlAssociationsToInsertDeduped.length; ++i) {
-            urlAssociationInsertionParams.push(urlAssociationsToInsertDeduped[i].URL_ID);
-            urlAssociationInsertionParams.push(urlAssociationsToInsertDeduped[i].URL_Association);
-            urlAssociationInsertionParams.push(urlAssociationsToInsertDeduped[i].URL_Associations_PK_Hash);
-            urlAssociationInsertionParams.push(Number(insertedHasURLAssociationTags[i].Tag_ID));
-        }
-
-        insertedDBURLAssociations = await dball(dbs, `
-            INSERT INTO URL_Associations(
-                URL_ID,
-                URL_Association,
-                URL_Associations_PK_Hash,
-                Has_URL_With_Association_Tag_ID
-            ) VALUES ${dbtuples(urlAssociationsToInsertDeduped.length, 4)} RETURNING *;
-            `, urlAssociationInsertionParams
-        );
-
-    }
-
-    return [
-        ...urlAssociationsWithHash.filter(urlAssociationWithHash => dbURLAssociationsMap.has(urlAssociationWithHash.URL_Associations_PK_Hash)).map(urlAssociationWithHash => ({
-            ...urlAssociationWithHash,
-            ...dbURLAssociationsMap.get(urlAssociationWithHash.URL_Associations_PK_Hash)
-        })),
-        ...urlAssociationsToInsertDeduped.map((urlAssociationToInsert, i) => ({
-            ...urlAssociationToInsert,
-            ...insertedDBURLAssociations[i]
-        }))
-    ].map(urlAssociation => ({
-        ...urlAssociation,
-        Has_URL_With_Association_Tag_ID: BigInt(urlAssociation.Has_URL_With_Association_Tag_ID)
-    }));
+    let preparedURLAssociations = urlAssociations.map(preparePreInsertURLAssociation);
+    // dedupe
+    preparedURLAssociations = [...(new Map(preparedURLAssociations.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]))).values()];
+    const dbURLAssociations = await selectURLAssociations(dbs, preparedURLAssociations);
+    const dbURLAssociationsExisting = new Set(dbURLAssociations.map(dbURLAssociation => dbURLAssociation.URL_Associations_PK_Hash));
+    const urlAssociationsToInsert = preparedURLAssociations.filter(urlAssociation => !dbURLAssociationsExisting.has(urlAssociation.URL_Associations_PK_Hash));
+    const dbURLAssociationsInserted = await insertURLAssociations(dbs, urlAssociationsToInsert);
+    
+    return dbURLAssociations.concat(dbURLAssociationsInserted);
 }

@@ -1,5 +1,6 @@
 /** @import {Databases} from "./db-util.js" */
 
+import { HAS_NOTES_TAG } from "../client/js/tags.js";
 import {dball, dbtuples} from "./db-util.js";
 
 /**
@@ -26,8 +27,11 @@ import {dball, dbtuples} from "./db-util.js";
  */
 export async function addNotesToTaggables(dbs, taggableNotePairings) {
     const taggableNotesInsertionParams = [];
+    /** @type {Set<bigint>} */
+    const taggableIDsWithNotes = new Set();
     for (const [taggableId, notes] of taggableNotePairings.entries()) {
         for (const note of notes) {
+            taggableIDsWithNotes.add(taggableId);
             taggableNotesInsertionParams.push(Number(taggableId));
             taggableNotesInsertionParams.push(note.Note_Association);
             taggableNotesInsertionParams.push(note.Note);
@@ -46,6 +50,9 @@ export async function addNotesToTaggables(dbs, taggableNotePairings) {
             Note
         ) VALUES ${dbtuples(3, taggableNotesInsertionParams.length / 3)} RETURNING *;
     `, taggableNotesInsertionParams));
+
+    await dbs.perfTags.insertTagPairings(new Map([HAS_NOTES_TAG.Tag_ID, [...taggableIDsWithNotes]]));
+
     return taggableNotes.map(taggableNote => ({
         ...taggableNote,
         Taggable_ID: BigInt(taggableNote.Taggable_ID)

@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
+import { HAS_URL_TAG, IS_FILE_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import {dball, dbget, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
@@ -10,7 +10,7 @@ import { extractFirstFrameWithFFMPEG } from "../util.js";
 /** @import {DBService} from "./services.js" */
 /** @import {PermissionInt} from "./user.js" */
 /** @import {Databases} from "./db-util.js" */
-/** @import {DBFileExtension} from "./tags.js" */
+/** @import {DBFileExtension, DBJoinedURLAssociation} from "./tags.js" */
 
 /**
  * @typedef {Object} DBTaggable
@@ -35,10 +35,6 @@ import { extractFirstFrameWithFFMPEG } from "../util.js";
  * @property {Buffer} File_Hash
  * @property {bigint} Has_File_Hash_Tag_ID
  * @property {number} File_Extension_ID
- */
-
-/**
- * @typedef {PreInsertFile & {Taggable_Name: string}} PreInsertLocalFile
  */
 
 /**
@@ -214,15 +210,51 @@ export async function updateTaggablesDeletedDate(dbs, taggablesTimes) {
 
 /**
  * @param {Databases} dbs 
- * @param {Buffer[]} fileHashes 
+ * @param {Map<bigint, DBJoinedURLAssociation[]>} taggableURLAssociationPairings
  */
-async function selectFiles(dbs, fileHashes) {
-    /** @type {DBFile[]} */
-    const dbFiles = await dball(dbs, `SELECT * FROM Files WHERE File_Hash IN ${dbvariablelist(fileHashes.length)}`, fileHashes);
-    return dbFiles.map(dbFile => ({
+export async function upsertTaggablesURLAssociations(dbs, taggableURLAssociationPairings) {
+    /** @type {Map<bigint, bigint[]>} */
+    const tagPairings = new Map([[HAS_URL_TAG.Tag_ID, []]]);
+    for (const [taggableID, dbJoinedURLAssociations] of taggableURLAssociationPairings) {
+        for (const dbJoinedURLAssociation of dbJoinedURLAssociations) {
+            if (tagPairings.get(dbJoinedURLAssociation.Has_URL_Tag_ID) === undefined) {
+                tagPairings.set(dbJoinedURLAssociation.Has_URL_Tag_ID, [])
+            }
+            if (tagPairings.get(dbJoinedURLAssociation.Has_URL_With_Association_Tag_ID) === undefined) {
+                tagPairings.set(dbJoinedURLAssociation.Has_URL_With_Association_Tag_ID, []);
+            }
+            tagPairings.get(dbJoinedURLAssociation.Has_URL_Tag_ID).push(taggableID);
+            tagPairings.get(dbJoinedURLAssociation.Has_URL_With_Association_Tag_ID).push(taggableID);
+            tagPairings.get(HAS_URL_TAG.Tag_ID).push(taggableID);
+        }
+    }
+
+    await dbs.perfTags.insertTagPairings(tagPairings);
+}
+
+/**
+ * 
+ * @param {DBFile} dbFile 
+ * @param {PreInsertFile} file 
+ */
+function mapDBFile(dbFile, file) {
+    return {
         ...dbFile,
+        ...file,
         Has_File_Hash_Tag_ID: BigInt(dbFile.Has_File_Hash_Tag_ID)
-    }));
+    };
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {PreInsertFile[]} files
+ */
+async function selectFiles(dbs, files) {
+    const filesMap = new Map(files.map(file => [file.File_Hash.toString("hex"), file]));
+
+    /** @type {DBFile[]} */
+    const dbFiles = await dball(dbs, `SELECT * FROM Files WHERE File_Hash IN ${dbvariablelist(files.length)}`, files.map(file => file.File_Hash));
+    return dbFiles.map(dbFile => mapDBFile(dbFile, filesMap.get(dbFile.File_Hash.toString("hex"))));
 }
 
 /**
@@ -245,12 +277,10 @@ async function insertFiles(dbs, files) {
         Lookup_Name: `system:has hash:${file.File_Hash.toString("hex")}`,
     })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
-    const hasFileHashTagMap = new Map(hasFileHashTags.map(hasFileHashTag => [hasFileHashTag.Lookup_Name.slice("system:has hash:".length), hasFileHashTag]));
-
     const fileInsertionParams = [];
     for (let i = 0; i < files.length; ++i) {
         fileInsertionParams.push(files[i].File_Hash);
-        fileInsertionParams.push(Number(hasFileHashTagMap.get(files[i].File_Hash.toString("hex")).Tag_ID));
+        fileInsertionParams.push(Number(hasFileHashTags[i].Tag_ID));
         fileInsertionParams.push(files[i].File_Extension_ID);
     }
 
@@ -303,11 +333,7 @@ async function insertFiles(dbs, files) {
     await Promise.all(thumbnailPromises);
 
     return {
-        dbFiles: insertedDBFiles.map((insertedDBFile, i) => ({
-            ...insertedDBFile,
-            ...files[i],
-            Has_File_Hash_Tag_ID: BigInt(insertedDBFile.Has_File_Hash_Tag_ID)
-        })),
+        dbFiles: insertedDBFiles.map((dbFile, i) => mapDBFile(dbFile, files[i])),
         finalizeFileMove: async () => {
             for (let i = 0; i < insertedDBFiles.length; ++i) {
                 const insertedDBFile = insertedDBFiles[i];
@@ -338,42 +364,77 @@ async function insertFiles(dbs, files) {
  * @param {PreInsertFile[]} files 
  */
 async function upsertFiles(dbs, files) {
-    const dbFiles = await selectFiles(dbs, files.map(file => file.File_Hash));
+    if (files.length === 0) {
+        return {
+            dbFiles: [],
+            finalizeFileMove: () => {}
+        };
+    }
+
+    // dedupe
+    files = [...(new Map(files.map(file => [file.File_Hash.toString("hex"), file]))).values()];
+
+    const dbFiles = await selectFiles(dbs, files);
     const dbFilesExisting = new Set(dbFiles.map(dbFile => dbFile.File_Hash.toString("hex")));
     const filesToInsert = files.filter(file => !dbFilesExisting.has(file.File_Hash.toString("hex")));
-    const filesToInsertDeduped = [...(new Map(filesToInsert.map(file => [file.File_Hash.toString("hex"), file]))).values()];
-    const dbFilesInserted = await insertFiles(dbs, filesToInsertDeduped);
+    const dbFilesInserted = await insertFiles(dbs, filesToInsert);
     return {
-        dbFiles: [...dbFiles, ...dbFilesInserted.dbFiles],
+        dbFiles: dbFiles.concat(dbFilesInserted.dbFiles),
         finalizeFileMove: dbFilesInserted.finalizeFileMove
+    };
+}
+
+
+/**
+ * @typedef {PreInsertFile & {Taggable_Name: string}} PreInsertLocalFile
+ * @typedef {PreInsertLocalFile & DBFile} PreparedPreInsertLocalFile
+ */
+
+/**
+ * @param {PreInsertLocalFile} preInsertLocalFile 
+ * @param {DBFile} dbFile 
+ */
+function preparePreInsertLocalFile(preInsertLocalFile, dbFile) {
+    return {
+        ...preInsertLocalFile,
+        ...dbFile
+    };
+}
+
+/**
+ * @param {DBLocalFile} dbLocalFile 
+ * @param {PreparedPreInsertLocalFile} dbFile
+ */
+function mapDBLocalFile(dbLocalFile, dbFile) {
+    return {
+        ...dbLocalFile,
+        ...dbFile,
+        Taggable_ID: BigInt(dbLocalFile.Taggable_ID)
     };
 }
 
 /**
  * @param {Databases} dbs
- * @param {DBFile[]} dbFiles
+ * @param {PreparedPreInsertLocalFile[]} localFiles
  * @param {DBLocalTaggableService} dbLocalTaggableService
  */
-export async function selectLocalFiles(dbs, dbFiles, dbLocalTaggableService) {
+export async function selectLocalFiles(dbs, localFiles, dbLocalTaggableService) {
     const {taggables} = await dbs.perfTags.search(PerfTags.searchIntersect([
         PerfTags.searchTag(dbLocalTaggableService.In_Local_Taggable_Service_Tag_ID),
-        PerfTags.searchUnion(dbFiles.map(dbFile => PerfTags.searchTag(dbFile.Has_File_Hash_Tag_ID)))
+        PerfTags.searchUnion(localFiles.map(dbFile => PerfTags.searchTag(dbFile.Has_File_Hash_Tag_ID)))
     ]));
     
-    const dbFileMap = new Map(dbFiles.map(dbFile => [dbFile.File_ID, dbFile]));
+    const dbFileMap = new Map(localFiles.map(dbFile => [dbFile.File_ID, dbFile]));
 
     /** @type {DBLocalFile[]} */
     const dbLocalFiles = await dball(dbs, `SELECT * FROM Local_Files Where Taggable_ID IN ${dbvariablelist(taggables.length)}`, taggables);
 
-    return dbLocalFiles.map(dbLocalFile => ({
-        ...dbLocalFile,
-        ...dbFileMap.get(dbLocalFile.File_ID)
-    }));
+    return dbLocalFiles.map(dbLocalFile => mapDBLocalFile(dbLocalFile, dbFileMap.get(dbLocalFile.File_ID)));
 }
 
 /**
  * @param {Databases} dbs
- * @param {(PreInsertLocalFile & DBFile)[]} localFiles
+ * @param {PreparedPreInsertLocalFile[]} localFiles
  * @param {DBLocalTaggableService} dbLocalTaggableService
  */
 export async function insertLocalFiles(dbs, localFiles, dbLocalTaggableService) {
@@ -397,48 +458,44 @@ export async function insertLocalFiles(dbs, localFiles, dbLocalTaggableService) 
         ) VALUES ${dbtuples(localFiles.length, 2)} RETURNING *;
         `, localFileInsertionParams
     );
+    const mappedInsertedDBLocalFiles = insertedDBLocalFiles.map((dbLocalFile, i) => mapDBLocalFile(dbLocalFile, localFiles[i]));
     
     await dbs.perfTags.insertTagPairings(new Map([
-        [dbLocalTaggableService.In_Local_Taggable_Service_Tag_ID, insertedTaggables.map(taggable => taggable.Taggable_ID)],
+        [dbLocalTaggableService.In_Local_Taggable_Service_Tag_ID, mappedInsertedDBLocalFiles.map(dbLocalFile => dbLocalFile.Taggable_ID)],
+        [IS_FILE_TAG.Tag_ID, mappedInsertedDBLocalFiles.map(dbLocalFile => dbLocalFile.Taggable_ID)],
+        ...localFiles.map((localFile, i) => [localFile.Has_File_Extension_Tag_ID, [insertedTaggables[i].Taggable_ID]]),
         ...localFiles.map((localFile, i) => [localFile.Has_File_Hash_Tag_ID, [insertedTaggables[i].Taggable_ID]])
     ]));
 
-    return insertedDBLocalFiles.map(dbLocalFile => ({
-        ...dbLocalFile,
-        Taggable_ID: BigInt(dbLocalFile.Taggable_ID)
-    }));
+    return mappedInsertedDBLocalFiles;
 }
 
 /**
  * @param {Databases} dbs
- * @param {PreInsertLocalFile[]} localFiles
+ * @param {PreInsertLocalFile[]} preInsertLocalFiles
  * @param {DBLocalTaggableService} dbLocalTaggableService
  */
-export async function upsertLocalFiles(dbs, localFiles, dbLocalTaggableService) {
-    if (localFiles.length === 0) {
+export async function upsertLocalFiles(dbs, preInsertLocalFiles, dbLocalTaggableService) {
+    if (preInsertLocalFiles.length === 0) {
         return {
             dbLocalFiles: [],
             finalizeFileMove: async () => {}
         };
     }
+    // dedupe
+    preInsertLocalFiles = [...(new Map(preInsertLocalFiles.map(localFile => [localFile.File_Hash.toString("hex"), localFile]))).values()];
     
-    const {dbFiles, finalizeFileMove} = await upsertFiles(dbs, localFiles);
+    const {dbFiles, finalizeFileMove} = await upsertFiles(dbs, preInsertLocalFiles);
     const dbFilesHashMap = new Map(dbFiles.map(dbFile => [dbFile.File_Hash.toString("hex"), dbFile]));
-    const dbFilesIDMap = new Map(dbFiles.map(dbFile => [dbFile.File_ID, dbFile]));
-    const dbLocalFiles = await selectLocalFiles(dbs, dbFiles, dbLocalTaggableService);
+    const preparedLocalFiles = preInsertLocalFiles.map(preInsertLocalFile => preparePreInsertLocalFile(preInsertLocalFile, dbFilesHashMap.get(preInsertLocalFile.File_Hash.toString("hex"))));
+    const dbLocalFiles = await selectLocalFiles(dbs, preparedLocalFiles, dbLocalTaggableService);
     const dbLocalFilesExisting = new Set(dbLocalFiles.map(dbLocalFile => dbLocalFile.File_Hash.toString("hex")));
-    const localFilesToInsert = localFiles.filter(localFile => !dbLocalFilesExisting.has(localFile.File_Hash.toString("hex")));
-    const dbLocalFilesInserted = await insertLocalFiles(dbs, localFilesToInsert.map(localFile => ({
-        ...localFile,
-        ...dbFilesHashMap.get(localFile.File_Hash.toString("hex"))
-    })), dbLocalTaggableService);
+    const preparedLocalFilesToInsert = preparedLocalFiles.filter(localFile => !dbLocalFilesExisting.has(localFile.File_Hash.toString("hex")));
+    const dbLocalFilesInserted = await insertLocalFiles(dbs, preparedLocalFilesToInsert, dbLocalTaggableService);
 
     
     return {
-        dbLocalFiles: [...dbLocalFiles, ...dbLocalFilesInserted.map(dbLocalFile => ({
-            ...dbLocalFile,
-            ...dbFilesIDMap.get(dbLocalFile.File_ID)
-        }))],
+        dbLocalFiles: dbLocalFiles.concat(dbLocalFilesInserted),
         finalizeFileMove
     };
 }
