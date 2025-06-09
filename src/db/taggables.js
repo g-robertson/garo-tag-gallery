@@ -5,7 +5,8 @@ import PerfTags from "../perf-tags-binding/perf-tags.js";
 import {dball, dbget, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
 import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
 import {insertLocalTags} from "./tags.js";
-import { extractFirstFrameWithFFMPEG } from "../util.js";
+import { extractFirstFrameWithFFMPEG, sha256 } from "../util.js";
+import { readFile } from "fs/promises";
 
 /** @import {DBService} from "./services.js" */
 /** @import {PermissionInt} from "./user.js" */
@@ -277,37 +278,24 @@ async function insertFiles(dbs, files) {
         Lookup_Name: `system:has hash:${file.File_Hash.toString("hex")}`,
     })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
-    const fileInsertionParams = [];
-    for (let i = 0; i < files.length; ++i) {
-        fileInsertionParams.push(files[i].File_Hash);
-        fileInsertionParams.push(Number(hasFileHashTags[i].Tag_ID));
-        fileInsertionParams.push(files[i].File_Extension_ID);
-    }
 
-    /** @type {DBFile[]} */
-    const insertedDBFiles = await dball(dbs, `
-        INSERT INTO Files(
-            File_Hash,
-            Has_File_Hash_Tag_ID,
-            File_Extension_ID
-        ) VALUES ${dbtuples(files.length, 3)} RETURNING *;
-        `, fileInsertionParams
-    );
-
+    
+    /** @type {{fileLocation: string, hash: Buffer}[]} */
     const thumbnailsGenerated = [];
+    const prethumbnailHashes = [];
     sharp.cache({files: 0});
     const thumbnailPromises = [];
-    for (let i = 0; i < insertedDBFiles.length; ++i) {
+    for (let i = 0; i < files.length; ++i) {
         thumbnailPromises.push((async () => {
-            const insertedDBFile = insertedDBFiles[i];
+            const file = files[i];
             const SHARP_IMAGE_EXTENSIONS = [".jpg", ".png", ".webp", ".gif", ".avif", ".tiff"];
             
-            const fileExtension = files[i].File_Extension;
+            const fileExtension = file.File_Extension;
             if (fileExtension === undefined) {
                 throw "File extension was undefined";
             }
 
-            const sourceLocation = fileToSourceLocationMap.get(insertedDBFile.File_Hash.toString("hex"));
+            const sourceLocation = fileToSourceLocationMap.get(file.File_Hash.toString("hex"));
             /** @type {string} */
             let sharpSourceLocation;
             const sharpOutputLocation = `${sourceLocation}.thumb.jpg`
@@ -316,21 +304,50 @@ async function insertFiles(dbs, files) {
             } else {
                 const success = await extractFirstFrameWithFFMPEG(sourceLocation, `${sourceLocation}.prethumb.jpg`);
                 if (success) {
+                    prethumbnailHashes[i] = sha256(await readFile(`${sourceLocation}.prethumb.jpg`));
+
                     sharpSourceLocation = `${sourceLocation}.prethumb.jpg`;
                 }
             }
 
             if (sharpSourceLocation !== undefined) {
                 await sharp(sharpSourceLocation)
-                .resize(300, 200, {fit: "contain"})
+                .resize(300, 200, {fit: "inside"})
                 .jpeg({force: true})
                 .toFile(sharpOutputLocation);
-                thumbnailsGenerated[i] = sharpOutputLocation;
+                const fileContents = await readFile(sharpOutputLocation);
+
+                thumbnailsGenerated[i] = {
+                    fileLocation: sharpOutputLocation,
+                    hash: sha256(fileContents)
+                };
             }
         })());
     }
 
     await Promise.all(thumbnailPromises);
+
+    const fileInsertionParams = [];
+    for (let i = 0; i < files.length; ++i) {
+        fileInsertionParams.push(files[i].File_Hash);
+        fileInsertionParams.push(thumbnailsGenerated[i].hash);
+        fileInsertionParams.push(prethumbnailHashes[i]);
+        fileInsertionParams.push(Number(hasFileHashTags[i].Tag_ID));
+        fileInsertionParams.push(files[i].File_Extension_ID);
+    }
+
+    /** @type {DBFile[]} */
+    const insertedDBFiles = await dball(dbs, `
+        INSERT INTO Files(
+            File_Hash,
+            Thumbnail_Hash,
+            Prethumbnail_Hash,
+            Has_File_Hash_Tag_ID,
+            File_Extension_ID
+        ) VALUES ${dbtuples(files.length, 5)} RETURNING *;
+        `, fileInsertionParams
+    );
+
 
     return {
         dbFiles: insertedDBFiles.map((dbFile, i) => mapDBFile(dbFile, files[i])),
@@ -349,7 +366,7 @@ async function insertFiles(dbs, files) {
                     insertedDBFile.File_Hash
                 );
                 if (thumbnailsGenerated[i] !== undefined) {
-                    dbs.fileStorage.move(`${thumbnailsGenerated[i]}`,
+                    dbs.fileStorage.move(`${thumbnailsGenerated[i].fileLocation}`,
                         `${insertedDBFile.File_Hash.toString("hex")}.thumb.jpg`,
                         insertedDBFile.File_Hash
                     );

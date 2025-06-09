@@ -33,7 +33,7 @@ async function main() {
   dbs.perfTags.__addStderrListener((data) => {
     appendFileSync("database/perf-tags-stderr.log", data);
   });
-  dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
+  //dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
 
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA foreign_keys = OFF;", () => resolve()));
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA journal_mode = WAL;", () => resolve()));

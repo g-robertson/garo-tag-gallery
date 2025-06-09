@@ -395,9 +395,6 @@ export async function upsertTagsNamespaces(dbs, tagNamespacePairings) {
     preparedTagsNamespaces = [...(new Map(preparedTagsNamespaces.map(preparedTagNamespace => [preparedTagNamespace.Tags_Namespaces_PK_Hash, preparedTagNamespace]))).values()];
 
     const dbTagsNamespaces = await selectTagsNamespaces(dbs, preparedTagsNamespaces);
-    if (dbTagsNamespaces.length !== 0) {
-        console.log(dbTagsNamespaces);
-    }
     const dbTagsNamespacesExisting = new Set(dbTagsNamespaces.map(dbTagNamespace => dbTagNamespace.Tags_Namespaces_PK_Hash));
     const tagsNamespacesToInsert = preparedTagsNamespaces.filter(tagNamespace => !dbTagsNamespacesExisting.has(tagNamespace.Tags_Namespaces_PK_Hash));
     const insertedDBTagNamespaces = await insertTagsNamespaces(dbs, tagsNamespacesToInsert);

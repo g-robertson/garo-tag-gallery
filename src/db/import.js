@@ -1,7 +1,7 @@
 import path from "path";
 import { extractWith7Z, getAllFileEntries, sha256 } from "../util.js";
 import { dbBeginTransaction, dbEndTransaction } from "./db-util.js";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync, rmSync } from "fs";
 import { addTagsToTaggables, normalizeFileExtension, upsertTagsNamespaces, upsertFileExtensions, upsertLocalTags, upsertNamespaces, upsertURLAssociations, upsertURLs, preparePreInsertURLAssociation } from "./tags.js";
 import { normalPreInsertLocalTag, localTagsPKHash } from "../client/js/tags.js";
 import { updateTaggablesCreatedDate, updateTaggablesDeletedDate, updateTaggablesLastModifiedDate, updateTaggablesLastViewedDate, upsertLocalFiles, upsertTaggablesURLAssociations } from "./taggables.js";
@@ -261,6 +261,7 @@ export async function importFilesFromHydrus(dbs, partialUploadFolder, partialFil
         if (fileInfoEntry['fileLocation'] === undefined) {
             continue;
         }
+        
         ++importChunks.length;
 
         importChunks.filePairings.set(fileName, {
