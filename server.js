@@ -13,6 +13,7 @@ import { randomBytes } from 'crypto';
 import { extractFirstFrameWithFFMPEG, rootedPath } from './src/util.js';
 import multer from 'multer';
 import { FileStorage } from './src/db/file-storage.js';
+import { dbget, dbrun } from './src/db/db-util.js';
 /** @import {User} from "./src/client/js/user.js" */
 /** @import {APIEndpoint} from "./src/api/api-types.js" */
 
@@ -25,7 +26,7 @@ async function main() {
         throw `Database failed to initialize: ${err.message}`;
       }
     }),
-    // perf/perftags.exe database/perf-input.txt database/perf-output.txt database/perf-tags
+    // .\perf\perftags.exe database/perf-input.txt database/perf-output.txt database/perf-tags
     perfTags: new PerfTags("perf/perftags.exe", "database/perf-input.txt", "database/perf-output.txt", "database/perf-tags", "archive-commands"),
     fileStorage: new FileStorage("database/file-storage")
   };
@@ -40,6 +41,7 @@ async function main() {
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA synchronous = NORMAL;", () => resolve()));
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA cache_size = 250000;", () => resolve()));
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA mmap_size=100000000;", () => resolve()));
+  
 
   await migrate(dbs);
 
@@ -126,6 +128,9 @@ async function main() {
       if (typeof api.checkPermission !== "function") {
         throw `Importing ${apiPath}: API endpoints must have an export to check permissions with signature checkPermission(dbs, req, res)`;
       }
+      if (typeof api.validate !== "function") {
+        throw `Importing ${apiPath}: API endpoints must have an export to check if the request has a valid body with signature validate(dbs, req, res)`;
+      }
 
       apis.set(`/${apiDir}/${apiFile.slice(0, -3)}`, {
         ...api,
@@ -158,47 +163,7 @@ async function main() {
     }
   })}).any());
 
-
-  // Limit page access by 403ing those the user does not have permissions for, get the api to call into the request
-  app.use((req, res) => {
-    /** @type {User} */
-    const user = req.user;
-    // Allow for admins to override missing permissions by sudo
-    if (user.isAdmin() && req.cookies['sudo'] !== undefined) {
-      user.setSudo(true);
-    }
-
-    if (req.normalizedUrl.startsWith("/api/")) {
-      const methodPath = req.normalizedUrl.slice("/api".length);
-      
-      const api = apis.get(req.normalizedUrl);
-      if (api === undefined) {
-        return res.redirect("/404");
-      }
-
-      if ((methodPath.startsWith("/get/") && req.method !== "GET") ||
-          (methodPath.startsWith("/post/") && req.method !== "POST") ||
-          (methodPath.startsWith("/put/") && req.method !== "PUT") ||
-          (methodPath.startsWith("/delete/") && req.method !== "DELETE")
-      ) {
-        return res.redirect("/400");
-      }
-
-      let canPerformAction = false;
-      canPerformAction ||= user.hasPermissions(req.method, api.PERMISSIONS_REQUIRED);
-      canPerformAction ||= api.checkPermission(dbs, req, res);
-
-      if (!canPerformAction) {
-        return res.redirect("/403");
-      }
-
-      req.apiToCall = api.default;
-      req.next();
-    } else {
-      req.next();
-    }
-  });
-
+  
   // prep partial file paths for api if remaining partial pieces finished is on
   app.use((req, res) => {
     if (req.body.remainingPartialPiecesFinished === "on") {
@@ -225,6 +190,50 @@ async function main() {
     }
 
     req.next();
+  });
+
+  // Limit page access by 403ing those the user does not have permissions for, get the api to call into the request
+  app.use(async (req, res) => {
+    /** @type {User} */
+    const user = req.user;
+    // Allow for admins to override missing permissions by sudo
+    if (user.isAdmin() && req.cookies['sudo'] !== undefined) {
+      user.setSudo(true);
+    }
+
+    if (req.normalizedUrl.startsWith("/api/")) {
+      const methodPath = req.normalizedUrl.slice("/api".length);
+      
+      const api = apis.get(req.normalizedUrl);
+      if (api === undefined) {
+        return res.redirect("/404");
+      }
+
+      if ((methodPath.startsWith("/get/") && req.method !== "GET") ||
+          (methodPath.startsWith("/post/") && req.method !== "POST") ||
+          (methodPath.startsWith("/put/") && req.method !== "PUT") ||
+          (methodPath.startsWith("/delete/") && req.method !== "DELETE")
+      ) {
+        return res.redirect("/400");
+      }
+
+      let canPerformAction = false;
+      const validationMessage = await api.validate(dbs, req, res);
+      if (validationMessage !== undefined) {
+        return res.status(400).send(validationMessage);
+      }
+      canPerformAction ||= user.hasPermissions(api.PERMISSION_BITS_REQUIRED ?? req.method, api.PERMISSIONS_REQUIRED);
+      canPerformAction ||= await api.checkPermission(dbs, req, res);
+
+      if (!canPerformAction) {
+        return res.redirect("/403");
+      }
+
+      req.apiToCall = api.default;
+      req.next();
+    } else {
+      req.next();
+    }
   });
 
   app.use((req, res) => {

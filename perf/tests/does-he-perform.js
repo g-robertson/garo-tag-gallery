@@ -311,7 +311,6 @@ const TESTS = {
         // * 9 inside for 64 bit entries + complement bit
         // * 2 in addition to that as wiggle room
         const MAX_ACCEPTABLE_FILE_SIZE = (9 * (totalTaggableCount + totalTagCount) * 2) * 2;
-        console.log(MAX_ACCEPTABLE_FILE_SIZE);
         const realDirectorySize = getTotalDirectoryBytes("test-dir/database-dir");
         if (realDirectorySize > MAX_ACCEPTABLE_FILE_SIZE) {
             throw `Directory size with only completely dense tags was ${realDirectorySize} bytes > ${MAX_ACCEPTABLE_FILE_SIZE} bytes indicating that complements are not implemented`;
@@ -325,7 +324,6 @@ const TESTS = {
         ]));
         const {ok, taggables} = await perfTags.search(PerfTags.searchTag(1n));
         if (taggables.length !== 3) {
-            console.log(taggables);
             throw "Taggables search did not return 3 taggables";
         }
         if (taggables.indexOf(1n) === -1 || taggables.indexOf(2n) === -1 || taggables.indexOf(3n) === -1) {

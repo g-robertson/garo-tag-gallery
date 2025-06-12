@@ -24,7 +24,8 @@ export async function dbrun(dbs, sql, params) {
     });
 
     if (err !== null) {
-        throw err;
+        Error.captureStackTrace(err);
+        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
     }
 
     return;
@@ -44,7 +45,8 @@ export async function dbget(dbs, sql, params) {
     });
 
     if (err !== null) {
-        throw err;
+        Error.captureStackTrace(err);
+        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
     }
 
     return row;
@@ -64,12 +66,16 @@ export async function dball(dbs, sql, params) {
     });
 
     if (err !== null) {
-        throw err;
+        Error.captureStackTrace(err);
+        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
     }
 
     return rows;
 }
 
+/**
+ * @param {number} rows 
+ */
 export function dbvariablelist(rows) {
     let list = "(?";
     for (let i = 1; i < rows; ++i) {
@@ -157,9 +163,11 @@ export function dbGenerateAccessKey() {
  * @param {(sliced: T[]) => R} callback 
  */
 export async function asyncDataSlicer(data, increment, callback) {
+    /** @type {R[]} */
     const results = []
     for (let i = 0; i < data.length; i += increment) {
         results.push(await callback(data.slice(i, i + increment)));
     }
+
     return results;
 }

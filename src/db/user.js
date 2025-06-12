@@ -56,6 +56,8 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @property {DBBoolean} Is_Administrator
  * @property {string} Access_Key
  * @property {number} Permission_Set_ID
+ * @property {Page[]} JSON_Pages
+ * @property {Object} JSON_Preferences
  * @property {number} User_Created_Date
  */
 

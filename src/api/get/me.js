@@ -7,9 +7,11 @@ import { PERMISSIONS } from "../../client/js/user.js";
 import { joinUsersPermittedObjects } from "../../db/user.js";
 
 export const PERMISSIONS_REQUIRED = PERMISSIONS.NONE;
-export async function checkPermission() {
+export async function checkPermission(dbs, req, res) {
     return true;
 }
+
+export async function validate(dbs, req, res) {}
 
 /** @type {APIFunction} */
 export default async function get(dbs, req, res) {

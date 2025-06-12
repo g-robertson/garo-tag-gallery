@@ -41,6 +41,10 @@ export function randomID(size) {
 
 const BIG_INT_IDENTIFIER = "BigInt_fuihi873ohr87hnfuidwnfufh3e2oi8fwefa";
 
+/**
+ * @param {any} obj 
+ * @returns {string} 
+ */
 export function bjsonStringify(obj) {
     return JSON.stringify(obj, (key, value) => {
         if (typeof value === "bigint") {
@@ -53,14 +57,39 @@ export function bjsonStringify(obj) {
     })
 }
 
+/**
+ * @param {string} json 
+ * @returns {any} 
+ */
 export function bjsonParse(json) {
     return JSON.parse(json, (key, value) => {
-        if (typeof value === "object" && value[BIG_INT_IDENTIFIER] !== undefined) {
+        if (value === null) {
+            return null;
+        } else if (typeof value === "object" && value[BIG_INT_IDENTIFIER] !== undefined) {
             return BigInt(value[BIG_INT_IDENTIFIER]);
         } else {
             return value;
         }
     })
+}
+
+/**
+ * @param {Set} set1 
+ * @param {Set} set2 
+ * @returns 
+ */
+export function setEquals(set1, set2) {
+    if (set1.size !== set2.size) {
+        return false;
+    }
+
+    for (const elem of set1) {
+        if (!set2.has(elem)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**

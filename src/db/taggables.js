@@ -2,48 +2,16 @@ import sharp from "sharp";
 import { HAS_URL_TAG, IS_FILE_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
-import {dball, dbget, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
+import {asyncDataSlicer, dball, dbget, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
 import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
-import {insertLocalTags} from "./tags.js";
+import {insertLocalTags, selectUserFacingLocalTagsFromTagIDs} from "./tags.js";
 import { extractFirstFrameWithFFMPEG, sha256 } from "../util.js";
 import { readFile } from "fs/promises";
 
 /** @import {DBService} from "./services.js" */
-/** @import {PermissionInt} from "./user.js" */
+/** @import {DBUser, PermissionInt} from "./user.js" */
 /** @import {Databases} from "./db-util.js" */
-/** @import {DBFileExtension, DBJoinedURLAssociation} from "./tags.js" */
-
-/**
- * @typedef {Object} DBTaggable
- * @property {bigint} Taggable_ID
- * @property {string} Taggable_Name
- * @property {number} Taggable_Last_Viewed_Date
- * @property {number} Taggable_Last_Modified_Date
- * @property {number} Taggable_Created_Date
- * @property {number} Taggable_Deleted_Date
- */
-
-/**
- * @typedef {{
- *   File_Hash: Buffer
- *   sourceLocation: string
- * } & DBFileExtension} PreInsertFile
- */
-
-/**
- * @typedef {Object} DBFile
- * @property {number} File_ID
- * @property {Buffer} File_Hash
- * @property {bigint} Has_File_Hash_Tag_ID
- * @property {number} File_Extension_ID
- */
-
-/**
- * @typedef {Object} DBLocalFile
- * @property {number} Local_File_ID
- * @property {number} File_ID
- * @property {bigint} Taggable_ID
- */
+/** @import {DBFileExtension, DBJoinedURLAssociation, UserFacingLocalTag} from "./tags.js" */
 
 /**
  * @typedef {Object} DBLocalTaggableService
@@ -57,7 +25,6 @@ import { readFile } from "fs/promises";
  */
 /** @typedef {DBJoinedLocalTaggableService & {Permission_Extent: PermissionInt}} DBPermissionedLocalTaggableService */
 
-/** @typedef {DBFile & DBFileExtension & DBTaggable} DBJoinedFile */
 
 /**
  * @param {DBJoinedLocalTaggableService} localTaggableService 
@@ -123,11 +90,11 @@ export async function selectAllLocalTaggableServices(dbs) {
 }
 
 /**
- * 
  * @param {Databases} dbs 
  * @param {User} user 
+ * @param {PermissionInt=} permissionBitsToCheck
  */
-export async function userSelectAllLocalTaggableServices(dbs, user) {
+export async function userSelectAllLocalTaggableServices(dbs, user, permissionBitsToCheck) {
     const userSelectedPermissionedLocalTaggableServices = await userSelectAllSpecificTypedServicesHelper(
         dbs,
         user,
@@ -141,11 +108,148 @@ export async function userSelectAllLocalTaggableServices(dbs, user) {
                   JOIN Services S ON LTS.Service_ID = S.Service_ID
                  WHERE SUP.User_ID = $userID;
             `, {$userID: user.id()});
-        }
+        },
+        permissionBitsToCheck
     );
 
     return userSelectedPermissionedLocalTaggableServices.map(mapLocalTaggableService);
 }
+
+
+/**
+ * @param {Databases} dbs 
+ * @param {string} searchCriteria
+ * @param {number[]} localTagServiceIDs
+ * @param {bigint[]} inLocalTaggableServiceTagIDs
+ */
+export async function searchTaggables(dbs, searchCriteria, localTagServiceIDs, inLocalTaggableServiceTagIDs) {
+    if (inLocalTaggableServiceTagIDs.length === 0) {
+        return [];
+    }
+
+    const {taggables} = await dbs.perfTags.search(PerfTags.searchIntersect([searchCriteria, PerfTags.searchUnion(
+        inLocalTaggableServiceTagIDs.map(inLocalTaggableServiceTagID => PerfTags.searchTag(inLocalTaggableServiceTagID))
+    )]));
+    return taggables;
+    return await selectUserFacingTaggables(dbs, taggables, localTagServiceIDs);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {bigint[]} taggableIDs 
+ * @param {number[]} localTagServiceIDs 
+ */
+async function selectTaggablesUserFacingLocalTags(dbs, taggableIDs, localTagServiceIDs) {
+    /** @type {Map<bigint, Awaited<ReturnType<typeof selectUserFacingLocalTagsFromTagIDs>>>} */
+    const taggablesUserFacingLocalTags = new Map();
+    if (localTagServiceIDs.length === 0) {
+        return taggablesUserFacingLocalTags;
+    }
+
+    const {taggablePairings} = await dbs.perfTags.readTaggablesTags(taggableIDs);
+    /** @type {Set<bigint>} */
+    const allTagIDs = new Set();
+    for (const tagIDs of taggablePairings.values()) {
+        for (const tagID of tagIDs) {
+            allTagIDs.add(tagID);
+        }
+    }
+
+    const userFacingLocalTags = await selectUserFacingLocalTagsFromTagIDs(dbs, allTagIDs, localTagServiceIDs);
+    const userFacingLocalTagsMap = new Map(userFacingLocalTags.map(userFacingLocalTag => [userFacingLocalTag.Tag_ID, userFacingLocalTag]));
+
+    for (const [taggableID, tagIDs] of taggablePairings) {
+        taggablesUserFacingLocalTags.set(taggableID, tagIDs.map(
+            tagID => userFacingLocalTagsMap.get(tagID)
+        ).filter(tag => tag !== undefined));
+    }
+
+    return taggablesUserFacingLocalTags;
+}
+
+/**
+ * @typedef {Object} DBUserFacingLocalFile
+ * @property {number} Local_File_ID
+ * @property {string} File_Hash
+ * @property {string} File_Extension
+ * @property {bigint} Taggable_ID
+ * @property {string} Taggable_Name
+ * @property {number} Taggable_Created_Date
+ * @property {number} Taggable_Last_Modified_Date
+ * @property {number} Taggable_Last_Viewed_Date
+ * @property {number} Taggable_Deleted_Date
+ * @property {UserFacingLocalTag[]} Tags
+ */
+
+/**
+ * @param {Databases} dbs
+ * @param {Omit<DBUserFacingLocalFile, "Tags">[]} dbUserFacingLocalFiles
+ * @param {number[]} localTagServiceIDs
+ */
+async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, localTagServiceIDs) {
+    dbUserFacingLocalFiles = dbUserFacingLocalFiles.map(dbUserFacingLocalFile => ({
+        ...dbUserFacingLocalFile,
+        Taggable_ID: BigInt(dbUserFacingLocalFile.Taggable_ID)
+    }));
+
+    const taggablesTags = await selectTaggablesUserFacingLocalTags(
+        dbs,
+        dbUserFacingLocalFiles.map(dbUserFacingLocalFile => dbUserFacingLocalFile.Taggable_ID),
+        localTagServiceIDs
+    );
+
+    return dbUserFacingLocalFiles.map(dbUserFacingLocalFile => ({
+        ...dbUserFacingLocalFile,
+        Tags: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID) ?? []
+    }));
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {bigint[]} taggableIDs 
+ * @param {number[]} localTagServiceIDs
+ * @returns {Promise<DBUserFacingLocalFile[]>}
+ */
+async function selectUserFacingTaggables(dbs, taggableIDs, localTagServiceIDs) {
+    if (taggableIDs.length === 0) {
+        return [];
+    }
+    if (taggableIDs.length > 10000) {
+        const slices = await asyncDataSlicer(taggableIDs, 10000, (sliced) => selectUserFacingTaggables(dbs, sliced, localTagServiceIDs));
+        return slices.flat();
+    }
+
+    /** @type {Omit<DBUserFacingLocalFile, "Tags">[]} */
+    const dbUserFacingLocalFiles = await dball(dbs, `
+        SELECT LF.Local_File_ID,
+               LOWER(HEX(F.File_Hash)) AS File_Hash,
+               FE.File_Extension,
+               T.Taggable_ID,
+               T.Taggable_Name,
+               T.Taggable_Created_Date,
+               T.Taggable_Last_Modified_Date,
+               T.Taggable_Last_Viewed_Date,
+               T.Taggable_Deleted_Date
+          FROM Taggables T
+          JOIN Local_Files LF ON T.Taggable_ID = LF.Taggable_ID
+          JOIN Files F ON LF.File_ID = F.File_ID
+          JOIN File_Extensions FE ON F.File_Extension_ID = FE.File_Extension_ID 
+            AND LF.Taggable_ID IN ${dbvariablelist(taggableIDs.length)};
+    `, [...taggableIDs.map(taggableID => Number(taggableID))]
+    );
+
+    return await mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, localTagServiceIDs);
+}
+
+/**
+ * @typedef {Object} DBTaggable
+ * @property {bigint} Taggable_ID
+ * @property {string} Taggable_Name
+ * @property {number} Taggable_Last_Viewed_Date
+ * @property {number} Taggable_Last_Modified_Date
+ * @property {number} Taggable_Created_Date
+ * @property {number} Taggable_Deleted_Date
+ */
 
 /**
  * @param {Databases} dbs 
@@ -232,6 +336,21 @@ export async function upsertTaggablesURLAssociations(dbs, taggableURLAssociation
 
     await dbs.perfTags.insertTagPairings(tagPairings);
 }
+
+/**
+ * @typedef {{
+ *   File_Hash: Buffer
+ *   sourceLocation: string
+ * } & DBFileExtension} PreInsertFile
+ */
+
+/**
+ * @typedef {Object} DBFile
+ * @property {number} File_ID
+ * @property {Buffer} File_Hash
+ * @property {bigint} Has_File_Hash_Tag_ID
+ * @property {number} File_Extension_ID
+ */
 
 /**
  * 
@@ -417,6 +536,13 @@ function preparePreInsertLocalFile(preInsertLocalFile, dbFile) {
         ...dbFile
     };
 }
+
+/**
+ * @typedef {Object} DBLocalFile
+ * @property {number} Local_File_ID
+ * @property {number} File_ID
+ * @property {bigint} Taggable_ID
+ */
 
 /**
  * @param {DBLocalFile} dbLocalFile 

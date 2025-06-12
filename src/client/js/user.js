@@ -33,7 +33,8 @@ export const PERMISSION_BITS = Object.freeze({
     CREATE: 8,
     READ: 4,
     UPDATE: 2,
-    DELETE: 1
+    DELETE: 1,
+    NONE: 0
 });
 export const METHOD_TO_PERMISSION_BIT = Object.freeze({
     "GET": PERMISSION_BITS.READ,

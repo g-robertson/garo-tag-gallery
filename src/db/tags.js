@@ -1,6 +1,6 @@
 import { SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash } from "../client/js/tags.js";
 import { PERMISSIONS, User } from "../client/js/user.js";
-import {asyncDataSlicer, dball, dbget, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
+import {asyncDataSlicer, dball, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
 import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
 
 /** @import {DBService} from "./services.js" */
@@ -115,45 +115,69 @@ export async function addTagsToTaggables(dbs, tagPairings) {
 
 /**
  * @param {Databases} dbs 
- * @param {number} localTagServiceID 
- * @returns {Promise<DBJoinedLocalTagService>}
+ * @param {number[]} localTagIDs
+ * @returns {Promise<{Local_Tag_Service_ID: number}[]>}
  */
-export async function selectLocalTagService(dbs, localTagServiceID) {
-    return await dbget(dbs, `
+export async function selectLocalTagServiceIDsByLocalTagIDs(dbs, localTagIDs) {
+    return await dball(dbs, `
+        SELECT Local_Tag_Service_ID
+          FROM Local_Tags
+          WHERE Local_Tag_ID IN ${dbvariablelist(localTagIDs.length)}
+        `, localTagIDs
+    );
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {number[]} localTagServiceID 
+ * @returns {Promise<DBJoinedLocalTagService[]>}
+ */
+export async function selectLocalTagServices(dbs, localTagServiceIDs) {
+    return await dball(dbs, `
         SELECT *
           FROM Local_Tag_Services LTS
           JOIN Services S ON LTS.Service_ID = S.Service_ID
-          WHERE Local_Tag_Service_ID = ?;
-        `, localTagServiceID
+          WHERE Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)};
+        `, localTagServiceIDs
     );
-
+}
+/**
+ * @param {Databases} dbs 
+ * @param {number} localTagServiceID 
+ */
+export async function selectLocalTagService(dbs, localTagServiceID) {
+    return (await selectAllLocalTagServices(dbs, [localTagServiceID]))[0];
 }
 
 /**
  * @param {Databases} dbs 
  * @param {User} user
  * @param {PermissionInt} permissionBitsToCheck
- * @param {number} localTagServiceID
- * @returns {Promise<DBJoinedLocalTagService>}
+ * @param {number[]} localTagServiceIDs
+ * @returns {Promise<DBJoinedLocalTagService[]>}
  */
-export async function userSelectLocalTagService(dbs, user, permissionBitsToCheck, localTagServiceID) {
+export async function userSelectLocalTagServices(dbs, user, permissionBitsToCheck, localTagServiceIDs) {
     if (user.isSudo() || user.hasPermissions(permissionBitsToCheck, PERMISSIONS.LOCAL_TAG_SERVICES)) {
-        return await selectLocalTagService(dbs, localTagServiceID);
+        return await selectLocalTagServices(dbs, localTagServiceIDs);
     }
 
-    return await dbget(dbs, `
+    return await dball(dbs, `
         SELECT LTS.*, S.*
           FROM Local_Tag_Services LTS
           JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
           JOIN Services S ON LTS.Service_ID = S.Service_ID
-         WHERE LTS.Local_Tag_Service_ID = $localTagServiceID
-           AND SUP.User_ID = $userID
-           AND (SUP.Permission_Extent & $permissionBitsToCheck) = $permissionBitsToCheck;
-    `, {
-        $localTagServiceID: localTagServiceID,
-        $userID: user.id(),
-        $permissionBitsToCheck: permissionBitsToCheck
-    });
+         WHERE SUP.User_ID = ?
+           AND (SUP.Permission_Extent & ?) = ?
+           AND LTS.Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)};
+    `, [
+        user.id(),
+        permissionBitsToCheck,
+        permissionBitsToCheck,
+        ...localTagServiceIDs
+    ]);
+}
+export async function userSelectLocalTagService(dbs, user, permissionBitsToCheck, localTagServiceID) {
+    return (await userSelectAllLocalTagServices(dbs, user, permissionBitsToCheck, [localTagServiceID]))[0];
 }
 
 /** @returns {Promise<DBJoinedLocalTagService[]>} */
@@ -191,27 +215,93 @@ export async function userSelectAllLocalTagServices(dbs, user) {
 }
 
 /**
- * @param {Databases} dbs 
- * @param {{Lookup_Name: string, Source_Name: string}[]} tagLookups 
- * @param {number} localTagServiceID
+ * @typedef {Object} UserFacingLocalTag
+ * @property {number} Local_Tag_ID
+ * @property {bigint} Tag_ID
+ * @property {string} Display_Name
  */
-async function selectLocalTags(dbs, tagLookups, localTagServiceID) {
-    if (tagLookups.length === 0) {
-        return [];
+
+/**
+ * @param {Databases} dbs
+ * @param {Omit<UserFacingLocalTag, "Namespaces">[]} dbUserFacingLocalTags
+ */
+async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
+    dbUserFacingLocalTags = dbUserFacingLocalTags.map(dbUserFacingLocalTag => ({
+        ...dbUserFacingLocalTag,
+        Tag_ID: BigInt(dbUserFacingLocalTag.Tag_ID)
+    }));
+
+    /** @type {Map<bigint, string[]} */
+    const tagsNamespaces = new Map();
+    for (const {Tag_ID, Namespace_Name} of await selectNamespacesFromTags(dbs, dbUserFacingLocalTags.map(tag => tag.Tag_ID))) {
+        if (tagsNamespaces.get(Tag_ID) === undefined) {
+            tagsNamespaces.set(Tag_ID, []);
+        }
+
+        tagsNamespaces.get(Tag_ID).push(Namespace_Name);
     }
 
-    const tagPKHashes = tagLookups.map(tagLookup => localTagsPKHash(tagLookup.Lookup_Name, tagLookup.Source_Name));
 
-    /** @type {DBLocalTag[]} */
-    const dbTags = await dball(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = ? AND Local_Tags_PK_Hash IN ${dbvariablelist(tagPKHashes.length)};`, [localTagServiceID, ...tagPKHashes]);
-    return dbTags.map(dbTag => ({
-        ...dbTag,
-        Tag_ID: BigInt(dbTag.Tag_ID)
+    return dbUserFacingLocalTags.map(dbUserFacingLocalTag => ({
+        ...dbUserFacingLocalTag,
+        Namespaces: tagsNamespaces.get(dbUserFacingLocalTag.Tag_ID) ?? []
     }));
 }
 
 /**
- * 
+ * @param {Databases} dbs 
+ * @param {number[]} localTagServiceIDs
+ */
+export async function selectUserFacingLocalTagsFromLocalTagServices(dbs, localTagServiceIDs) {
+    /** @type {Omit<UserFacingLocalTag, "Namespaces">[]} */
+    const dbUserFacingLocalTags = await dball(dbs, `
+        SELECT Tag_ID, Local_Tag_ID, Display_Name
+          FROM Local_Tags
+         WHERE Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
+        ;`, localTagServiceIDs
+    );
+    
+    return await mapUserFacingLocalTags(dbs, dbUserFacingLocalTags);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {Iterable<bigint>} tagIDsIterable 
+ * @param {number[]} localTagServiceIDs
+ * @returns {Promise<UserFacingLocalTag[]>}
+ */
+export async function selectUserFacingLocalTagsFromTagIDs(dbs, tagIDsIterable, localTagServiceIDs) {
+    const tagIDs = [...tagIDsIterable].map(tagID => Number(tagID));
+
+    if (tagIDs.length === 0 || localTagServiceIDs.length === 0) {
+        return [];
+    }
+    if (tagIDs.length > 10000) {
+        const slices = await asyncDataSlicer(tagIDs, 10000, (sliced) => selectUserFacingLocalTagsFromTagIDs(dbs, sliced, localTagServiceIDs));
+        return slices.flat();
+    }
+
+    /** @type {UserFacingLocalTag[]} */
+    const dbUserFacingLocalTags = await dball(dbs, `
+        SELECT Tag_ID, Local_Tag_ID, Display_Name
+          FROM Local_Tags
+        WHERE Tag_ID IN ${dbvariablelist(tagIDs.length)}
+        AND Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
+    `, [...tagIDs, ...localTagServiceIDs]);
+    return await mapUserFacingLocalTags(dbs, dbUserFacingLocalTags);
+}
+
+/**
+ * @param {DBTag} dbTag
+ */
+function mapDBTag(dbTag) {
+    return {
+        ...dbTag,
+        Tag_ID: BigInt(dbTag.Tag_ID)
+    };
+}
+
+/**
  * @param {Databases} dbs 
  * @param {number} amount 
  */
@@ -224,10 +314,49 @@ async function insertTags(dbs, amount) {
     
     /** @type {DBTag[]} */
     const dbTags = await dball(dbs, `INSERT INTO Tags(Tag_Created_Date) VALUES ${dbtuples(amount, 1)} RETURNING *;`, nows);
-    return dbTags.map(dbTag => ({
-        ...dbTag,
-        Tag_ID: BigInt(dbTag.Tag_ID)
-    }))
+    return dbTags.map(mapDBTag);
+}
+
+/**
+ * @param {DBLocalTag} dbLocalTag 
+ * @returns 
+ */
+function mapDBLocalTag(dbLocalTag) {
+    return {
+        ...dbLocalTag,
+        Tag_ID: BigInt(dbLocalTag.Tag_ID)
+    }
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {number[]} localTagIDs 
+ */
+export async function selectLocalTagsByLocalTagIDs(dbs, localTagIDs) {
+    if (localTagIDs.length === 0) {
+        return [];
+    }
+
+    /** @type {DBLocalTag[]} */
+    const dbLocalTags = await dball(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_ID IN ${dbvariablelist(localTagIDs.length)}`, localTagIDs);
+    return dbLocalTags.map(mapDBLocalTag);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {{Lookup_Name: string, Source_Name: string}[]} tagLookups 
+ * @param {number} localTagServiceID
+ */
+async function selectLocalTags(dbs, tagLookups, localTagServiceID) {
+    if (tagLookups.length === 0) {
+        return [];
+    }
+
+    const tagPKHashes = tagLookups.map(tagLookup => localTagsPKHash(tagLookup.Lookup_Name, tagLookup.Source_Name));
+
+    /** @type {DBLocalTag[]} */
+    const dbLocalTags = await dball(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = ? AND Local_Tags_PK_Hash IN ${dbvariablelist(tagPKHashes.length)};`, [localTagServiceID, ...tagPKHashes]);
+    return dbLocalTags.map(mapDBLocalTag);
 }
 
 /**
@@ -241,7 +370,8 @@ export async function insertLocalTags(dbs, localTags, localTagServiceID) {
         return [];
     }
     if (localTags.length > 2000) {
-        return (await asyncDataSlicer(localTags, 2000, sliced => insertLocalTags(dbs, sliced, localTagServiceID))).flat();
+        const slices = await asyncDataSlicer(localTags, 2000, (sliced) => insertLocalTags(dbs, sliced, localTagServiceID));
+        return slices.flat();
     }
     
     const dbTags = await insertTags(dbs, localTags.length);
@@ -269,10 +399,7 @@ export async function insertLocalTags(dbs, localTags, localTagServiceID) {
         ) VALUES ${dbtuples(localTags.length, 6)} RETURNING *;
         `, tagInsertionParams
     );
-    return dbLocalTags.map(dbLocalTag => ({
-        ...dbLocalTag,
-        Tag_ID: BigInt(dbLocalTag.Tag_ID)
-    }));
+    return dbLocalTags.map(mapDBLocalTag);
 }
 
 /**
@@ -490,6 +617,32 @@ export async function upsertFileExtensions(dbs, fileExtensions) {
     return dbFileExtensions.concat(insertedDBFileExtensions);
 }
 
+/**
+ * @param {Databases} dbs 
+ * @param {bigint[]} tagIDs
+ * @returns {Promise<{Namespace_Name: string, Tag_ID: bigint}[]>}
+ */
+export async function selectNamespacesFromTags(dbs, tagIDs) {
+    if (tagIDs.length === 0) {
+        return [];
+    }
+
+    return (await dball(dbs, `
+        SELECT N.Namespace_Name, TN.Tag_ID
+          FROM Tags_Namespaces TN
+          JOIN Namespaces N ON TN.Namespace_ID = N.Namespace_ID
+         WHERE TN.Tag_ID IN ${dbvariablelist(tagIDs.length)}`,
+        tagIDs.map(tagID => Number(tagID))
+    )).map(result => ({
+        ...result,
+        Tag_ID: BigInt(result.Tag_ID)
+    }));
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {string[]} namespaces 
+ */
 export async function selectNamespaces(dbs, namespaces) {
     if (namespaces.length === 0) {
         return [];
@@ -503,7 +656,6 @@ export async function selectNamespaces(dbs, namespaces) {
 /**
  * @param {Databases} dbs 
  * @param {string[]} namespaces 
- * @returns 
  */
 export async function insertNamespaces(dbs, namespaces) {
     if (namespaces.length === 0) {

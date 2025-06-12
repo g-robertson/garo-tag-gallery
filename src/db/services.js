@@ -16,10 +16,18 @@ import { PERMISSION_BITS, User } from "../client/js/user.js";
  * @param {PermissionType} specificServicePermissionType 
  * @param {(dbs: Databases) => Promise<T[]>} selectAllSpecificTypedServices
  * @param {() => Promise<T & {Permission_Extent: PermissionInt}>} selectAllUserPermissionedSpecificTypedServices
- * @returns 
+ * @param {PermissionInt=} permissionBitsToCheck
  */
-export async function userSelectAllSpecificTypedServicesHelper(dbs, user, specificServicePermissionType, selectAllSpecificTypedServices, selectAllUserPermissionedSpecificTypedServices) {
-    
+export async function userSelectAllSpecificTypedServicesHelper(
+    dbs,
+    user,
+    specificServicePermissionType,
+    selectAllSpecificTypedServices,
+    selectAllUserPermissionedSpecificTypedServices,
+    permissionBitsToCheck
+) {
+    permissionBitsToCheck ??= PERMISSION_BITS.NONE;
+
     /** @type {(T & {Permission_Extent: PermissionInt})[]} */
     let returnedSpecificServices = [];
     let giveAllSpecificTypedServicesPermission = 0;
@@ -61,5 +69,5 @@ export async function userSelectAllSpecificTypedServicesHelper(dbs, user, specif
         }
     }
 
-    return returnedSpecificServices;
+    return returnedSpecificServices.filter(specificService => (specificService.Permission_Extent & permissionBitsToCheck) === permissionBitsToCheck);
 }

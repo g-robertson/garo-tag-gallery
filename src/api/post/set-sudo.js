@@ -4,6 +4,17 @@
 
 import { PERMISSIONS } from "../../client/js/user.js";
 
+export async function validate(dbs, req, res) {
+    const sudo = req?.body?.sudo;
+    if (typeof sudo !== "boolean") {
+        return "sudo was not a boolean";
+    }
+
+    req.sanitizedBody = {
+        sudo
+    };
+}
+
 export const PERMISSIONS_REQUIRED = [PERMISSIONS.IS_ADMIN];
 export async function checkPermission() {
     return false;
@@ -11,6 +22,6 @@ export async function checkPermission() {
 
 /** @type {APIFunction} */
 export default async function post(dbs, req, res) {
-    res.cookie("sudo", req.body.sudo);
+    res.cookie("sudo", req.sanitizedBody.sudo);
     res.status(200).send("Set sudo status");
 }

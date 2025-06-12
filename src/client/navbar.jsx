@@ -1,20 +1,24 @@
 import { useState } from 'react';
 import './global.css';
 import { MODAL_NAME as IMPORT_FILES_FROM_HYDRUS_MODAL_NAME } from './modal/modals/import-files-from-hydrus.jsx';
+import { PAGE_NAME as FILE_SEARCH_PAGE_NAME, PAGE_DEFAULT_DISPLAY_NAME as FILE_SEARCH_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
 
 const FILE_MENU = "file";
-const FILE_MENU_2 = "file2";
+const PAGES_MENU = "pages";
+
+/** @import {Setters, States} from "./App.jsx" */
 
 /**
  * 
  * @param {{
- *     pushModal: (modalName: string) => void
- *     pushAction: (actionName: string) => void
+ *     setters: Setters,
+ *     states: States,
+ *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
  * }} param0 
  * @returns 
  */
-const Navbar = ({pushModal, pushAction}) => {
-    /** @type [string | null, (menuOpened: string | null)=>void] */
+const Navbar = ({setters, states, pushModal}) => {
+    /** @type [string | null, (menuOpened: string | null) => void] */
     const [menuOpened, setMenuOpened] = useState(null);
 
     const toggleMenuOpened = (menu) => {
@@ -27,16 +31,24 @@ const Navbar = ({pushModal, pushAction}) => {
                 <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(FILE_MENU)}>File</div>
                 <div className="topbar-dropdown-options" style={{display: menuOpened === FILE_MENU ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
-                        pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_NAME)
+                        setMenuOpened(null);
+                        pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_NAME);
                     }}>Import files from Hydrus</div>
                 </div>
             </div>
             
             <div className="topbar-dropdown">
-                <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(FILE_MENU_2)}>Pages</div>
-                <div className="topbar-dropdown-options" style={{display: menuOpened === FILE_MENU_2 ? "block" : "none"}}>
+                <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(PAGES_MENU)}>Pages</div>
+                <div className="topbar-dropdown-options" style={{display: menuOpened === PAGES_MENU ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
-                        pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_NAME)
+                        const newActivePageIndex = states.pages.length;
+                        setters.setPages([...states.pages, {
+                            pageName: FILE_SEARCH_PAGE_NAME,
+                            pageDisplayName: FILE_SEARCH_DEFAULT_DISPLAY_NAME
+                        }]);
+                        setters.setActivePageIndex(newActivePageIndex);
+
+                        setMenuOpened(null);
                     }}>New file search page</div>
                 </div>
             </div>

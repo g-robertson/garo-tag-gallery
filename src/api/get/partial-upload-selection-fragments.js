@@ -8,25 +8,33 @@ import { PERMISSIONS } from "../../client/js/user.js";
 import path from "path";
 import { rootedPath } from "../../util.js";
 
+export async function validate(dbs, req, res) {
+    const partialUploadFolder = req?.query?.partialUploadPath;
+    if (typeof partialUploadFolder !== "string") {
+        return "partialUploadPath was not a string";
+    }
+    const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadFolder));
+    if (!partialUploadFolderRootedPath.isRooted) {
+        return "partialUploadPath was not rooted in partial-zips";
+    }
+
+    const partialUploadFolderSafePath = partialUploadFolderRootedPath.safePath;
+    req.sanitizedBody = {
+        partialUploadFolderSafePath
+    };
+}
+
 export const PERMISSIONS_REQUIRED = PERMISSIONS.NONE;
-export async function checkPermission() {
+export async function checkPermission(dbs, req, res) {
     return true;
 }
 
+
 /** @type {APIFunction} */
 export default async function get(dbs, req, res) {
-    const partialUploadFolder = req?.query.partialUploadPath;
-    if (typeof partialUploadFolder !== "string") {
-        return res.redirect("/400");
-    }
-    const partialUploadPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadFolder));
-    if (!partialUploadPath.isRooted) {
-        return res.redirect("/400");
-    }
-
     let dirContents = [];
     try {
-        dirContents = readdirSync(partialUploadPath.safePath);
+        dirContents = readdirSync(req.sanitizedBody.partialUploadFolderSafePath);
     } catch (err) {} // Nothing we can do about a non-existent directory
     res.send(dirContents);
 }

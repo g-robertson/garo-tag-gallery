@@ -1,39 +1,85 @@
 import { useEffect, useState } from 'react';
 import './global.css';
-import Navbar from './navbar';
+import Navbar from './navbar.jsx';
 import Modal from './modal/modal.jsx';
 import getMe from '../api/client-get/me.js';
 import { User } from './js/user.js';
+import Page from './page/page.jsx';
+import PageNavbar from './page-navbar.jsx';
+
+/** @import {PageType} from "./page/page.jsx" */
+/** @import {ModalProperties} from "./modal/modal.jsx" */
+
+/**
+ * @typedef {Object} Setters
+ * @property {(activeModals: ModalProperties[]) => void} setActiveModals
+ * @property {(pages: PageType[]) => void} setPages
+ * @property {(activePageIndex: number | null) => void} setActivePageIndex
+ * @property {(user: User) => void} setUser
+ * 
+ * @typedef {Object} States
+ * @property {ModalProperties[]} activeModals
+ * @property {PageType[]} pages
+ */
 
 const App = () => {
-    /** @type [string[], (activeModals: string[])=>void] */
+    /** @type {[ModalProperties[], (activeModals: ModalProperties[]) => void]} */
     const [activeModals, setActiveModals] = useState([]);
+    /** @type {[PageType[], (pages: PageType[]) => void]} */
+    const [pages, setPages] = useState([]);
+    /** @type {[number | null, (activePageIndex: number | null) => void]} */
+    const [activePageIndex, setActivePageIndex] = useState(null);
     const [user, setUser] = useState(User.EMPTY_USER);
+
     useEffect(() => {
         (async () => {
             setUser(new User(await getMe()));
         })();
     }, []);
 
-    const pushModal = (modalName) => {
-        setActiveModals([...activeModals, modalName]);
+    const pushModal = async (modalName, extraProperties) => {
+        return new Promise(resolve => {
+            setters.setActiveModals([...states.activeModals, {modalName, extraProperties, resolve}]);
+        });
     }
     const popModal = () => {
+        activeModals[activeModals.length - 1].resolve();
         setActiveModals([...activeModals.slice(0, -1)]);
     }
-    const pushAction = (actionName) => {
+    
+    const setters = {
+        setPages,
+        setActivePageIndex,
+        setUser,
+        setActiveModals
+    };
+    const states = {
+        pages,
+        activeModals
+    };
 
-    }
-    const mappedModals = activeModals.map((modalName, index) => (
+    const mappedModals = activeModals.map((modalProperties, index) => (
         <div style={{pointerEvents: activeModals.length - 1 === index ? "auto" : "none"}}>
-            <Modal modalName={modalName} popModal={popModal} user={user} />
+            <Modal modalProperties={modalProperties} pushModal={pushModal} popModal={popModal} user={user} index={index} />
         </div>
     ));
 
     return (
         <div>
-            <div style={{pointerEvents: mappedModals.length === 0 ? "auto" : "none"}}>
-                <Navbar pushModal={pushModal} pushAction={pushAction} />
+            <div style={{flexDirection: "column", pointerEvents: mappedModals.length === 0 ? "auto" : "none"}}>
+                <div>
+                    <Navbar setters={setters} states={states} pushModal={pushModal} />
+                </div>
+                <div>
+                    <PageNavbar pages={pages} setActivePageIndex={setActivePageIndex} activePageIndex={activePageIndex}></PageNavbar>
+                </div>
+                <div>
+                    {
+                        (activePageIndex !== null)
+                        ? (<Page page={pages[activePageIndex]} user={user} pushModal={pushModal} ></Page>)
+                        : (<></>)
+                    }
+                </div>
             </div>
             <div>
                 {mappedModals}

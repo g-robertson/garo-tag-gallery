@@ -219,7 +219,7 @@ export default class PerfTags {
         /** @type {Map<bigint, bigint[]>} */
         const taggablePairings = new Map();
         for (let i = 0; i < taggablesTagsStr.length;) {
-            const taggable = taggablesTagsStr.readBigUInt64BE(i)
+            const taggable = taggablesTagsStr.readBigUInt64BE(i);
             i += 8;
             const tagCount = taggablesTagsStr.readBigUInt64BE(i);
             i += 8;
@@ -260,6 +260,13 @@ export default class PerfTags {
     }
 
     /**
+     * @param {string} expression 
+     */
+    static searchComplement(expression) {
+        return `~${expression}`;
+    }
+
+    /**
      * @param {string[]} expressions
      */
     static searchUnion(expressions) {
@@ -267,6 +274,10 @@ export default class PerfTags {
             if (typeof expression !== "string") {
                 throw "Expression in search union was not a string";
             }
+        }
+
+        if (expressions.length === 0) {
+            return "";
         }
 
         if (expressions.length === 1) {
@@ -285,6 +296,10 @@ export default class PerfTags {
             if (typeof expression !== "string") {
                 throw "Expression in search intersect was not a string";
             }
+        }
+
+        if (expressions.length === 0) {
+            return "";
         }
         
         if (expressions.length === 1) {

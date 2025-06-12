@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '../global.css';
 import getPartialUploadSelections, { NOT_A_PARTIAL_UPLOAD } from '../../api/client-get/partial-upload-selections.js';
 import getPartialUploadSelectionFragments from '../../api/client-get/partial-upload-selection-fragments.js';
@@ -15,7 +15,7 @@ import { randomID } from '../js/client-util.js';
  * @returns 
  */
 const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
-    const [uniqueID,] = useState(randomID());
+    const uniqueID = useRef(randomID(32));
     const [partialUploadSelections, setPartialUploadSelections] = useState(new Set([NOT_A_PARTIAL_UPLOAD]));
     const [activePartialUploadSelection, setActivePartialUploadSelection] = useState(NOT_A_PARTIAL_UPLOAD);
     const [activePartialUploadSelectionFragments, setActivePartialUploadSelectionFragments] = useState([]);
@@ -42,7 +42,7 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
 
     return {
         PartialSelector: (
-            <div style={{marginLeft: "8px"}}>
+            <div style={{marginLeft: "8px", flexDirection: "column"}}>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Partial upload location: </span>
                     <select style={{display: "inline-block"}} name="partialUploadSelection" onChange={(e) => {
@@ -70,7 +70,7 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>{text}</span>
-                    <input style={{display: "inline-block", marginLeft: "4px"}}  id={`partialFiles-${uniqueID}`} name="partialFiles" type="file" multiple />
+                    <input style={{display: "inline-block", marginLeft: "4px"}}  id={`partialFiles-${uniqueID.current}`} name="partialFiles" type="file" multiple />
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Are all remaining pieces in this upload:</span>
@@ -100,7 +100,7 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                       trueActivePartialUploadSelection = `____NOT_PARTIAL____${randomID(16).toString("hex")}`;
                     }
                     
-                    const filesSelected = document.getElementById(`partialFiles-${uniqueID}`).files;
+                    const filesSelected = document.getElementById(`partialFiles-${uniqueID.current}`).files;
                     for (const file of filesSelected) {
                         const formData = new FormData();
                         formData.append("partialUploadSelection", trueActivePartialUploadSelection);
@@ -113,7 +113,7 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                     }
 
                     /** @type {HTMLFormElement} */
-                    let outerForm = document.getElementById(`submit-${uniqueID}`);
+                    let outerForm = document.getElementById(`submit-${uniqueID.current}`);
                     while (outerForm !== null && outerForm.tagName !== "FORM") {
                         outerForm = outerForm.parentElement;
                     }
@@ -132,7 +132,7 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                     }
                     setUploading(false);
                 }}/>
-                <input type="submit" id={`submit-${uniqueID}`} style={{display: "none"}} />
+                <input type="submit" id={`submit-${uniqueID.current}`} style={{display: "none"}} />
             </div>
         )
     };
