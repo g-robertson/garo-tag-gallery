@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import TagsSelector from '../../components/tags-selector.jsx';
 import '../../global.css';
-import { fbjsonParse } from '../../js/client-util.js';
+import { fjsonParse } from '../../js/client-util.js';
 import { User } from '../js/user.js';
+import LazyGallery from '../../components/lazy-gallery.jsx';
 
 /** @import {SearchObject} from "../../components/tags-selector.jsx" */
 
@@ -12,6 +14,8 @@ import { User } from '../js/user.js';
  * }}
 */
 const FileSearchPage = ({user, pushModal}) => {
+    /** @type {[number[], (taggableIDs: number[]) => void]} */
+    const [taggableIDs, setTaggableIDs] = useState([]);
 
     return (
         <div style={{width: "100%", height: "100%"}}>
@@ -32,11 +36,16 @@ const FileSearchPage = ({user, pushModal}) => {
                         method: "POST"
                     });
 
-                    console.log(await fbjsonParse(response));
+                    setTaggableIDs(await fjsonParse(response));
                 }} />
             </div>
             <div style={{width: "auto", flex: 3, height: "100%"}}>
-                Files portion
+                <LazyGallery 
+                    taggableIDs={taggableIDs}
+                    onValuesDoubleClicked={() => {
+
+                    }}
+                />
             </div>
         </div>
     );

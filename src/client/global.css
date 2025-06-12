@@ -238,7 +238,8 @@ div {
 .scroll-cursor {
     user-select: none;
     -webkit-user-select: none;
-    vertical-align: middle;
+    text-align: center;
+    flex-direction: column;
     justify-content: center;
     color: var(--background);
     background-color: var(--accent-foreground-alt);

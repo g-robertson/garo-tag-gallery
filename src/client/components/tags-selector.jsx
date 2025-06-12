@@ -3,7 +3,6 @@ import '../global.css';
 import { PERMISSION_BITS, User } from '../js/user.js';
 import { fjsonParse } from '../js/client-util.js';
 import MultiSelect from './multi-select.jsx';
-import LazySelector from './lazy-selector.jsx';
 
 import { MODAL_NAME as CREATE_OR_SEARCH_GROUP_MODAL_NAME } from '../modal/modals/create-or-search-group.jsx';
 import LazyTagSelector from './lazy-tag-selector.jsx';
@@ -12,7 +11,7 @@ import LazyTagSelector from './lazy-tag-selector.jsx';
  * @typedef {Object} ClientTag
  * @property {number} localTagID
  * @property {string} tagName
- * @property {string} title
+ * @property {string} displayName
  * @property {string[]} namespaces
  */
 
@@ -50,7 +49,7 @@ function searchObjectToDisplayName(searchObject) {
         }
     }
 
-    return `${(searchObject.exclude ? '-' : '')}${searchObject.title}`;
+    return `${(searchObject.exclude ? '-' : '')}${searchObject.displayName}`;
 
 }
 
@@ -107,7 +106,7 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsRef, o
 
                     setTags(tagsResponse.map(tag => ({
                         localTagID: tag[0],
-                        title: tag[1],
+                        displayName: tag[1],
                         tagName: tag[2],
                         namespaces: tag[3]
                     })));
@@ -119,7 +118,7 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsRef, o
                     tags={[...searchObjects.values()].map(searchObject => {
                         return searchObject;
                     })}
-                    onOptionsDoubleClicked={(searchObjects_ => {
+                    onValuesDoubleClicked={(searchObjects_ => {
                         for (const searchObject of searchObjects_) {
                             searchObjects.delete(searchObjectToHash(searchObject));
                         }
@@ -139,6 +138,7 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsRef, o
                             if (orGroupSearchObjects.length !== 0) {
                                 searchObjects.set(searchObjectToHash(orGroupSearchObjects), orGroupSearchObjects);
                             }
+
                             setSearchObjects(new Map([...searchObjects]));
                         }} />
                         <div className="lazy-selector-selectable-item-portion" style={{width: "100%", overflowX: "hidden"}}>{searchObjectToDisplayName(realizedValue)}</div>
@@ -194,10 +194,11 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsRef, o
                                 searchObjects.set(searchObjectHash, searchObject);
                             }
 
-                            setSearchObjects(new Map([...searchObjects]))
                         }
+                        setSearchObjects(new Map([...searchObjects]));
                     }}
-                    customItemComponent={({realizedValue}) => <>{realizedValue.title}</>}
+                    customItemComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
+                    customTitleRealizer={(value) => value.displayName}
                 />
             </div>
         </div>

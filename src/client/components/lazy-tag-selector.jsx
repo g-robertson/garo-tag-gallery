@@ -14,10 +14,12 @@ const LazyTagSelector = ({tags, onValuesDoubleClicked, customItemComponent, cust
         values={tags}
         onValuesDoubleClicked={onValuesDoubleClicked}
         customItemComponent={customItemComponent}
-        valueRealizer={(value) => value}
+        valuesRealizer={(values) => values}
+        valueRealizationRange={Infinity}
+        valueRealizationDelay={0}
         customTitleRealizer={customTitleRealizer}
-        valueWidth={"100%"}
-        valueHeight={20}
+        itemWidth={"100%"}
+        itemHeight={20}
     />
 }
 

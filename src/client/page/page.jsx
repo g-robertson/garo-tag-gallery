@@ -30,7 +30,7 @@ const PAGES = {
 const Page = ({page, user, pushModal}) => {
     const {component} = PAGES[page.pageName];
     
-    return (<div className="page" style={{marginLeft: 8, marginRight: 8}}>
+    return (<div className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}>
         <div className="page-topbar">
             <div className="page-topbar-right">
                 <div className="page-title">{page.pageDisplayName}</div>

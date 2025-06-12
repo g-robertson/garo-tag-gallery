@@ -177,7 +177,7 @@ export async function userSelectLocalTagServices(dbs, user, permissionBitsToChec
     ]);
 }
 export async function userSelectLocalTagService(dbs, user, permissionBitsToCheck, localTagServiceID) {
-    return (await userSelectAllLocalTagServices(dbs, user, permissionBitsToCheck, [localTagServiceID]))[0];
+    return (await userSelectLocalTagServices(dbs, user, permissionBitsToCheck, [localTagServiceID]))[0];
 }
 
 /** @returns {Promise<DBJoinedLocalTagService[]>} */

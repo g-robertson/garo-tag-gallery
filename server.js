@@ -49,7 +49,7 @@ async function main() {
 
   const app = express();
   app.use(cookieParser());
-  app.use(express.json());
+  app.use(express.json({limit: "1MB"}));
   app.use(express.urlencoded());
 
   // normalize url by removing query string, and body by making it {} when not there
@@ -254,7 +254,9 @@ async function main() {
     }
 
     req.next();
-  })
+  });
+
+  app.use("/images-database", serveStatic(dbs.fileStorage.directory()));
 
   app.use(serveStatic("dist", {index: ["index.htm", "index.html"], extensions: ['html', 'htm']}));
 

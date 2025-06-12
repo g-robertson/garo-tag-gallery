@@ -12,6 +12,10 @@ export class FileStorage {
         this.#directory = directory;
     }
 
+    directory() {
+        return this.#directory;
+    }
+
     /**
      * 
      * @param {string} from 
@@ -35,7 +39,7 @@ export class FileStorage {
         const hashStr = hash.toString("hex");
         const dirUsed = path.join(this.#directory, hashStr.slice(0, 2), hashStr.slice(2, 4));
         const fileEndLocation = path.join(dirUsed, fileName);
-        readFileSync(fileEndLocation);
+        return readFileSync(fileEndLocation);
     }
 
     /**

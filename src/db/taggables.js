@@ -42,15 +42,29 @@ function mapLocalTaggableService(localTaggableService) {
 
 /**
  * @param {Databases} dbs 
- * @param {number} localTaggableServiceId 
+ * @param {number[]} localTaggableServiceIDs
  */
-export async function selectLocalTaggableService(dbs, localTaggableServiceId) {
-    /** @type {DBJoinedLocalTaggableService} */
+export async function selectLocalTaggableServices(dbs, localTaggableServiceIDs) {
     return mapLocalTaggableService(await dbget(dbs, `
         SELECT *
           FROM Local_Taggable_Services LTS
           JOIN Services S ON LTS.Service_ID = S.Service_ID
-          WHERE LTS.Local_Taggable_Service_ID = ?;`, localTaggableServiceId)
+          WHERE LTS.Local_Taggable_Service_ID IN ${dbvariablelist(localTaggableServiceIDs.length)};`, localTaggableServiceIDs)
+    );
+}
+
+
+/**
+ * @param {Databases} dbs 
+ * @param {bigint[]} taggableIDs
+ * @returns {Promise<{Local_Tag_Service_ID: number}[]>}
+ */
+export async function selectLocalTaggableServiceIDsByTaggableIDs(dbs, taggableIDs) {
+    return await dball(dbs, `
+        SELECT Local_Taggable_Service_ID
+          FROM Local_Files
+          WHERE Taggable_ID IN ${dbvariablelist(taggableIDs.length)}
+        `, taggableIDs.map(taggableID => Number(taggableID))
     );
 }
 
@@ -58,25 +72,42 @@ export async function selectLocalTaggableService(dbs, localTaggableServiceId) {
  * @param {Databases} dbs 
  * @param {User} user
  * @param {PermissionInt} permissionBitsToCheck
- * @param {number} localTaggableServiceID
+ * @param {number[]} localTaggableServiceIDs
+ * @returns {Promise<DBJoinedLocalTaggableService[]>}
  */
-export async function userSelectLocalTaggableService(dbs, user, permissionBitsToCheck, localTaggableServiceID) {
-    if (user.isSudo() || user.hasPermissions(permissionBitsToCheck, PERMISSIONS.LOCAL_TAGGABLE_SERVICES)) {
-        return await selectLocalTaggableService(dbs, localTaggableServiceID);
+export async function userSelectLocalTaggableServices(dbs, user, permissionBitsToCheck, localTaggableServiceIDs) {
+    if (user.isSudo() || user.hasPermissions(permissionBitsToCheck, PERMISSIONS.LOCAL_TAG_SERVICES)) {
+        return await selectLocalTaggableServices(dbs, localTaggableServiceIDs);
     }
 
-    return mapLocalTaggableService(await dbget(dbs, `
-        SELECT LTS.*, S.* FROM Local_Taggable_Services LTS
-                 JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
-                 JOIN Services S ON LTS.Service_ID = S.Service_ID
-                WHERE LTS.Local_Taggable_Service_ID = $localTaggableServiceID
-                  AND SUP.User_ID = $userID
-                  AND (SUP.Permission_Extent & $permissionBitsToCheck) = $permissionBitsToCheck;
-    `, {
-        $localTaggableServiceID: localTaggableServiceID,
-        $userID: user.id(),
-        $permissionBitsToCheck: permissionBitsToCheck
-    }));
+    /** @type {DBJoinedLocalTaggableService[]} */
+    const localTaggableServices = await dball(dbs, `
+        SELECT LTS.*, S.*
+          FROM Local_Taggable_Services LTS
+          JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
+          JOIN Services S ON LTS.Service_ID = S.Service_ID
+         WHERE SUP.User_ID = ?
+           AND (SUP.Permission_Extent & ?) = ?
+           AND LTS.Local_Taggable_Service_ID IN ${dbvariablelist(localTaggableServiceIDs.length)};
+    `, [
+        user.id(),
+        permissionBitsToCheck,
+        permissionBitsToCheck,
+        ...localTaggableServiceIDs
+    ]);
+
+    return localTaggableServices.map(mapLocalTaggableService);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {User} user 
+ * @param {PermissionInt} permissionBitsToCheck 
+ * @param {number} localTagServiceID 
+ * @returns 
+ */
+export async function userSelectLocalTaggableService(dbs, user, permissionBitsToCheck, localTagServiceID) {
+    return (await userSelectLocalTaggableServices(dbs, user, permissionBitsToCheck, [localTagServiceID]))[0];
 }
 
 export async function selectAllLocalTaggableServices(dbs) {
@@ -131,7 +162,6 @@ export async function searchTaggables(dbs, searchCriteria, localTagServiceIDs, i
         inLocalTaggableServiceTagIDs.map(inLocalTaggableServiceTagID => PerfTags.searchTag(inLocalTaggableServiceTagID))
     )]));
     return taggables;
-    return await selectUserFacingTaggables(dbs, taggables, localTagServiceIDs);
 }
 
 /**
@@ -210,7 +240,7 @@ async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, localTagSe
  * @param {number[]} localTagServiceIDs
  * @returns {Promise<DBUserFacingLocalFile[]>}
  */
-async function selectUserFacingTaggables(dbs, taggableIDs, localTagServiceIDs) {
+export async function selectUserFacingTaggables(dbs, taggableIDs, localTagServiceIDs) {
     if (taggableIDs.length === 0) {
         return [];
     }
