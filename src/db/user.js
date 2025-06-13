@@ -1,7 +1,8 @@
 import { User } from "../client/js/user.js";
-import { dbget } from "./db-util.js";
+import { dbget, dbsqlcommand } from "./db-util.js";
 import { userSelectAllLocalTagServices } from "./tags.js";
 import { userSelectAllLocalTaggableServices } from "./taggables.js";
+import { userSelectAllLocalMetricServices } from "./metrics.js";
 
 /**
  * @import {DBBoolean} from "./db-util.js"
@@ -67,6 +68,7 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  *          {
  *              Local_Tag_Services: (DBPermissionedLocalTagService)[],
  *              Local_Taggable_Services: (DBPermissionedLocalTaggableService)[]
+ *              Local_Metric_Services: (DBPermissionedLocalMetricService)[]
  *          }
  * } DBJoinedUser
  */
@@ -89,6 +91,7 @@ async function getUserById(dbs, userId) {
 export async function joinUsersPermittedObjects(dbs, user) {
     user.setLocalTagServices(await userSelectAllLocalTagServices(dbs, user));
     user.setLocalTaggableServices(await userSelectAllLocalTaggableServices(dbs, user));
+    user.setLocalMetricServices(await userSelectAllLocalMetricServices(dbs, user));
     
     return user;
 }

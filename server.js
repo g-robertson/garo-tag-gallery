@@ -131,6 +131,9 @@ async function main() {
       if (typeof api.validate !== "function") {
         throw `Importing ${apiPath}: API endpoints must have an export to check if the request has a valid body with signature validate(dbs, req, res)`;
       }
+      if (typeof api.PERMISSION_BITS_REQUIRED !== "number") {
+        throw `Importing ${apiPath}: PERMISSION_BITS_REQUIRED is a required export for API endpoints and must be within [0,15]`;
+      }
 
       apis.set(`/${apiDir}/${apiFile.slice(0, -3)}`, {
         ...api,
@@ -222,7 +225,7 @@ async function main() {
       if (validationMessage !== undefined) {
         return res.status(400).send(validationMessage);
       }
-      canPerformAction ||= user.hasPermissions(api.PERMISSION_BITS_REQUIRED ?? req.method, api.PERMISSIONS_REQUIRED);
+      canPerformAction ||= user.hasPermissions(api.PERMISSION_BITS_REQUIRED, api.PERMISSIONS_REQUIRED);
       canPerformAction ||= await api.checkPermission(dbs, req, res);
 
       if (!canPerformAction) {

@@ -47,6 +47,7 @@ export async function validate(dbs, req, res) {
 }
 
 export const PERMISSIONS_REQUIRED = [PERMISSIONS.LOCAL_TAGGABLE_SERVICES, PERMISSIONS.LOCAL_TAG_SERVICES];
+export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.CREATE;
 export async function checkPermission() {
     return false;
 }

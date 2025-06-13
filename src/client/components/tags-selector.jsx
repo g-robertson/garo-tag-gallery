@@ -4,7 +4,7 @@ import { PERMISSION_BITS, User } from '../js/user.js';
 import { fjsonParse } from '../js/client-util.js';
 import MultiSelect from './multi-select.jsx';
 
-import { MODAL_NAME as CREATE_OR_SEARCH_GROUP_MODAL_NAME } from '../modal/modals/create-or-search-group.jsx';
+import { MODAL_PROPERTIES as CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES } from '../modal/modals/create-or-search-group.jsx';
 import LazyTagSelector from './lazy-tag-selector.jsx';
 
 /**
@@ -127,7 +127,7 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsRef, o
                     })}
                     customItemComponent={({realizedValue}) => (<div style={{width: "100%", position: "relative"}}>
                         <input type="button" style={{position: "absolute", top:0, right: 4}} value="OR" onClick={async () => {
-                            const orGroupSearchObjects = await pushModal(CREATE_OR_SEARCH_GROUP_MODAL_NAME, {initialSelectedTags: new Map(
+                            const orGroupSearchObjects = await pushModal(CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {initialSelectedTags: new Map(
                                 realizedValue.map(tag => [searchObjectToHash([tag]), [tag]])
                             )});
                             if (orGroupSearchObjects === undefined) {

@@ -3,7 +3,7 @@
  */
 
 import { mkdirSync, renameSync } from "fs";
-import { PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { rootedPath } from "../../util.js";
 import path from "path";
 
@@ -37,6 +37,7 @@ export async function validate(dbs, req, res) {
 }
 
 export const PERMISSIONS_REQUIRED = [PERMISSIONS.NONE];
+export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.UPDATE;
 export async function checkPermission() {
     return false;
 }

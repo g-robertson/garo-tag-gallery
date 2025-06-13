@@ -2,7 +2,7 @@
  * @import {APIFunction} from "../api-types.js"
  */
 
-import { PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 
 export async function validate(dbs, req, res) {
     const sudo = req?.body?.sudo;
@@ -16,6 +16,7 @@ export async function validate(dbs, req, res) {
 }
 
 export const PERMISSIONS_REQUIRED = [PERMISSIONS.IS_ADMIN];
+export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.ALL;
 export async function checkPermission() {
     return false;
 }

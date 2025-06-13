@@ -124,3 +124,17 @@ export function deserializeUint64(str) {
     num += BigInt(str.charCodeAt(7));
     return num;
 }
+
+/**
+ * @param {number} number
+ * @param {number} lower 
+ * @param {number} upper 
+ */
+export function clamp(number, lower, upper) {
+    if (number < lower) {
+        return lower;
+    } else if (number > upper) {
+        return upper;
+    }
+    return number;
+}

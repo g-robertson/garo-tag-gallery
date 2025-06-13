@@ -1,8 +1,6 @@
 import '../global.css';
 import { User } from '../js/user.js';
 
-/** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
-
 /**
  * 
  * @param {{

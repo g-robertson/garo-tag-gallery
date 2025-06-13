@@ -3,12 +3,13 @@
  */
 
 import { bjsonStringify } from "../../client/js/client-util.js";
-import { PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { joinUsersPermittedObjects } from "../../db/user.js";
 
 export const PERMISSIONS_REQUIRED = PERMISSIONS.NONE;
+export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.READ;
 export async function checkPermission(dbs, req, res) {
-    return true;
+    return false;
 }
 
 export async function validate(dbs, req, res) {}

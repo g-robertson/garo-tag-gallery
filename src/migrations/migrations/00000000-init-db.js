@@ -356,7 +356,7 @@ export const MIGRATION = {
             );
         `),
         dbsqlcommand(`
-            CREATE TABLE Local_Metrics_Service(
+            CREATE TABLE Local_Metric_Services(
                 Local_Metric_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Service_ID INTEGER NOT NULL,
                 Has_Metric_From_Local_Metric_Service_Tag_ID INTEGER NOT NULL,
@@ -371,7 +371,7 @@ export const MIGRATION = {
                 Local_Metric_Name TEXT NOT NULL,
                 Local_Metric_Lower_Bound REAL,
                 Local_Metric_Upper_Bound REAL,
-                Local_Metric_Precision REAL NOT NULL,
+                Local_Metric_Precision INTEGER NOT NULL,
                 Local_Metric_Type INTEGER NOT NULL
             );
         `),

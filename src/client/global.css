@@ -106,11 +106,7 @@ div {
 .modal {
     flex-direction: column;
     position: absolute;
-    left: 10vw;
-    top: 10vh;
     border: 2px solid var(--foreground);
-    width: 80vw;
-    height: 80vh;
 }
 
 .modal-topbar * {
@@ -215,7 +211,7 @@ div {
 .lazy-selector-selectable-item.selectable:nth-child(even):hover {
     background-color: var(--hover-background-layered);
 }
-.lazy-selector-selectable-item:not(.nice.nice):nth-child(even).selected {
+.lazy-selector-selectable-item:nth-child(even).selectable.selected {
     background-color: var(--foreground-layered);
     color: var(--background-layered);
 }
@@ -226,7 +222,7 @@ div {
 .lazy-selector-selectable-item.selectable:nth-child(odd):hover {
     background-color: var(--hover-background-layered-alt);
 }
-.lazy-selector-selectable-item:not(.nice.nice):nth-child(odd).selected {
+.lazy-selector-selectable-item:nth-child(odd).selectable.selected {
     background-color: var(--foreground-layered-alt);
     color: var(--background-layered-alt);
 }

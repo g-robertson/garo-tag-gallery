@@ -1,7 +1,6 @@
 import '../global.css';
 import { User } from '../js/user.js';
 
-/** @import {DBPermissionedLocalTaggableService} from "../../db/taggables.js" */
 
 /**
  * 

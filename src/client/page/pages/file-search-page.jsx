@@ -3,7 +3,9 @@ import TagsSelector from '../../components/tags-selector.jsx';
 import '../../global.css';
 import { fjsonParse } from '../../js/client-util.js';
 import { User } from '../js/user.js';
-import LazyGallery from '../../components/lazy-gallery.jsx';
+import LazyThumbnailGallery from '../../components/lazy-thumbnail-gallery.jsx';
+
+import { MODAL_PROPERTIES as GALLERY_MODAL_PROPERTIES } from '../../modal/modals/gallery.jsx';
 
 /** @import {SearchObject} from "../../components/tags-selector.jsx" */
 
@@ -40,10 +42,19 @@ const FileSearchPage = ({user, pushModal}) => {
                 }} />
             </div>
             <div style={{width: "auto", flex: 3, height: "100%"}}>
-                <LazyGallery 
+                <LazyThumbnailGallery 
                     taggableIDs={taggableIDs}
-                    onValuesDoubleClicked={() => {
-
+                    onValuesDoubleClicked={(valuesSelected) => {
+                        if (valuesSelected.length > 1) {
+                            pushModal(GALLERY_MODAL_PROPERTIES.modalName, {
+                                taggableIDs: valuesSelected.map(value => Number(value.Taggable_ID))
+                            });
+                        } else if (valuesSelected.length === 1) {
+                            pushModal(GALLERY_MODAL_PROPERTIES.modalName, {
+                                taggableIDs,
+                                initialTaggableID: Number(valuesSelected[0].Taggable_ID)
+                            });
+                        }
                     }}
                 />
             </div>

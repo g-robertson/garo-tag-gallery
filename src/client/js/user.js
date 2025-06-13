@@ -6,8 +6,8 @@ export const PERMISSIONS = Object.freeze({
     USER_MANAGEMENT: "USER_MANAGEMENT",
     LOCAL_TAGGABLE_SERVICES: "LOCAL_TAGGABLE_SERVICES",
     GLOBAL_TAGGABLE_SERVICES: "GLOBAL_TAGGABLE_SERVICES",
-    LOCAL_RATING_SERVICES: "LOCAL_RATING_SERVICES",
-    GLOBAL_RATING_SERVICES: "GLOBAL_RATING_SERVICES",
+    LOCAL_METRIC_SERVICES: "LOCAL_METRIC_SERVICES",
+    GLOBAL_METRIC_SERVICES: "GLOBAL_METRIC_SERVICES",
     LOCAL_TAG_SERVICES: "LOCAL_TAG_SERVICES",
     GLOBAL_TAG_SERVICES: "GLOBAL_TAG_SERVICES",
     LOCAL_TAG_RELATIONS_SERVICES: "LOCAL_TAG_RELATIONS_SERVICES",
@@ -52,12 +52,13 @@ export class User {
     #createdDate;
     #localTaggableServices;
     #localTagServices;
+    #localMetricServices;
 
     #userManagementPermission;
     #localFileServicesPermission;
     #globalFileServicesPermission;
-    #localRatingServicesPermission;
-    #globalRatingServicesPermission;
+    #localMetricServicesPermission;
+    #globalMetricServicesPermission;
     #localTagServicesPermission;
     #globalTagServicesPermission;
     #localTagRelationsServicesPermission;
@@ -83,11 +84,12 @@ export class User {
         this.#isAdmin = json.Is_Administrator;
         this.#localTagServices = json.Local_Tag_Services;
         this.#localTaggableServices = json.Local_Taggable_Services;
+        this.#localMetricServices = json.Local_Metric_Services;
         this.#userManagementPermission = json.User_Management_Permission;
         this.#localFileServicesPermission = json.Local_Taggable_Services_Permission;
         this.#globalFileServicesPermission = json.Global_Taggable_Services_Permission;
-        this.#localRatingServicesPermission = json.Local_Rating_Services_Permission;
-        this.#globalRatingServicesPermission = json.Global_Rating_Services_Permission;
+        this.#localMetricServicesPermission = json.Local_Metric_Services_Permission;
+        this.#globalMetricServicesPermission = json.Global_Metric_Services_Permission;
         this.#localTagServicesPermission = json.Local_Tag_Services_Permission;
         this.#globalTagServicesPermission = json.Global_Tag_Services_Permission;
         this.#localTagRelationsServicesPermission = json.Local_Tag_Relations_Services_Permission;
@@ -143,6 +145,17 @@ export class User {
         this.#localTaggableServices = localTaggableServices;
     }
 
+    localMetricServices() {
+        return this.#localMetricServices;
+    }
+
+    /**
+     * @param {ReturnType<typeof this.localMetricServices>} localMetricServices 
+     */
+    setLocalMetricServices(localMetricServices) {
+        this.#localMetricServices = localMetricServices;
+    }
+
     /**
      * @param {HTTPMethod | PermissionInt} permissionBitsToCheck 
      * @param {PermissionType | PermissionType[]} permissionTypes
@@ -185,10 +198,10 @@ export class User {
             return this.#localFileServicesPermission;
         } else if (permissionType === PERMISSIONS.GLOBAL_TAGGABLE_SERVICES) {
             return this.#globalFileServicesPermission;
-        } else if (permissionType === PERMISSIONS.LOCAL_RATING_SERVICES) {
-            return this.#localRatingServicesPermission;
-        } else if (permissionType === PERMISSIONS.GLOBAL_RATING_SERVICES) {
-            return this.#globalRatingServicesPermission;
+        } else if (permissionType === PERMISSIONS.LOCAL_METRIC_SERVICES) {
+            return this.#localMetricServicesPermission;
+        } else if (permissionType === PERMISSIONS.GLOBAL_METRIC_SERVICES) {
+            return this.#globalMetricServicesPermission;
         } else if (permissionType === PERMISSIONS.LOCAL_TAG_SERVICES) {
             return this.#localTagServicesPermission;
         } else if (permissionType === PERMISSIONS.GLOBAL_TAG_SERVICES) {
@@ -227,10 +240,11 @@ export class User {
             Is_Administrator: this.#isAdmin,
             Local_Tag_Services: this.#localTagServices,
             Local_Taggable_Services: this.#localTaggableServices,
+            Local_Metric_Services: this.#localMetricServices,
             Local_Taggable_Services_Permission: this.#localFileServicesPermission,
             Global_Taggable_Services_Permission: this.#globalFileServicesPermission,
-            Local_Rating_Services_Permission: this.#localRatingServicesPermission,
-            Global_Rating_Services_Permission: this.#globalRatingServicesPermission,
+            Local_Metric_Services_Permission: this.#localMetricServicesPermission,
+            Global_Metric_Services_Permission: this.#globalMetricServicesPermission,
             Local_Tag_Services_Permission: this.#localTagServicesPermission,
             Global_Tag_Services_Permission: this.#globalTagServicesPermission,
             Local_Tag_Relations_Services_Permission: this.#localTagRelationsServicesPermission,

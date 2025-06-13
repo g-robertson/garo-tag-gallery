@@ -15,5 +15,5 @@ import { User } from "../client/js/user.js";
    * @property {APIValidationFunction} validate
    * @property {APIFunction} checkPermission
    * @property {PermissionType | PermissionType[]} PERMISSIONS_REQUIRED
-   * @property {PermissionInt=} PERMISSION_BITS_REQUIRED
+   * @property {PermissionInt} PERMISSION_BITS_REQUIRED
 */

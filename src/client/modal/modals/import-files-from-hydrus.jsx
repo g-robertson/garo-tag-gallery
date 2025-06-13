@@ -37,5 +37,7 @@ const ImportFilesFromHydrus = ({user}) => {
 
 export default ImportFilesFromHydrus;
 
-export const MODAL_NAME = "import-files-from-hydrus";
-export const MODAL_DISPLAY_NAME = "Import Files From Hydrus";
+export const MODAL_PROPERTIES = {
+    modalName: "import-files-from-hydrus",
+    displayName: "Import Files From Hydrus"
+};

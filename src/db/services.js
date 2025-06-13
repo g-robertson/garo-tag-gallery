@@ -1,4 +1,5 @@
 import { PERMISSION_BITS, User } from "../client/js/user.js";
+import {dbget, dbrun} from "./db-util.js";
 
 /** @import {PermissionType, PermissionInt} from "../client/js/user.js" */
 /** @import {Databases} from "./db-util.js" */
@@ -70,4 +71,50 @@ export async function userSelectAllSpecificTypedServicesHelper(
     }
 
     return returnedSpecificServices.filter(specificService => (specificService.Permission_Extent & permissionBitsToCheck) === permissionBitsToCheck);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {string} serviceName 
+ */
+export async function insertService(dbs, serviceName) {
+    /** @type {number} */
+    const serviceID = (await dbget(dbs, `
+        INSERT INTO Services(
+            Service_Name
+        ) VALUES (
+            ?
+        ) RETURNING Service_ID;
+    `, serviceName)).Service_ID;
+
+    return serviceID;
+}
+
+/**
+ * 
+ * @param {Databases} dbs 
+ * @param {number} serviceID 
+ * @param {number} userID 
+ * @param {PermissionInt} permissionExtent 
+ */
+export async function insertServiceUserPermission(dbs, serviceID, userID, permissionExtent) {
+    if (!Number.isSafeInteger(serviceID) || !Number.isSafeInteger(userID) || !Number.isSafeInteger(permissionExtent)) {
+        throw "Bad call to insertServiceUserPermission";
+    }
+
+    await dbrun(dbs, `
+        INSERT INTO Services_Users_Permissions(
+            Service_ID,
+            User_ID,
+            Permission_Extent
+        ) VALUES (
+            $serviceID,
+            $userID,
+            $permissionExtent 
+        );
+    `, {
+        $serviceID: serviceID,
+        $userID: userID,
+        $permissionExtent: permissionExtent
+    });
 }

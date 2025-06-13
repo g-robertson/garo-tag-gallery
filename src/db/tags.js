@@ -219,16 +219,19 @@ export async function userSelectAllLocalTagServices(dbs, user) {
  * @property {number} Local_Tag_ID
  * @property {bigint} Tag_ID
  * @property {string} Display_Name
+ * @property {string} Tag_Name
+ * @property {string[]} Namespaces
  */
 
 /**
  * @param {Databases} dbs
- * @param {Omit<UserFacingLocalTag, "Namespaces">[]} dbUserFacingLocalTags
+ * @param {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} dbUserFacingLocalTags
  */
 async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
     dbUserFacingLocalTags = dbUserFacingLocalTags.map(dbUserFacingLocalTag => ({
-        ...dbUserFacingLocalTag,
-        Tag_ID: BigInt(dbUserFacingLocalTag.Tag_ID)
+            ...dbUserFacingLocalTag,
+            Tag_Name: dbUserFacingLocalTag.Display_Name,
+            Tag_ID: BigInt(dbUserFacingLocalTag.Tag_ID)
     }));
 
     /** @type {Map<bigint, string[]} */
@@ -239,13 +242,23 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
         }
 
         tagsNamespaces.get(Tag_ID).push(Namespace_Name);
-    }
+    }    
 
+    return dbUserFacingLocalTags.map(dbUserFacingLocalTag => {
+        let {Display_Name} = dbUserFacingLocalTag;
+        const Namespaces = tagsNamespaces.get(dbUserFacingLocalTag.Tag_ID) ?? []
+        if (Namespaces.length === 1) {
+            Display_Name = `${Namespaces[0]}:${Display_Name}`;
+        } else if (Namespaces.length > 1) {
+            Display_Name = `multi-namespaced:${Display_Name}`;
+        }
 
-    return dbUserFacingLocalTags.map(dbUserFacingLocalTag => ({
-        ...dbUserFacingLocalTag,
-        Namespaces: tagsNamespaces.get(dbUserFacingLocalTag.Tag_ID) ?? []
-    }));
+        return {
+            ...dbUserFacingLocalTag,
+            Namespaces,
+            Display_Name
+        }
+    });
 }
 
 /**
@@ -253,7 +266,7 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
  * @param {number[]} localTagServiceIDs
  */
 export async function selectUserFacingLocalTagsFromLocalTagServices(dbs, localTagServiceIDs) {
-    /** @type {Omit<UserFacingLocalTag, "Namespaces">[]} */
+    /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
     const dbUserFacingLocalTags = await dball(dbs, `
         SELECT Tag_ID, Local_Tag_ID, Display_Name
           FROM Local_Tags
@@ -281,7 +294,7 @@ export async function selectUserFacingLocalTagsFromTagIDs(dbs, tagIDsIterable, l
         return slices.flat();
     }
 
-    /** @type {UserFacingLocalTag[]} */
+    /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
     const dbUserFacingLocalTags = await dball(dbs, `
         SELECT Tag_ID, Local_Tag_ID, Display_Name
           FROM Local_Tags
@@ -311,7 +324,7 @@ async function insertTags(dbs, amount) {
     for (let i = 0; i < amount; ++i) {
         nows.push(now);
     }
-    
+
     /** @type {DBTag[]} */
     const dbTags = await dball(dbs, `INSERT INTO Tags(Tag_Created_Date) VALUES ${dbtuples(amount, 1)} RETURNING *;`, nows);
     return dbTags.map(mapDBTag);
@@ -400,6 +413,15 @@ export async function insertLocalTags(dbs, localTags, localTagServiceID) {
         `, tagInsertionParams
     );
     return dbLocalTags.map(mapDBLocalTag);
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {PreInsertLocalTag} localTag
+ * @param {number} localTagServiceID
+ */
+export async function insertLocalTag(dbs, localTag, localTagServiceID) {
+    return (await insertLocalTags(dbs, [localTag], localTagServiceID))[0];
 }
 
 /**

@@ -3,21 +3,21 @@ import '../global.css';
 import { fbjsonParse } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 
-const THUMB_ORIGINAL_WIDTH = 300;
-const THUMB_ORIGINAL_HEIGHT = 200;
-
-const THUMB_WIDTH = 150;
-const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH);
-
 /** @import {DBUserFacingLocalFile} from "../../db/taggables.js" */
 
 /**
  * @param {{
  *  taggableIDs: number[]
- *  onValuesDoubleClicked?: (valuesSelected: number[]) => void
+ *  initialTaggableID?: number
+ *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingLocalFile[]) => void
  * }} param0
  */
-const LazyGallery = ({taggableIDs, onValuesDoubleClicked}) => {
+const LazyGallery = ({taggableIDs, initialTaggableID, onValuesDoubleClicked}) => {
+    let initialLastClickedIndex = taggableIDs.indexOf(initialTaggableID);
+    if (initialLastClickedIndex === -1) {
+        initialLastClickedIndex = 0;
+    }
+
     return <LazySelector
         values={taggableIDs}
         valuesRealizer={async (values) => {
@@ -35,7 +35,7 @@ const LazyGallery = ({taggableIDs, onValuesDoubleClicked}) => {
             const taggablesResponse = await fbjsonParse(response);
             const taggablesResponseMap = new Map(taggablesResponse.map(taggable => [Number(taggable.Taggable_ID), taggable]));
             for (const taggableResponse of taggablesResponse) {
-                preload(`images-database/${taggableResponse.File_Hash.slice(0, 2)}/${taggableResponse.File_Hash.slice(2, 4)}/${taggableResponse.File_Hash}.thumb.jpg`, {
+                preload(`images-database/${taggableResponse.File_Hash.slice(0, 2)}/${taggableResponse.File_Hash.slice(2, 4)}/${taggableResponse.File_Hash}${taggableResponse.File_Extension}`, {
                     "fetchPriority": "high",
                     "as": "image"
                 });
@@ -44,22 +44,28 @@ const LazyGallery = ({taggableIDs, onValuesDoubleClicked}) => {
         }}
         customItemComponent={({realizedValue}) => {
             const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];
+            const src = `images-database/${realizedValue.File_Hash.slice(0, 2)}/${realizedValue.File_Hash.slice(2, 4)}/${realizedValue.File_Hash}${realizedValue.File_Extension}`;
 
-            return <div className="lazy-selector-selectable-item-portion" style={{width: "100%", height: "100%", justifyContent: "center"}}>
-                {VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_Extension) !== -1 ? (<img src="assets/video.png" style={{position: "absolute", width: THUMB_WIDTH, height: THUMB_HEIGHT, opacity: .4}} />) : ""}
-                <img style={{maxWidth: THUMB_WIDTH}} src={`images-database/${realizedValue.File_Hash.slice(0, 2)}/${realizedValue.File_Hash.slice(2, 4)}/${realizedValue.File_Hash}.thumb.jpg`} />
+            return <div style={{width: "100%", height: "100%", justifyContent: "center"}}>
+                {(VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_Extension) !== -1)
+                ? <video controls={true}>
+                    <source src={src}></source>
+                </video>
+                : <img src={src} />
+                }
             </div>
         }}
         onValuesDoubleClicked={onValuesDoubleClicked}
         customTitleRealizer={() => ""}
         valueRealizationDelay={50}
-        valueRealizationRange={2}
-        itemWidth={THUMB_WIDTH}
-        itemHeight={THUMB_HEIGHT}
-        horizontalMargin={4}
-        verticalMargin={4}
+        valueRealizationRange={5}
+        itemWidth={"100%"}
+        itemHeight={"100%"}
         scrollbarIncrement={1}
+        scrollbarWidth={0}
         preloadRealizedItems={true}
+        initialLastClickedIndex={initialLastClickedIndex}
+        elementsSelectable={false}
     />
 };
 

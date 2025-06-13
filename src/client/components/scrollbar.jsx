@@ -14,6 +14,7 @@ const SCROLL_CURSOR_MIN_LENGTH = 20;
  *     alternativeScrollingElements?: string[]
  *     onScrollbarUpdate?: (scrollbarPosition: number) => void
  *     setItemPositionOut?: {out: (itemPosition: number) => void | null}
+ *     scrollbarWidth?: number
  * }} param0 
  */
 const Scrollbar = ({
@@ -25,8 +26,10 @@ const Scrollbar = ({
     scrollbarIncrement,
     alternativeScrollingElements,
     onScrollbarUpdate,
-    setItemPositionOut
+    setItemPositionOut,
+    scrollbarWidth
 }) => {
+    scrollbarWidth ??= 17;
     scrollbarInterval ??= 1;
     const scrollbarIntervalRef = useRef(scrollbarInterval);
     scrollbarIntervalRef.current = scrollbarInterval;
@@ -165,8 +168,9 @@ const Scrollbar = ({
         }
     }, [clickedCursorPos]);
 
-    return (
-        <div id={`scrollbar-${uniqueID.current}`} className="scrollbar" style={{width: "17px", height: length, float: "left"}} onWheel={wheelListener} onMouseDown={(e) => {
+    return scrollbarWidth !== 0
+    ? (
+        <div id={`scrollbar-${uniqueID.current}`} className="scrollbar" style={{width: scrollbarWidth, height: length}} onWheel={wheelListener} onMouseDown={(e) => {
             if (!e.target.classList.contains("scrollbar")) {
                 return;
             }
@@ -180,6 +184,7 @@ const Scrollbar = ({
                     setClickedCursorPos(e.pageY);
                  }}>&#8801;</div>
         </div>
-    );
+    )
+    : <></>;
 }
 export default Scrollbar;

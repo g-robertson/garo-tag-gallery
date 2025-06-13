@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import './global.css';
-import { MODAL_NAME as IMPORT_FILES_FROM_HYDRUS_MODAL_NAME } from './modal/modals/import-files-from-hydrus.jsx';
+import { MODAL_PROPERTIES as IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES } from './modal/modals/import-files-from-hydrus.jsx';
+import { MODAL_PROPERTIES as CREATE_METRIC_MODAL_PROPERTIES } from './modal/modals/create-metric.jsx';
+import { MODAL_PROPERTIES as CREATE_METRIC_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-metric-service.jsx';
 import { PAGE_NAME as FILE_SEARCH_PAGE_NAME, PAGE_DEFAULT_DISPLAY_NAME as FILE_SEARCH_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
 
 const FILE_MENU = "file";
 const PAGES_MENU = "pages";
+const METRICS_MENU = "metrics";
 
 /** @import {Setters, States} from "./App.jsx" */
 
@@ -32,7 +35,7 @@ const Navbar = ({setters, states, pushModal}) => {
                 <div className="topbar-dropdown-options" style={{display: menuOpened === FILE_MENU ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_NAME);
+                        pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES.modalName);
                     }}>Import files from Hydrus</div>
                 </div>
             </div>
@@ -50,6 +53,19 @@ const Navbar = ({setters, states, pushModal}) => {
 
                         setMenuOpened(null);
                     }}>New file search page</div>
+                </div>
+            </div>
+            <div className="topbar-dropdown">
+                <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(METRICS_MENU)}>Metrics</div>
+                <div className="topbar-dropdown-options" style={{display: menuOpened === METRICS_MENU ? "block" : "none"}}>
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                        pushModal(CREATE_METRIC_SERVICE_MODAL_PROPERTIES.modalName);
+                    }}>Create new metric service</div>
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                        pushModal(CREATE_METRIC_MODAL_PROPERTIES.modalName);
+                    }}>Create new metric</div>
                 </div>
             </div>
         </nav>

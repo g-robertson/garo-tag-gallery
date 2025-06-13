@@ -59,7 +59,6 @@ export default async function get(dbs, req, res) {
     if (localTagsMap.size !== req.sanitizedBody.allLocalTagIDs.length) {
         return res.status(400).send("One of the local tags sent in did not exist");
     }
-    const localTagServices = await userSelectAllLocalTagServices(dbs, req.user, PERMISSION_BITS.READ);
     const localTaggableServices = await userSelectAllLocalTaggableServices(dbs, req.user, PERMISSION_BITS.READ);
     const searchCriteria = PerfTags.searchIntersect(req.sanitizedBody.searchQuery.map(searchTags => {
         return PerfTags.searchUnion(searchTags.map(({Local_Tag_ID, exclude}) => {
@@ -75,7 +74,6 @@ export default async function get(dbs, req, res) {
     const taggables = await searchTaggables(
         dbs,
         searchCriteria,
-        localTagServices.map(localTagService => localTagService.Local_Tag_Service_ID),
         localTaggableServices.map(localTaggableService => localTaggableService.In_Local_Taggable_Service_Tag_ID)
     );
 

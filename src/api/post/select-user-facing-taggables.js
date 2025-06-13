@@ -4,9 +4,8 @@
 
 import { bjsonStringify } from "../../client/js/client-util.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { selectLocalTaggableServiceIDsByTaggableIDs, selectUserFacingTaggables, userSelectAllLocalTaggableServices, userSelectLocalTaggableServices } from "../../db/taggables.js";
-import { selectLocalTagsByLocalTagIDs, userSelectAllLocalTagServices } from "../../db/tags.js";
-import PerfTags from "../../perf-tags-binding/perf-tags.js";
+import { selectLocalTaggableServiceIDsByTaggableIDs, selectUserFacingTaggables, userSelectLocalTaggableServices } from "../../db/taggables.js";
+import { userSelectAllLocalTagServices } from "../../db/tags.js";
 
 export function validate(dbs, req, res) {
     const taggableIDs = req?.body?.taggableIDs;
