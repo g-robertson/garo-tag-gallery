@@ -17,11 +17,12 @@ export default class PerfTags {
     #stdinWrites = 0;
     #data = "";
 
+    #promises = [];
+
     __open() {
         this.#closed = false;
         this.#closing = false;
         this.#perfTags = spawn(this.#path, [this.#inputFileName, this.#outputFileName, this.#databaseDirectory]);
-
         this.#perfTags.stdout.on("data", (chunk) => {
             this.#data += chunk;
             this.#dataCallback();
@@ -51,8 +52,12 @@ export default class PerfTags {
     }
 
     async reopen() {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+
         await this.close();
         this.__open();
+
+        resolveCurrentExecution();
     }
 
     constructor(path, inputFileName, outputFileName, databaseDirectory, archiveDirectory) {
@@ -128,18 +133,28 @@ export default class PerfTags {
      * @param {bigint[]} taggables 
      */
     async insertTaggables(taggables) {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+
         this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
-        this.__writeToStdin("insert_taggables\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeToStdin("insert_taggables\r\n");
+        const result = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+
+        resolveCurrentExecution();
+        return result;
     }
     
     /**
      * @param {bigint[]} tags 
      */
     async insertTags(tags) {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+
         this.__writeToInputFile(PerfTags.#serializeSingles(tags));
-        this.__writeToStdin("insert_tags\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeToStdin("insert_tags\r\n");
+        const result = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+
+        resolveCurrentExecution();
+        return result;
     }
 
     /**
@@ -167,9 +182,14 @@ export default class PerfTags {
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async insertTagPairings(tagPairings) {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+
         await this.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
         await this.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
-        return await this.__insertTagPairings(tagPairings);
+        const result = await this.__insertTagPairings(tagPairings);
+
+        resolveCurrentExecution();
+        return result;
     }
 
     /**
@@ -177,7 +197,7 @@ export default class PerfTags {
      */
     async __insertTagPairings(tagPairings) {
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
-        this.__writeToStdin("insert_tag_pairings\r\n");
+        await this.__writeToStdin("insert_tag_pairings\r\n");
         return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
@@ -185,17 +205,23 @@ export default class PerfTags {
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async toggleTagPairings(tagPairings) {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+
         await this.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
         await this.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
-        return await this.__toggleTagPairings(tagPairings);
+        const result = await this.__toggleTagPairings(tagPairings);
+
+        resolveCurrentExecution();
+        return result;
     }
     
     /**
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async __toggleTagPairings(tagPairings) {
+
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
-        this.__writeToStdin("toggle_tag_pairings\r\n");
+        await this.__writeToStdin("toggle_tag_pairings\r\n");
         return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
@@ -203,17 +229,24 @@ export default class PerfTags {
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async deleteTagPairings(tagPairings) {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
         this.#perfTags.stdin.write("delete_tag_pairings\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        const result = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+
+        resolveCurrentExecution();
+        return result;
     }
 
     /**
      * @param {bigint[]} taggables
      */
     async readTaggablesTags(taggables) {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+
         this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
-        this.__writeToStdin("read_taggables_tags\r\n");
+        await this.__writeToStdin("read_taggables_tags\r\n");
         const ok = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
         let taggablesTagsStr = this.__readFromOutputFile();
         /** @type {Map<bigint, bigint[]>} */
@@ -232,6 +265,8 @@ export default class PerfTags {
             }
             taggablePairings.set(taggable, tags);
         }
+
+        resolveCurrentExecution();
         return {ok, taggablePairings};
     }
 
@@ -239,8 +274,10 @@ export default class PerfTags {
      * @param {string} searchCriteria
      */
     async search(searchCriteria) {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+        
         this.__writeToInputFile(Buffer.from(searchCriteria, 'binary'));
-        this.__writeToStdin("search\r\n");
+        await this.__writeToStdin("search\r\n");
         const ok = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
         let taggablesStr = this.__readFromOutputFile();
         /** @type {bigint[]} */
@@ -249,6 +286,7 @@ export default class PerfTags {
             taggables.push(taggablesStr.readBigUInt64BE(i));
         }
 
+        resolveCurrentExecution();
         return {ok, taggables};
     }
 
@@ -332,12 +370,12 @@ export default class PerfTags {
     }
 
     async beginTransaction() {
-        this.__writeToStdin("begin_transaction\r\n");
+        await this.__writeToStdin("begin_transaction\r\n");
         return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
     async endTransaction() {
-        this.__writeToStdin("end_transaction\r\n");
+        await this.__writeToStdin("end_transaction\r\n");
         return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 
@@ -376,7 +414,7 @@ export default class PerfTags {
         }
         this.#closing = true;
 
-        this.__writeToStdin("exit\r\n");
+        await this.__writeToStdin("exit\r\n");
         await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
         this.#closed = true;
         return await this.__nonErrorExitOrTimeout(THIRTY_MINUTES);
@@ -397,10 +435,27 @@ export default class PerfTags {
         return readFileSync(this.#outputFileName);
     }
 
+    async __resolvePriorExecutions() {
+        const existingPromises = this.#promises.length;
+        /** @type {() => void} */
+        let resolveFn;
+        this.#promises.push(new Promise(resolve => {
+            resolveFn = () => {
+                resolve();
+                this.#promises = this.#promises.slice(1);
+            }
+        }));
+        if (existingPromises > 0) {
+            await this.#promises[existingPromises - 1];
+        }
+        return resolveFn;
+    }
+
     /**
      * @param {string} data 
      */
-    __writeToStdin(data) {
+    async __writeToStdin(data) {
+
         ++this.#stdinWrites;
         if (this.#archiveDirectory !== undefined) {
             mkdirSync(this.#archiveDirectory, {recursive: true});
@@ -415,9 +470,9 @@ export default class PerfTags {
     }
 
     async __flushAndPurgeUnusedFiles() {
-        this.__writeToStdin("flush_files\r\n");
+        await this.__writeToStdin("flush_files\r\n");
         await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
-        this.__writeToStdin("purge_unused_files\r\n");
+        await this.__writeToStdin("purge_unused_files\r\n");
         return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
     }
 

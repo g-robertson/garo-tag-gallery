@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import TagsSelector from '../../components/tags-selector.jsx';
 import '../../global.css';
 import { fjsonParse } from '../../js/client-util.js';
@@ -13,33 +13,40 @@ import { MODAL_PROPERTIES as GALLERY_MODAL_PROPERTIES } from '../../modal/modals
  * @param {{
  *  user: User
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
+ *  existingState: any
  * }}
 */
-const FileSearchPage = ({user, pushModal}) => {
-    /** @type {[number[], (taggableIDs: number[]) => void]} */
-    const [taggableIDs, setTaggableIDs] = useState([]);
+const FileSearchPage = ({user, pushModal, existingState}) => {
+    const [taggableIDs, setTaggableIDs] = useState(existingState?.taggableIDs ?? []);
+    existingState.tagsSelector ??= {};
 
     return (
         <div style={{width: "100%", height: "100%"}}>
             <div style={{flex: 1, height: "100%"}}>
-                <TagsSelector user={user} pushModal={pushModal} onSearchChanged={async (searchObjects) => {
-                    const searchQuery = searchObjects.map(searchObject => searchObject.flat(Infinity).map(searchTag => ({
-                        Local_Tag_ID: searchTag.localTagID,
-                        exclude: searchTag.exclude
-                    })));
+                <TagsSelector
+                    user={user}
+                    pushModal={pushModal}
+                    onSearchChanged={async (searchObjects) => {
+                        const searchQuery = searchObjects.map(searchObject => searchObject.flat(Infinity).map(searchTag => ({
+                            Local_Tag_ID: searchTag.localTagID,
+                            exclude: searchTag.exclude
+                        })));
 
-                    const response = await fetch("/api/post/search-taggables", {
-                        body: JSON.stringify({
-                            searchQuery
-                        }),
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        method: "POST"
-                    });
+                        const response = await fetch("/api/post/search-taggables", {
+                            body: JSON.stringify({
+                                searchQuery
+                            }),
+                            headers: {
+                              "Content-Type": "application/json",
+                            },
+                            method: "POST"
+                        });
 
-                    setTaggableIDs(await fjsonParse(response));
-                }} />
+                        setTaggableIDs(await fjsonParse(response));
+                    }}
+
+                    existingState={existingState.tagsSelector}
+                />
             </div>
             <div style={{width: "auto", flex: 3, height: "100%"}}>
                 <LazyThumbnailGallery 

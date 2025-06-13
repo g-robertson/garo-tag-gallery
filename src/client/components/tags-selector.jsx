@@ -58,23 +58,26 @@ function searchObjectToDisplayName(searchObject) {
  *  user: User
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  initialSelectedTags?: Map<string, SearchObject>
- *  searchObjectsRef?: {current: Map<string, SearchObject>}
+ *  searchObjectsOut?: {out: Map<string, SearchObject>}
  *  onSearchChanged?: (searchObjects: SearchObject[]) => void
+ *  existingState?: any
  * }} param0
  */
-const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsRef, onSearchChanged}) => {
-    searchObjectsRef ??= {};
+const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, onSearchChanged, existingState}) => {
+    existingState ??= {};
+    searchObjectsOut ??= {};
     onSearchChanged ??= () => {};
 
     /** @type {[Map<string, SearchObject>, (searchObjects: Map<string, SearchObject>) => void]} */
-    const [searchObjects, setSearchObjects] = useState(initialSelectedTags ?? new Map());
-    searchObjectsRef.current = searchObjects;
+    const [searchObjects, setSearchObjects] = useState(existingState.searchObjects ?? initialSelectedTags ?? new Map());
+    useEffect(() => {existingState.searchObjects = searchObjects;}, [searchObjects]);
+    searchObjectsOut.out = searchObjects;
 
     /** @type {[ClientTag[], (tags: ClientTag[]) => void]} */
     const [tags, setTags] = useState([]);
     /** @type {[string, (tagFilterValue: string) => void]} */
     const [tagFilterValue, setTagFilterValue] = useState("");
-    const [isExcludeOn, setIsExcludeOn] = useState(false);
+    const [isExcludeOn, setIsExcludeOn] = useState(existingState?.isExcludeOn ?? false);
 
     useEffect(() => {
         onSearchChanged([...searchObjects.values()]);

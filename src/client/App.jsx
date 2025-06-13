@@ -38,7 +38,6 @@ const App = () => {
     }, []);
 
     const pushModal = async (modalName, extraProperties) => {
-        console.log(modalName, extraProperties);
         return new Promise(resolve => {
             setters.setActiveModals([...states.activeModals, {modalName, extraProperties, resolve}]);
         });
@@ -77,7 +76,7 @@ const App = () => {
                 <div>
                     {
                         (activePageIndex !== null)
-                        ? (<Page page={pages[activePageIndex]} user={user} pushModal={pushModal} ></Page>)
+                        ? (<Page page={pages[activePageIndex]} user={user} pushModal={pushModal} />)
                         : (<></>)
                     }
                 </div>

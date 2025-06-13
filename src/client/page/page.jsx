@@ -1,9 +1,19 @@
 import '../global.css';
+import { randomID } from '../js/client-util.js';
 
 /** @import {JSX} from "react" */
 
 import FileSearchPage, { PAGE_NAME as FILE_SEARCH_PAGE_NAME } from './pages/file-search-page.jsx';
-/** @type {Record<string, {component: (param0: {user: User}) => JSX.Element, pageDisplayName: string}} */
+/**
+ * @type {Record<string, {
+ *     component: (param0: {
+ *         user: User
+ *         pushModal: (modalName: string, extraProperties: any) => Promise<any>
+ *         existingState: any
+ *         onUpdateExistingState: () => void
+ *     }) => JSX.Element, pageDisplayName: string
+ * }}
+ **/
 const PAGES = {
     [FILE_SEARCH_PAGE_NAME]: {
         component: FileSearchPage
@@ -14,6 +24,8 @@ const PAGES = {
  * @typedef {Object} PageType
  * @property {string} pageName
  * @property {string} pageDisplayName
+ * @property {string} pageID
+ * @property {any} existingState
  * @property {Record<string, any>} extraProperties
 */
 
@@ -24,13 +36,13 @@ const PAGES = {
  *     page: PageType
  *     user: User
  *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
+ *     onUpdateExistingState: () => void
  * }} param0 
  * @returns 
  */
 const Page = ({page, user, pushModal}) => {
-    const {component} = PAGES[page.pageName];
-    
-    return (<div className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}>
+    page.existingState ??= {};
+    return (<div key={page.pageID} className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}>
         <div className="page-topbar">
             <div className="page-topbar-right">
                 <div className="page-title">{page.pageDisplayName}</div>
@@ -38,7 +50,11 @@ const Page = ({page, user, pushModal}) => {
             </div>
         </div>
         <div className="page-contents">
-            {component({user, pushModal})}
+            {(() => {
+                if (page.pageName === FILE_SEARCH_PAGE_NAME) {
+                    return <FileSearchPage user={user} pushModal={pushModal} existingState={page.existingState} />
+                }
+            })()}
         </div>
     </div>);
 };

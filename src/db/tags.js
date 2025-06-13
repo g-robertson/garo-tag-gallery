@@ -217,6 +217,7 @@ export async function userSelectAllLocalTagServices(dbs, user) {
 /**
  * @typedef {Object} UserFacingLocalTag
  * @property {number} Local_Tag_ID
+ * @property {number} Local_Tag_Service_ID
  * @property {bigint} Tag_ID
  * @property {string} Display_Name
  * @property {string} Tag_Name
@@ -268,7 +269,7 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
 export async function selectUserFacingLocalTagsFromLocalTagServices(dbs, localTagServiceIDs) {
     /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
     const dbUserFacingLocalTags = await dball(dbs, `
-        SELECT Tag_ID, Local_Tag_ID, Display_Name
+        SELECT Tag_ID, Local_Tag_ID, Display_Name, Local_Tag_Service_ID
           FROM Local_Tags
          WHERE Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
         ;`, localTagServiceIDs
@@ -296,7 +297,7 @@ export async function selectUserFacingLocalTagsFromTagIDs(dbs, tagIDsIterable, l
 
     /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
     const dbUserFacingLocalTags = await dball(dbs, `
-        SELECT Tag_ID, Local_Tag_ID, Display_Name
+        SELECT Tag_ID, Local_Tag_ID, Display_Name, Local_Tag_Service_ID
           FROM Local_Tags
         WHERE Tag_ID IN ${dbvariablelist(tagIDs.length)}
         AND Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}

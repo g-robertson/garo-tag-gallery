@@ -4,6 +4,7 @@ import { MODAL_PROPERTIES as IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES } from '.
 import { MODAL_PROPERTIES as CREATE_METRIC_MODAL_PROPERTIES } from './modal/modals/create-metric.jsx';
 import { MODAL_PROPERTIES as CREATE_METRIC_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-metric-service.jsx';
 import { PAGE_NAME as FILE_SEARCH_PAGE_NAME, PAGE_DEFAULT_DISPLAY_NAME as FILE_SEARCH_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
+import { randomID } from './js/client-util.js';
 
 const FILE_MENU = "file";
 const PAGES_MENU = "pages";
@@ -47,7 +48,8 @@ const Navbar = ({setters, states, pushModal}) => {
                         const newActivePageIndex = states.pages.length;
                         setters.setPages([...states.pages, {
                             pageName: FILE_SEARCH_PAGE_NAME,
-                            pageDisplayName: FILE_SEARCH_DEFAULT_DISPLAY_NAME
+                            pageDisplayName: FILE_SEARCH_DEFAULT_DISPLAY_NAME,
+                            pageID: randomID(32)
                         }]);
                         setters.setActivePageIndex(newActivePageIndex);
 

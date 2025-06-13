@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import '../../global.css';
+import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 
 /** 
  * @param {{
@@ -7,8 +7,6 @@ import '../../global.css';
  * }}
 */
 const CreateMetricService = ({popModal}) => {
-    const [firstLoad, setFirstLoad] = useState(true);
-
     return (
         <div>
             <form action="/api/post/create-metric-service" target="frame" method="POST">
@@ -22,13 +20,7 @@ const CreateMetricService = ({popModal}) => {
                     <input type="submit" value="Submit" />
                 </div>
             </form>
-            <iframe name="frame" style={{display: "none"}} onLoad={() => {
-                if (firstLoad) {
-                    setFirstLoad(false);
-                } else {
-                    popModal();
-                }
-            }}></iframe>
+            <OnFormSubmit onFormSubmit={popModal} />
         </div>
     );
 };

@@ -30,7 +30,6 @@ const ImportFilesFromHydrus = ({user}) => {
                 {PartialSubmitButton}
             </form>
             <p style={{color: "green"}}>{finishedImportingText}</p>
-            <iframe name="frame" style={{display: "none"}}></iframe>
         </div>
     );
 };

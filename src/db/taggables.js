@@ -214,38 +214,44 @@ async function selectTaggablesUserFacingLocalTags(dbs, taggableIDs, localTagServ
 /**
  * @param {Databases} dbs
  * @param {Omit<DBUserFacingLocalFile, "Tags">[]} dbUserFacingLocalFiles
+ * @param {number} userID
  * @param {number[]} localTagServiceIDs
+ * @param {number[]} localMetricServiceIDs
  */
-async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, localTagServiceIDs) {
+async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, localTagServiceIDs, localMetricServiceIDs) {
     dbUserFacingLocalFiles = dbUserFacingLocalFiles.map(dbUserFacingLocalFile => ({
         ...dbUserFacingLocalFile,
         Taggable_ID: BigInt(dbUserFacingLocalFile.Taggable_ID)
     }));
 
+    const taggableIDs = dbUserFacingLocalFiles.map(dbUserFacingLocalFile => dbUserFacingLocalFile.Taggable_ID);
     const taggablesTags = await selectTaggablesUserFacingLocalTags(
         dbs,
-        dbUserFacingLocalFiles.map(dbUserFacingLocalFile => dbUserFacingLocalFile.Taggable_ID),
-        localTagServiceIDs
+        taggableIDs,
+        [SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, ...localTagServiceIDs]
     );
 
     return dbUserFacingLocalFiles.map(dbUserFacingLocalFile => ({
         ...dbUserFacingLocalFile,
-        Tags: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID) ?? []
+        Tags: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID).filter?.((tag => tag.Local_Tag_Service_ID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)) ?? []
     }));
 }
 
 /**
  * @param {Databases} dbs 
  * @param {bigint[]} taggableIDs 
+ * @param {Omit<DBUserFacingLocalFile, "Tags">[]} dbUserFacingLocalFiles
+ * @param {number} userID
  * @param {number[]} localTagServiceIDs
+ * @param {number[]} localMetricServiceIDs
  * @returns {Promise<DBUserFacingLocalFile[]>}
  */
-export async function selectUserFacingTaggables(dbs, taggableIDs, localTagServiceIDs) {
+export async function selectUserFacingTaggables(dbs, taggableIDs, userID, localTagServiceIDs, localMetricServiceIDs) {
     if (taggableIDs.length === 0) {
         return [];
     }
     if (taggableIDs.length > 10000) {
-        const slices = await asyncDataSlicer(taggableIDs, 10000, (sliced) => selectUserFacingTaggables(dbs, sliced, localTagServiceIDs));
+        const slices = await asyncDataSlicer(taggableIDs, 10000, (sliced) => selectUserFacingTaggables(dbs, sliced, userID, localTagServiceIDs, localMetricServiceIDs));
         return slices.flat();
     }
 
@@ -268,7 +274,7 @@ export async function selectUserFacingTaggables(dbs, taggableIDs, localTagServic
     `, [...taggableIDs.map(taggableID => Number(taggableID))]
     );
 
-    return await mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, localTagServiceIDs);
+    return await mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, localTagServiceIDs, localMetricServiceIDs);
 }
 
 /**

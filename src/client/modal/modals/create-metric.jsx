@@ -3,6 +3,7 @@ import '../../global.css';
 import { User } from '../js/user.js';
 import { clamp } from '../../js/client-util.js';
 import LocalMetricServiceSelector from '../../components/local-metric-service-selector.jsx';
+import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 
 function clampServiceType(metricType) {
     if (isNaN(metricType)) {
@@ -61,9 +62,10 @@ const METRIC_TYPES = {
 /** 
  * @param {{
  *  user: User
+ *  popModal: () => void
  * }}
 */
-const CreateMetric = ({user}) => {
+const CreateMetric = ({user, popModal}) => {
     const [lowerBound, setLowerBound] = useState(0);
     const [upperBound, setUpperBound] = useState(10);
     const [precision, setPrecision] = useState(0);
@@ -137,8 +139,8 @@ const CreateMetric = ({user}) => {
                 <div style={{marginLeft: "8px"}}>
                     <input type="submit" value="Submit" />
                 </div>
+                <OnFormSubmit onFormSubmit={popModal}/>
             </form>
-            <iframe name="frame" style={{display: "none"}}></iframe>
         </div>
     );
 };

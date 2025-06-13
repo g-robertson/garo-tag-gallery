@@ -15,17 +15,17 @@ import TagsSelector from '../../components/tags-selector.jsx';
  * }}
 */
 const CreateOrSearchGroup = ({user, modalOptions, pushModal, popModal}) => {
-    /** @type {{current: Map<string, SearchObject> | null}} */
-    const searchObjectsRef = useRef(null);
+    /** @type {{out: Map<string, SearchObject> | null}} */
+    const searchObjectsOut = {out: null}
 
     return (
         <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
             Select tags for your OR group:
             <div style={{width: "100%", height: "100%"}}>
-                <TagsSelector user={user} pushModal={pushModal} initialSelectedTags={modalOptions?.extraProperties?.initialSelectedTags} searchObjectsRef={searchObjectsRef} />
+                <TagsSelector user={user} pushModal={pushModal} initialSelectedTags={modalOptions?.extraProperties?.initialSelectedTags} searchObjectsOut={searchObjectsOut} />
             </div>
             <input style={{margin: 8}} type="button" value="Select OR group" onClick={() => {
-                modalOptions.resolve([...searchObjectsRef.current.values()]);
+                modalOptions.resolve([...searchObjectsOut.out.values()]);
                 popModal();
             }} />
         </div>
