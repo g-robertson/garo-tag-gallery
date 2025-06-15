@@ -3,27 +3,26 @@
  */
 
 import { mkdirSync, renameSync } from "fs";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 import { rootedPath } from "../../util.js";
 import path from "path";
+import { z } from "zod";
 
 export async function validate(dbs, req, res) {
-    const partialUploadFolder = req?.body?.partialUploadSelection;
-    if (typeof partialUploadFolder !== "string") {
-        return "partialUploadSelection was not a string";
-    }
+    const partialUploadSelection = z.string().nonempty().max(120).safeParse(req?.query?.partialUploadSelection, {path: ["partialUploadSelection"]});
+    if (!partialUploadSelection.success) return partialUploadSelection.error.message;
     if (req?.files?.length > 1) {
         return "More than one file is not allowed to be uploaded at a time";
     }
     const file = req.files[0];
 
-    const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadFolder));
+    const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadSelection.data));
     if (!partialUploadFolderRootedPath.isRooted) {
         return "Partial upload folder was not rooted in partial-zips";
     }
     const partialUploadFolderSafePath = partialUploadFolderRootedPath.safePath;
+
     const partialUploadFileRootedPath = rootedPath("./partial-zips", path.join(partialUploadFolderSafePath, file.originalname));
-    
     if (!partialUploadFileRootedPath.isRooted) {
         return "Partial upload file path was not rooted in partial-zips";
     }
@@ -36,8 +35,7 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = [PERMISSIONS.NONE];
-export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.UPDATE;
+export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.NONE, BITS: 0};
 export async function checkPermission() {
     return false;
 }

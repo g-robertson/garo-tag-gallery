@@ -1,14 +1,15 @@
 import { User } from "../client/js/user.js";
-import { dbget, dbsqlcommand } from "./db-util.js";
-import { userSelectAllLocalTagServices } from "./tags.js";
-import { userSelectAllLocalTaggableServices } from "./taggables.js";
-import { userSelectAllLocalMetricServices } from "./metrics.js";
+import { dball, dbget, dbvariablelist } from "./db-util.js";
+import { LocalTagServices } from "./tags.js";
+import { LocalTaggableServices } from "./taggables.js";
+import { LocalMetricServices } from "./metrics.js";
 
 /**
  * @import {DBBoolean} from "./db-util.js"
  * @import {PermissionInt} from "../client/js/user.js"
  * @import {DBPermissionedLocalTagService} from "./tags.js"
  * @import {DBPermissionedLocalTaggableService} from "./taggables.js"
+ * @import {DBPermissionedLocalMetricService} from "./metrics.js"
  */
 export const DEFAULT_ADMINISTRATOR_USER_ID = 0;
 export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
@@ -55,7 +56,6 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @property {number} User_ID
  * @property {string} User_Name
  * @property {DBBoolean} Is_Administrator
- * @property {string} Access_Key
  * @property {number} Permission_Set_ID
  * @property {Page[]} JSON_Pages
  * @property {Object} JSON_Preferences
@@ -74,53 +74,71 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  */
 
 /**
- * 
- * @param {Databases} dbs
- * @param {number} userId 
- * @returns {Promise<DBUser>}
+ * @param {DBUser} dbUser 
  */
-async function getUserById(dbs, userId) {
-    return (await dbget(dbs, "SELECT * FROM Users WHERE User_ID = ?;", [userId]));
+function mapDBUser(dbUser) {
+    const mappedDBUser = {...dbUser};
+    delete mappedDBUser['Access_Key'];
+    return mappedDBUser;
 }
 
-/**
- * 
- * @param {Databases} dbs 
- * @param {User} user 
- */
-export async function joinUsersPermittedObjects(dbs, user) {
-    user.setLocalTagServices(await userSelectAllLocalTagServices(dbs, user));
-    user.setLocalTaggableServices(await userSelectAllLocalTaggableServices(dbs, user));
-    user.setLocalMetricServices(await userSelectAllLocalMetricServices(dbs, user));
+export class Users {
     
-    return user;
-}
+    /**
+     * @param {Databases} dbs
+     * @param {number[]} userIDs
+     */
+    static async selectManyByIDs(dbs, userIDs) {
+        /** @type {DBUser[]} */
+        const dbUsers = (await dball(dbs, `SELECT * FROM Users WHERE User_ID IN ${dbvariablelist(userIDs.length)};`, userIDs));
 
-/**
- * @param {Databases} dbs
- * @param {string} accessKey
- * @returns {Promise<User>}
- */
-export async function getUserByAccessKey(dbs, accessKey) {
-    const user = await dbget(dbs, `
-        SELECT *
-        FROM Users
-        JOIN Permission_Sets ON Users.Permission_Set_ID = Permission_Sets.Permission_Set_ID
-        WHERE Users.Access_Key = ?;
-    `, [accessKey]);
-    
-    if (user === undefined) {
-        return undefined;
-    } else {
-        return new User(user);
+        return dbUsers.map(mapDBUser);
     }
-}
 
-/**
- * 
- * @param {Databases} dbs
- * @returns {Promise<DBUser>}
- */
-export async function getDefaultAdminUser(dbs) {
-    return await getUserById(dbs, DEFAULT_ADMINISTRATOR_USER_ID);
+    /**
+     * @param {Databases} dbs
+     * @param {number} userID
+     */
+    static async selectByID(dbs, userID) {
+        return (await Users.selectManyByIDs(dbs, [userID]))[0];
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {User} user 
+     */
+    static async joinUsersPermittedObjects(dbs, user) {
+        user.setLocalTagServices(await LocalTagServices.userSelectAll(dbs, user));
+        user.setLocalTaggableServices(await LocalTaggableServices.userSelectAll(dbs, user));
+        user.setLocalMetricServices(await LocalMetricServices.userSelectAll(dbs, user));
+
+        return user;
+    }
+
+    /**
+     * @param {Databases} dbs
+     * @param {string} accessKey
+     */
+    static async selectByAccessKey(dbs, accessKey) {
+        const user = await dbget(dbs, `
+            SELECT *
+              FROM Users
+              JOIN Permission_Sets ON Users.Permission_Set_ID = Permission_Sets.Permission_Set_ID
+              WHERE Users.Access_Key = ?;`, [accessKey]
+        );
+        
+        if (user === undefined) {
+            return undefined;
+        } else {
+            return new User(user);
+        }
+    }
+
+    /**
+     * @param {Databases} dbs
+     * @returns {Promise<DBUser>}
+     */
+    static async selectDefaultAdminUser(dbs) {
+        return await dbget(dbs, `SELECT * FROM Users WHERE User_ID = ?`, [DEFAULT_ADMINISTRATOR_USER_ID]);
+    }
 }

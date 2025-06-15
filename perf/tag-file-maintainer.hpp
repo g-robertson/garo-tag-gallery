@@ -59,11 +59,9 @@ class TagFileMaintainer {
         ~TagFileMaintainer();
 
         void insertTaggables(std::string_view input);
-        void toggleTaggables(std::string_view input);
         void deleteTaggables(std::string_view input);
         void readTaggables(void (*writer)(const std::string&));
         void insertTags(std::string_view input);
-        void toggleTags(std::string_view input);
         void deleteTags(std::string_view input);
         void readTags(void (*writer)(const std::string&));
         void insertPairings(std::string_view input);
@@ -88,8 +86,6 @@ class TagFileMaintainer {
         const PairingBucket& getTaggableBucket(uint64_t file) const;
         PairingBucket& getTaggableBucket(uint64_t file);
 
-        void modifyTaggables(std::string_view input, void (SingleBucket::*callback)(uint64_t));
-        void modifyTags(std::string_view input, void (SingleBucket::*callback)(uint64_t));
         void modifyPairings(std::string_view input, void (PairingBucket::*callback)(std::pair<uint64_t, uint64_t>));
 
         const static int VERSION;

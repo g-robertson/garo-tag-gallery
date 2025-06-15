@@ -36,6 +36,7 @@ div {
 
 .navbar {
     height: var(--navbar-height);
+    z-index: 100;
     border-bottom: 1px solid var(--accent-foreground);
 }
 
@@ -82,6 +83,7 @@ div {
 .page-navbar {
     display: inline-block;
     text-wrap: nowrap;
+    z-index: 99;
     height: var(--navbar-height);
     border-bottom: 1px solid var(--accent-foreground);
 }

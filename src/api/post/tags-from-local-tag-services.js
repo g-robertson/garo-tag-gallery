@@ -2,45 +2,40 @@
  * @import {APIFunction} from "../api-types.js"
  */
 
+import { z } from "zod";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { selectUserFacingLocalTagsFromLocalTagServices, userSelectLocalTagServices } from "../../db/tags.js";
+import { UserFacingLocalTags, LocalTagServices } from "../../db/tags.js";
 
 export function validate(dbs, req, res) {
-    let localTagServiceIDs = req?.body?.localTagServiceIDs;
-    if (!(localTagServiceIDs instanceof Array)) {
-        return "localTagServiceIDs was not an array";
-    }
-    for (const localTagServiceID of localTagServiceIDs) {
-        if (!Number.isSafeInteger(localTagServiceID)) {
-            return "localTagServiceIDs was not an array of numbers";
-        }
-
-        if (localTagServiceID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID) {
-            return "Cannot lookup tags in system local tag service";
-        }
-    }
+    let localTagServiceIDs = z.array(z.number().nonnegative().int()
+        .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
+    ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
+    if (!localTagServiceIDs.success) return localTagServiceIDs.error;
 
     req.sanitizedBody = {
-        localTagServiceIDs
+        localTagServiceIDs: localTagServiceIDs.data
     };
 }
 
-export const PERMISSIONS_REQUIRED = PERMISSIONS.LOCAL_TAG_SERVICES;
-export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.READ;
+export const PERMISSIONS_REQUIRED = {
+    TYPE: PERMISSIONS.LOCAL_TAG_SERVICES,
+    BITS: PERMISSION_BITS.READ
+};
 export async function checkPermission(dbs, req, res) {
     const localTagServiceIDsToCheck = req.sanitizedBody.localTagServiceIDs;
-    const localTagServices = await userSelectLocalTagServices(dbs, req.user, PERMISSION_BITS.READ, localTagServiceIDsToCheck);
+    const localTagServices = await LocalTagServices.userSelectManyByIDs(dbs, req.user, PERMISSION_BITS.READ, localTagServiceIDsToCheck);
     return localTagServices.length === localTagServiceIDsToCheck.length;
 }
 
 
 /** @type {APIFunction} */
 export default async function get(dbs, req, res) {
-    const tags = await selectUserFacingLocalTagsFromLocalTagServices(dbs, req.sanitizedBody.localTagServiceIDs);
+    const tags = await UserFacingLocalTags.selectManyByLocalTagServiceIDs(dbs, req.sanitizedBody.localTagServiceIDs);
 
     return res.status(200).send(JSON.stringify(tags.map(tag => [
         tag.Local_Tag_ID,
+        tag.Local_Tag_Service_ID,
         tag.Display_Name,
         tag.Tag_Name,
         tag.Namespaces

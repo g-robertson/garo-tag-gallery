@@ -3,7 +3,7 @@ import serveStatic from 'serve-static';
 import cookieParser from 'cookie-parser';
 import sqlite3 from 'sqlite3';
 import migrate from "./src/migrations/migrate.js";
-import { getDefaultAdminUser, getUserByAccessKey } from './src/db/user.js';
+import { Users } from './src/db/user.js';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appendFileSync, mkdirSync, readdirSync } from 'fs';
@@ -47,7 +47,7 @@ async function main() {
 
   await migrate(dbs);
 
-  console.log(`The default administrator user access key is: ${(await getDefaultAdminUser(dbs))['Access_Key']}`);
+  console.log(`The default administrator user access key is: ${(await Users.selectDefaultAdminUser(dbs))['Access_Key']}`);
 
   const app = express();
   app.use(cookieParser());
@@ -70,7 +70,7 @@ async function main() {
   app.use((req, res) => {
     const accessKey = req.cookies['access-key'];
     if (accessKey !== undefined) {
-      getUserByAccessKey(dbs, accessKey).then(user => {
+      Users.selectByAccessKey(dbs, accessKey).then(user => {
         if (user !== undefined) {
           req.user = user;
         }
@@ -116,13 +116,21 @@ async function main() {
         permissionsRequired = [permissionsRequired];
       }
 
+      const BAD_PERMISSION_IMPORT_ERROR = `Importing ${apiPath}: PERMISSIONS_REQUIRED is a required export for API endpoints and must be of type {
+        PERMISSION_TYPE: PermissionType
+        PERMISSION_BITS: PermissionInt
+      }[]`;
       for (const permissionRequired of permissionsRequired) {
-        if (VALID_PERMISSIONS.indexOf(permissionRequired) === -1) {
-          throw `Importing ${apiPath}: PERMISSIONS_REQUIRED is a required export for API endpoints and must be a member of the PERMISSIONS object`;
+        const {TYPE, BITS} = permissionRequired;
+        if (VALID_PERMISSIONS.indexOf(TYPE) === -1) {
+          throw BAD_PERMISSION_IMPORT_ERROR;
+        }
+        if (!Number.isSafeInteger(BITS) || BITS < 0 || BITS > 15) {
+          throw BAD_PERMISSION_IMPORT_ERROR;
         }
       }
       if (permissionsRequired.length === 0) {
-        throw `Importing ${apiPath}: PERMISSIONS_REQUIRED is a required export for API endpoints and must be a member of the PERMISSIONS object`;
+        throw BAD_PERMISSION_IMPORT_ERROR;
       }
       if (typeof api.default !== "function") {
         throw `Importing ${apiPath}: API endpoints must default export the function used to call them`;
@@ -132,9 +140,6 @@ async function main() {
       }
       if (typeof api.validate !== "function") {
         throw `Importing ${apiPath}: API endpoints must have an export to check if the request has a valid body with signature validate(dbs, req, res)`;
-      }
-      if (typeof api.PERMISSION_BITS_REQUIRED !== "number") {
-        throw `Importing ${apiPath}: PERMISSION_BITS_REQUIRED is a required export for API endpoints and must be within [0,15]`;
       }
 
       apis.set(`/${apiDir}/${apiFile.slice(0, -3)}`, {
@@ -227,7 +232,11 @@ async function main() {
       if (validationMessage !== undefined) {
         return res.status(400).send(validationMessage);
       }
-      canPerformAction ||= user.hasPermissions(api.PERMISSION_BITS_REQUIRED, api.PERMISSIONS_REQUIRED);
+      let userHasGlobalPermissions = true;
+      for (const {TYPE, BITS} of api.permissionsRequired) {
+        userHasGlobalPermissions &&= user.hasPermissions(BITS, TYPE);
+      }
+      canPerformAction ||= userHasGlobalPermissions;
       canPerformAction ||= await api.checkPermission(dbs, req, res);
 
       if (!canPerformAction) {

@@ -1,5 +1,5 @@
-import { appendFile, appendFileSync } from "fs";
-import { strTaggablePairingsToStrTagPairings, getPairingsFromStrPairings, getStrPairingsFromPairings, TEST_DEFAULT_PERF_TAGS_ARGS, getTotalDirectoryBytes } from "./helpers.js";
+import { appendFile, appendFileSync, statSync } from "fs";
+import { strTaggablePairingsToStrTagPairings, getPairingsFromStrPairings, getStrPairingsFromPairings, TEST_DEFAULT_PERF_TAGS_ARGS, getTotalDirectoryBytes, TEST_DEFAULT_DATABASE_DIR } from "./helpers.js";
 import PerfTags from "../../src/perf-tags-binding/perf-tags.js"
 import { getAllFileEntries } from "../../src/util.js";
 /** @import {TestFunction} from "./helpers.js" */
@@ -283,6 +283,132 @@ const TESTS = {
             throw "Taggable pairings tgbl0001 lacks one of the placed tags";
         }
     },
+    "delete_tags_functions_correctly": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n, [1n,2n,3n]],
+            [2n, [2n,3n,4n,5n]],
+            [3n, [4n,8n]],
+            [4n, [6n,7n]],
+            [5n, [6n,8n]]
+        ]));
+        await perfTags.deleteTags([2n, 3n]);
+        const {taggablePairings} = await perfTags.readTaggablesTags([1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n]);
+        
+        if (taggablePairings.size !== 8) {
+            throw "taggable pairings does not have size 8";
+        }
+
+        if (taggablePairings.get(1n).length !== 1
+         || taggablePairings.get(1n).indexOf(1n) === -1
+         || taggablePairings.get(2n).length !== 1
+         || taggablePairings.get(2n).indexOf(1n) === -1
+         || taggablePairings.get(3n).length !== 1
+         || taggablePairings.get(3n).indexOf(1n) === -1
+         || taggablePairings.get(4n).length !== 0
+         || taggablePairings.get(5n).length !== 0
+         || taggablePairings.get(6n).length !== 2
+         || taggablePairings.get(6n).indexOf(4n) === -1
+         || taggablePairings.get(6n).indexOf(5n) === -1
+         || taggablePairings.get(7n).length !== 1
+         || taggablePairings.get(7n).indexOf(4n) === -1
+         || taggablePairings.get(8n).length !== 1
+         || taggablePairings.get(8n).indexOf(5n) === -1) {
+            throw "One of the taggables returned lacks one of the placed tags";
+        }
+    },
+    "delete_tags_functions_correctly_with_kill": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n, [1n,2n,3n]],
+            [2n, [2n,3n,4n,5n]],
+            [3n, [4n,8n]],
+            [4n, [6n,7n]],
+            [5n, [6n,8n]]
+        ]));
+        await perfTags.deleteTags([2n, 3n]);
+        perfTags.__kill();
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const {taggablePairings} = await perfTags.readTaggablesTags([1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n]);
+        
+        if (taggablePairings.size !== 8) {
+            throw "taggable pairings does not have size 8";
+        }
+
+        if (taggablePairings.get(1n).length !== 1
+         || taggablePairings.get(1n).indexOf(1n) === -1
+         || taggablePairings.get(2n).length !== 1
+         || taggablePairings.get(2n).indexOf(1n) === -1
+         || taggablePairings.get(3n).length !== 1
+         || taggablePairings.get(3n).indexOf(1n) === -1
+         || taggablePairings.get(4n).length !== 0
+         || taggablePairings.get(5n).length !== 0
+         || taggablePairings.get(6n).length !== 2
+         || taggablePairings.get(6n).indexOf(4n) === -1
+         || taggablePairings.get(6n).indexOf(5n) === -1
+         || taggablePairings.get(7n).length !== 1
+         || taggablePairings.get(7n).indexOf(4n) === -1
+         || taggablePairings.get(8n).length !== 1
+         || taggablePairings.get(8n).indexOf(5n) === -1) {
+            throw "One of the taggables returned lacks one of the placed tags";
+        }
+    },
+    "delete_tags_functions_correctly_with_reopen": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n, [1n,2n,3n]],
+            [2n, [2n,3n,4n,5n]],
+            [3n, [4n,8n]],
+            [4n, [6n,7n]],
+            [5n, [6n,8n]]
+        ]));
+        await perfTags.deleteTags([2n, 3n]);
+        await perfTags.reopen();
+        const {taggablePairings} = await perfTags.readTaggablesTags([1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n]);
+        
+        if (taggablePairings.size !== 8) {
+            throw "taggable pairings does not have size 8";
+        }
+
+        if (taggablePairings.get(1n).length !== 1
+         || taggablePairings.get(1n).indexOf(1n) === -1
+         || taggablePairings.get(2n).length !== 1
+         || taggablePairings.get(2n).indexOf(1n) === -1
+         || taggablePairings.get(3n).length !== 1
+         || taggablePairings.get(3n).indexOf(1n) === -1
+         || taggablePairings.get(4n).length !== 0
+         || taggablePairings.get(5n).length !== 0
+         || taggablePairings.get(6n).length !== 2
+         || taggablePairings.get(6n).indexOf(4n) === -1
+         || taggablePairings.get(6n).indexOf(5n) === -1
+         || taggablePairings.get(7n).length !== 1
+         || taggablePairings.get(7n).indexOf(4n) === -1
+         || taggablePairings.get(8n).length !== 1
+         || taggablePairings.get(8n).indexOf(5n) === -1) {
+            throw "One of the taggables returned lacks one of the placed tags";
+        }
+    },
+    "delete_tags_empties_bucket": async (createPerfTags) => {
+        
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n, [1n,2n,3n]],
+            [2n, [2n,3n,4n,5n]],
+            [3n, [4n,8n]],
+            [4n, [6n,7n]],
+            [5n, [6n,8n]]
+        ]));
+        await perfTags.deleteTags([1n]);
+        await perfTags.deleteTags([2n]);
+        await perfTags.deleteTags([3n]);
+        await perfTags.reopen();
+        await perfTags.deleteTags([4n]);
+        await perfTags.deleteTags([5n]);
+        await perfTags.__flushAndPurgeUnusedFiles();
+        if (statSync(`${TEST_DEFAULT_DATABASE_DIR}/buckets/tag-bucket/bucket.tbd`).size > 8) {
+            throw "Size of tag bucket should not be greater than 8 after deletion and flush";
+        }
+    },
     "complements_make_size_smaller": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const strTaggablePairings = {};
@@ -332,7 +458,6 @@ const TESTS = {
 
     },
     "search_union_functions_correctly": async (createPerfTags) => {
-        appendFileSync("test-err.log", "Problem run started:\r\n");
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.insertTagPairings(new Map([
             [1n, [1n,2n,3n]],
@@ -366,7 +491,6 @@ const TESTS = {
         }
     },
     "search_complex_1_functions_correctly": async (createPerfTags) => {
-            appendFileSync("test-err.log", "START BAD RUN\r\n");
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.insertTagPairings(new Map([
             [1n, [1n,2n,3n]],
@@ -415,6 +539,61 @@ const TESTS = {
          || taggables.indexOf(6n) === -1
          || taggables.indexOf(7n) === -1) {
             throw "Taggable search did not return taggable 2, 3, 4, 6, or 7";
+        }
+    },
+    "search_complex_3_functions_correctly": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n, [1n,2n,3n]],
+            [2n, [2n,3n,4n,5n]],
+            [3n, [4n,8n]],
+            [4n, [6n,7n]]
+        ]));
+        const {ok, taggables} = await perfTags.search(
+            PerfTags.searchUnion([
+                PerfTags.searchIntersect([
+                    PerfTags.searchUnion([PerfTags.searchTag(1n), PerfTags.searchTag(3n)]),
+                    PerfTags.searchComplement(PerfTags.searchTag(2n))
+                ]),
+                PerfTags.searchTag(4n)
+            ])
+        );
+        if (taggables.length !== 4) {
+            throw "Taggables search did not return 4 taggables";
+        }
+        if (taggables.indexOf(1n) === -1
+         || taggables.indexOf(6n) === -1
+         || taggables.indexOf(7n) === -1
+         || taggables.indexOf(8n) === -1) {
+            throw "Taggable search did not return taggable 1, 6, 7, or 8";
+        }
+    },
+    "search_complex_4_functions_correctly": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n, [1n,2n,3n]],
+            [2n, [2n,3n,4n,5n]],
+            [3n, [4n,8n]],
+            [4n, [6n,7n]]
+        ]));
+        const {ok, taggables} = await perfTags.search(
+            PerfTags.searchUnion([
+                PerfTags.searchComplement(PerfTags.searchIntersect([
+                    PerfTags.searchUnion([PerfTags.searchTag(1n), PerfTags.searchTag(3n)]),
+                    PerfTags.searchTag(2n)
+                ])),
+                PerfTags.searchTag(4n)
+            ])
+        );
+        if (taggables.length !== 5) {
+            throw "Taggables search did not return 5 taggables";
+        }
+        if (taggables.indexOf(1n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+         || taggables.indexOf(7n) === -1
+         || taggables.indexOf(8n) === -1) {
+            throw "Taggable search did not return taggable 1, 5, 6, 7, or 8";
         }
     }
 };

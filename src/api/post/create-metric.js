@@ -3,62 +3,49 @@
  * @import {PreInsertLocalMetric} from "../../db/metrics.js"
  */
 
+import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { createLocalMetric, userSelectLocalMetricService } from "../../db/metrics.js";
+import { LocalMetrics, LocalMetricServices } from "../../db/metrics.js";
 
 export async function validate(dbs, req, res) {
-    const localMetricServiceID = Number(req?.body?.localMetricServiceID);
-    if (!Number.isSafeInteger(localMetricServiceID)) {
-        return "localMetricServiceID was not a number";
-    }
+    const localMetricServiceID = z.coerce.number().nonnegative().int().safeParse(req?.body?.localMetricServiceID, {path: ["localMetricServiceID"]});
+    if (!localMetricServiceID.success) return localMetricServiceID.error.message;
+    const Local_Metric_Name = z.string().nonempty().max(200).safeParse(req?.body?.metricName, {path: ["metricName"]});
+    if (!Local_Metric_Name.success) return Local_Metric_Name.error.message;
+    const Local_Metric_Lower_Bound = z.coerce.number().finite().safeParse(req?.body?.lowerBound, {path: ["lowerBound"]});
+    if (!Local_Metric_Lower_Bound.success) return Local_Metric_Lower_Bound.error.message;
+    const Local_Metric_Upper_Bound = z.coerce.number().finite().safeParse(req?.body?.upperBound, {path: ["upperBound"]});
+    if (!Local_Metric_Upper_Bound.success) return Local_Metric_Upper_Bound.error.message;
+    const Local_Metric_Precision = z.coerce.number().gte(0).max(10).int().safeParse(req?.body?.precision, {path: ["precision"]});
+    if (!Local_Metric_Precision.success) return Local_Metric_Precision.error.message;
+    const Local_Metric_Type = z.coerce.number().gte(0).max(3).int().safeParse(req?.body?.metricType, {path: ["metricType"]});
+    if (!Local_Metric_Type.success) return Local_Metric_Type.error.message;
 
     /** @type {PreInsertLocalMetric} */
     const preInsertLocalMetric = {
-        Local_Metric_Name: req?.body?.metricName,
-        Local_Metric_Lower_Bound: Number(req?.body?.lowerBound),
-        Local_Metric_Upper_Bound: Number(req?.body?.upperBound),
-        Local_Metric_Precision: Number(req?.body?.precision),
-        Local_Metric_Type: Number(req?.body?.metricType)
+        Local_Metric_Name: Local_Metric_Name.data,
+        Local_Metric_Lower_Bound: Local_Metric_Lower_Bound.data,
+        Local_Metric_Upper_Bound: Local_Metric_Upper_Bound.data,
+        Local_Metric_Precision: Local_Metric_Precision.data,
+        Local_Metric_Type: Local_Metric_Type.data
     };
 
-    if (typeof preInsertLocalMetric.Local_Metric_Name !== "string") {
-        return "metricName must be a string";
-    }
-    if (preInsertLocalMetric.Local_Metric_Name.length === 0) {
-        return "metricName must have a value";
-    }
-    if (preInsertLocalMetric.Local_Metric_Name.length > 200) {
-        return "metricName must not be over 200 length";
-    }
-    if (isNaN(preInsertLocalMetric.Local_Metric_Lower_Bound)) {
-        return "lowerBound must be a number";
-    }
-    if (isNaN(preInsertLocalMetric.Local_Metric_Upper_Bound)) {
-        return "upperBound must be a number";
-    }
-    if (isNaN(preInsertLocalMetric.Local_Metric_Precision)) {
-        return "precision must be a number";
-    }
-    if (isNaN(preInsertLocalMetric.Local_Metric_Type)) {
-        return "metricType must be a number";
-    }
 
     req.sanitizedBody = {
-        localMetricServiceID,
+        localMetricServiceID: localMetricServiceID.data,
         preInsertLocalMetric
     };
 }
 
-export const PERMISSIONS_REQUIRED = [PERMISSIONS.LOCAL_METRIC_SERVICES];
-export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.CREATE;
+export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.LOCAL_METRIC_SERVICES, BITS: PERMISSION_BITS.CREATE};
 export async function checkPermission(dbs, req, res) {
     const localMetricServiceIDToCheck = req.sanitizedBody.localMetricServiceID;
-    const localMetricService = await userSelectLocalMetricService(dbs, req.user, PERMISSION_BITS.CREATE, localMetricServiceIDToCheck);
+    const localMetricService = await LocalMetricServices.userSelectByID(dbs, req.user, PERMISSION_BITS.CREATE, localMetricServiceIDToCheck);
     return localMetricService !== undefined;
 }
 
 /** @type {APIFunction} */
 export default async function post(dbs, req, res) {
-    await createLocalMetric(dbs, req.sanitizedBody.preInsertLocalMetric, req.sanitizedBody.localMetricServiceID);
+    await LocalMetrics.insert(dbs, req.sanitizedBody.preInsertLocalMetric, req.sanitizedBody.localMetricServiceID);
     res.status(200).send("Metric service created");
 }

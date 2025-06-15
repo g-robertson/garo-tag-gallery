@@ -16,6 +16,7 @@ import Scrollbar from './scrollbar.jsx';
  * @template R
  * @param {{
  *  values: T[]
+ *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[]) => void
  *  onValuesDoubleClicked?: (realizedValuesSelected: Awaited<R>[]) => void
  *  valuesRealizer: (values: T[]) => R
  *  valueRealizationRange?: number
@@ -30,10 +31,12 @@ import Scrollbar from './scrollbar.jsx';
  *  initialLastClickedIndex?: number
  *  scrollbarWidth?: number
  *  elementsSelectable?: boolean
+ *  multiSelect?: boolean
  * }} param0
  */
 function LazySelector({
     values,
+    onValuesSelected,
     onValuesDoubleClicked,
     valuesRealizer,
     valueRealizationRange,
@@ -47,9 +50,11 @@ function LazySelector({
     scrollbarIncrement,
     initialLastClickedIndex,
     scrollbarWidth,
+    multiSelect,
     elementsSelectable
 }) {
     onValuesDoubleClicked ??= () => {};
+    onValuesSelected ??= () => {};
     valueRealizationRange ??= 5;
     valueRealizationDelay ??= 200;
     customItemComponent ??= ({realizedValue}) => (<>{realizedValue}</>);
@@ -59,6 +64,7 @@ function LazySelector({
     scrollbarIncrement ??= 4;
     initialLastClickedIndex ??= null;
     scrollbarWidth ??= 17;
+    multiSelect ??= true;
     elementsSelectable ??= true;
 
 
@@ -109,6 +115,7 @@ function LazySelector({
     const [preShiftClickIndices, setPreShiftClickIndices] = useState(null);
     /** @type {[Set<number>, (selectedIndices: Set<number>) => void]} */
     const [selectedIndices, setSelectedIndices] = useState(new Set());
+
     const isClickFocused = useRef(false);
 
     let selectableContentsWidth = widthAvailable;
@@ -249,16 +256,23 @@ function LazySelector({
         }
 
         const valuesPromise = valuesRealizer(absentValues.map(absentValue => absentValue.value));
-        for (let i = 0; i < absentValues.length; ++i) {
-            const absentValue = absentValues[i];
-            realizingValues.current[absentValue.index] = (async () => {
-                const values = await valuesPromise;
-                return values[i];
-            })();
-        }
+        if (valuesPromise instanceof Promise) {
+            for (let i = 0; i < absentValues.length; ++i) {
+                const absentValue = absentValues[i];
+                realizingValues.current[absentValue.index] = (async () => {
+                    const values = await valuesPromise;
+                    return values[i];
+                })();
+            }
 
-        for (const {index} of absentValues) {
-            newRealizedValues[index] = await realizingValues.current[index];
+            for (const {index} of absentValues) {
+                newRealizedValues[index] = await realizingValues.current[index];
+            }
+        } else {
+            for (let i = 0; i < absentValues.length; ++i) {
+                realizingValues.current[absentValues[i].index] = valuesPromise[i];
+                newRealizedValues[absentValues[i].index] = valuesPromise[i];
+            }
         }
 
 
@@ -335,6 +349,36 @@ function LazySelector({
         }
     }, [shownStartIndex, selectedIndices, values]);
 
+
+    useEffect(() => {
+        if (!multiSelect && selectedIndices.size >= 1) {
+            const selectedIndex = [...selectedIndices][0];
+            if (selectedIndices.size > 1 || selectedIndex !== lastClickedIndex) {
+                setSelectedIndices(new Set([lastClickedIndex]));
+                return;
+            }
+        }
+
+        (async () => {
+            /** @type {R[]} */
+            const realizedValuesDoubleClicked = [];
+            setToRealize(selectedIndices, valuesRef.current, valuesRealizationSync.current);
+            for (const index of selectedIndices) {
+                if (realizedValues[index] === undefined) {
+                    if (realizingValues.current[index] === undefined) {
+                        throw "Both realized and realizing values were undefined on double click, should not be possible";
+                    } else {
+                        realizedValuesDoubleClicked.push(await realizingValues[index]);
+                    }
+                } else {
+                    realizedValuesDoubleClicked.push(realizedValues[index]);
+                }
+            }
+
+            onValuesSelected([...selectedIndices].map(selectedIndex => realizedValues[selectedIndex]));
+        })();
+    }, [selectedIndices]);
+
     const LAZY_SELECTOR_ID = `lazy-selector-${uniqueID.current}`;
     const SELECTABLE_CONTENTS_ID = `lazy-selector-selectable-contents-${uniqueID.current}`
     const SCROLLABLE_ELEMENTS = [SELECTABLE_CONTENTS_ID];
@@ -381,7 +425,11 @@ function LazySelector({
                                                 }
                                                 let newSelectedIndices;
 
-                                                if (e.ctrlKey) {
+
+                                                if (!multiSelect) {
+                                                    setLastClickedIndex(itemIndex);
+                                                    setSelectedIndices(new Set([itemIndex]));
+                                                } else if (e.ctrlKey) {
                                                     setLastClickedIndex(itemIndex);
                                                     newSelectedIndices = selectedIndices;
                                                     if (selectedIndices.has(itemIndex)) {
@@ -423,12 +471,17 @@ function LazySelector({
 
                                                 /** @type {R[]} */
                                                 const realizedValuesDoubleClicked = [];
+                                                setToRealize(selectedIndices, valuesRef.current, valuesRealizationSync.current);
                                                 for (const index of selectedIndices) {
-                                                    if (realizedValues[index] === undefined && realizingValues.current[index] === undefined) {
-                                                        throw "Both realized and realizing values were undefined on double click, should not be possible";
+                                                    if (realizedValues[index] === undefined) {
+                                                        if (realizingValues.current[index] === undefined) {
+                                                            throw "Both realized and realizing values were undefined on double click, should not be possible";
+                                                        } else {
+                                                            realizedValuesDoubleClicked.push(await realizingValues[index]);
+                                                        }
+                                                    } else {
+                                                        realizedValuesDoubleClicked.push(realizedValues[index]);
                                                     }
-
-                                                    realizedValuesDoubleClicked.push(realizedValues[index]);
                                                 }
 
                                                 onValuesDoubleClicked(realizedValuesDoubleClicked);

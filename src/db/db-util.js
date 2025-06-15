@@ -105,14 +105,14 @@ export function dbtuples(rows, columns) {
  */
 export async function dbBeginTransaction(dbs) {
     await dbrun(dbs, "BEGIN TRANSACTION;");
-    await dbs.perfTags.beginTransaction();
+    dbs.currentTransaction = (await dbs.perfTags.beginTransaction()).resolveFn;
 }
 
 /**
  * @param {Databases} dbs 
  */
 export async function dbEndTransaction(dbs) {
-    await dbs.perfTags.endTransaction();
+    await dbs.perfTags.endTransaction(dbs.currentTransaction);
     await dbrun(dbs, "COMMIT;");
 }
 

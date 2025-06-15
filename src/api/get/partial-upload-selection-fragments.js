@@ -4,16 +4,16 @@ import {readdirSync} from "fs";
  * @import {APIFunction} from "../api-types.js"
  */
 
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 import path from "path";
 import { rootedPath } from "../../util.js";
+import { z } from "zod";
 
 export async function validate(dbs, req, res) {
-    const partialUploadFolder = req?.query?.partialUploadPath;
-    if (typeof partialUploadFolder !== "string") {
-        return "partialUploadPath was not a string";
-    }
-    const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadFolder));
+    const partialUploadFolder = z.string().nonempty().max(40).safeParse(req?.query?.partialUploadFolder, {path: ["partialUploadFolder"]});
+    if (!partialUploadFolder.success) return partialUploadFolder.error.message;
+
+    const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadFolder.data));
     if (!partialUploadFolderRootedPath.isRooted) {
         return "partialUploadPath was not rooted in partial-zips";
     }
@@ -24,8 +24,7 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = PERMISSIONS.NONE;
-export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.READ;
+export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.NONE, BITS: 0};
 export async function checkPermission(dbs, req, res) {
     return false;
 }

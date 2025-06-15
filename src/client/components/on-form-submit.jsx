@@ -10,11 +10,13 @@ import { useState } from "react";
 export const OnFormSubmit = ({onFormSubmit}) => {
     const [firstLoad, setFirstLoad] = useState(true);
 
-    return <iframe name="frame" style={{display: "none"}} onLoad={() => {
+    return <iframe name="frame" style={{display: "none"}} onLoad={(e) => {
         if (firstLoad) {
             setFirstLoad(false);
         } else {
-            onFormSubmit();
+            if (e.currentTarget.contentWindow.performance.getEntriesByType("navigation")[0].responseStatus === 200) {
+                onFormSubmit();
+            }
         }
     }}></iframe>
 }

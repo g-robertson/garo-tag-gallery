@@ -29,6 +29,7 @@ const MODALS = {};
         await import('./modals/import-files-from-hydrus.jsx'),
         await import('./modals/create-metric-service.jsx'),
         await import('./modals/create-metric.jsx'),
+        await import('./modals/change-tag-to-metric.jsx')
     ];
     
     for (const modal of modals) {

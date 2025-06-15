@@ -1,5 +1,3 @@
-import sqlite3 from "sqlite3";
-import { ChildProcess } from "child_process"
 import { User } from "../client/js/user.js";
 /** 
  * @import express from "@types/express"
@@ -14,6 +12,8 @@ import { User } from "../client/js/user.js";
    * @property {APIFunction} default
    * @property {APIValidationFunction} validate
    * @property {APIFunction} checkPermission
-   * @property {PermissionType | PermissionType[]} PERMISSIONS_REQUIRED
-   * @property {PermissionInt} PERMISSION_BITS_REQUIRED
+   * @property {{
+   *   TYPE: PermissionType
+   *   BITS: PermissionInt
+   * }[]} PERMISSIONS_REQUIRED
 */

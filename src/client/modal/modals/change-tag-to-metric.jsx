@@ -1,0 +1,55 @@
+import '../../global.css';
+import { User } from '../js/user.js';
+import { OnFormSubmit } from '../../components/on-form-submit.jsx';
+import LocalMetricSelector from '../../components/local-metric-selector.jsx';
+import LocalTagsSelector from '../../components/local-tags-selector.jsx';
+import LazyTagSelector from '../../components/lazy-tag-selector.jsx';
+import { useState } from 'react';
+
+/** @import {ClientTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
+
+/** 
+ * @param {{
+ *  user: User
+ *  popModal: () => void
+ * }}
+*/
+const ChangeTagToMetric = ({user, popModal}) => {
+    /** @type {[null | ClientTag, (tag: null | ClientTag) => void]} */
+    const [tag, setTag] = useState(null);
+    const tags = tag === null ? [] : [tag];
+
+    return (
+        <div style={{width: "100%", flexDirection: "column"}}>
+            <div style={{flex: 2, margin: 8}}>
+                <LocalTagsSelector localTagServices={user.localTagServices()} multiSelect={false} excludeable={false} onTagsSelected={(tags) => {
+                    setTag(tags[0]);
+                }}/>
+            </div>
+            <div style={{marginLeft: 8}}>
+                Select a tag from above: <div style={{height: 20, flexGrow: 100}}><LazyTagSelector tags={tags} elementsSelectable={false} scrollbarWidth={0} /></div>
+            </div>
+            <form style={{flex: 5}} action="/api/post/change-tag-to-metric" target="frame" method="POST">
+                <LocalMetricSelector user={user} />
+                <input name="localTagID" style={{display: "none"}} value={tag !== null ? tag.localTagID : ""} />
+                <div style={{marginLeft: "8px"}}>
+                    Select what metric value you wish for this tag to be applied as: <input name="metricValue" type="text" />
+                </div>
+                <div style={{marginLeft: "8px"}}>
+                    Remove existing tag?: <input name="removeExistingTag" type="checkbox" />
+                </div>
+                <div style={{marginLeft: "8px"}}>
+                    <input type="submit" value="Submit" />
+                </div>
+                <OnFormSubmit onFormSubmit={popModal}/>
+            </form>
+        </div>
+    );
+};
+
+export default ChangeTagToMetric;
+
+export const MODAL_PROPERTIES = {
+    modalName: "change-tag-to-metric",
+    displayName: "Change Tag to Metric"
+};

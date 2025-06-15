@@ -2,52 +2,48 @@
  * @import {APIFunction} from "../api-types.js"
  */
 
+import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { importFilesFromHydrus } from "../../db/import.js";
-import { userSelectLocalTaggableService } from "../../db/taggables.js";
-import { userSelectLocalTagService } from "../../db/tags.js";
+import { LocalTaggableServices } from "../../db/taggables.js";
+import { LocalTagServices } from "../../db/tags.js";
 
 export async function validate(dbs, req, res) {
-    const partialUploadPath = req.partialUploadPath;
-    if (typeof partialUploadPath !== "string") {
-        return "partialUploadPath was not a string";
-    }
-    const partialFilePaths = req.partialFilePaths;
-    if (!(partialFilePaths instanceof Array)) {
-        return "partialFilePaths was not an array";
-    }
-    for (const partialFilePath of partialFilePaths) {
-        if (typeof partialFilePath !== "string") {
-            return "partialFilePaths was not an array of strings";
-        }
-    }
-    const localTagServiceID = Number(req?.body?.localTagServiceID);
-    if (!Number.isSafeInteger(localTagServiceID)) {
-        return "localTagServiceID was not a number";
-    }
-    const localTaggableServiceID = Number(req?.body?.localTaggableServiceID);
-    if (!Number.isSafeInteger(localTaggableServiceID)) {
-        return "localTaggableServiceID was not a number";
-    }
-    const localTagService = await userSelectLocalTagService(dbs, req.user, PERMISSION_BITS.UPDATE, localTagServiceID);
+    const partialUploadPath = z.string().nonempty().max(120).safeParse(req.partialUploadPath, {path: ["partialUploadPath"]});
+    if (!partialUploadPath.success) return partialUploadPath.error.message;
+    const partialFilePaths = z.array(z.string().nonempty().max(120)).safeParse(req.partialFilePaths, ["partialFilePaths"]);
+    if (!partialFilePaths.success) return partialFilePaths.error.message;
+
+    const localTagServiceID = z.coerce.number().nonnegative().int().safeParse(req?.body?.localTagServiceID, {path: ["localTagServiceID"]});
+    if (!localTagServiceID.success) return localTagServiceID.error.message;
+
+    const localTaggableServiceID = z.coerce.number().nonnegative().int().safeParse(req?.body?.localTaggableServiceID, {path: ["localTaggableServiceID"]});
+    if (!localTaggableServiceID.success) return localTaggableServiceID.error.message;
+
+    const localTagService = await LocalTagServices.userSelectByID(dbs, req.user, PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE, localTagServiceID.data);
     if (localTagService === undefined) {
-        return "User did not have update access to local tag service";
+        return "User did not have (create | update) access to local tag service";
     }
-    const localTaggableService = await userSelectLocalTaggableService(dbs, req.user, PERMISSION_BITS.UPDATE, localTaggableServiceID);
+    const localTaggableService = await LocalTaggableServices.userSelectByID(dbs, req.user, PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE, localTaggableServiceID.data);
     if (localTaggableService === undefined) {
-        return "User did not have update access to local taggable service";
+        return "User did not have (create | update) access to local taggable service";
     }
 
     req.sanitizedBody = {
-        partialUploadPath,
-        partialFilePaths,
+        partialUploadPath: partialUploadPath.data,
+        partialFilePaths: partialFilePaths.data,
         localTagService,
         localTaggableService
     };
 }
 
-export const PERMISSIONS_REQUIRED = [PERMISSIONS.LOCAL_TAGGABLE_SERVICES, PERMISSIONS.LOCAL_TAG_SERVICES];
-export const PERMISSION_BITS_REQUIRED = PERMISSION_BITS.CREATE;
+export const PERMISSIONS_REQUIRED = [{
+    TYPE: PERMISSIONS.LOCAL_TAGGABLE_SERVICES,
+    BITS: PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE
+}, {
+    TYPE: PERMISSIONS.LOCAL_TAG_SERVICES,
+    BITS: PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE
+}];
 export async function checkPermission() {
     return false;
 }

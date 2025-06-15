@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
 import '../global.css';
 import { PERMISSION_BITS, User } from '../js/user.js';
-import { fjsonParse } from '../js/client-util.js';
-import MultiSelect from './multi-select.jsx';
 
 import { MODAL_PROPERTIES as CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES } from '../modal/modals/create-or-search-group.jsx';
 import LazyTagSelector from './lazy-tag-selector.jsx';
+import LocalTagsSelector from './local-tags-selector.jsx';
 
-/**
- * @typedef {Object} ClientTag
- * @property {number} localTagID
- * @property {string} tagName
- * @property {string} displayName
- * @property {string[]} namespaces
- */
+/** @import {ClientTag} from "./local-tags-selector.jsx" */
 
 /**
  * @typedef {ClientTag & {
@@ -73,50 +66,14 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, o
     useEffect(() => {existingState.searchObjects = searchObjects;}, [searchObjects]);
     searchObjectsOut.out = searchObjects;
 
-    /** @type {[ClientTag[], (tags: ClientTag[]) => void]} */
-    const [tags, setTags] = useState([]);
-    /** @type {[string, (tagFilterValue: string) => void]} */
-    const [tagFilterValue, setTagFilterValue] = useState("");
-    const [isExcludeOn, setIsExcludeOn] = useState(existingState?.isExcludeOn ?? false);
-
     useEffect(() => {
         onSearchChanged([...searchObjects.values()]);
     }, [searchObjects]);
 
-    const readableLocalTagServices = user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ);
-
     return (
         <div style={{width: "100%", flexDirection: "column", margin: 4}}>
-            <div>Tag services to view:</div>
-            <div style={{flex: 1}}>
-                <MultiSelect options={[
-                    ...readableLocalTagServices.map(localTagService => ({
-                        value: localTagService.Local_Tag_Service_ID.toString(),
-                        displayName: localTagService.Service_Name
-                    }))
-                ]} onOptionsChange={async (optionsSelected) => {
-                    const response = await fetch("/api/post/tags-from-local-tag-services", {
-                        body: JSON.stringify({
-                            localTagServiceIDs: optionsSelected.map(option => Number(option))
-                        }),
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        method: "POST"
-                    });
-
-                    const tagsResponse = await fjsonParse(response);
-
-                    setTags(tagsResponse.map(tag => ({
-                        localTagID: tag[0],
-                        displayName: tag[1],
-                        tagName: tag[2],
-                        namespaces: tag[3]
-                    })));
-                }}/>
-            </div>
             Search:
-            <div style={{flex: 2}}>
+            <div style={{flex: 1}}>
                 <LazyTagSelector
                     tags={[...searchObjects.values()].map(searchObject => {
                         return searchObject;
@@ -149,35 +106,11 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, o
                     customTitleRealizer={(value) => searchObjectToDisplayName(value)}
                 />
             </div>
-
-            Select Tags:
-            <div>Tag filter: <input type="text" value={tagFilterValue} onChange={(e) => {
-                setTagFilterValue(e.currentTarget.value);
-            }}/></div>
-            <div>Exclude: <input type="checkbox" checked={isExcludeOn} onChange={() => {
-                setIsExcludeOn(!isExcludeOn);
-            }}/></div>
-            <div style={{flex: 5}}>
-                <LazyTagSelector
-                    tags={
-                        tags.filter(tag => {
-                            if (tagFilterValue === "") {
-                                return true;
-                            }
-                            if (tag.tagName.startsWith(tagFilterValue)) {
-                                return true;
-                            }
-                            for (const namespace of tag.namespaces) {
-                                if (namespace.startsWith(tagFilterValue)) {
-                                    return true;
-                                }
-                            }
-
-                            return false;
-                        })
-                    }
-                    onValuesDoubleClicked={(valuesSelected) => {
-                        for (const tag of valuesSelected) {
+            <div style={{flex: 3}}>
+                <LocalTagsSelector 
+                    localTagServices={user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)}
+                    onTagsSelected={(tags, isExcludeOn) => {
+                        for (const tag of tags) {
                             const searchObject = [{
                                 ...tag,
                                 exclude: isExcludeOn
@@ -200,8 +133,6 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, o
                         }
                         setSearchObjects(new Map([...searchObjects]));
                     }}
-                    customItemComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
-                    customTitleRealizer={(value) => value.displayName}
                 />
             </div>
         </div>

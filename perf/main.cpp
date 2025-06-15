@@ -56,9 +56,13 @@ int main(int argc, const char** argv) {
 
         if (op == "insert_taggables") {
             tfm.insertTaggables(input);
+        } else if (op == "delete_taggables") {
+            tfm.deleteTaggables(input);
         } else if (op == "insert_tags") {
             tfm.insertTags(input);
-        }  else if (op == "insert_tag_pairings") {
+        } else if (op == "delete_tags") {
+            tfm.deleteTags(input);
+        } else if (op == "insert_tag_pairings") {
             tfm.insertPairings(input);
         } else if (op == "toggle_tag_pairings") {
             tfm.togglePairings(input);

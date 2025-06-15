@@ -254,6 +254,20 @@ export default class PerfTags {
     }
 
     /**
+     * @param {bigint[]} tags 
+     */
+    async deleteTags(tags) {
+        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+
+        this.__writeToInputFile(PerfTags.#serializeSingles(tags));
+        await this.__writeLineToStdin("delete_tags");
+        const result = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+
+        resolveCurrentExecution();
+        return result;
+    }
+
+    /**
      * @param {bigint[]} taggables
      */
     async readTaggablesTags(taggables) {
@@ -383,14 +397,35 @@ export default class PerfTags {
         return `(${expression}C<${serializeUint64(occurrences)}${serializeUint64(tags.length)}${this.#serializeSingles(tags)})`;
     }
 
+    #transactionPromises = [];
     async beginTransaction() {
+        const existingPromises = this.#transactionPromises.length;
+        /** @type {() => void} */
+        let resolveFn;
+        this.#transactionPromises.push(new Promise(resolve => {
+            resolveFn = () => {
+                resolve();
+                this.#transactionPromises = this.#transactionPromises.slice(1);
+            }
+        }));
+        if (existingPromises > 0) {
+            await this.#transactionPromises[existingPromises - 1];
+        }
+
         await this.__writeLineToStdin("begin_transaction");
-        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        const result = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        return {result, resolveFn};
     }
 
-    async endTransaction() {
+    /**
+     * @param {() => void} resolveFn 
+     */
+    async endTransaction(resolveFn) {
         await this.__writeLineToStdin("end_transaction");
-        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        const result = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        
+        resolveFn();
+        return result;
     }
 
     #exitCount = 0;

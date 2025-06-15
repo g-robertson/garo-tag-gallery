@@ -118,14 +118,14 @@ void TagFileMaintainer::writeCacheFile() {
     }
 }
 
-void TagFileMaintainer::modifyTaggables(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
-    auto modifyTaggable = [&callback, this](uint64_t taggable) {
+void TagFileMaintainer::insertTaggables(std::string_view input) {
+    auto insertTaggable = [this](uint64_t taggable) {
         for (auto& bucket : tagTaggableBuckets) {
             bucket.insertComplement(taggable);
         }
-        (*taggableBucket.*callback)(taggable);
+        taggableBucket->insertItem(taggable);
     };
-    processSingles(input, modifyTaggable);
+    processSingles(input, insertTaggable);
 
     for (auto& bucket : tagTaggableBuckets) {
         bucket.diffAhead();
@@ -134,28 +134,50 @@ void TagFileMaintainer::modifyTaggables(std::string_view input, void (SingleBuck
     taggableBucket->diffAhead();
     writeCacheFile();
 }
-
-void TagFileMaintainer::insertTaggables(std::string_view input) {
-    modifyTaggables(input, &SingleBucket::insertItem);
-}
-void TagFileMaintainer::toggleTaggables(std::string_view input) {
-    modifyTaggables(input, &SingleBucket::toggleItem);
-}
 void TagFileMaintainer::deleteTaggables(std::string_view input) {
-    modifyTaggables(input, &SingleBucket::deleteItem);
+    auto deleteTaggable = [this](uint64_t taggable) {
+        auto& taggableTagBucket = getTaggableBucket(taggable);
+        const auto* tags = taggableTagBucket.firstContents(taggable);
+        std::vector<std::pair<uint64_t, uint64_t>> taggableTagsToErase;
+        taggableTagsToErase.reserve(tags->size());
+
+        auto insertPairingErasures = [this, &taggableTagsToErase, &taggable](uint64_t tag) {
+            taggableTagsToErase.push_back({taggable, tag});
+        };
+        tags->forEach(insertPairingErasures);
+
+        for (const auto& taggableTagToErase : taggableTagsToErase) {
+            taggableTagBucket.deleteItem(taggableTagToErase);
+            getTagBucket(taggableTagToErase.second).deleteItem({taggableTagToErase.second, taggableTagToErase.first});
+        }
+
+        taggableBucket->deleteItem(taggable);
+    };
+    
+    processSingles(input, deleteTaggable);
+    
+    for (auto& bucket : taggableTagBuckets) {
+        bucket.diffAhead();
+    }
+    for (auto& bucket : tagTaggableBuckets) {
+        bucket.diffAhead();
+    }
+
+    taggableBucket->diffAhead();
+    writeCacheFile();
 }
 void TagFileMaintainer::readTaggables(void (*writer)(const std::string&)) {
     writer(serializeSingles(taggableBucket->contents()));
 }
 
-void TagFileMaintainer::modifyTags(std::string_view input, void (SingleBucket::*callback)(uint64_t)) {
-    auto modifyTag = [&callback, this](uint64_t tag) {
+void TagFileMaintainer::insertTags(std::string_view input) {
+    auto insertTag = [this](uint64_t tag) {
         for (auto& bucket : taggableTagBuckets) {
             bucket.insertComplement(tag);
         }
-        (*tagBucket.*callback)(tag);
+        tagBucket->insertItem(tag);
     };
-    processSingles(input, modifyTag);
+    processSingles(input, insertTag);
 
     for (auto& bucket : taggableTagBuckets) {
         bucket.diffAhead();
@@ -164,15 +186,38 @@ void TagFileMaintainer::modifyTags(std::string_view input, void (SingleBucket::*
     tagBucket->diffAhead();
     writeCacheFile();
 }
-
-void TagFileMaintainer::insertTags(std::string_view input) {
-    modifyTags(input, &SingleBucket::insertItem);
-}
-void TagFileMaintainer::toggleTags(std::string_view input) {
-    modifyTags(input, &SingleBucket::toggleItem);
-}
 void TagFileMaintainer::deleteTags(std::string_view input) {
-    modifyTags(input, &SingleBucket::deleteItem);
+    auto deleteTag = [this](uint64_t tag) {
+        auto& tagTaggableBucket = getTagBucket(tag);
+        const auto* taggables = tagTaggableBucket.firstContents(tag);
+        std::vector<std::pair<uint64_t, uint64_t>> tagTaggablesToErase;
+        tagTaggablesToErase.reserve(taggables->size());
+
+        auto insertPairingErasures = [this, &tagTaggablesToErase, &tag](uint64_t taggable) {
+            tagTaggablesToErase.push_back({tag, taggable});
+        };
+        taggables->forEach(insertPairingErasures);
+
+        for (const auto& tagTaggableToErase : tagTaggablesToErase) {
+            tagTaggableBucket.deleteItem(tagTaggableToErase);
+            getTaggableBucket(tagTaggableToErase.second).deleteItem({tagTaggableToErase.second, tagTaggableToErase.first});
+        }
+
+
+        tagBucket->deleteItem(tag);
+    };
+
+    processSingles(input, deleteTag);
+    
+    for (auto& bucket : taggableTagBuckets) {
+        bucket.diffAhead();
+    }
+    for (auto& bucket : tagTaggableBuckets) {
+        bucket.diffAhead();
+    }
+
+    tagBucket->diffAhead();
+    writeCacheFile();
 }
 void TagFileMaintainer::readTags(void (*writer)(const std::string&)) {
     writer(serializeSingles(tagBucket->contents()));
@@ -316,7 +361,7 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
             if (taggables == nullptr) {
                 taggables = &EMPTY_TAGGABLES;
             }
-            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(taggables->isComplement(), universe, &taggables->physicalContents()));
+            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(taggables->isComplement() ^ isComplement, universe, &taggables->physicalContents()));
         } else if (input[0] == TAGGABLE_LIST) {
             input = input.substr(1);
             uint64_t taggableCount = util::deserializeUInt64(input);
@@ -327,17 +372,14 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
                 input = input.substr(8);
             }
             context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, std::move(taggables)));
-            if (isComplement) {
-                context.complement();
-            }
         } else if (input[0] == OPEN_GROUP) {
             input = input.substr(1);
             auto subSearch = search_(input);
             input = subSearch.first;
-            context = SET_OPERATIONS.at(op)(std::move(context), std::move(subSearch.second));
             if (isComplement) {
-                context.complement();
+                subSearch.second.complement();
             }
+            context = SET_OPERATIONS.at(op)(std::move(context), std::move(subSearch.second));
         }
     }
 
