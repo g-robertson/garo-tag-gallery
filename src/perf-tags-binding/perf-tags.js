@@ -19,10 +19,17 @@ export default class PerfTags {
 
     #promises = [];
 
+    static EXE_NAME = process.platform === "win32" ? "perftags.exe" : "perftags";
+    static NEWLINE = process.platform === "win32" ? "\r\n" : "\n";
+    static OK_RESULT = `OK!${PerfTags.NEWLINE}`;
+
     __open() {
         this.#closed = false;
         this.#closing = false;
         this.#perfTags = spawn(this.#path, [this.#inputFileName, this.#outputFileName, this.#databaseDirectory]);
+        if (this.#perfTags.pid === undefined) {
+            throw "Perf tags did not start with spawn arguments"
+        }
         this.#perfTags.stdout.on("data", (chunk) => {
             this.#data += chunk;
             this.#dataCallback();
@@ -61,7 +68,7 @@ export default class PerfTags {
     }
 
     constructor(path, inputFileName, outputFileName, databaseDirectory, archiveDirectory) {
-        this.#path = path ?? "perftags.exe";
+        this.#path = path ?? `./${PerfTags.EXE_NAME}`;
         this.#inputFileName = inputFileName ?? "perf-input.txt";
         this.#outputFileName = outputFileName ?? "perf-output.txt";
         this.#databaseDirectory = databaseDirectory ?? "database/tag-pairings";
@@ -135,12 +142,16 @@ export default class PerfTags {
     async insertTaggables(taggables) {
         const resolveCurrentExecution = await this.__resolvePriorExecutions();
 
-        this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
-        await this.__writeToStdin("insert_taggables\r\n");
-        const result = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        const result = await this.__insertTaggables(taggables);
 
         resolveCurrentExecution();
         return result;
+    }
+
+    async __insertTaggables(taggables) {
+        this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
+        await this.__writeLineToStdin("insert_taggables");
+        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
     }
     
     /**
@@ -149,12 +160,16 @@ export default class PerfTags {
     async insertTags(tags) {
         const resolveCurrentExecution = await this.__resolvePriorExecutions();
 
-        this.__writeToInputFile(PerfTags.#serializeSingles(tags));
-        await this.__writeToStdin("insert_tags\r\n");
-        const result = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        const result = await this.__insertTags(tags);
 
         resolveCurrentExecution();
         return result;
+    }
+
+    async __insertTags(tags) {
+        this.__writeToInputFile(PerfTags.#serializeSingles(tags));
+        await this.__writeLineToStdin("insert_tags");
+        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
     }
 
     /**
@@ -184,8 +199,8 @@ export default class PerfTags {
     async insertTagPairings(tagPairings) {
         const resolveCurrentExecution = await this.__resolvePriorExecutions();
 
-        await this.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
-        await this.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
+        await this.__insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
+        await this.__insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         const result = await this.__insertTagPairings(tagPairings);
 
         resolveCurrentExecution();
@@ -197,8 +212,8 @@ export default class PerfTags {
      */
     async __insertTagPairings(tagPairings) {
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
-        await this.__writeToStdin("insert_tag_pairings\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("insert_tag_pairings");
+        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
     }
 
     /**
@@ -207,8 +222,8 @@ export default class PerfTags {
     async toggleTagPairings(tagPairings) {
         const resolveCurrentExecution = await this.__resolvePriorExecutions();
 
-        await this.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
-        await this.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
+        await this.__insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
+        await this.__insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         const result = await this.__toggleTagPairings(tagPairings);
 
         resolveCurrentExecution();
@@ -219,10 +234,9 @@ export default class PerfTags {
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     async __toggleTagPairings(tagPairings) {
-
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
-        await this.__writeToStdin("toggle_tag_pairings\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("toggle_tag_pairings");
+        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
     }
 
     /**
@@ -232,8 +246,8 @@ export default class PerfTags {
         const resolveCurrentExecution = await this.__resolvePriorExecutions();
 
         this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
-        this.#perfTags.stdin.write("delete_tag_pairings\r\n");
-        const result = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("delete_tag_pairings");
+        const result = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
 
         resolveCurrentExecution();
         return result;
@@ -246,8 +260,8 @@ export default class PerfTags {
         const resolveCurrentExecution = await this.__resolvePriorExecutions();
 
         this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
-        await this.__writeToStdin("read_taggables_tags\r\n");
-        const ok = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("read_taggables_tags");
+        const ok = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
         let taggablesTagsStr = this.__readFromOutputFile();
         /** @type {Map<bigint, bigint[]>} */
         const taggablePairings = new Map();
@@ -277,8 +291,8 @@ export default class PerfTags {
         const resolveCurrentExecution = await this.__resolvePriorExecutions();
         
         this.__writeToInputFile(Buffer.from(searchCriteria, 'binary'));
-        await this.__writeToStdin("search\r\n");
-        const ok = await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("search");
+        const ok = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
         let taggablesStr = this.__readFromOutputFile();
         /** @type {bigint[]} */
         const taggables = [];
@@ -370,13 +384,13 @@ export default class PerfTags {
     }
 
     async beginTransaction() {
-        await this.__writeToStdin("begin_transaction\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("begin_transaction");
+        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
     }
 
     async endTransaction() {
-        await this.__writeToStdin("end_transaction\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("end_transaction");
+        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
     }
 
     #exitCount = 0;
@@ -414,8 +428,8 @@ export default class PerfTags {
         }
         this.#closing = true;
 
-        await this.__writeToStdin("exit\r\n");
-        await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("exit");
+        await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
         this.#closed = true;
         return await this.__nonErrorExitOrTimeout(THIRTY_MINUTES);
     }
@@ -454,6 +468,13 @@ export default class PerfTags {
     /**
      * @param {string} data 
      */
+    async __writeLineToStdin(data) {
+        return await this.__writeToStdin(`${data}${PerfTags.NEWLINE}`);
+    }
+
+    /**
+     * @param {string} data 
+     */
     async __writeToStdin(data) {
 
         ++this.#stdinWrites;
@@ -470,10 +491,10 @@ export default class PerfTags {
     }
 
     async __flushAndPurgeUnusedFiles() {
-        await this.__writeToStdin("flush_files\r\n");
-        await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
-        await this.__writeToStdin("purge_unused_files\r\n");
-        return await this.__dataOrTimeout("OK!\r\n", THIRTY_MINUTES);
+        await this.__writeLineToStdin("flush_files");
+        await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        await this.__writeLineToStdin("purge_unused_files");
+        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
     }
 
     __kill() {

@@ -19,13 +19,13 @@ async function runInPracticeSuite(perfTags, directory) {
     mkdirSync(dirname(TEST_DEFAULT_PERF_INPUT), {recursive: true});
     for (let i = 0; i < practiceSuiteCommands.length; ++i) {
         const command = practiceSuiteCommands[i];
-        if (command === "exit\r\n") {
+        if (command === "exit\n" || command === "exit\r\n") {
             await perfTags.reopen();
             continue;
         }
         copyFileSync(path.join(directory, practiceSuiteInputs[i]), TEST_DEFAULT_PERF_INPUT);
-        perfTags.__writeToStdin(command);
-        await perfTags.__dataOrTimeout("OK!\r\n", 60000);
+        perfTags.__writeToStdin(command.replaceAll("\r\n", PerfTags.NEWLINE));
+        await perfTags.__dataOrTimeout(PerfTags.OK_RESULT, 60000);
     }
 }
 
@@ -38,7 +38,7 @@ const TESTS = {
         as it did not know it had been inserted from insertComplement
     */
     "in-practice-example-1": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await runInPracticeSuite(perfTags, "tests/in-practice-examples/in-practice-example-1");
     }
 };

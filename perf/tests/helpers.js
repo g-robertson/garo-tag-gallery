@@ -14,8 +14,9 @@ import { statSync } from "fs";
  * @returns {Map<bigint, bigint[]>}
  */
 
+export const TEST_DEFAULT_PERF_EXE = `./${PerfTags.EXE_NAME}`;
 export const TEST_DEFAULT_PERF_INPUT = "test-dir/perf-input.txt";
-export const TEST_DEFAULT_PERF_TAGS_ARGS = [TEST_DEFAULT_PERF_INPUT, "test-dir/perf-output.txt", "test-dir/database-dir", "test-dir/archive"];
+export const TEST_DEFAULT_PERF_TAGS_ARGS = [TEST_DEFAULT_PERF_EXE, TEST_DEFAULT_PERF_INPUT, "test-dir/perf-output.txt", "test-dir/database-dir", "test-dir/archive"];
 
 export function getPairingsFromStrPairings(strTagPairings) {
     const output = new Map();

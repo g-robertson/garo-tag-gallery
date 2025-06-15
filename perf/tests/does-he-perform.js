@@ -10,7 +10,7 @@ import { getAllFileEntries } from "../../src/util.js";
  */
 const TESTS = {
     "read_file_tags": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         await perfTags.insertTagPairings(tagPairings);
         const {ok, taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
@@ -26,11 +26,11 @@ const TESTS = {
         }
     },
     "read_file_tags_after_exit": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         await perfTags.insertTagPairings(tagPairings);
         await perfTags.close();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
         const strTaggablePairings = getStrPairingsFromPairings(taggablePairings);
         if (strTaggablePairings['tgbl0001'] === undefined) {
@@ -47,11 +47,11 @@ const TESTS = {
         }
     },
     "read_file_tags_after_kill": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         await perfTags.insertTagPairings(tagPairings);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
         const strTaggablePairings = getStrPairingsFromPairings(taggablePairings);
         if (strTaggablePairings['tgbl0001'] === undefined) {
@@ -68,7 +68,7 @@ const TESTS = {
         }
     },
     "insert_tags between toggle tag pairings should not cause problem": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         await perfTags.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
         await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
@@ -85,7 +85,7 @@ const TESTS = {
         }
     },
     "read_toggled_tag_pairings": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n,4n]]]));
 
         await perfTags.toggleTagPairings(tagPairings);
@@ -99,13 +99,13 @@ const TESTS = {
         }
     },
     "read_toggled_tag_pairings_after_exit": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n,4n]]]));
 
         await perfTags.toggleTagPairings(tagPairings);
         await perfTags.toggleTagPairings(tagPairings);
         await perfTags.close();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
         if (taggablePairings.get(1n) === undefined) {
             throw "Taggable pairings does not have taggable 1";
@@ -115,13 +115,13 @@ const TESTS = {
         }
     },
     "read_toggled_tag_pairings_after_kill": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n,4n]]]));
 
         await perfTags.toggleTagPairings(tagPairings);
         await perfTags.toggleTagPairings(tagPairings);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
         if (taggablePairings.get(1n) === undefined) {
             throw "Taggable pairings does not have taggable 1";
@@ -131,7 +131,7 @@ const TESTS = {
         }
     },
     "read_toggled_tag_pairings_complex": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         const tagPairings2 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00003','tag00005','tag00007']}));
         const tagPairings3 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00007']}));
@@ -154,19 +154,19 @@ const TESTS = {
         }
     },
     "read_toggled_tag_pairings_complex_with_exits": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         const tagPairings2 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00003','tag00005','tag00007']}));
         const tagPairings3 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00007']}));
         await perfTags.toggleTagPairings(tagPairings);
         await perfTags.close();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings2);
         await perfTags.close();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings3);
         await perfTags.close();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
         const strTaggablePairings = getStrPairingsFromPairings(taggablePairings);
         if (strTaggablePairings['tgbl0001'] === undefined) {
@@ -183,19 +183,19 @@ const TESTS = {
         }
     },
     "read_toggled_tag_pairings_complex_with_kills": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         const tagPairings2 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00003','tag00005','tag00007']}));
         const tagPairings3 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00007']}));
         await perfTags.toggleTagPairings(tagPairings);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings2);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings3);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
         const strTaggablePairings = getStrPairingsFromPairings(taggablePairings);
         if (strTaggablePairings['tgbl0001'] === undefined) {
@@ -212,26 +212,26 @@ const TESTS = {
         }
     },
     "read_toggled_tag_pairings_complex_with_kills_and_additional_file": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         const tagPairings2 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00003','tag00005','tag00007']}));
         const tagPairings3 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00007']}));
         const tagPairings4 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0002': ['tag00001','tag00033','tag00052','tag00071']}));
         await perfTags.toggleTagPairings(tagPairings);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings2);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings3);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.toggleTagPairings(tagPairings4);
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
         perfTags.__kill();
-        perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         let {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
         let strTaggablePairings = getStrPairingsFromPairings(taggablePairings);
         if (strTaggablePairings['tgbl0001'] === undefined) {
@@ -264,7 +264,7 @@ const TESTS = {
         }
     },
     "read_deleted_tag_pairings": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         const tagPairings2 = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00003']}));
         await perfTags.insertTagPairings(tagPairings);
@@ -284,7 +284,7 @@ const TESTS = {
         }
     },
     "complements_make_size_smaller": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const strTaggablePairings = {};
         let totalTaggableCount = 200;
         let totalTagCount = 8000;
@@ -317,7 +317,7 @@ const TESTS = {
         }
     },
     "search_functions_correctly": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.insertTagPairings(new Map([
             [1n, [1n,2n,3n]],
             [2n, [2n,3n,4n,5n]]
@@ -333,7 +333,7 @@ const TESTS = {
     },
     "search_union_functions_correctly": async (createPerfTags) => {
         appendFileSync("test-err.log", "Problem run started:\r\n");
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.insertTagPairings(new Map([
             [1n, [1n,2n,3n]],
             [2n, [2n,3n,4n,5n]]
@@ -351,7 +351,7 @@ const TESTS = {
         }
     },
     "search_intersect_functions_correctly": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.insertTagPairings(new Map([
             [1n, [1n,2n,3n]],
             [2n, [2n,3n,4n,5n]]
@@ -367,7 +367,7 @@ const TESTS = {
     },
     "search_complex_1_functions_correctly": async (createPerfTags) => {
             appendFileSync("test-err.log", "START BAD RUN\r\n");
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.insertTagPairings(new Map([
             [1n, [1n,2n,3n]],
             [2n, [2n,3n,4n,5n]],
@@ -390,7 +390,7 @@ const TESTS = {
         }
     },
     "search_complex_2_functions_correctly": async (createPerfTags) => {
-        let perfTags = createPerfTags("perftags.exe", ...TEST_DEFAULT_PERF_TAGS_ARGS);
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.insertTagPairings(new Map([
             [1n, [1n,2n,3n]],
             [2n, [2n,3n,4n,5n]],

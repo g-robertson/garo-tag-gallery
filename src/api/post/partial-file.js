@@ -15,6 +15,7 @@ export async function validate(dbs, req, res) {
     if (req?.files?.length > 1) {
         return "More than one file is not allowed to be uploaded at a time";
     }
+    const file = req.files[0];
 
     const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadFolder));
     if (!partialUploadFolderRootedPath.isRooted) {
@@ -27,7 +28,6 @@ export async function validate(dbs, req, res) {
         return "Partial upload file path was not rooted in partial-zips";
     }
     const partialUploadFileSafePath = partialUploadFileRootedPath.safePath;
-    const file = req.files[0];
 
     req.sanitizedBody = {
         partialUploadFolderSafePath,

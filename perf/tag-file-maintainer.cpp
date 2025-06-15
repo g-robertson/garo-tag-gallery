@@ -136,13 +136,13 @@ void TagFileMaintainer::modifyTaggables(std::string_view input, void (SingleBuck
 }
 
 void TagFileMaintainer::insertTaggables(std::string_view input) {
-    modifyTaggables(input, SingleBucket::insertItem);
+    modifyTaggables(input, &SingleBucket::insertItem);
 }
 void TagFileMaintainer::toggleTaggables(std::string_view input) {
-    modifyTaggables(input, SingleBucket::toggleItem);
+    modifyTaggables(input, &SingleBucket::toggleItem);
 }
 void TagFileMaintainer::deleteTaggables(std::string_view input) {
-    modifyTaggables(input, SingleBucket::deleteItem);
+    modifyTaggables(input, &SingleBucket::deleteItem);
 }
 void TagFileMaintainer::readTaggables(void (*writer)(const std::string&)) {
     writer(serializeSingles(taggableBucket->contents()));
@@ -166,13 +166,13 @@ void TagFileMaintainer::modifyTags(std::string_view input, void (SingleBucket::*
 }
 
 void TagFileMaintainer::insertTags(std::string_view input) {
-    modifyTags(input, SingleBucket::insertItem);
+    modifyTags(input, &SingleBucket::insertItem);
 }
 void TagFileMaintainer::toggleTags(std::string_view input) {
-    modifyTags(input, SingleBucket::toggleItem);
+    modifyTags(input, &SingleBucket::toggleItem);
 }
 void TagFileMaintainer::deleteTags(std::string_view input) {
-    modifyTags(input, SingleBucket::deleteItem);
+    modifyTags(input, &SingleBucket::deleteItem);
 }
 void TagFileMaintainer::readTags(void (*writer)(const std::string&)) {
     writer(serializeSingles(tagBucket->contents()));
@@ -209,15 +209,15 @@ void TagFileMaintainer::modifyPairings(std::string_view input, void (PairingBuck
 }
 
 void TagFileMaintainer::insertPairings(std::string_view input) {
-    modifyPairings(input, PairingBucket::insertItem);
+    modifyPairings(input, &PairingBucket::insertItem);
 }
 
 void TagFileMaintainer::togglePairings(std::string_view input) {
-    modifyPairings(input, PairingBucket::toggleItem);
+    modifyPairings(input, &PairingBucket::toggleItem);
 }
 
 void TagFileMaintainer::deletePairings(std::string_view input) {
-    modifyPairings(input, PairingBucket::deleteItem);
+    modifyPairings(input, &PairingBucket::deleteItem);
 }
 
 void TagFileMaintainer::readTaggablesTags(std::string_view input, void (*writer)(const std::string&)) {

@@ -6,18 +6,21 @@ import migrate from "./src/migrations/migrate.js";
 import { getDefaultAdminUser, getUserByAccessKey } from './src/db/user.js';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { appendFileSync, readdirSync, renameSync } from 'fs';
+import { appendFileSync, mkdirSync, readdirSync } from 'fs';
 import { PERMISSIONS } from './src/client/js/user.js';
 import PerfTags from './src/perf-tags-binding/perf-tags.js';
 import { randomBytes } from 'crypto';
-import { extractFirstFrameWithFFMPEG, rootedPath } from './src/util.js';
+import { rootedPath } from './src/util.js';
 import multer from 'multer';
 import { FileStorage } from './src/db/file-storage.js';
-import { dbget, dbrun } from './src/db/db-util.js';
 /** @import {User} from "./src/client/js/user.js" */
 /** @import {APIEndpoint} from "./src/api/api-types.js" */
 
 const ONE_YEAR = 86400000 * 365;
+
+mkdirSync("database", {recursive: true});
+mkdirSync("partial-zips", {recursive: true});
+mkdirSync("tmp", {recursive: true});
 
 async function main() {
   const dbs = {
@@ -27,7 +30,7 @@ async function main() {
       }
     }),
     // .\perf\perftags.exe database/perf-input.txt database/perf-output.txt database/perf-tags
-    perfTags: new PerfTags("perf/perftags.exe", "database/perf-input.txt", "database/perf-output.txt", "database/perf-tags", "archive-commands"),
+    perfTags: new PerfTags(`perf/${PerfTags.EXE_NAME}`, "database/perf-input.txt", "database/perf-output.txt", "database/perf-tags", "archive-commands"),
     fileStorage: new FileStorage("database/file-storage")
   };
 
@@ -41,7 +44,6 @@ async function main() {
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA synchronous = NORMAL;", () => resolve()));
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA cache_size = 250000;", () => resolve()));
   await new Promise(resolve => dbs.sqlite3.run("PRAGMA mmap_size=100000000;", () => resolve()));
-  
 
   await migrate(dbs);
 
