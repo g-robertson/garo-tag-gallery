@@ -32,12 +32,12 @@ export async function checkPermission(dbs, req, res) {
 /** @type {APIFunction} */
 export default async function get(dbs, req, res) {
     const tags = await UserFacingLocalTags.selectManyByLocalTagServiceIDs(dbs, req.sanitizedBody.localTagServiceIDs);
-
     return res.status(200).send(JSON.stringify(tags.map(tag => [
         tag.Local_Tag_ID,
         tag.Local_Tag_Service_ID,
         tag.Display_Name,
         tag.Tag_Name,
-        tag.Namespaces
+        tag.Namespaces,
+        tag.Tag_Count
     ])));
 }

@@ -42,7 +42,7 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, onTagsSe
                         displayName: SYSTEM_LOCAL_TAG_SERVICE.Service_Name
                     }
                 ]} onOptionsChange={async (optionsSelected) => {
-                    setTags(await getTagsFromLocalTagServiceIDs(optionsSelected.map(option => Number(option))));
+                    setTags((await getTagsFromLocalTagServiceIDs(optionsSelected.map(option => Number(option)))).sort((a, b) => b.tagCount - a.tagCount));
                 }}/>
             </div>
             Select Tags:
@@ -93,7 +93,8 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, onTagsSe
                     onValuesDoubleClicked={(valuesSelected) => {
                         onTagsSelected(valuesSelected, isExcludeOn);
                     }}
-                    customTitleRealizer={(value) => value.displayName}
+                    customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== undefined ? ` (${realizedValue.tagCount})` : ""}</>}
+                    customTitleRealizer={(realizedValue) => realizedValue.displayName}
                     multiSelect={multiSelect}
                 />
             </div>

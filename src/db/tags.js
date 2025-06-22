@@ -201,7 +201,9 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
     const tagsNamespaces = new Map(dbUserFacingLocalTags.map(dbUserFacingLocalTag => [dbUserFacingLocalTag.Tag_ID, []]));
     for (const {Tag_ID, Namespace_Name} of await TagsNamespaces.selectMappedByTagIDs(dbs, dbUserFacingLocalTags.map(tag => tag.Tag_ID))) {
         tagsNamespaces.get(Tag_ID).push(Namespace_Name);
-    }    
+    }
+
+    const {tagsTaggableCounts} = await dbs.perfTags.readTagsTaggableCounts(dbUserFacingLocalTags.map(dbUserFacingLocalTag => dbUserFacingLocalTag.Tag_ID));
 
     return dbUserFacingLocalTags.map(dbUserFacingLocalTag => {
         let {Display_Name} = dbUserFacingLocalTag;
@@ -215,7 +217,8 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
         return {
             ...dbUserFacingLocalTag,
             Namespaces,
-            Display_Name
+            Display_Name,
+            Tag_Count: tagsTaggableCounts.get(dbUserFacingLocalTag.Tag_ID)
         }
     });
 }

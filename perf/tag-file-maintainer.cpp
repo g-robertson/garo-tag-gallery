@@ -285,6 +285,29 @@ void TagFileMaintainer::deletePairings(std::string_view input) {
     modifyPairings(input, &PairingBucket::deleteItem);
 }
 
+void TagFileMaintainer::readTagsTaggableCounts(std::string_view input, void (*writer)(const std::string&)) {
+    std::string output;
+    std::size_t location = 0;
+    
+    if (input.size() % 8 != 0) {
+        throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
+    }
+    while (input.size() > 0) {
+        uint64_t tag = util::deserializeUInt64(input);
+        input = input.substr(8);
+        auto& tagBucket = getTagBucket(tag);
+        const auto* tagsTaggables = tagBucket.firstContents(tag);
+        util::serializeUInt64(tag, output, location);
+        if (tagsTaggables != nullptr) {
+            util::serializeUInt64(tagsTaggables->size(), output, location);
+        } else {
+            util::serializeUInt64(0, output, location);
+        }
+    }
+
+    writer(output);
+}
+
 void TagFileMaintainer::readTaggablesTags(std::string_view input, void (*writer)(const std::string&)) {
     std::string output;
     std::size_t location = 0;

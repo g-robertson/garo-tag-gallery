@@ -96,7 +96,6 @@ export class JobManager {
         }
 
         job.addOnFinishCallback(job => {
-            console.log(runnerJobs.has(job));
             runnerJobs.delete(job);
         });
 

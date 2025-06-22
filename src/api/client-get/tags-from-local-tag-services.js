@@ -8,6 +8,7 @@ import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
  * @property {string} tagName
  * @property {string} displayName
  * @property {string[]} namespaces
+ * @property {number} tagCount
  */
 
 /** @type {Map<number, ClientTag[]} */
@@ -38,7 +39,8 @@ export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs) 
             localTagServiceID: tag[1],
             displayName: tag[2],
             tagName: tag[3],
-            namespaces: tag[4]
+            namespaces: tag[4],
+            tagCount: tag[5]
         }));
 
         for (const localTagServiceID of localTagServiceIDsUncached) {

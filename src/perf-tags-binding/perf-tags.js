@@ -337,6 +337,30 @@ export default class PerfTags {
     }
 
     /**
+     * @param {bigint[]} tags 
+     */
+    async readTagsTaggableCounts(tags) {
+        await this.#readMutex.acquire();
+
+        await this.__writeToReadInputFile(PerfTags.#serializeSingles(tags));
+        await this.__writeLineToStdin("read_tags_taggable_counts");
+        const ok = await this.__dataOrTimeout(PerfTags.READ_OK_RESULT, 1000);
+        let tagsTaggableCountsStr = await this.__readFromOutputFile();
+        /** @type {Map<bigint, number>} */
+        const tagsTaggableCounts = new Map();
+        for (let i = 0; i < tagsTaggableCountsStr.length;) {
+            const tag = tagsTaggableCountsStr.readBigUInt64BE(i);
+            i += 8;
+            const taggableCount = Number(tagsTaggableCountsStr.readBigUInt64BE(i));
+            i += 8;
+            tagsTaggableCounts.set(tag, taggableCount);
+        }
+
+        this.#readMutex.release();
+        return {ok, tagsTaggableCounts};
+    }
+
+    /**
      * @param {bigint[]} taggables
      */
     async readTaggablesTags(taggables) {
