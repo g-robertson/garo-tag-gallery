@@ -4,6 +4,7 @@ import { User } from '../js/user.js';
 import { clamp } from '../../js/client-util.js';
 import LocalMetricServiceSelector from '../../components/local-metric-service-selector.jsx';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
+import { METRIC_TYPES } from '../../js/metrics.js';
 
 function clampServiceType(metricType) {
     if (isNaN(metricType)) {
@@ -52,12 +53,6 @@ function clampPrecision(metricType, precision) {
         return clamp(precision, 0, 9);
     }
 }
-
-const METRIC_TYPES = {
-    NUMERIC: 0,
-    INCDEC: 1,
-    STARS: 2
-};
 
 /** 
  * @param {{

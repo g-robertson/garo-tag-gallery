@@ -1,7 +1,6 @@
-import { appendFile, appendFileSync, statSync } from "fs";
+import { statSync } from "fs";
 import { strTaggablePairingsToStrTagPairings, getPairingsFromStrPairings, getStrPairingsFromPairings, TEST_DEFAULT_PERF_TAGS_ARGS, getTotalDirectoryBytes, TEST_DEFAULT_DATABASE_DIR } from "./helpers.js";
 import PerfTags from "../../src/perf-tags-binding/perf-tags.js"
-import { getAllFileEntries } from "../../src/util.js";
 /** @import {TestFunction} from "./helpers.js" */
 
 
@@ -437,7 +436,7 @@ const TESTS = {
         // * 9 inside for 64 bit entries + complement bit
         // * 2 in addition to that as wiggle room
         const MAX_ACCEPTABLE_FILE_SIZE = (9 * (totalTaggableCount + totalTagCount) * 2) * 2;
-        const realDirectorySize = getTotalDirectoryBytes("test-dir/database-dir");
+        const realDirectorySize = await getTotalDirectoryBytes("test-dir/database-dir");
         if (realDirectorySize > MAX_ACCEPTABLE_FILE_SIZE) {
             throw `Directory size with only completely dense tags was ${realDirectorySize} bytes > ${MAX_ACCEPTABLE_FILE_SIZE} bytes indicating that complements are not implemented`;
         }
@@ -595,6 +594,58 @@ const TESTS = {
          || taggables.indexOf(8n) === -1) {
             throw "Taggable search did not return taggable 1, 5, 6, 7, or 8";
         }
+    },
+    "cache_file_should_be_either_prior_or_present": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        // make taggable with excessively overloaded tags to make it complement
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n]]])));
+        // force flush to go from write ahead file to db file
+        await perfTags.__flushAndPurgeUnusedFiles();
+        // cache file = 1 -> 1-10, db file => 1 -> 1-10
+        perfTags.__kill();
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [11n, 12n, 13n, 14n,]]])));
+        // cache file is 1 -> 1-14, but db file is 1 -> 1-10
+        // if we crash here, in between, it could think cache file is 1-14, when in reality the only two valid states to return to are 1 => 1-10 or 1 => 1-15
+        // so we need to write the cache file back to 1 -> 1-10 before writing the .ta file
+        // override to fail between writing complement pairings and singles
+        await perfTags.__override("fail_tags_insert_between_pairings_and_singles_writes");
+        // add another tag but with failure mode on, should cause mismatch between cache file being 1-14, but tbd file only containing 1-10
+        perfTags.__expectError();
+        const result = await perfTags.insertTags([15n]);
+        // if passed, then the override didn't work
+        if (result === true) {
+            throw "Override for failure did not cause failure";
+        }
+
+        // reopen perfTags
+        perfTags.__kill();
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        // read tags should yield 1 => 1-10 cache variant
+        const {taggablePairings} = await perfTags.readTaggablesTags([1n]);
+        if (taggablePairings.size != 1
+         || taggablePairings.get(1n).length !== 10
+         || taggablePairings.get(1n).indexOf(1n) === -1
+         || taggablePairings.get(1n).indexOf(2n) === -1
+         || taggablePairings.get(1n).indexOf(3n) === -1
+         || taggablePairings.get(1n).indexOf(4n) === -1
+         || taggablePairings.get(1n).indexOf(5n) === -1
+         || taggablePairings.get(1n).indexOf(6n) === -1
+         || taggablePairings.get(1n).indexOf(7n) === -1
+         || taggablePairings.get(1n).indexOf(8n) === -1
+         || taggablePairings.get(1n).indexOf(9n) === -1
+         || taggablePairings.get(1n).indexOf(10n) === -1
+        ) {
+            throw "Could not find one of the assigned taggable's tags"
+        }
+    },
+    "cache_file_should_not_revert_to_empty": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.__override("fail_tags_insert_between_pairings_and_singles_writes");
+        perfTags.__expectError();
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n]]])));
+        perfTags.__kill();
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
     }
 };
 export default TESTS;

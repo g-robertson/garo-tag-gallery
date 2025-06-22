@@ -76,8 +76,10 @@ class TagFileMaintainer {
         bool needsMaintenance();
         void doMaintenance();
         void close();
-    private:
+    protected:
         void readCacheFile();
+        std::string priorCacheFile = "";
+        void writePriorCacheFile();
         void writeCacheFile();
         std::pair<std::string_view, SetEvaluation> search_(std::string_view input);
         unsigned short getBucketIndex(uint64_t item) const;

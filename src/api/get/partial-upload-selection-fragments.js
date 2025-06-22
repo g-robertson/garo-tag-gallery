@@ -1,5 +1,3 @@
-import {readdirSync} from "fs";
-
 /**
  * @import {APIFunction} from "../api-types.js"
  */
@@ -8,6 +6,7 @@ import { PERMISSIONS } from "../../client/js/user.js";
 import path from "path";
 import { rootedPath } from "../../util.js";
 import { z } from "zod";
+import { readdir } from "fs/promises";
 
 export async function validate(dbs, req, res) {
     const partialUploadFolder = z.string().nonempty().max(40).safeParse(req?.query?.partialUploadFolder, {path: ["partialUploadFolder"]});
@@ -34,7 +33,7 @@ export async function checkPermission(dbs, req, res) {
 export default async function get(dbs, req, res) {
     let dirContents = [];
     try {
-        dirContents = readdirSync(req.sanitizedBody.partialUploadFolderSafePath);
+        dirContents = await readdir(req.sanitizedBody.partialUploadFolderSafePath);
     } catch (err) {} // Nothing we can do about a non-existent directory
     res.send(dirContents);
 }

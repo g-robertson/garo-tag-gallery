@@ -8,9 +8,10 @@ import { useState } from "react";
  * @returns 
  */
 export const OnFormSubmit = ({onFormSubmit}) => {
+    onFormSubmit ??= () => {};
     const [firstLoad, setFirstLoad] = useState(true);
 
-    return <iframe name="frame" style={{display: "none"}} onLoad={(e) => {
+    return <iframe id="frame" name="frame" style={{display: "none"}} onLoad={(e) => {
         if (firstLoad) {
             setFirstLoad(false);
         } else {

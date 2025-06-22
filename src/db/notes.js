@@ -51,7 +51,7 @@ export async function addNotesToTaggables(dbs, taggableNotePairings) {
         ) VALUES ${dbtuples(3, taggableNotesInsertionParams.length / 3)} RETURNING *;
     `, taggableNotesInsertionParams));
 
-    await dbs.perfTags.insertTagPairings(new Map([HAS_NOTES_TAG.Tag_ID, [...taggableIDsWithNotes]]));
+    await dbs.perfTags.insertTagPairings(new Map([HAS_NOTES_TAG.Tag_ID, [...taggableIDsWithNotes]]), dbs.inTransaction);
 
     return taggableNotes.map(taggableNote => ({
         ...taggableNote,

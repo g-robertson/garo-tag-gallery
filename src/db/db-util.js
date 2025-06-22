@@ -2,13 +2,19 @@ import sqlite3 from "sqlite3";
 import crypto from "crypto";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import { FileStorage } from "./file-storage.js";
+import { JobManager } from "./job-manager.js";
+import { Mutex } from "async-mutex";
 
 /**
  * @typedef {0 | 1} DBBoolean
  * @typedef {Object} Databases
  * @property {sqlite3.Database} sqlite3
+ * @property {Mutex} sqlMutex
+ * @property {Mutex} sqlTransactionMutex
  * @property {PerfTags} perfTags
+ * @property {Mutex} perfTagsMutex
  * @property {FileStorage} fileStorage
+ * @property {JobManager} jobManager
  */
 
 /**
@@ -17,11 +23,21 @@ import { FileStorage } from "./file-storage.js";
  * @param {any} params
  */
 export async function dbrun(dbs, sql, params) {
+    if (dbs.inTransaction !== true) {
+        await dbs.sqlTransactionMutex.acquire();
+    }
+    await dbs.sqlMutex.acquire();
+
     const err = await new Promise(resolve => {
         dbs.sqlite3.run(sql, params, err => {
             resolve(err);
         });
     });
+
+    dbs.sqlMutex.release();
+    if (dbs.inTransaction !== true) {
+        dbs.sqlTransactionMutex.release();
+    }
 
     if (err !== null) {
         Error.captureStackTrace(err);
@@ -31,18 +47,22 @@ export async function dbrun(dbs, sql, params) {
     return;
 }
 
+
 /**
- * 
  * @param {Databases} dbs
  * @param {string} sql 
  * @param {any} params
  */
-export async function dbget(dbs, sql, params) {
+export async function dbgetselect(dbs, sql, params) {
+    await dbs.sqlMutex.acquire();
+
     const {err, row} = await new Promise(resolve => {
         dbs.sqlite3.get(sql, params, (err, row) => {
             resolve({err, row});
         });
     });
+
+    dbs.sqlMutex.release();
 
     if (err !== null) {
         Error.captureStackTrace(err);
@@ -53,17 +73,80 @@ export async function dbget(dbs, sql, params) {
 }
 
 /**
- * 
  * @param {Databases} dbs
  * @param {string} sql 
  * @param {any} params
  */
-export async function dball(dbs, sql, params) {
+export async function dbget(dbs, sql, params) {
+    if (dbs.inTransaction !== true) {
+        await dbs.sqlTransactionMutex.acquire();
+    }
+    await dbs.sqlMutex.acquire();
+
+    const {err, row} = await new Promise(resolve => {
+        dbs.sqlite3.get(sql, params, (err, row) => {
+            resolve({err, row});
+        });
+    });
+
+    dbs.sqlMutex.release();
+    if (dbs.inTransaction !== true) {
+        dbs.sqlTransactionMutex.release();
+    }
+
+    if (err !== null) {
+        Error.captureStackTrace(err);
+        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
+    }
+
+    return row;
+}
+
+/**
+ * @param {Databases} dbs 
+ * @param {string} sql 
+ * @param {any} params 
+ */
+export async function dballselect(dbs, sql, params) {
+    await dbs.sqlMutex.acquire();
+
     const {err, rows} = await new Promise(resolve => {
         dbs.sqlite3.all(sql, params, (err, rows) => {
             resolve({err, rows});
         });
     });
+
+    dbs.sqlMutex.release();
+
+    if (err !== null) {
+        Error.captureStackTrace(err);
+        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
+    }
+
+    return rows;
+}
+
+/**
+ * @param {Databases} dbs
+ * @param {string} sql 
+ * @param {any} params
+ */
+export async function dball(dbs, sql, params) {
+    if (dbs.inTransaction !== true) {
+        await dbs.sqlTransactionMutex.acquire();
+    }
+    await dbs.sqlMutex.acquire();
+
+    const {err, rows} = await new Promise(resolve => {
+        dbs.sqlite3.all(sql, params, (err, rows) => {
+            resolve({err, rows});
+        });
+    });
+
+    dbs.sqlMutex.release();
+    if (dbs.inTransaction !== true) {
+        dbs.sqlTransactionMutex.release();
+    }
 
     if (err !== null) {
         Error.captureStackTrace(err);
@@ -104,16 +187,24 @@ export function dbtuples(rows, columns) {
  * @param {Databases} dbs 
  */
 export async function dbBeginTransaction(dbs) {
+    await dbs.sqlTransactionMutex.acquire();
+    dbs = {
+        ...dbs,
+        inTransaction: true
+    };
     await dbrun(dbs, "BEGIN TRANSACTION;");
-    dbs.currentTransaction = (await dbs.perfTags.beginTransaction()).resolveFn;
+    await dbs.perfTags.beginTransaction();
+
+    return dbs;
 }
 
 /**
  * @param {Databases} dbs 
  */
 export async function dbEndTransaction(dbs) {
-    await dbs.perfTags.endTransaction(dbs.currentTransaction);
+    await dbs.perfTags.endTransaction();
     await dbrun(dbs, "COMMIT;");
+    dbs.sqlTransactionMutex.release();
 }
 
 export function dbsqlcommand(sql, params) {

@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { importFilesFromHydrus } from "../../db/import.js";
+import { importFilesFromHydrusJob } from "../../db/import.js";
 import { LocalTaggableServices } from "../../db/taggables.js";
 import { LocalTagServices } from "../../db/tags.js";
 
@@ -50,16 +50,12 @@ export async function checkPermission() {
 
 /** @type {APIFunction} */
 export default async function post(dbs, req, res) {
-    const err = await importFilesFromHydrus(
+    dbs.jobManager.addJobToRunner(req.user.id(), importFilesFromHydrusJob(
         dbs,
         req.sanitizedBody.partialUploadPath,
         req.sanitizedBody.partialFilePaths,
         req.sanitizedBody.localTagService,
         req.sanitizedBody.localTaggableService
-    );
-    if (err === undefined) {
-        res.status(200).send("Finished retrieving file");
-    } else {
-        res.status(400).send(err);
-    }
+    ));
+    res.status(200).send("Summoned job");
 }

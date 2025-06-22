@@ -21,7 +21,7 @@ import Scrollbar from './scrollbar.jsx';
  *  valuesRealizer: (values: T[]) => R
  *  valueRealizationRange?: number
  *  valueRealizationDelay?: number
- *  customItemComponent?: (param0: {realizedValue: Awaited<R>, width: number, height: number}) => JSX.Element
+ *  customItemComponent?: (param0: {realizedValue: Awaited<R>, setRealizedValue: (realizedValue: Awaited<R> => void) width: number, height: number}) => JSX.Element
  *  customTitleRealizer?: (realizedValue: Awaited<R>) => string,
  *  itemWidth: number | "100%"
  *  itemHeight: number | "100%"
@@ -487,7 +487,11 @@ function LazySelector({
                                                 onValuesDoubleClicked(realizedValuesDoubleClicked);
                                              }}
                                         >
-                                            {customItemComponent({realizedValue})}
+                                            {customItemComponent({realizedValue, setRealizedValue: (realizedValue) => {
+                                                realizedValues[itemIndex] = realizedValue;
+                                                console.log("realizing");
+                                                setRealizedValues([...realizedValues]);
+                                            }})}
                                         </div>
                                     );
                                 }

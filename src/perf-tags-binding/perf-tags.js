@@ -1,7 +1,11 @@
 import { spawn } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync } from 'fs';
 import path from 'path';
 import { serializeUint64 } from '../client/js/client-util.js';
+import { Mutex } from 'async-mutex';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+
+/** @import {Databases} from "../db/db-util.js" */
 
 const THIRTY_MINUTES = 30 * 60 * 1000;
 
@@ -10,36 +14,42 @@ export default class PerfTags {
     #closing = false;
     #perfTags;
     #path;
-    #inputFileName;
-    #outputFileName;
+    #writeInputFileName;
+    #readInputFileName;
+    #writeOutputFileName;
+    #readOutputFileName;
     #databaseDirectory;
     #archiveDirectory;
     #stdinWrites = 0;
     #data = "";
-
-    #promises = [];
+    #writeMutex = new Mutex();
+    #readMutex = new Mutex();
+    #unflushedData = false;
 
     static EXE_NAME = process.platform === "win32" ? "perftags.exe" : "perftags";
     static NEWLINE = process.platform === "win32" ? "\r\n" : "\n";
-    static OK_RESULT = `OK!${PerfTags.NEWLINE}`;
+    static WRITE_OK_RESULT = `WRITE_OK!${PerfTags.NEWLINE}`;
+    static READ_OK_RESULT = `READ_OK!${PerfTags.NEWLINE}`;
 
     __open() {
         this.#closed = false;
         this.#closing = false;
-        this.#perfTags = spawn(this.#path, [this.#inputFileName, this.#outputFileName, this.#databaseDirectory]);
+        this.#perfTags = spawn(this.#path, [this.#writeInputFileName, this.#writeOutputFileName, this.#readInputFileName, this.#readOutputFileName, this.#databaseDirectory]);
         if (this.#perfTags.pid === undefined) {
             throw "Perf tags did not start with spawn arguments"
         }
         this.#perfTags.stdout.on("data", (chunk) => {
             this.#data += chunk;
-            this.#dataCallback();
+            for (const dataCallback of this.#dataCallbacks) {
+                dataCallback();  
+            }
         });
 
         this.#perfTags.stderr.on("data", (chunk) => {
             for (const listener of this.#stderrListeners) {
                 listener(chunk);
             }
-        })
+        });
 
         this.#perfTags.on("error", () => {
             ++this.#errorCount;
@@ -53,27 +63,33 @@ export default class PerfTags {
 
             this.#closed = true;
             ++this.#exitCount;
-            this.#dataCallback();
+            for (const dataCallback of this.#dataCallbacks) {
+                dataCallback();  
+            }
             this.#exitCallback();
         });
+
+        setInterval(async () => {
+            if (this.#unflushedData && !this.#closed) {
+                await this.flushData();
+            }
+        }, 15000);
     }
 
     async reopen() {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
-
         await this.close();
         this.__open();
-
-        resolveCurrentExecution();
     }
 
-    constructor(path, inputFileName, outputFileName, databaseDirectory, archiveDirectory) {
+    constructor(path, writeInputFileName, writeOutputFileName, readInputFileName, readOutputFileName, databaseDirectory, archiveDirectory) {
         this.#path = path ?? `./${PerfTags.EXE_NAME}`;
-        this.#inputFileName = inputFileName ?? "perf-input.txt";
-        this.#outputFileName = outputFileName ?? "perf-output.txt";
+        this.#writeInputFileName = writeInputFileName ?? "perf-write-input.txt";
+        this.#writeOutputFileName = writeOutputFileName ?? "perf-write-output.txt";
+        this.#readInputFileName = readInputFileName ?? "perf-read-input.txt";
+        this.#readOutputFileName = readOutputFileName ?? "perf-read-output.txt";
         this.#databaseDirectory = databaseDirectory ?? "database/tag-pairings";
         this.#archiveDirectory = archiveDirectory;
-        
+
         this.__open();
     }
 
@@ -97,9 +113,8 @@ export default class PerfTags {
         });
     };
 
-    #dataCallback = () => {}
+    #dataCallbacks = [];
     /**
-     * 
      * @param {string} data 
      * @param {number} timeout 
      * @returns {Promise<boolean>}
@@ -110,17 +125,26 @@ export default class PerfTags {
                 resolve(false);
             }, timeout);
 
-            this.#dataCallback = () => {
+            const myDataCallback = () => {
                 if (this.#data.startsWith(data)) {
                     this.#data = this.#data.slice(data.length);
+                    // delete self from data callbacks
+                    const callbackIndex = this.#dataCallbacks.findIndex(callback => callback === myDataCallback);
+                    if (callbackIndex !== -1) {
+                        this.#dataCallbacks.splice(callbackIndex, 1);
+                    }
                     clearTimeout(timeoutHandle);
+                    for (const dataCallback of this.#dataCallbacks) {
+                        dataCallback();
+                    }
                     resolve(true);
                 } else if (this.#closed) {
                     clearTimeout(timeoutHandle);
                     resolve(false);
                 }
             };
-            this.#dataCallback();            
+            this.#dataCallbacks.push(myDataCallback);
+            myDataCallback();          
         });
     }
 
@@ -138,38 +162,50 @@ export default class PerfTags {
 
     /**
      * @param {bigint[]} taggables 
+     * @param {boolean=} inTransaction
      */
-    async insertTaggables(taggables) {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+    async insertTaggables(taggables, inTransaction = false) {
+        if (!inTransaction) {
+            await this.#writeMutex.acquire();
+        }
 
         const result = await this.__insertTaggables(taggables);
+        this.#unflushedData = true;
 
-        resolveCurrentExecution();
+        if (!inTransaction) {
+            this.#writeMutex.release();
+        }
         return result;
     }
 
     async __insertTaggables(taggables) {
-        this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
+        await this.__writeToWriteInputFile(PerfTags.#serializeSingles(taggables));
         await this.__writeLineToStdin("insert_taggables");
-        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        return await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
     }
     
     /**
      * @param {bigint[]} tags 
+     * @param {boolean=} inTransaction
      */
-    async insertTags(tags) {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+    async insertTags(tags, inTransaction = false) {
+        if (!inTransaction) {
+            await this.#writeMutex.acquire();
+        }
 
         const result = await this.__insertTags(tags);
+        this.#unflushedData = true;
 
-        resolveCurrentExecution();
+        if (!inTransaction) {
+            this.#writeMutex.release();
+        }
         return result;
     }
 
     async __insertTags(tags) {
-        this.__writeToInputFile(PerfTags.#serializeSingles(tags));
+        await this.__writeToWriteInputFile(PerfTags.#serializeSingles(tags));
         await this.__writeLineToStdin("insert_tags");
-        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        return await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
     }
 
     /**
@@ -194,16 +230,22 @@ export default class PerfTags {
     }
 
     /**
-     * @param {Map<bigint, bigint[]>} tagPairings 
+     * @param {Map<bigint, bigint[]>} tagPairings
+     * @param {boolean=} inTransaction
      */
-    async insertTagPairings(tagPairings) {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+    async insertTagPairings(tagPairings, inTransaction = false) {
+        if (!inTransaction) {
+            await this.#writeMutex.acquire();
+        }
 
         await this.__insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
         await this.__insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         const result = await this.__insertTagPairings(tagPairings);
+        this.#unflushedData = true;
 
-        resolveCurrentExecution();
+        if (!inTransaction) {
+            this.#writeMutex.release();
+        }
         return result;
     }
 
@@ -211,59 +253,77 @@ export default class PerfTags {
      * @param {Map<bigint, bigint[]>} tagPairings
      */
     async __insertTagPairings(tagPairings) {
-        this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
+        await this.__writeToWriteInputFile(PerfTags.#serializeTagPairings(tagPairings));
         await this.__writeLineToStdin("insert_tag_pairings");
-        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        return await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
     }
 
     /**
-     * @param {Map<bigint, bigint[]>} tagPairings 
+     * @param {Map<bigint, bigint[]>} tagPairings
+     * @param {boolean=} inTransaction
      */
-    async toggleTagPairings(tagPairings) {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+    async toggleTagPairings(tagPairings, inTransaction = false) {
+        if (!inTransaction) {
+            await this.#writeMutex.acquire();
+        }
 
         await this.__insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
         await this.__insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
         const result = await this.__toggleTagPairings(tagPairings);
+        this.#unflushedData = true;
 
-        resolveCurrentExecution();
+        if (!inTransaction) {
+            this.#writeMutex.release();
+        }
         return result;
     }
     
     /**
-     * @param {Map<bigint, bigint[]>} tagPairings 
+     * @param {Map<bigint, bigint[]>} tagPairings
      */
     async __toggleTagPairings(tagPairings) {
-        this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
+        await this.__writeToWriteInputFile(PerfTags.#serializeTagPairings(tagPairings));
         await this.__writeLineToStdin("toggle_tag_pairings");
-        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        return await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
     }
 
     /**
-     * @param {Map<bigint, bigint[]>} tagPairings 
+     * @param {Map<bigint, bigint[]>} tagPairings
+     * @param {boolean=} inTransaction
      */
-    async deleteTagPairings(tagPairings) {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+    async deleteTagPairings(tagPairings, inTransaction = false) {
+        if (!inTransaction) {
+            await this.#writeMutex.acquire();
+        }
 
-        this.__writeToInputFile(PerfTags.#serializeTagPairings(tagPairings));
+        await this.__writeToWriteInputFile(PerfTags.#serializeTagPairings(tagPairings));
         await this.__writeLineToStdin("delete_tag_pairings");
-        const result = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
+        this.#unflushedData = true;
 
-        resolveCurrentExecution();
+        if (!inTransaction) {
+            this.#writeMutex.release();
+        }
         return result;
     }
 
     /**
-     * @param {bigint[]} tags 
+     * @param {bigint[]} tags
+     * @param {boolean=} inTransaction
      */
-    async deleteTags(tags) {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+    async deleteTags(tags, inTransaction = false) {
+        if (!inTransaction) {
+            await this.#writeMutex.acquire();
+        }
 
-        this.__writeToInputFile(PerfTags.#serializeSingles(tags));
+        await this.__writeToWriteInputFile(PerfTags.#serializeSingles(tags));
         await this.__writeLineToStdin("delete_tags");
-        const result = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
+        this.#unflushedData = true;
 
-        resolveCurrentExecution();
+        if (!inTransaction) {
+            this.#writeMutex.release();
+        }
         return result;
     }
 
@@ -271,12 +331,12 @@ export default class PerfTags {
      * @param {bigint[]} taggables
      */
     async readTaggablesTags(taggables) {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+        await this.#readMutex.acquire();
 
-        this.__writeToInputFile(PerfTags.#serializeSingles(taggables));
+        await this.__writeToReadInputFile(PerfTags.#serializeSingles(taggables));
         await this.__writeLineToStdin("read_taggables_tags");
-        const ok = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
-        let taggablesTagsStr = this.__readFromOutputFile();
+        const ok = await this.__dataOrTimeout(PerfTags.READ_OK_RESULT, THIRTY_MINUTES);
+        let taggablesTagsStr = await this.__readFromOutputFile();
         /** @type {Map<bigint, bigint[]>} */
         const taggablePairings = new Map();
         for (let i = 0; i < taggablesTagsStr.length;) {
@@ -294,27 +354,30 @@ export default class PerfTags {
             taggablePairings.set(taggable, tags);
         }
 
-        resolveCurrentExecution();
+        this.#readMutex.release();
         return {ok, taggablePairings};
     }
 
     /**
      * @param {string} searchCriteria
+     * @param {boolean=} inTransaction
      */
     async search(searchCriteria) {
-        const resolveCurrentExecution = await this.__resolvePriorExecutions();
+        await this.#readMutex.acquire();
         
-        this.__writeToInputFile(Buffer.from(searchCriteria, 'binary'));
+        const st = Date.now();
+
+        await this.__writeToReadInputFile(Buffer.from(searchCriteria, 'binary'));
         await this.__writeLineToStdin("search");
-        const ok = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
-        let taggablesStr = this.__readFromOutputFile();
+        const ok = await this.__dataOrTimeout(PerfTags.READ_OK_RESULT, THIRTY_MINUTES);
+        let taggablesStr = await this.__readFromOutputFile();
         /** @type {bigint[]} */
         const taggables = [];
         for (let i = 0; i  < taggablesStr.length; i += 8) {
             taggables.push(taggablesStr.readBigUInt64BE(i));
         }
 
-        resolveCurrentExecution();
+        this.#readMutex.release();
         return {ok, taggables};
     }
 
@@ -397,34 +460,18 @@ export default class PerfTags {
         return `(${expression}C<${serializeUint64(occurrences)}${serializeUint64(tags.length)}${this.#serializeSingles(tags)})`;
     }
 
-    #transactionPromises = [];
     async beginTransaction() {
-        const existingPromises = this.#transactionPromises.length;
-        /** @type {() => void} */
-        let resolveFn;
-        this.#transactionPromises.push(new Promise(resolve => {
-            resolveFn = () => {
-                resolve();
-                this.#transactionPromises = this.#transactionPromises.slice(1);
-            }
-        }));
-        if (existingPromises > 0) {
-            await this.#transactionPromises[existingPromises - 1];
-        }
-
+        await this.#writeMutex.acquire();
         await this.__writeLineToStdin("begin_transaction");
-        const result = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
-        return {result, resolveFn};
+        const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
+        return {result};
     }
 
-    /**
-     * @param {() => void} resolveFn 
-     */
-    async endTransaction(resolveFn) {
+    async endTransaction() {
         await this.__writeLineToStdin("end_transaction");
-        const result = await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
-        
-        resolveFn();
+        await this.__flushData();
+        const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
+        this.#writeMutex.release();
         return result;
     }
 
@@ -458,15 +505,18 @@ export default class PerfTags {
         });
     };
     async close() {
+        await this.#writeMutex.acquire();
         if (this.#closing) {
             return;
         }
         this.#closing = true;
 
         await this.__writeLineToStdin("exit");
-        await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
         this.#closed = true;
-        return await this.__nonErrorExitOrTimeout(THIRTY_MINUTES);
+        const result = await this.__nonErrorExitOrTimeout(THIRTY_MINUTES);
+        this.#writeMutex.release();
+        return result;
     }
 
     __process() {
@@ -476,28 +526,19 @@ export default class PerfTags {
     /**
      * @param {Buffer} buffer 
      */
-    __writeToInputFile(buffer) {
-        mkdirSync(path.dirname(this.#inputFileName), {recursive: true});
-        writeFileSync(this.#inputFileName, buffer);
+    async __writeToWriteInputFile(buffer) {
+        await mkdir(path.dirname(this.#writeInputFileName), {recursive: true});
+        await writeFile(this.#writeInputFileName, buffer);
     }
-    __readFromOutputFile() {
-        return readFileSync(this.#outputFileName);
+    /**
+     * @param {Buffer} buffer 
+     */
+    async __writeToReadInputFile(buffer) {
+        await mkdir(path.dirname(this.#readInputFileName), {recursive: true});
+        await writeFile(this.#readInputFileName, buffer);
     }
-
-    async __resolvePriorExecutions() {
-        const existingPromises = this.#promises.length;
-        /** @type {() => void} */
-        let resolveFn;
-        this.#promises.push(new Promise(resolve => {
-            resolveFn = () => {
-                resolve();
-                this.#promises = this.#promises.slice(1);
-            }
-        }));
-        if (existingPromises > 0) {
-            await this.#promises[existingPromises - 1];
-        }
-        return resolveFn;
+    async __readFromOutputFile() {
+        return await readFile(this.#readOutputFileName);
     }
 
     /**
@@ -511,25 +552,41 @@ export default class PerfTags {
      * @param {string} data 
      */
     async __writeToStdin(data) {
-
         ++this.#stdinWrites;
         if (this.#archiveDirectory !== undefined) {
-            mkdirSync(this.#archiveDirectory, {recursive: true});
-            writeFileSync(path.join(this.#archiveDirectory, `command-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), data);
-            if (existsSync(this.#inputFileName)) {
-                writeFileSync(path.join(this.#archiveDirectory, `perf-input-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), readFileSync(this.#inputFileName));
+            await mkdir(this.#archiveDirectory, {recursive: true});
+            await writeFile(path.join(this.#archiveDirectory, `command-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), data);
+            if (existsSync(this.#writeInputFileName)) {
+                await writeFile(path.join(this.#archiveDirectory, `perf-input-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), await readFile(this.#writeInputFileName));
             } else {
-                writeFileSync(path.join(this.#archiveDirectory, `perf-input-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), "");
+                await writeFile(path.join(this.#archiveDirectory, `perf-input-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), "");
             }
         }
+        
         this.#perfTags.stdin.write(data);
     }
 
-    async __flushAndPurgeUnusedFiles() {
+    async flushData() {
+        await this.#writeMutex.acquire();
+        await this.__flushData();
+        this.#writeMutex.release();
+    }
+
+    async __flushData() {
         await this.__writeLineToStdin("flush_files");
-        await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
+    }
+
+    async __flushAndPurgeUnusedFiles() {
+        await this.flushData();
         await this.__writeLineToStdin("purge_unused_files");
-        return await this.__dataOrTimeout(PerfTags.OK_RESULT, THIRTY_MINUTES);
+        return await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
+    }
+
+    async __override(overrideString) {
+        await this.__writeToWriteInputFile(overrideString);
+        await this.__writeLineToStdin("override");
+        return await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
     }
 
     __kill() {

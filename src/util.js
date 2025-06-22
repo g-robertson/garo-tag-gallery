@@ -1,8 +1,9 @@
-import { spawnSync } from "child_process";
-import { existsSync, readdirSync, statSync, writeFileSync } from "fs";
+import { spawn } from "child_process";
+import { existsSync } from "fs";
 import { createHash } from "crypto";
 import path from "path";
 import process from "process";
+import { readdir, stat, writeFile } from "fs/promises";
 
 /**
  * 
@@ -30,13 +31,23 @@ function get7ZExecutableName() {
     return "7z";
 }
 
-export function extractWith7Z(archiveName, outputDirectory) {
+/**
+ * @param {string} archiveName 
+ * @param {string} outputDirectory 
+ * @returns 
+ */
+export async function extractWith7Z(archiveName, outputDirectory) {
     if (existsSync(`${archiveName}.fin`)) {
         return;
     }
 
-    spawnSync(get7ZExecutableName(), ['x', archiveName, `-o${outputDirectory}`]).stdout.toString();
-    writeFileSync(`${archiveName}.fin`, "");
+    const ret = spawn(get7ZExecutableName(), ['x', archiveName, `-o${outputDirectory}`]);
+    await new Promise(resolve => {
+        ret.on("exit", () => {
+            resolve();
+        });
+    })
+    await writeFile(`${archiveName}.fin`, "");
 }
 
 function getFFMPEGExecutableName() {
@@ -47,31 +58,40 @@ function getFFMPEGExecutableName() {
 }
 
 export async function extractFirstFrameWithFFMPEG(inputFileName, outputFileName) {
-    const ret = spawnSync(getFFMPEGExecutableName(), ['-i', inputFileName, "-vf", "scale=iw*sar:ih,setsar=1", '-vframes', '1', outputFileName]);
-    if (ret.error || ret.status !== 0) {
-        return false;
-    }
-    return true;
+    const ret = spawn(getFFMPEGExecutableName(), ['-y', '-i', inputFileName, "-vf", "scale=iw*sar:ih,setsar=1", '-vframes', '1', outputFileName]);
+    return await new Promise(resolve => {
+        ret.on("error", () => {
+            resolve(false);
+        });
+        ret.on("exit", (code) => {
+            if (code !== 0) {
+                resolve(false);
+            }
+            resolve(true);
+        })
+    });
 }
 
 /**
  * 
  * @param {string} directory 
- * @param {{recursive: boolean}} options 
+ * @param {{
+ *     recursive?: boolean
+ * }} options 
  */
-export function getAllFileEntries(directory, options) {
+export async function getAllFileEntries(directory, options) {
     options ??= {};
     options.recursive ??= false;
 
     /** @type {string[]} */
     const entries = [];
 
-    for (const entry of readdirSync(directory)) {
+    for (const entry of await readdir(directory)) {
         const entryPath = path.join(directory, entry);
-        const entryStat = statSync(entryPath);
+        const entryStat = await stat(entryPath);
         if (entryStat.isDirectory()) {
             if (options.recursive) {
-                for (const fileEntry of getAllFileEntries(entryPath, options)) {
+                for (const fileEntry of await getAllFileEntries(entryPath, options)) {
                     entries.push(fileEntry);
                 }
             }

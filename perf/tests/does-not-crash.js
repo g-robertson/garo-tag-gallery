@@ -67,20 +67,25 @@ const TESTS = {
         }
     },
     "uses_specified_input_locations": async(createPerfTags) => {
-        let perfTags = createPerfTags(TEST_DEFAULT_PERF_EXE, "test-dir/iodir/perf-input.txt", "test-dir/iodir/perf-output.txt", "test-dir/database-dir/perftag-dir");
-        const tagPairings = getPairingsFromStrPairings({'tag00001': ['tgbl0001']});
-        await perfTags.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
-        await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
-        await perfTags.insertTagPairings(tagPairings);
+        const NEW_ARGS = [...TEST_DEFAULT_PERF_TAGS_ARGS].map((v, i) => {
+            if (i === 0) {
+                return v;
+            }
+            return `test-dir/newdir/${v.slice("test-dir/".length)}`;
+        })
+        let perfTags = createPerfTags(...NEW_ARGS);
+        await perfTags.insertTaggables([1n]);
+        await perfTags.insertTags([1n]);
+        await perfTags.insertTagPairings(new Map([[1n, [1n]]]));
         await perfTags.close();
-        perfTags = createPerfTags(TEST_DEFAULT_PERF_EXE, "test-dir/iodir/perf-input.txt", "test-dir/iodir/perf-output.txt", "test-dir/database-dir/perftag-dir");
-        const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
-        const strFileTags = getStrPairingsFromPairings(taggablePairings);
-        if (strFileTags['tgbl0001'] === undefined || strFileTags['tgbl0001'].length !== 1 || strFileTags['tgbl0001'][0] !== "tag00001") {
+        perfTags = createPerfTags(...NEW_ARGS);
+        const {taggablePairings} = await perfTags.readTaggablesTags([1n]);
+        if (taggablePairings.get(1n) === undefined || taggablePairings.get(1n).length !== 1 || taggablePairings.get(1n)[0] !== 1n) {
             throw "Test case failed, file tags not found after writing";
         }
 
-        if (!existsSync("test-dir/iodir/perf-input.txt") || !existsSync("test-dir/iodir/perf-output.txt") || !existsSync("test-dir/database-dir/perftag-dir")) {
+        // write input, read input, read output, database dir, and archive dir
+        if (!existsSync(NEW_ARGS[1]) || !existsSync(NEW_ARGS[3]) || !existsSync(NEW_ARGS[4]) || !existsSync(NEW_ARGS[5]) || !existsSync(NEW_ARGS[6])) {
             throw "Test case failed, one of the specified input locations was not found";
         }
     },
@@ -116,8 +121,22 @@ const TESTS = {
     "unended_transactional_insert_should_not_cause_crash": async(createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.beginTransaction();
-        await perfTags.insertTags([0n,1n,2n,3n]);
-        await perfTags.reopen();
-    }
+        await perfTags.insertTags([0n,1n,2n,3n], true);
+        await perfTags.close();
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+    },
+    "complement_should_correctly_flush_to_cache_file": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        // make taggable with excessively overloaded tags to make it complement
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n]]])));
+        // force flush to go from write ahead file which has no complements to db file
+        await perfTags.__flushAndPurgeUnusedFiles();
+
+        // reopen perfTags
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTags([11n, 12n, 13n]);
+        // read tags should not fail
+        await perfTags.readTaggablesTags([1n]);
+    },
 };
 export default TESTS;

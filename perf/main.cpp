@@ -24,30 +24,72 @@ unsigned short wantedBucketCount() {
 }
 
 namespace {
-    std::string Output_File_Name = "perf-output.txt";
-    void outputFileWriter(const std::string& outputData) {
-        util::writeFile(Output_File_Name, outputData);
+    std::string Write_Output_File_Name = "perf-write-output.txt";
+    std::string Read_Output_File_Name = "perf-read-output.txt";
+    void writeOutputFileWriter(const std::string& outputData) {
+        util::writeFile(Write_Output_File_Name, outputData);
+    }
+    void readOutputFileWriter(const std::string& outputData) {
+        util::writeFile(Read_Output_File_Name, outputData);
     }
 };
 
+#ifdef TESTING_MODE
+    #include "tests/test-tag-file-maintainer.hpp"
+    #define TagFileMaintainer TestTagFileMaintainer
+#else
+    #define TagFileMaintainer TagFileMaintainer
+#endif
+
 int main(int argc, const char** argv) {
-    std::string inputFileName = "perf-input.txt";
+    std::string writeInputFileName = "perf-write-input.txt";
+    std::string readInputFileName = "perf-read-input.txt";
     std::string dataStorageDirectory = "tag-pairings";
     if (argc > 1) {
-        inputFileName = argv[1];
+        writeInputFileName = argv[1];
     }
     if (argc > 2) {
-        Output_File_Name = argv[2];
+        Write_Output_File_Name = argv[2];
     }
     if (argc > 3) {
-        dataStorageDirectory = argv[3];
+        readInputFileName = argv[3];
+    }
+    if (argc > 4) {
+        Read_Output_File_Name = argv[4];
+    }
+    if (argc > 5) {
+        dataStorageDirectory = argv[5];
     }
 
     auto tfm = TagFileMaintainer(dataStorageDirectory);
+    std::unordered_set<std::string> WRITE_OPS = {
+        "insert_taggables",
+        "delete_taggables",
+        "insert_tags",
+        "delete_tags",
+        "insert_tag_pairings",
+        "toggle_tag_pairings",
+        "delete_tag_pairings",
+        "flush_files",
+        "purge_unused_files",
+        "begin_transaction",
+        "end_transaction",
+        "exit",
+        "override"
+    };
+    std::unordered_set<std::string> READ_OPS = {
+        "read_taggables_tags",
+        "search"
+    };
     std::string op;
     while (op != "exit") {
         bool badCommand = false;
         std::getline(std::cin, op);
+
+        std::string inputFileName = writeInputFileName;
+        if (READ_OPS.contains(op)) {
+            inputFileName = readInputFileName;
+        }
 
         std::ifstream file(inputFileName, std::ios::in | std::ios::binary);
         std::stringstream buffer;
@@ -69,9 +111,9 @@ int main(int argc, const char** argv) {
         } else if (op == "delete_tag_pairings") {
             tfm.deletePairings(input);
         } else if (op == "read_taggables_tags") {
-            tfm.readTaggablesTags(input, outputFileWriter);
+            tfm.readTaggablesTags(input, readOutputFileWriter);
         } else if (op == "search") {
-            tfm.search(input, outputFileWriter);
+            tfm.search(input, readOutputFileWriter);
         } else if (op == "flush_files") {
             tfm.flushFiles();
         } else if (op == "purge_unused_files") {
@@ -90,13 +132,23 @@ int main(int argc, const char** argv) {
             }
 
             tfm.close();
-        } else {
+        }
+        #ifdef TESTING_MODE
+        else if (op == "override") {
+            tfm.overrideMode = input;
+        }
+        #endif
+        else {
             std::cout << "BAD COMMAND!" << std::endl;
             badCommand = true;
         }
 
         if (!badCommand) {
-            std::cout << "OK!" << std::endl;
+            if (inputFileName == writeInputFileName) {
+                std::cout << "WRITE_OK!" << std::endl;
+            } else {
+                std::cout << "READ_OK!" << std::endl;
+            }
         }
     }
     

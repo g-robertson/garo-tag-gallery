@@ -99,10 +99,6 @@ class Bucket {
             }
         }
 
-        void close() {
-            write();
-        }
-
         void beginTransaction() {
             inTransaction = true;
         }
@@ -148,7 +144,13 @@ class Bucket {
                 return;
             }
 
-            applyDiff(deserializeDiff(util::readFile(diffFileName)));
+            std::string diffContentsStr;
+            try {
+                diffContentsStr = util::readFile(diffFileName);
+            } catch (std::logic_error& err) {
+                throw std::logic_error(std::string("Could not find ") + diffFileName.generic_string() + " despite needed write ahead contents for the expected starting size to match");
+            }
+            applyDiff(deserializeDiff(diffContentsStr));
             contentsIsDirty = true;
             if (contents_.size() != startingSize_) {
                 // TODO: allow user intervention while showing both before and after diff, 

@@ -7,7 +7,7 @@
 
 import { normalPreInsertLocalTag, SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
-import { dball, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
+import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js"
 import { Users } from "./user.js";
 import { LocalTags } from "./tags.js";
@@ -52,7 +52,7 @@ export class LocalMetricServices {
      * @param {number[]} localMetricIDs
      */
     static async selectManyByLocalMetricIDs(dbs, localMetricIDs) {
-        return await mapLocalMetricServices(dbs, await dball(dbs, `
+        return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT DISTINCT LMS.*, S.*
               FROM Local_Metric_Services LMS
               JOIN Services S ON LMS.Service_ID = S.Service_ID
@@ -75,7 +75,7 @@ export class LocalMetricServices {
      * @param {number[]} localMetricServiceIDs
      */
     static async selectManyByIDs(dbs, localMetricServiceIDs) {
-        return await mapLocalMetricServices(dbs, await dball(dbs, `
+        return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT *
               FROM Local_Metric_Services LMS
               JOIN Services S ON LMS.Service_ID = S.Service_ID
@@ -84,7 +84,7 @@ export class LocalMetricServices {
     }
 
     static async selectAll(dbs) {
-        return await mapLocalMetricServices(dbs, await dball(dbs, `
+        return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT *
               FROM Local_Metric_Services LMS
               JOIN Services S ON LMS.Service_ID = S.Service_ID;
@@ -102,7 +102,7 @@ export class LocalMetricServices {
             return await LocalMetricServices.selectManyByIDs(dbs, localMetricServiceIDs);
         }
 
-        return await mapLocalMetricServices(dbs, await dball(dbs, `
+        return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT LMS.*, S.*
               FROM Local_Metric_Services LMS
               JOIN Services_Users_Permissions SUP ON LMS.Service_ID = SUP.Service_ID
@@ -140,7 +140,7 @@ export class LocalMetricServices {
             PERMISSIONS.LOCAL_METRIC_SERVICES,
             LocalMetricServices.selectAll,
             async () => {
-                return await mapLocalMetricServices(dbs, await dball(dbs, `
+                return await mapLocalMetricServices(dbs, await dballselect(dbs, `
                     SELECT SUP.Permission_Extent, LMS.*, S.*
                       FROM Local_Metric_Services LMS
                       JOIN Services_Users_Permissions SUP ON LMS.Service_ID = SUP.Service_ID
@@ -158,7 +158,7 @@ export class LocalMetricServices {
      * @param {string} serviceName
      */
     static async userInsert(dbs, user, serviceName) {
-        await dbBeginTransaction(dbs);
+        dbs = await dbBeginTransaction(dbs);
 
         const serviceID = await Services.insert(dbs, serviceName);
         await ServicesUsersPermissions.insert(dbs, serviceID, user.id(), PERMISSION_BITS.ALL);
@@ -239,17 +239,53 @@ async function preparePreInsertAppliedMetrics(dbs, preInsertAppliedMetrics) {
 export class AppliedMetrics {
     /**
      * @param {Databases} dbs 
-     * @param {PreparedPreInsertAppliedMetric[]} appliedMetrics 
+     * @param {bigint[]} appliedMetricTagIDs
+     * @returns {Promise<DBAppliedMetric[]}
+     */
+    static async selectManyByLocalAppliedMetricTagIDs(dbs, appliedMetricTagIDs) {
+        if (appliedMetricTagIDs.length === 0) {
+            return [];
+        }
+        if (appliedMetricTagIDs.length > 10000) {
+            const slices = await asyncDataSlicer(appliedMetricTagIDs, 10000, (sliced) => AppliedMetrics.selectManyByLocalAppliedMetricTagIDs(dbs, sliced));
+            return slices.flat();
+        }
+
+        /** @type {DBAppliedMetric[]} */
+        const dbAppliedMetrics = await dballselect(dbs,
+            `SELECT * FROM Local_Applied_Metrics WHERE Local_Applied_Metric_Tag_ID IN ${dbvariablelist(appliedMetricTagIDs.length)};`,
+            appliedMetricTagIDs.map(appliedMetricTagIDs => Number(appliedMetricTagIDs))
+        );
+        return dbAppliedMetrics.map(mapDBAppliedMetric);
+    }
+
+    static async userSelectManyByLocalMetricID(dbs, userID, localMetricID) {
+        /** @type {DBAppliedMetric[]} */
+        const dbAppliedMetrics = await dballselect(dbs,
+            `SELECT * FROM Local_Applied_Metrics WHERE User_ID = ? AND Local_Metric_ID = ?;`,
+            [userID, localMetricID]
+        );
+        return dbAppliedMetrics.map(mapDBAppliedMetric);
+    }
+
+    
+    /**
+     * @param {Databases} dbs 
+     * @param {PreparedPreInsertAppliedMetric[]} appliedMetrics
      */
     static async selectMany(dbs, appliedMetrics) {
         if (appliedMetrics.length === 0) {
             return [];
         }
+        if (appliedMetrics.length > 10000) {
+            const slices = await asyncDataSlicer(appliedMetrics, 10000, (sliced) => AppliedMetrics.selectMany(dbs, sliced));
+            return slices.flat();
+        }
 
         /** @type {DBAppliedMetric[]} */
-        const dbAppliedMetrics = await dball(dbs,
+        const dbAppliedMetrics = await dballselect(dbs,
             `SELECT * FROM Local_Applied_Metrics WHERE Local_Applied_Metric_PK_Hash IN ${dbvariablelist(appliedMetrics.length)};`,
-            appliedMetrics.map(appliedMetric => appliedMetric.Local_Applied_Metric_PK_Hash)
+            appliedMetrics.map(appliedMetrics => appliedMetrics.Local_Applied_Metric_PK_Hash)
         );
         return dbAppliedMetrics.map(mapDBAppliedMetric);
     }
@@ -311,6 +347,10 @@ export class AppliedMetrics {
         return dbAppliedMetrics.concat(insertedDBAppliedMetrics);
     }
 
+    /**
+     * @param {Databases} dbs 
+     * @param {PreInsertAppliedMetric} preInsertAppliedMetric 
+     */
     static async upsert(dbs, preInsertAppliedMetric) {
         return (await AppliedMetrics.upsertMany(dbs, [preInsertAppliedMetric]))[0];
     }
@@ -323,7 +363,7 @@ export class AppliedMetrics {
      * @param {User} user
      */
     static async userConvertFromLocalTag(dbs, localTag, preInsertAppliedMetric, deleteExistingTag, user) {
-        await dbBeginTransaction(dbs);
+        dbs = await dbBeginTransaction(dbs);
 
         const appliedMetric = await AppliedMetrics.upsert(dbs, preInsertAppliedMetric);
 
@@ -343,7 +383,22 @@ export class AppliedMetrics {
      * @param {DBAppliedMetric} appliedMetric 
      */
     static async applyToTaggables(dbs, taggableIDs, appliedMetric) {
-        await dbs.perfTags.insertTagPairings(new Map([[appliedMetric.Local_Applied_Metric_Tag_ID, taggableIDs]]));
+
+        // remove pre-existing metric applications of the same type
+        dbs = await dbBeginTransaction(dbs);
+        const otherAppliedMetrics = await AppliedMetrics.userSelectManyByLocalMetricID(dbs, appliedMetric.User_ID, appliedMetric.Local_Metric_ID);
+        await dbs.perfTags.deleteTagPairings(new Map(otherAppliedMetrics.map(appliedMetric => [appliedMetric.Local_Applied_Metric_Tag_ID, taggableIDs])), dbs.inTransaction);
+        await dbs.perfTags.insertTagPairings(new Map([[appliedMetric.Local_Applied_Metric_Tag_ID, taggableIDs]]), dbs.inTransaction);
+        await dbEndTransaction(dbs);
+    }
+    
+    /**
+     * @param {Databases} dbs 
+     * @param {bigint} taggableID
+     * @param {DBAppliedMetric} appliedMetric 
+     */
+    static async applyToTaggable(dbs, taggableID, appliedMetric) {
+        await AppliedMetrics.applyToTaggables(dbs, [taggableID], appliedMetric);
     }
 };
 
@@ -385,7 +440,7 @@ export class LocalMetrics {
      */
     static async selectManyByIDs(dbs, localMetricIDs) {
         /** @type {DBLocalMetric[]} */
-        const dbLocalMetrics = await dball(dbs, `
+        const dbLocalMetrics = await dballselect(dbs, `
             SELECT *
               FROM Local_Metrics
              WHERE Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)}
@@ -401,7 +456,7 @@ export class LocalMetrics {
      */
     static async selectManyByLocalMetricServiceIDs(dbs, localMetricServiceIDs) {
         /** @type {DBLocalMetric[]} */
-        const dbLocalMetrics = await dball(dbs, `
+        const dbLocalMetrics = await dballselect(dbs, `
             SELECT *
               FROM Local_Metrics
              WHERE Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)}
@@ -417,7 +472,7 @@ export class LocalMetrics {
      * @param {number} localMetricServiceID
      */
     static async insert(dbs, preInsertLocalMetric, localMetricServiceID) {
-        await dbBeginTransaction(dbs);
+        dbs = await dbBeginTransaction(dbs);
 
         if (!Number.isFinite(preInsertLocalMetric.Local_Metric_Lower_Bound)) {
             preInsertLocalMetric.Local_Metric_Lower_Bound = null;

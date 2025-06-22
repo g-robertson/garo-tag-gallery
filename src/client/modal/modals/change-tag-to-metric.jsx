@@ -18,10 +18,11 @@ const ChangeTagToMetric = ({user, popModal}) => {
     /** @type {[null | ClientTag, (tag: null | ClientTag) => void]} */
     const [tag, setTag] = useState(null);
     const tags = tag === null ? [] : [tag];
+    const [successMessage, setSuccessMessage] = useState("");
 
     return (
         <div style={{width: "100%", flexDirection: "column"}}>
-            <div style={{flex: 2, margin: 8}}>
+            <div style={{flex: 4, margin: 8}}>
                 <LocalTagsSelector localTagServices={user.localTagServices()} multiSelect={false} excludeable={false} onTagsSelected={(tags) => {
                     setTag(tags[0]);
                 }}/>
@@ -33,7 +34,7 @@ const ChangeTagToMetric = ({user, popModal}) => {
                 <LocalMetricSelector user={user} />
                 <input name="localTagID" style={{display: "none"}} value={tag !== null ? tag.localTagID : ""} />
                 <div style={{marginLeft: "8px"}}>
-                    Select what metric value you wish for this tag to be applied as: <input name="metricValue" type="text" />
+                    Select what metric value you wish for this tag to be applied as: <input id="metricValue" name="metricValue" type="text" />
                 </div>
                 <div style={{marginLeft: "8px"}}>
                     Remove existing tag?: <input name="removeExistingTag" type="checkbox" />
@@ -41,7 +42,12 @@ const ChangeTagToMetric = ({user, popModal}) => {
                 <div style={{marginLeft: "8px"}}>
                     <input type="submit" value="Submit" />
                 </div>
-                <OnFormSubmit onFormSubmit={popModal}/>
+                <OnFormSubmit onFormSubmit={() => {
+                    setSuccessMessage(`Successfully set tag ${tag.displayName} to metric value ${document.getElementById("metricValue").value}`);
+                }}/>
+                <div style={{color: "green"}}>
+                    {successMessage}
+                </div>
             </form>
         </div>
     );

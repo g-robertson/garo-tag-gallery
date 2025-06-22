@@ -68,7 +68,7 @@ const LazyThumbnailGallery = ({taggableIDs, onValuesDoubleClicked}) => {
                 return 0;
             }
         }).join(" ")}
-        valueRealizationDelay={50}
+        valueRealizationDelay={25}
         valueRealizationRange={2}
         itemWidth={THUMB_WIDTH}
         itemHeight={THUMB_HEIGHT}

@@ -90,6 +90,17 @@ void TagFileMaintainer::readCacheFile() {
         tagTaggableBuckets.push_back(PairingBucket(folderPath_ / "buckets" / tagTaggableFolderName, bucketTotalTagsToTaggables, bucketTagsToTaggablesComplementCount, &taggableBucket->contents()));
         taggableTagBuckets.push_back(PairingBucket(folderPath_ / "buckets" / taggableTagFolderName, bucketTotalTaggablesToTags, bucketTaggablesToTagsComplementCount, &tagBucket->contents()));
     }
+
+    if (!cacheFile.fail()) {
+        cacheFile.close();
+        priorCacheFile = util::readFile(cacheFilePath_);
+    } else {
+        flushFiles();
+    }
+}
+
+void TagFileMaintainer::writePriorCacheFile() {
+    util::writeFile(cacheFilePath_, priorCacheFile);
 }
 
 void TagFileMaintainer::writeCacheFile() {
@@ -127,6 +138,8 @@ void TagFileMaintainer::insertTaggables(std::string_view input) {
     };
     processSingles(input, insertTaggable);
 
+    writePriorCacheFile();
+
     for (auto& bucket : tagTaggableBuckets) {
         bucket.diffAhead();
     }
@@ -156,6 +169,8 @@ void TagFileMaintainer::deleteTaggables(std::string_view input) {
     
     processSingles(input, deleteTaggable);
     
+    writePriorCacheFile();
+
     for (auto& bucket : taggableTagBuckets) {
         bucket.diffAhead();
     }
@@ -178,6 +193,8 @@ void TagFileMaintainer::insertTags(std::string_view input) {
         tagBucket->insertItem(tag);
     };
     processSingles(input, insertTag);
+
+    writePriorCacheFile();
 
     for (auto& bucket : taggableTagBuckets) {
         bucket.diffAhead();
@@ -209,6 +226,8 @@ void TagFileMaintainer::deleteTags(std::string_view input) {
 
     processSingles(input, deleteTag);
     
+    writePriorCacheFile();
+
     for (auto& bucket : taggableTagBuckets) {
         bucket.diffAhead();
     }
@@ -243,6 +262,7 @@ void TagFileMaintainer::modifyPairings(std::string_view input, void (PairingBuck
         }
     }
     
+    writePriorCacheFile();
 
     for (auto& bucket : tagTaggableBuckets) {
         bucket.diffAhead();
@@ -395,6 +415,8 @@ void TagFileMaintainer::flushFiles() {
     }
     taggableBucket->write();
     tagBucket->write();
+    writeCacheFile();
+    priorCacheFile = util::readFile(cacheFilePath_);
 }
 
 void TagFileMaintainer::purgeUnusedFiles() const {
@@ -453,6 +475,8 @@ void TagFileMaintainer::beginTransaction() {
     inTransaction = true;
 }
 void TagFileMaintainer::endTransaction() {
+    writePriorCacheFile();
+
     for (auto& tagTaggableBucket : tagTaggableBuckets) {
         tagTaggableBucket.endTransaction();
     }
@@ -462,6 +486,7 @@ void TagFileMaintainer::endTransaction() {
     taggableBucket->endTransaction();
     tagBucket->endTransaction();
     inTransaction = false;
+
     writeCacheFile();
 }
 
@@ -478,15 +503,8 @@ void TagFileMaintainer::close() {
         return;
     }
     
-    for (auto& bucket : tagTaggableBuckets) {
-        bucket.close();
-    }
-    for (auto& bucket : taggableTagBuckets) {
-        bucket.close();
-    }
-    taggableBucket->close();
-    tagBucket->close();
-    writeCacheFile();
+    flushFiles();
+
     closed_ = true;
 }
 

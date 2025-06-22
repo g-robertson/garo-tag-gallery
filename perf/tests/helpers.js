@@ -1,8 +1,7 @@
 import {deserializeUint64, serializeUint64} from "../../src/client/js/client-util.js";
 import PerfTags from "../../src/perf-tags-binding/perf-tags.js";
 import { getAllFileEntries } from "../../src/util.js";
-import { statSync } from "fs";
-
+import {stat} from "fs/promises";
 /**
  * @typedef {(...args: ConstructorParameters<typeof PerfTags>) => PerfTags} PerfTagsCtor
  * @typedef {(createPerfTags: PerfTagsCtor) => Promise<void>} TestFunction
@@ -14,10 +13,19 @@ import { statSync } from "fs";
  * @returns {Map<bigint, bigint[]>}
  */
 
-export const TEST_DEFAULT_PERF_EXE = `./${PerfTags.EXE_NAME}`;
-export const TEST_DEFAULT_PERF_INPUT = "test-dir/perf-input.txt";
+export const TEST_DEFAULT_PERF_EXE = `./perftags-test${PerfTags.EXE_NAME.slice("perftags".length)}`;
+export const TEST_DEFAULT_PERF_WRITE_INPUT = "test-dir/perf-write-input.txt";
+export const TEST_DEFAULT_PERF_READ_INPUT = "test-dir/perf-read-input.txt";
 export const TEST_DEFAULT_DATABASE_DIR = "test-dir/database-dir";
-export const TEST_DEFAULT_PERF_TAGS_ARGS = [TEST_DEFAULT_PERF_EXE, TEST_DEFAULT_PERF_INPUT, "test-dir/perf-output.txt", TEST_DEFAULT_DATABASE_DIR, "test-dir/archive"];
+export const TEST_DEFAULT_PERF_TAGS_ARGS = [
+    TEST_DEFAULT_PERF_EXE,
+    TEST_DEFAULT_PERF_WRITE_INPUT,
+    "test-dir/perf-write-output.txt",
+    TEST_DEFAULT_PERF_READ_INPUT,
+    "test-dir/perf-read-output.txt",
+    TEST_DEFAULT_DATABASE_DIR,
+    "test-dir/archive"
+];
 
 export function getPairingsFromStrPairings(strTagPairings) {
     const output = new Map();
@@ -50,10 +58,10 @@ export function getStrPairingsFromPairings(pairings) {
     return output;
 }
 
-export function getTotalDirectoryBytes(directory) {
+export async function getTotalDirectoryBytes(directory) {
     let totalBytes = 0;
     for (const fileEntry of getAllFileEntries(directory, {recursive: true})) {
-        totalBytes += statSync(fileEntry).size;
+        totalBytes += await stat(fileEntry).size;
     }
     return totalBytes;
 }

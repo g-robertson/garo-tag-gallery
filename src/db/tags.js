@@ -1,6 +1,6 @@
 import { HAS_URL_TAG, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash } from "../client/js/tags.js";
 import { PERMISSIONS, User } from "../client/js/user.js";
-import {asyncDataSlicer, dball, dbBeginTransaction, dbEndTransaction, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
+import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
 import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
 
 /** @import {DBService} from "./services.js" */
@@ -67,7 +67,7 @@ export class LocalTagServices {
      * @returns {Promise<DBJoinedLocalTagService[]>}
      */
     static async selectManyByLocalTagIDs(dbs, localTagIDs) {
-        return (await dball(dbs, `
+        return (await dballselect(dbs, `
             SELECT DISTINCT LTS.*, S.*
               FROM Local_Tag_Services LTS
               JOIN Services S ON LTS.Service_ID = S.Service_ID
@@ -83,7 +83,7 @@ export class LocalTagServices {
      * @returns {Promise<DBJoinedLocalTagService[]>}
      */
     static async selectManyByIDs(dbs, localTagServiceIDs) {
-        return await dball(dbs, `
+        return await dballselect(dbs, `
             SELECT *
               FROM Local_Tag_Services LTS
               JOIN Services S ON LTS.Service_ID = S.Service_ID
@@ -105,7 +105,7 @@ export class LocalTagServices {
      * @returns {Promise<DBJoinedLocalTagService[]>}
      */
     static async selectAll(dbs) {
-        return await dball(dbs, `
+        return await dballselect(dbs, `
             SELECT *
               FROM Local_Tag_Services LTS
               JOIN Services S ON LTS.Service_ID = S.Service_ID;
@@ -124,7 +124,7 @@ export class LocalTagServices {
             return await LocalTagServices.selectManyByIDs(dbs, localTagServiceIDs);
         }
 
-        return await dball(dbs, `
+        return await dballselect(dbs, `
             SELECT LTS.*, S.*, SUP.Permission_Extent
               FROM Local_Tag_Services LTS
               JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
@@ -161,7 +161,7 @@ export class LocalTagServices {
             PERMISSIONS.LOCAL_TAG_SERVICES,
             LocalTagServices.selectAll,
             async () => {
-                return await dball(dbs, `
+                return await dballselect(dbs, `
                     SELECT SUP.Permission_Extent, LTS.*, S.*
                       FROM Local_Tag_Services LTS
                       JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
@@ -231,8 +231,7 @@ export class UserFacingLocalTags {
         if (localTagServiceIDs.length === 0) {
             return taggablesUserFacingLocalTags;
         }
-
-        const {taggablePairings} = await dbs.perfTags.readTaggablesTags(taggableIDs);
+        const {taggablePairings} = await dbs.perfTags.readTaggablesTags(taggableIDs, dbs.inTransaction);
         /** @type {Set<bigint>} */
         const allTagIDs = new Set();
         for (const tagIDs of taggablePairings.values()) {
@@ -259,7 +258,7 @@ export class UserFacingLocalTags {
      */
     static async selectManyByLocalTagServiceIDs(dbs, localTagServiceIDs) {
         /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
-        const dbUserFacingLocalTags = await dball(dbs, `
+        const dbUserFacingLocalTags = await dballselect(dbs, `
             SELECT Tag_ID, Local_Tag_ID, Display_Name, Local_Tag_Service_ID
               FROM Local_Tags
              WHERE Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
@@ -287,7 +286,7 @@ export class UserFacingLocalTags {
         }
 
         /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
-        const dbUserFacingLocalTags = await dball(dbs, `
+        const dbUserFacingLocalTags = await dballselect(dbs, `
             SELECT Tag_ID, Local_Tag_ID, Display_Name, Local_Tag_Service_ID
               FROM Local_Tags
             WHERE Tag_ID IN ${dbvariablelist(tagIDs.length)}
@@ -319,7 +318,7 @@ export class Tags {
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
     static async upsertMappedToTaggables(dbs, tagPairings) {
-        const ok = await dbs.perfTags.insertTagPairings(tagPairings);
+        const ok = await dbs.perfTags.insertTagPairings(tagPairings, dbs.inTransaction);
         if (!ok) {
             console.log(dbs.perfTags);
             throw "Perf tags failed to insert tag pairings";
@@ -388,9 +387,9 @@ export class LocalTags {
             throw "Cannot delete tag from local tag service with user editable set to 0";
         }
 
-        await dbBeginTransaction();
+        dbs = await dbBeginTransaction();
 
-        await dbs.perfTags.deleteTags(localTags.map(localTag => localTag.Tag_ID));
+        await dbs.perfTags.deleteTags(localTags.map(localTag => localTag.Tag_ID), dbs.inTransaction);
         await dbrun(dbs, `DELETE FROM Local_Tags WHERE Local_Tag_ID IN ${dbvariablelist(localTags.length)}`, localTags.map(localTag => localTag.Local_Tag_ID));
         await dbrun(dbs, `DELETE FROM Tags WHERE Tag_ID IN ${dbvariablelist(localTags.length)}`, localTags.map(localTag => Number(localTag.Tag_ID)));
 
@@ -414,7 +413,7 @@ export class LocalTags {
         }
 
         /** @type {DBLocalTag[]} */
-        const dbLocalTags = await dball(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_ID IN ${dbvariablelist(localTagIDs.length)}`, localTagIDs);
+        const dbLocalTags = await dballselect(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_ID IN ${dbvariablelist(localTagIDs.length)}`, localTagIDs);
         return dbLocalTags.map(mapDBLocalTag);
     }
     /**
@@ -438,7 +437,7 @@ export class LocalTags {
         const tagPKHashes = tagLookups.map(tagLookup => localTagsPKHash(tagLookup.Lookup_Name, tagLookup.Source_Name));
 
         /** @type {DBLocalTag[]} */
-        const dbLocalTags = await dball(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = ? AND Local_Tags_PK_Hash IN ${dbvariablelist(tagPKHashes.length)};`, [localTagServiceID, ...tagPKHashes]);
+        const dbLocalTags = await dballselect(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = ? AND Local_Tags_PK_Hash IN ${dbvariablelist(tagPKHashes.length)};`, [localTagServiceID, ...tagPKHashes]);
         return dbLocalTags.map(mapDBLocalTag);
     }
 
@@ -557,7 +556,7 @@ export class FileExtensions {
      */
     static async selectMany(dbs, fileExtensions) {
         /** @type {DBFileExtension[]} */
-        const dbFileExtensions = await dball(dbs, `SELECT * FROM File_Extensions WHERE File_Extension IN ${dbvariablelist(fileExtensions.length)};`, fileExtensions);
+        const dbFileExtensions = await dballselect(dbs, `SELECT * FROM File_Extensions WHERE File_Extension IN ${dbvariablelist(fileExtensions.length)};`, fileExtensions);
         return dbFileExtensions.map(mapDBFileExtension);
     }
 
@@ -663,7 +662,7 @@ export class TagsNamespaces {
             return [];
         }
 
-        return (await dball(dbs, `
+        return (await dballselect(dbs, `
             SELECT N.Namespace_Name, TN.Tag_ID
               FROM Tags_Namespaces TN
               JOIN Namespaces N ON TN.Namespace_ID = N.Namespace_ID
@@ -685,7 +684,7 @@ export class TagsNamespaces {
         }
 
         /** @type {DBTagNamespace[]} */
-        const dbTagsNamespaces = await dball(dbs,
+        const dbTagsNamespaces = await dballselect(dbs,
             `SELECT * FROM Tags_Namespaces WHERE Tags_Namespaces_PK_Hash IN ${dbvariablelist(tagsNamespaces.length)};`,
             tagsNamespaces.map(tagNamespace => tagNamespace.Tags_Namespaces_PK_Hash)
         );
@@ -765,7 +764,7 @@ export class Namespaces {
         }
 
         /** @type {DBNamespace[]} */
-        const dbNamespaces = await dball(dbs, `SELECT * FROM Namespaces WHERE Namespace_Name IN ${dbvariablelist(namespaces.length)};`, namespaces);
+        const dbNamespaces = await dballselect(dbs, `SELECT * FROM Namespaces WHERE Namespace_Name IN ${dbvariablelist(namespaces.length)};`, namespaces);
         return dbNamespaces;
     }
 
@@ -779,7 +778,7 @@ export class Namespaces {
         }
 
         /** @type {DBNamespace[]} */
-        const insertedDBNamespaces = await dball(dbs, `
+        const insertedDBNamespaces = await dballselect(dbs, `
             INSERT INTO Namespaces(
                 Namespace_Name
             ) VALUES ${dbtuples(namespaces.length, 1)} RETURNING *;
@@ -837,7 +836,7 @@ export class URLs {
         }
 
         /** @type {DBURL[]} */
-        const dbURLs = await dball(dbs, `SELECT * FROM URLs WHERE URL IN ${dbvariablelist(urls.length)};`, urls);
+        const dbURLs = await dballselect(dbs, `SELECT * FROM URLs WHERE URL IN ${dbvariablelist(urls.length)};`, urls);
         return dbURLs.map(mapDBURL);
     }
 
@@ -949,7 +948,7 @@ export class URLAssociations {
         const urlAssociationsMap = new Map(urlAssociations.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]));
 
         /** @type {DBURLAssociation[]} */
-        const dbURLAssociations = await dball(dbs,
+        const dbURLAssociations = await dballselect(dbs,
             `SELECT * FROM URL_Associations WHERE URL_Associations_PK_Hash IN ${dbvariablelist(urlAssociations.length)};`,
             urlAssociations.map(urlAssociation => urlAssociation.URL_Associations_PK_Hash)
         );
@@ -1037,6 +1036,6 @@ export class URLAssociations {
             }
         }
 
-        await dbs.perfTags.insertTagPairings(tagPairings);
+        await dbs.perfTags.insertTagPairings(tagPairings, dbs.inTransaction);
     }
 }

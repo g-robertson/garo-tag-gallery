@@ -1,8 +1,9 @@
 import { User } from "../client/js/user.js";
-import { dball, dbget, dbvariablelist } from "./db-util.js";
+import { dball, dballselect, dbget, dbgetselect, dbvariablelist } from "./db-util.js";
 import { LocalTagServices } from "./tags.js";
 import { LocalTaggableServices } from "./taggables.js";
 import { LocalMetricServices } from "./metrics.js";
+import { LRUCache } from "./lru-cache.js";
 
 /**
  * @import {DBBoolean} from "./db-util.js"
@@ -83,14 +84,16 @@ function mapDBUser(dbUser) {
 }
 
 export class Users {
-    
+    /** @type {LRUCache<string, User>} */
+    static #accessKeyToUserLRUCache = new LRUCache(4096);
+
     /**
      * @param {Databases} dbs
      * @param {number[]} userIDs
      */
     static async selectManyByIDs(dbs, userIDs) {
         /** @type {DBUser[]} */
-        const dbUsers = (await dball(dbs, `SELECT * FROM Users WHERE User_ID IN ${dbvariablelist(userIDs.length)};`, userIDs));
+        const dbUsers = (await dballselect(dbs, `SELECT * FROM Users WHERE User_ID IN ${dbvariablelist(userIDs.length)};`, userIDs));
 
         return dbUsers.map(mapDBUser);
     }
@@ -120,18 +123,23 @@ export class Users {
      * @param {string} accessKey
      */
     static async selectByAccessKey(dbs, accessKey) {
-        const user = await dbget(dbs, `
-            SELECT *
-              FROM Users
-              JOIN Permission_Sets ON Users.Permission_Set_ID = Permission_Sets.Permission_Set_ID
-              WHERE Users.Access_Key = ?;`, [accessKey]
-        );
-        
-        if (user === undefined) {
-            return undefined;
-        } else {
-            return new User(user);
+        let cachedUser = this.#accessKeyToUserLRUCache.get(accessKey);
+        if (cachedUser === undefined) {
+            const user = await dbget(dbs, `
+                SELECT *
+                  FROM Users
+                  JOIN Permission_Sets ON Users.Permission_Set_ID = Permission_Sets.Permission_Set_ID
+                  WHERE Users.Access_Key = ?;`, [accessKey]
+            );
+
+            if (user === undefined) {
+                return undefined;
+            } else {
+                cachedUser = new User(user);
+                this.#accessKeyToUserLRUCache.set(accessKey, cachedUser);
+            }
         }
+        return cachedUser;
     }
 
     /**
@@ -139,6 +147,6 @@ export class Users {
      * @returns {Promise<DBUser>}
      */
     static async selectDefaultAdminUser(dbs) {
-        return await dbget(dbs, `SELECT * FROM Users WHERE User_ID = ?`, [DEFAULT_ADMINISTRATOR_USER_ID]);
+        return await dbgetselect(dbs, `SELECT * FROM Users WHERE User_ID = ?`, [DEFAULT_ADMINISTRATOR_USER_ID]);
     }
 }

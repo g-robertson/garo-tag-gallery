@@ -246,3 +246,16 @@ div {
 .scroll-cursor:hover {
     background-color: var(--hover-accent-foreground-alt);
 }
+
+.metric-star {
+    cursor: pointer;
+    line-height: 17px;
+}
+
+.metric-star.selected {
+    color: #c88d14;
+}
+
+.metric-star.hovered, .metric-star.hovered.selected {
+    color: #ffb419;
+}

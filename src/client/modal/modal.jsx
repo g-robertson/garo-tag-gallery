@@ -69,7 +69,7 @@ const Modal = ({modalOptions, pushModal, popModal, user, index}) => {
     const left = ((100 - width) / 2);
     const top = ((100 - height) / 2) + (moveWithIndex * index)
 
-    return (<div className="modal" style={{border: hasBorder ? "2px solid white" : "none", maxWidth: "100%", width: `${width}vw`, height: `${height}vh`, left: `${left}vw`, top: `${top}vh`}}>
+    return (<div className="modal" style={{zIndex: 999, border: hasBorder ? "2px solid white" : "none", maxWidth: "100%", width: `${width}vw`, height: `${height}vh`, left: `${left}vw`, top: `${top}vh`}}>
         {
             hasTopbar
             ?    <div className="modal-topbar">

@@ -41,6 +41,8 @@ async function main() {
         PERF_TAGS = [];
         console.log(`Test case "${test}" passed`);
     }
+
+    process.exit(0);
 }
 
 main();

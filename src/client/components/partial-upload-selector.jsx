@@ -105,6 +105,7 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                         const formData = new FormData();
                         formData.append("partialUploadSelection", trueActivePartialUploadSelection);
                         formData.append("file", file, file.name);
+                        console.log(formData);
                         const res = await fetch("/api/post/partial-file", {
                             body: formData,
                             method: "POST"

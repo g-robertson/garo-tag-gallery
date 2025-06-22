@@ -13,6 +13,10 @@ import { randomBytes } from 'crypto';
 import { rootedPath } from './src/util.js';
 import multer from 'multer';
 import { FileStorage } from './src/db/file-storage.js';
+import { dbrun } from './src/db/db-util.js';
+import { JobManager } from './src/db/job-manager.js';
+import { Mutex } from "async-mutex";
+import { readdir } from 'fs/promises';
 /** @import {User} from "./src/client/js/user.js" */
 /** @import {APIEndpoint} from "./src/api/api-types.js" */
 
@@ -29,21 +33,32 @@ async function main() {
         throw `Database failed to initialize: ${err.message}`;
       }
     }),
-    // .\perf\perftags.exe database/perf-input.txt database/perf-output.txt database/perf-tags
-    perfTags: new PerfTags(`perf/${PerfTags.EXE_NAME}`, "database/perf-input.txt", "database/perf-output.txt", "database/perf-tags", "archive-commands"),
-    fileStorage: new FileStorage("database/file-storage")
+    sqlMutex: new Mutex(),
+    sqlTransactionMutex: new Mutex(),
+    // .\perf\perftags.exe database/perf-write-input.txt database/perf-write-output.txt database/perf-read-input.txt database/perf-read-output.txt database/perf-tags
+    perfTags: new PerfTags(
+      `perf/${PerfTags.EXE_NAME}`,
+      "database/perf-write-input.txt",
+      "database/perf-write-output.txt",
+      "database/perf-read-input.txt",
+      "database/perf-read-output.txt",
+      "database/perf-tags",
+      "archive-commands"
+    ),
+    fileStorage: new FileStorage("database/file-storage"),
+    jobManager: new JobManager()
   };
 
   dbs.perfTags.__addStderrListener((data) => {
     appendFileSync("database/perf-tags-stderr.log", data);
   });
-  //dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
+  // await dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
 
-  await new Promise(resolve => dbs.sqlite3.run("PRAGMA foreign_keys = OFF;", () => resolve()));
-  await new Promise(resolve => dbs.sqlite3.run("PRAGMA journal_mode = WAL;", () => resolve()));
-  await new Promise(resolve => dbs.sqlite3.run("PRAGMA synchronous = NORMAL;", () => resolve()));
-  await new Promise(resolve => dbs.sqlite3.run("PRAGMA cache_size = 250000;", () => resolve()));
-  await new Promise(resolve => dbs.sqlite3.run("PRAGMA mmap_size=100000000;", () => resolve()));
+  await dbrun(dbs, "PRAGMA foreign_keys = OFF;");
+  await dbrun(dbs, "PRAGMA journal_mode = WAL;");
+  await dbrun(dbs, "PRAGMA synchronous = NORMAL;");
+  await dbrun(dbs, "PRAGMA cache_size = 250000;");
+  await dbrun(dbs, "PRAGMA mmap_size = 100000000;");
 
   await migrate(dbs);
 
@@ -175,7 +190,7 @@ async function main() {
 
   
   // prep partial file paths for api if remaining partial pieces finished is on
-  app.use((req, res) => {
+  app.use(async (req, res) => {
     if (req.body.remainingPartialPiecesFinished === "on") {
       const partialUploadFolder = req.body.partialUploadSelection;
       if (partialUploadFolder === undefined) {
@@ -189,7 +204,13 @@ async function main() {
 
       const partialUploadPath = partialUploadRootedPath.safePath;
       req.partialUploadPath = partialUploadPath;
-      req.partialFilePaths = readdirSync(partialUploadPath).map(partialUploadFileName => {
+      let filePaths = [];
+      try {
+        filePaths = await readdir(partialUploadPath);
+      } catch (e) {
+        return res.redirect("/400");
+      }
+      req.partialFilePaths = filePaths.map(partialUploadFileName => {
         const partialUploadFilePath = rootedPath("./partial-zips", path.join(partialUploadPath, partialUploadFileName));
         if (!partialUploadFilePath.isRooted) {
             return res.redirect("/400");

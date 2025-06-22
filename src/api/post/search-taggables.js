@@ -64,7 +64,6 @@ export default async function get(dbs, req, res) {
             }
         }));
     }));
-
     const taggables = await Taggables.searchWithUser(
         dbs,
         searchCriteria,

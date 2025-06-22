@@ -333,6 +333,8 @@ export const MIGRATION = {
             CREATE TABLE Files(
                 File_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 File_Hash BLOB NOT NULL,
+                Perceptual_Hash BLOB,
+                Exact_Bitmap_Hash BLOB,
                 Prethumbnail_Hash BLOB,
                 Thumbnail_Hash BLOB,
                 Has_File_Hash_Tag_ID INTEGER NOT NULL,

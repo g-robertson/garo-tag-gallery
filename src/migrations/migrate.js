@@ -25,7 +25,7 @@ export default async function migrate(dbs) {
             continue;
         }
 
-        await dbBeginTransaction(dbs);
+        dbs = await dbBeginTransaction(dbs);
         for (let command of migration.commands) {
             if (typeof command === "string") {
                 command = {sql: command};

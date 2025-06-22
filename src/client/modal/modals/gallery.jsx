@@ -18,7 +18,7 @@ const GalleryModal = ({user, modalOptions, pushModal, popModal}) => {
     initialTaggableID ??= taggableIDs[0];
     return (
         <div style={{width: "100%", height: "100%"}}>
-            <LazyGallery taggableIDs={taggableIDs} initialTaggableID={initialTaggableID} />
+            <LazyGallery user={user} taggableIDs={taggableIDs} initialTaggableID={initialTaggableID} />
         </div>
     );
 };
