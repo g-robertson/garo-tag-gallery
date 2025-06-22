@@ -296,15 +296,24 @@ export default class PerfTags {
             await this.#writeMutex.acquire();
         }
 
-        await this.__writeToWriteInputFile(PerfTags.#serializeTagPairings(tagPairings));
-        await this.__writeLineToStdin("delete_tag_pairings");
-        const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
+        await this.__insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
+        await this.__insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
+        const result = await this.__deleteTagPairings(tagPairings);
         this.#unflushedData = true;
 
         if (!inTransaction) {
             this.#writeMutex.release();
         }
         return result;
+    }
+
+    /**
+     * @param {Map<bigint, bigint[]>} tagPairings
+     */
+    async __deleteTagPairings(tagPairings) {
+        await this.__writeToWriteInputFile(PerfTags.#serializeTagPairings(tagPairings));
+        await this.__writeLineToStdin("delete_tag_pairings");
+        return await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
     }
 
     /**
@@ -364,8 +373,6 @@ export default class PerfTags {
      */
     async search(searchCriteria) {
         await this.#readMutex.acquire();
-        
-        const st = Date.now();
 
         await this.__writeToReadInputFile(Buffer.from(searchCriteria, 'binary'));
         await this.__writeLineToStdin("search");

@@ -23,7 +23,7 @@ import { Mutex } from "async-mutex";
  * @param {any} params
  */
 export async function dbrun(dbs, sql, params) {
-    if (dbs.inTransaction !== true) {
+    if (dbs.inTransaction === undefined) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
@@ -35,7 +35,7 @@ export async function dbrun(dbs, sql, params) {
     });
 
     dbs.sqlMutex.release();
-    if (dbs.inTransaction !== true) {
+    if (dbs.inTransaction === undefined) {
         dbs.sqlTransactionMutex.release();
     }
 
@@ -78,7 +78,7 @@ export async function dbgetselect(dbs, sql, params) {
  * @param {any} params
  */
 export async function dbget(dbs, sql, params) {
-    if (dbs.inTransaction !== true) {
+    if (dbs.inTransaction === undefined) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
@@ -90,7 +90,7 @@ export async function dbget(dbs, sql, params) {
     });
 
     dbs.sqlMutex.release();
-    if (dbs.inTransaction !== true) {
+    if (dbs.inTransaction === undefined) {
         dbs.sqlTransactionMutex.release();
     }
 
@@ -132,7 +132,7 @@ export async function dballselect(dbs, sql, params) {
  * @param {any} params
  */
 export async function dball(dbs, sql, params) {
-    if (dbs.inTransaction !== true) {
+    if (dbs.inTransaction === undefined) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
@@ -144,7 +144,7 @@ export async function dball(dbs, sql, params) {
     });
 
     dbs.sqlMutex.release();
-    if (dbs.inTransaction !== true) {
+    if (dbs.inTransaction === undefined) {
         dbs.sqlTransactionMutex.release();
     }
 
@@ -187,10 +187,17 @@ export function dbtuples(rows, columns) {
  * @param {Databases} dbs 
  */
 export async function dbBeginTransaction(dbs) {
+    if (dbs.inTransaction !== undefined) {
+        return {
+            ...dbs,
+            inTransaction: dbs.inTransaction + 1
+        };
+    }
+
     await dbs.sqlTransactionMutex.acquire();
     dbs = {
         ...dbs,
-        inTransaction: true
+        inTransaction: 1
     };
     await dbrun(dbs, "BEGIN TRANSACTION;");
     await dbs.perfTags.beginTransaction();
@@ -202,6 +209,13 @@ export async function dbBeginTransaction(dbs) {
  * @param {Databases} dbs 
  */
 export async function dbEndTransaction(dbs) {
+    if (dbs.inTransaction > 1) {
+        return {
+            ...dbs,
+            inTransaction: dbs.inTransaction - 1
+        };
+    }
+
     await dbs.perfTags.endTransaction();
     await dbrun(dbs, "COMMIT;");
     dbs.sqlTransactionMutex.release();

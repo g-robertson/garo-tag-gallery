@@ -5,6 +5,7 @@ import { clamp } from '../../js/client-util.js';
 import LocalMetricServiceSelector from '../../components/local-metric-service-selector.jsx';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import { METRIC_TYPES } from '../../js/metrics.js';
+import getMe from '../../../api/client-get/me.js';
 
 function clampServiceType(metricType) {
     if (isNaN(metricType)) {
@@ -57,10 +58,11 @@ function clampPrecision(metricType, precision) {
 /** 
  * @param {{
  *  user: User
+ *  setUser: (user: User) => void
  *  popModal: () => void
  * }}
 */
-const CreateMetric = ({user, popModal}) => {
+const CreateMetric = ({user, setUser, popModal}) => {
     const [lowerBound, setLowerBound] = useState(0);
     const [upperBound, setUpperBound] = useState(10);
     const [precision, setPrecision] = useState(0);
@@ -99,7 +101,7 @@ const CreateMetric = ({user, popModal}) => {
                 <div style={{marginLeft: "8px"}}>
                     <div style={{margin: "2px 0 2px 0"}}>
                         <span style={{marginRight: 2}}>Choose a <span title="how many fractional digits are stored">precision<sub><sub>?</sub></sub></span> for your rating service: </span>
-                        <input disabled={metricType !== METRIC_TYPES.NUMERIC} name="precision" type="text" value={precision} onChange={(e) => {
+                        <input disabled={metricType !== METRIC_TYPES.NUMERIC} type="text" value={precision} onChange={(e) => {
                             setPrecision(e.currentTarget.value);
                         }}  onBlur={(e) => {
                             setPrecision(clampPrecision(metricType, Number(e.currentTarget.value)));
@@ -134,7 +136,10 @@ const CreateMetric = ({user, popModal}) => {
                 <div style={{marginLeft: "8px"}}>
                     <input type="submit" value="Submit" />
                 </div>
-                <OnFormSubmit onFormSubmit={popModal}/>
+                <OnFormSubmit onFormSubmit={async () => {
+                    setUser(await getMe());
+                    popModal();
+                }} />
             </form>
         </div>
     );

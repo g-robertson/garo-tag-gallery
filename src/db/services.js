@@ -17,6 +17,7 @@ import {dbget, dbrun} from "./db-util.js";
  * @param {PermissionType} specificServicePermissionType 
  * @param {(dbs: Databases) => Promise<T[]>} selectAllSpecificTypedServices
  * @param {() => Promise<T & {Permission_Extent: PermissionInt}>} selectAllUserPermissionedSpecificTypedServices
+ * @param {keyof T} primaryKeyColumnName
  * @param {PermissionInt=} permissionBitsToCheck
  */
 export async function userSelectAllSpecificTypedServicesHelper(
@@ -25,6 +26,7 @@ export async function userSelectAllSpecificTypedServicesHelper(
     specificServicePermissionType,
     selectAllSpecificTypedServices,
     selectAllUserPermissionedSpecificTypedServices,
+    primaryKeyColumnName,
     permissionBitsToCheck
 ) {
     permissionBitsToCheck ??= PERMISSION_BITS.NONE;
@@ -50,15 +52,15 @@ export async function userSelectAllSpecificTypedServicesHelper(
             /** @type {Map<number, T & {Permission_Extent: PermissionInt}} */
             const specificServicesMap = new Map();
             for (const specificService of await selectAllSpecificTypedServices(dbs)) {
-                specificServicesMap.set(specificService.Local_Tag_Service_ID, {
+                specificServicesMap.set(specificService[primaryKeyColumnName], {
                     ...specificService,
                     Permission_Extent: giveAllSpecificTypedServicesPermission
                 });
             }
 
             for (const permissionedSpecificService of permissionedSpecificServices) {
-                const preExistingPermission = specificServicesMap.get(permissionedSpecificService.Local_Tag_Service_ID).Permission_Extent ?? 0;
-                specificServicesMap.set(permissionedSpecificService.Local_Tag_Service_ID, {
+                const preExistingPermission = specificServicesMap.get(permissionedSpecificService[primaryKeyColumnName]).Permission_Extent ?? 0;
+                specificServicesMap.set(permissionedSpecificService[primaryKeyColumnName], {
                     ...permissionedSpecificService,
                     Permission_Extent: preExistingPermission | permissionedSpecificService.Permission_Extent
                 });

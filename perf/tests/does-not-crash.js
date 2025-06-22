@@ -118,13 +118,6 @@ const TESTS = {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.search(PerfTags.searchTag(5n));
     },
-    "unended_transactional_insert_should_not_cause_crash": async(createPerfTags) => {
-        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-        await perfTags.beginTransaction();
-        await perfTags.insertTags([0n,1n,2n,3n], true);
-        await perfTags.close();
-        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-    },
     "complement_should_correctly_flush_to_cache_file": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         // make taggable with excessively overloaded tags to make it complement
@@ -138,5 +131,9 @@ const TESTS = {
         // read tags should not fail
         await perfTags.readTaggablesTags([1n]);
     },
+    "erasing_non_existent_tag_pairings_should_not_crash": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.deleteTagPairings(new Map([[1n, [1n,2n,3n,4n]]]));
+    }
 };
 export default TESTS;

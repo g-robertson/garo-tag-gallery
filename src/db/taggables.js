@@ -177,6 +177,7 @@ export class LocalTaggableServices {
                      WHERE SUP.User_ID = $userID;
                 `, {$userID: user.id()})).map(mapLocalTaggableService);
             },
+            "Local_Taggable_Service_ID",
             permissionBitsToCheck
         );
     }

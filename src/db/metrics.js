@@ -148,6 +148,7 @@ export class LocalMetricServices {
                      WHERE SUP.User_ID = $userID;
                 `, {$userID: user.id()}));
             },
+            "Local_Metric_Service_ID",
             permissionBitsToCheck
         );
     }
@@ -374,7 +375,7 @@ export class AppliedMetrics {
             await LocalTags.delete(dbs, localTag);
         }
 
-        dbEndTransaction(dbs);
+        await dbEndTransaction(dbs);
     }
 
     /**

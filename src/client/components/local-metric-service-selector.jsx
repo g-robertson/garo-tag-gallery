@@ -5,11 +5,12 @@ import { User } from '../js/user.js';
  * 
  * @param {{
  *  user: User
- *  onMetricServiceSelected: (localMetricService: DBPermissionedLocalMetricService) => void
+ *  onMetricServiceSelected?: (localMetricService: DBPermissionedLocalMetricService) => void
  * }} param0
  * @returns s
  */
 const LocalMetricServiceSelector = ({user, onMetricServiceSelected}) => {
+    onMetricServiceSelected = () => {};
     return (
         <div style={{marginLeft: "8px"}}>
             <div style={{margin: "2px 0 2px 0"}}>

@@ -168,7 +168,8 @@ export class LocalTagServices {
                       JOIN Services S ON LTS.Service_ID = S.Service_ID
                      WHERE SUP.User_ID = $userID;
                 `, {$userID: user.id()});
-            }
+            },
+            "Local_Tag_Service_ID"
         );
 
         return userSelectedPermissionedLocalTagServices.filter(dbLocalTagService => dbLocalTagService.User_Editable !== 0);

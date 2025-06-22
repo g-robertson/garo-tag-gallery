@@ -33,7 +33,7 @@ const App = () => {
 
     useEffect(() => {
         (async () => {
-            setUser(new User(await getMe()));
+            setUser(await getMe());
         })();
     }, []);
 
@@ -60,7 +60,7 @@ const App = () => {
 
     const mappedModals = activeModals.map((modalOptions, index) => (
         <div style={{pointerEvents: activeModals.length - 1 === index ? "auto" : "none"}}>
-            <Modal modalOptions={modalOptions} pushModal={pushModal} popModal={popModal} user={user} index={index} />
+            <Modal modalOptions={modalOptions} pushModal={pushModal} popModal={popModal} user={user} setUser={setUser} index={index} />
         </div>
     ));
 

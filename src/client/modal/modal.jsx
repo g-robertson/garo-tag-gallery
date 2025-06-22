@@ -54,11 +54,12 @@ const MODALS = {};
  *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *     popModal: () => void
  *     user: User
+ *     setUser: (user: User) => void
  *     index: number
  * }} param0 
  * @returns 
  */
-const Modal = ({modalOptions, pushModal, popModal, user, index}) => {
+const Modal = ({modalOptions, pushModal, popModal, user, setUser, index}) => {
     const {component, modalProperties} = MODALS[modalOptions.modalName];
 
     const hasTopbar = modalProperties.hasTopbar ?? true;
@@ -79,7 +80,7 @@ const Modal = ({modalOptions, pushModal, popModal, user, index}) => {
             :    <div style={{position: "absolute", top: 0, right: 0, zIndex: 100}} className="modal-cancel" onClick={popModal}>X</div>
         }
         <div className="modal-content">
-            {component({modalOptions, user, pushModal, popModal})}
+            {component({modalOptions, user, setUser, pushModal, popModal})}
         </div>
     </div>);
 };
