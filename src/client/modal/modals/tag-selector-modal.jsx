@@ -1,6 +1,7 @@
 import '../../global.css';
 import { User } from '../js/user.js';
 import TagsSelector from '../../components/tags-selector.jsx';
+import { useRef } from 'react';
 
 /** @import {ModalOptions} from "../modal.jsx" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
@@ -13,14 +14,15 @@ import TagsSelector from '../../components/tags-selector.jsx';
  *      selectionButtonText: string
  *      searchType: "intersect" | "union"
  *      initialSelectedTags?: ClientSearchQuery[]
+ *      tagsFilter?:
  *  }>
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  popModal: () => void
  * }}
 */
 export const TagSelectorModal = ({user, modalOptions, pushModal, popModal}) => {
-    /** @type {{out: Map<string, ClientSearchQuery> | null}} */
-    const searchObjectsOut = {out: null}
+    /** @type {{current: ClientSearchQuery | null}} */
+    const searchObjectsRef = useRef(null);
     modalOptions.extraProperties.initialSelectedTags ??= [];
     return (
         <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
@@ -31,10 +33,14 @@ export const TagSelectorModal = ({user, modalOptions, pushModal, popModal}) => {
                     pushModal={pushModal}
                     searchType={modalOptions.extraProperties.searchType}
                     initialSelectedTags={modalOptions.extraProperties.initialSelectedTags}
-                    searchObjectsOut={searchObjectsOut} />
+                    tagsFilter={modalOptions.extraProperties.tagsFilter}
+                    onSearchChanged={(clientSearchQuery) => {
+                        searchObjectsRef.current = clientSearchQuery;
+                    }}
+                />
             </div>
             <input style={{margin: 8}} type="button" value={modalOptions.extraProperties.selectionButtonText} onClick={() => {
-                modalOptions.resolve(searchObjectsOut.out);
+                modalOptions.resolve(searchObjectsRef.current);
                 popModal();
             }} />
         </div>

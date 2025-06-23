@@ -38,15 +38,14 @@ function clientSearchQueryToDisplayName(clientSearchQuery) {
  *  user: User
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  initialSelectedTags?: ClientSearchQuery[]
- *  searchObjectsOut?: {out: ClientSearchQuery}
  *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery) => void
  *  searchType?: "intersect" | "union"
  *  existingState?: any
  * }} param0
  */
-const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, onSearchChanged, searchType, existingState}) => {
+const TagsSelector = ({user, pushModal, initialSelectedTags, onSearchChanged, searchType, existingState}) => {
+    console.log(initialSelectedTags);
     existingState ??= {};
-    searchObjectsOut ??= {};
     onSearchChanged ??= () => {};
     searchType ??= "intersect";
 
@@ -60,10 +59,6 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, o
             type: searchType,
             value: clientSearchQuery
         });
-        searchObjectsOut.out = {
-            type: searchType,
-            value: clientSearchQuery
-        };
     }, [clientSearchQuery]);
 
     return (
@@ -81,7 +76,13 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, o
                     })}
                     customItemComponent={({realizedValue, index}) => (<div style={{width: "100%", position: "relative"}}>
                         <input type="button" style={{position: "absolute", top:0, right: 4}} value="OR" onClick={async () => {
-                            const orGroupSearchQuery = await pushModal(CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {initialSelectedTags: [realizedValue]});
+                            let initialSelectedTags = [realizedValue];
+                            if (realizedValue.type === "union" || realizedValue.type === "intersect") {
+                                initialSelectedTags = [...realizedValue.value];
+                            } else {
+
+                            }
+                            const orGroupSearchQuery = await pushModal(CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {initialSelectedTags});
                             if (orGroupSearchQuery === null || orGroupSearchQuery === undefined) {
                                 return;
                             }
@@ -111,10 +112,10 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, o
                                 };
                             }
                             const sameItemIndex = clientSearchQuery.findIndex(clientSearchQuery => {
-                                if (clientSearchQuery.type === "tagByLocalTagID" && clientSearchQuery.localTagID === tag.localTagID) {
+                                if (clientSearchQuery.type === "tagByLocalTagID" && clientSearchQuery.localTagID === clientSearchQueryToAdd.localTagID) {
                                     return true;
                                 }
-                                if (clientSearchQuery.type === "complement" && clientSearchQuery.value.type === "tagByLocalTagID" && clientSearchQuery.value.localTagID === tag.localTagID) {
+                                if (clientSearchQuery.type === "complement" && clientSearchQuery.value.type === "tagByLocalTagID" && clientSearchQuery.value.localTagID === clientSearchQueryToAdd.localTagID) {
                                     return true;
                                 }
                                 return false;

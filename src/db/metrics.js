@@ -13,6 +13,7 @@ import { Users } from "./user.js";
 import { LocalTags, Tags } from "./tags.js";
 import { Taggables } from "./taggables.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
+import { createAppliedMetricLookupName } from "../client/js/metrics.js";
 
 /**
  * @typedef {Object} DBLocalMetricService
@@ -321,7 +322,7 @@ export class AppliedMetrics {
         }
 
         const insertedAppliedMetricTags = await LocalTags.insertMany(dbs, appliedMetrics.map(appliedMetric => normalPreInsertLocalTag(
-            `system:applied metric:${appliedMetric.Applied_Value} on ${appliedMetric.Local_Metric_ID} with user ${appliedMetric.User_ID}`,
+            createAppliedMetricLookupName(appliedMetric.Local_Metric_ID, appliedMetric.User_ID, appliedMetric.Applied_Value),
             "System generated"
         )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 

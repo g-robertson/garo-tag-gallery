@@ -108,6 +108,10 @@ export class User {
         return this.#id;
     }
 
+    name() {
+        return this.#name;
+    }
+
     isAdmin() {
         return this.#isAdmin;
     }

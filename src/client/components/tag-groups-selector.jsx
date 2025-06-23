@@ -5,13 +5,23 @@ import MultiSelect from "./multi-select.jsx";
 import { useEffect, useState } from "react";
 
 /** @import {DBNamespace} from "../../db/tags.js" */
+/** @import {DBLocalMetric} from "../../db/metrics.js" */
 /** @import {ClientTagGroup} from "../../api/post/search-taggables.js" */
+
+/**
+ * @typedef {{
+ *     extraInfo?: {
+ *         localMetric?: DBLocalMetric
+ *         namespace?: DBNamespace
+ *     }
+ * } & ClientTagGroup} DisplayClientTagGroup
+ */
 
 /**
  * @param {{
  *  user: User
  *  multiSelect?: boolean
- *  onTagGroupsSelected?: (tagGroups: ClientTagGroup[]) => void
+ *  onTagGroupsSelected?: (tagGroups: DisplayClientTagGroup[]) => void
  * }} param0
  */
 const TagGroupsSelector = ({user, multiSelect, onTagGroupsSelected}) => {
@@ -22,20 +32,26 @@ const TagGroupsSelector = ({user, multiSelect, onTagGroupsSelected}) => {
     const [tagGroupOptionsSelected, setTagGroupOptionsSelected] = useState(new Set([NAMESPACES_SELECTED, METRIC_RATINGS_SELECTED]));
     /** @type {[DBNamespace[], (namespaces: DBNamespace[]) => void]} */
     const [namespaces, setNamespaces] = useState([]);
-    /** @type {ClientTagGroup[]} */
+    /** @type {DisplayClientTagGroup[]} */
     let tagGroups = [];
     if (tagGroupOptionsSelected.has(METRIC_RATINGS_SELECTED)) {
         tagGroups = tagGroups.concat(user.localMetricServices().map(localMetricService => localMetricService.Local_Metrics).flat().map(localMetric => ({
             type: "applied-metrics",
             displayName: `aggregate metric:${localMetric.Local_Metric_Name}`,
-            localMetricID: localMetric.Local_Metric_ID
+            localMetricID: localMetric.Local_Metric_ID,
+            extraInfo: {
+                localMetric
+            }
         })));
     }
     if (tagGroupOptionsSelected.has(NAMESPACES_SELECTED)) {
         tagGroups = tagGroups.concat(namespaces.map(namespace => ({
             type: "namespace",
             displayName: `aggregate namespace:${namespace.Namespace_Name}`,
-            namespaceID: namespace.Namespace_ID
+            namespaceID: namespace.Namespace_ID,
+            extraInfo: {
+                namespace
+            }
         })));
     }
     /** @type {[string, (tagGroupFilterValue: string) => void]} */

@@ -588,9 +588,10 @@ export default class PerfTags {
             await mkdir(this.#archiveDirectory, {recursive: true});
             await writeFile(path.join(this.#archiveDirectory, `command-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), data);
             if (existsSync(this.#writeInputFileName)) {
-                await writeFile(path.join(this.#archiveDirectory, `perf-input-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), await readFile(this.#writeInputFileName));
-            } else {
-                await writeFile(path.join(this.#archiveDirectory, `perf-input-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), "");
+                await writeFile(path.join(this.#archiveDirectory, `${path.basename(this.#writeInputFileName)}-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), await readFile(this.#writeInputFileName));
+            }
+            if (existsSync(this.#readInputFileName)) {
+                await writeFile(path.join(this.#archiveDirectory, `${path.basename(this.#readInputFileName)}-${this.#stdinWrites.toString().padStart(5, '0')}.txt`), await readFile(this.#readInputFileName));
             }
         }
         

@@ -32,6 +32,7 @@ const MODALS = {};
         await import('./modals/change-tag-to-metric.jsx'),
         await import('./modals/create-aggregate-tag.jsx'),
         await import("./modals/tag-selector-modal.jsx"),
+        await import("./modals/select-from-list-of-tags-modal.jsx")
     ];
     
     for (const modal of modals) {

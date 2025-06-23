@@ -45,7 +45,7 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags, pushModal) {
  *  excludeable?: boolean
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  allowSystemTags?: boolean
- *  valueMappingFunction: (tags: ClientTag[], pushModal: (modalName: string, extraProperties: any) => Promise<any>) => Promise<T>[]
+ *  valueMappingFunction: (tags: ClientTag[], pushModal: (modalName: string, extraProperties: any) => Promise<any>) => Promise<T[]>
  *  onTagsSelected?: (tags: T[], isExcludeOn: boolean) => void
  * }} param0
  */

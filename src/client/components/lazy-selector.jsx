@@ -102,7 +102,6 @@ function LazySelector({
     optionShowCount.current = rowCountAvailable.current * columnCountAvailable.current;
     const [shownStartIndex, setShownStartIndex] = useState(initialLastClickedIndex);
     const shownEndIndex = shownStartIndex + optionShowCount.current - 1;
-
     const lastPossibleShownStartIndex = useRef(0);
     lastPossibleShownStartIndex.current = Math.max((columnCountAvailable.current * Math.ceil(values.length / columnCountAvailable.current)) - optionShowCount.current, 0);
 
@@ -338,7 +337,6 @@ function LazySelector({
     }
 
     useEffect(() => {
-
         if (valueRealizationDelay === 0) {
             realizeItems.current();
         } else {
@@ -347,7 +345,7 @@ function LazySelector({
                 clearTimeout(timeoutHandle);
             };
         }
-    }, [shownStartIndex, selectedIndices, values]);
+    }, [shownStartIndex, selectedIndices, values, widthAvailable, heightAvailable]);
 
 
     useEffect(() => {

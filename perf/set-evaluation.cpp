@@ -66,8 +66,7 @@ std::size_t SetEvaluation::size() const {
 }
 
 SetEvaluation SetEvaluation::rightHandSide(SetEvaluation lhsSet, SetEvaluation rhsSet) {
-    auto postMove = std::move(rhsSet);
-    return std::move(postMove);
+    return SetEvaluation(rhsSet.isComplement, rhsSet.universe, std::unordered_set<uint64_t>(*rhsSet.itemsPtr));
 }
 SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation lhsSet, SetEvaluation rhsSet) {
     if (lhsSet.universe != rhsSet.universe) {
@@ -143,6 +142,9 @@ SetEvaluation SetEvaluation::intersect(SetEvaluation lhsSet, SetEvaluation rhsSe
 
 }
 SetEvaluation SetEvaluation::setUnion(SetEvaluation lhsSet, SetEvaluation rhsSet) {
+    if (!lhsSet.items.has_value()) {
+        throw std::logic_error("LHS did not have real value");
+    }
     if (lhsSet.universe != rhsSet.universe) {
         throw std::logic_error("Sets had different universe values");
     }
@@ -151,7 +153,7 @@ SetEvaluation SetEvaluation::setUnion(SetEvaluation lhsSet, SetEvaluation rhsSet
     if (lhsSet.isComplement) {
         if (rhsSet.isComplement) {
             // ~A U ~B <=> ~(A N B)
-            return SetEvaluation(true, universe, usetIntersect_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(true, universe, usetIntersect_(std::move(*lhsSet.items), *rhsSet.itemsPtr));
         } else {
             // ~A U B <=> ~(A N ~B)
             return SetEvaluation(true, universe, usetIntersectRHSComplement_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
@@ -162,9 +164,18 @@ SetEvaluation SetEvaluation::setUnion(SetEvaluation lhsSet, SetEvaluation rhsSet
             return SetEvaluation(true, universe, usetIntersectRHSComplement_(*rhsSet.itemsPtr, *lhsSet.itemsPtr));
         } else {
             // A U B
-            return SetEvaluation(false, universe, usetUnion_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            usetUnion_(*lhsSet.items, *rhsSet.itemsPtr);
+            return SetEvaluation(false, universe, std::move(*lhsSet.items));
         }
     }
+}
+
+std::unordered_set<uint64_t>& SetEvaluation::usetUnion_(std::unordered_set<uint64_t>& modifiableSet, const std::unordered_set<uint64_t>& unmodifiableSet) {
+    for (auto item : unmodifiableSet) {
+        modifiableSet.insert(item);
+    }
+
+    return modifiableSet;
 }
 
 std::unordered_set<uint64_t> SetEvaluation::usetUnion_(const std::unordered_set<uint64_t>& smallerSet, const std::unordered_set<uint64_t>& largerSet) {

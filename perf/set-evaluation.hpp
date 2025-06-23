@@ -24,6 +24,7 @@ class SetEvaluation {
         static SetEvaluation setUnion(SetEvaluation lhsSet, SetEvaluation rhsSet);
     private:
         static std::unordered_set<uint64_t> usetIntersect_(const std::unordered_set<uint64_t>& smallerSet, const std::unordered_set<uint64_t>& largerSet);
+        static std::unordered_set<uint64_t>& usetUnion_(std::unordered_set<uint64_t>& modifiableSet, const std::unordered_set<uint64_t>& unmodifiableSet);
         static std::unordered_set<uint64_t> usetUnion_(const std::unordered_set<uint64_t>& smallerSet, const std::unordered_set<uint64_t>& largerSet);
         static std::unordered_set<uint64_t> usetIntersectRHSComplement_(const std::unordered_set<uint64_t>& lhsSet, const std::unordered_set<uint64_t>& rhsSet);
         static std::unordered_set<uint64_t> usetSymmetricDifference_(const std::unordered_set<uint64_t>& lhsSet, const std::unordered_set<uint64_t>& rhsSet);

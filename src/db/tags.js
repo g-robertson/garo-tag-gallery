@@ -153,8 +153,9 @@ export class LocalTagServices {
     /**
      * @param {Databases} dbs 
      * @param {User} user 
+     * @param {PermissionInt} permissionBitsToCheck 
      */
-    static async userSelectAll(dbs, user) {
+    static async userSelectAll(dbs, user, permissionBitsToCheck) {
         const userSelectedPermissionedLocalTagServices = await userSelectAllSpecificTypedServicesHelper(
             dbs,
             user,
@@ -169,7 +170,8 @@ export class LocalTagServices {
                      WHERE SUP.User_ID = $userID;
                 `, {$userID: user.id()});
             },
-            "Local_Tag_Service_ID"
+            "Local_Tag_Service_ID",
+            permissionBitsToCheck
         );
 
         return userSelectedPermissionedLocalTagServices.filter(dbLocalTagService => dbLocalTagService.User_Editable !== 0);
@@ -254,6 +256,35 @@ export class UserFacingLocalTags {
         }
 
         return taggablesUserFacingLocalTags;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number[]} namespaceIDs 
+     * @param {number[]} localTagServiceIDs 
+     */
+    static async selectManyByNamespaceIDs(dbs, namespaceIDs, localTagServiceIDs) {
+        /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
+        const dbUserFacingLocalTags = await dballselect(dbs, `
+            SELECT LT.Tag_ID, LT.Local_Tag_ID, LT.Display_Name, LT.Local_Tag_Service_ID
+              FROM Local_Tags LT
+              JOIN Tags T ON LT.Tag_ID = T.Tag_ID
+              JOIN Tags_Namespaces TN ON T.Tag_ID = TN.Tag_ID
+             WHERE LT.Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
+               AND TN.Namespace_ID IN ${dbvariablelist(namespaceIDs.length)}
+            ;`, [...localTagServiceIDs, ...namespaceIDs]
+        );
+
+        return await mapUserFacingLocalTags(dbs, dbUserFacingLocalTags);
+    }
+    
+    /**
+     * @param {Databases} dbs 
+     * @param {number} namespaceID
+     * @param {number[]} localTagServiceIDs 
+     */
+    static async selectManyByNamespaceID(dbs, namespaceID, localTagServiceIDs) {
+        return await UserFacingLocalTags.selectManyByNamespaceIDs(dbs, [namespaceID], localTagServiceIDs);
     }
 
     /**
