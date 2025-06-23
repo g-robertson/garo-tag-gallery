@@ -10,8 +10,8 @@ import { Job } from "./job-manager.js";
 import { readFile } from "fs/promises";
 /**
  * @import {Databases} from "./db-util.js"
- * @import {PreInsertLocalTag, DBFileExtension, DBLocalTagService, DBJoinedURLAssociation} from "./tags.js"
- * @import {PreInsertLocalFile, DBLocalTaggableService} from "./taggables.js"
+ * @import {PreInsertLocalTag, DBFileExtension, DBJoinedURLAssociation} from "./tags.js"
+ * @import {PreInsertLocalFile} from "./taggables.js"
  * @import {PreInsertNote} from "./notes.js"
  */
 
@@ -20,10 +20,10 @@ import { readFile } from "fs/promises";
  * @param {Databases} dbs
  * @param {string} partialUploadFolder
  * @param {string[]} partialFilePaths
- * @param {DBLocalTagService} dbLocalTagService
- * @param {DBLocalTaggableService} dbLocalTaggableService
+ * @param {number} localTagServiceID
+ * @param {number} localTaggableServiceID
  */
-export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePaths, dbLocalTagService, dbLocalTaggableService) {
+export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePaths, localTagServiceID, localTaggableServiceID) {
     return new Job({durationBetweenTasks: 250}, async function*() {
         yield {upcomingSubtasks: 1};
 
@@ -128,7 +128,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
                 });
             }
 
-            const {dbLocalFiles, finalizeFileMove} = await LocalFiles.upsertMany(dbsTransaction, localFiles, dbLocalTaggableService);
+            const {dbLocalFiles, finalizeFileMove} = await LocalFiles.upsertMany(dbsTransaction, localFiles, localTaggableServiceID);
             const dbLocalFilesMap = new Map(dbLocalFiles.map(dbFile => [dbFile.File_Hash.toString("hex"), dbFile]));
             /** @type {Map<string, string>} */
             const dbFileHashMap = new Map();
@@ -220,7 +220,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
             // upsert namespaces
             const dbNamespacesMap = new Map((await Namespaces.upsertMany(dbsTransaction, [...allNamespacesSet])).map(dbNamespace => [dbNamespace.Namespace_Name, dbNamespace]));
             // upsert tags
-            const dbLocalTagsMap = new Map((await LocalTags.upsertMany(dbsTransaction, allTags, dbLocalTagService.Local_Tag_Service_ID)).map(dbTag => [dbTag.Local_Tags_PK_Hash, dbTag]));
+            const dbLocalTagsMap = new Map((await LocalTags.upsertMany(dbsTransaction, allTags, localTagServiceID)).map(dbTag => [dbTag.Local_Tags_PK_Hash, dbTag]));
 
             /** @type {Map<bigint, bigint[]>} */
             const taggablePairings = new Map();

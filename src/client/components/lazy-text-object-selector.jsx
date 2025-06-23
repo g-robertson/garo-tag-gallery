@@ -3,18 +3,18 @@ import LazySelector from "./lazy-selector.jsx";
 /**
  * @template T
  * @param {{
- *  tags: T[]
- *  onValuesSelected?: (valuesSelected: T[]) => void
- *  onValuesDoubleClicked?: (valuesSelected: T[]) => void
- *  customItemComponent?: (param0: {realizedValue: T}) => JSX.Element
+ *  textObjects: T[]
+ *  onValuesSelected?: (valuesSelected: T[], indicesSelected: number[]) => void
+ *  onValuesDoubleClicked?: (valuesSelected: T[], indicesSelected: number[]) => void
+ *  customItemComponent?: (param0: {realizedValue: T, index: number}) => JSX.Element
  *  customTitleRealizer?: (value: T) => string
  *  multiSelect?: boolean
  *  elementsSelectable?: boolean
  *  scrollbarWidth?: number
  * }} param0
  */
-const LazyTagSelector = ({
-    tags,
+const LazyTextObjectSelector = ({
+    textObjects,
     onValuesSelected,
     onValuesDoubleClicked,
     customItemComponent,
@@ -26,7 +26,7 @@ const LazyTagSelector = ({
     scrollbarWidth ??= 17;
     customItemComponent ??= ({realizedValue}) => (<>{realizedValue.displayName}</>);
     return <LazySelector
-        values={tags}
+        values={textObjects}
         onValuesDoubleClicked={onValuesDoubleClicked}
         onValuesSelected={onValuesSelected}
         customItemComponent={customItemComponent}
@@ -42,4 +42,4 @@ const LazyTagSelector = ({
     />
 }
 
-export default LazyTagSelector;
+export default LazyTextObjectSelector;

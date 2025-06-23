@@ -1,10 +1,8 @@
-import { useRef } from 'react';
 import '../../global.css';
 import { User } from '../js/user.js';
-import TagsSelector from '../../components/tags-selector.jsx';
+import { TagSelectorModal } from './tag-selector-modal.jsx';
 
 /** @import {ModalOptions} from "../modal.jsx" */
-/** @import {SearchObject} from "../../components/tags-selector.jsx" */
 
 /** 
  * @param {{
@@ -15,20 +13,21 @@ import TagsSelector from '../../components/tags-selector.jsx';
  * }}
 */
 const CreateOrSearchGroup = ({user, modalOptions, pushModal, popModal}) => {
-    /** @type {{out: Map<string, SearchObject> | null}} */
-    const searchObjectsOut = {out: null}
-
     return (
-        <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
-            Select tags for your OR group:
-            <div style={{width: "100%", height: "100%"}}>
-                <TagsSelector user={user} pushModal={pushModal} initialSelectedTags={modalOptions?.extraProperties?.initialSelectedTags} searchObjectsOut={searchObjectsOut} />
-            </div>
-            <input style={{margin: 8}} type="button" value="Select OR group" onClick={() => {
-                modalOptions.resolve([...searchObjectsOut.out.values()]);
-                popModal();
-            }} />
-        </div>
+        <TagSelectorModal
+            user={user}
+            modalOptions={{
+                ...modalOptions,
+                extraProperties: {
+                    ...modalOptions.extraProperties,
+                    searchType: "union",
+                    titleText: "Select tags for your OR group:",
+                    selectionButtonText: "Select OR Group"
+                }
+            }}
+            pushModal={pushModal}
+            popModal={popModal}
+        />
     );
 };
 

@@ -18,6 +18,7 @@ import applyMetricToTaggable from '../../api/client-get/apply-metric-to-taggable
  * }} param0
  */
 const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicked}) => {
+    /** @type {[Map<number, number>, (metricValuesMap: Map<number, number>) => void]} */
     const [metricValuesMap, setMetricValuesMap] = useState(new Map());
     const [metricStarsHovered, setMetricStarsHovered] = useState({localMetricID: -1, starsHovered: -1});
     const galleryID = useRef(randomID(32));
@@ -95,7 +96,7 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
                                               };
 
                                               metricValuesMap.set(localMetric.Local_Metric_ID, newAppliedMetric);
-                                              setMetricValuesMap(new Map([...metricValuesMap]));
+                                              setMetricValuesMap(new Map(metricValuesMap));
                                               setRealizedValue({
                                                 ...realizedValue,
                                                 Metrics: [

@@ -18,22 +18,23 @@ export async function validate(dbs, req, res) {
     }
 
     const partialUploadFolderSafePath = partialUploadFolderRootedPath.safePath;
-    req.sanitizedBody = {
+    return {
         partialUploadFolderSafePath
     };
 }
 
 export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.NONE, BITS: 0};
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export async function checkPermission(dbs, req, res) {
     return false;
 }
 
 
-/** @type {APIFunction} */
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {
     let dirContents = [];
     try {
-        dirContents = await readdir(req.sanitizedBody.partialUploadFolderSafePath);
+        dirContents = await readdir(req.body.partialUploadFolderSafePath);
     } catch (err) {} // Nothing we can do about a non-existent directory
     res.send(dirContents);
 }

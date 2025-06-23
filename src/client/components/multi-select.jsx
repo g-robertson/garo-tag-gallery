@@ -45,7 +45,7 @@ const MultiSelect = ({options, defaultOptionsSelected, onOptionsChange}) => {
                             optionsSelected.delete(option.value);
                         }
 
-                        setOptionsSelected(new Set([...optionsSelected]));
+                        setOptionsSelected(new Set(optionsSelected));
                     }}/> {option.displayName}
                 </div>
             ))}

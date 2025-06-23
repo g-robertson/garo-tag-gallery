@@ -14,6 +14,7 @@ export async function validate(dbs, req, res) {
     if (req?.files?.length > 1) {
         return "More than one file is not allowed to be uploaded at a time";
     }
+    /** @type {Express.Multer.File} */
     const file = req.files[0];
 
     const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadSelection.data));
@@ -28,7 +29,7 @@ export async function validate(dbs, req, res) {
     }
     const partialUploadFileSafePath = partialUploadFileRootedPath.safePath;
 
-    req.sanitizedBody = {
+    return {
         partialUploadFolderSafePath,
         partialUploadFileSafePath,
         file
@@ -36,14 +37,15 @@ export async function validate(dbs, req, res) {
 }
 
 export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.NONE, BITS: 0};
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export async function checkPermission() {
     return false;
 }
 
-/** @type {APIFunction} */
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
-    await mkdir(req.sanitizedBody.partialUploadFolderSafePath, {recursive: true});
-    await rename(req.sanitizedBody.file.path, req.sanitizedBody.partialUploadFileSafePath);
+    await mkdir(req.body.partialUploadFolderSafePath, {recursive: true});
+    await rename(req.body.file.path, req.body.partialUploadFileSafePath);
 
     res.status(200).send("Finished posting file");
 }

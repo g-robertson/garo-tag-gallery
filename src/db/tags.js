@@ -1,4 +1,4 @@
-import { HAS_URL_TAG, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash } from "../client/js/tags.js";
+import { HAS_URL_TAG, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash, normalPreInsertLocalTag } from "../client/js/tags.js";
 import { PERMISSIONS, User } from "../client/js/user.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
 import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
@@ -74,7 +74,7 @@ export class LocalTagServices {
               JOIN Local_Tags LT ON LTS.Local_Tag_Service_ID = LT.Local_Tag_Service_ID
               WHERE LT.Local_Tag_ID IN ${dbvariablelist(localTagIDs.length)}
             `, localTagIDs
-        )).map(localTagServiceID => localTagServiceID.Local_Tag_Service_ID);
+        ));
     }
 
     /**
@@ -199,7 +199,7 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
 
     /** @type {Map<bigint, string[]} */
     const tagsNamespaces = new Map(dbUserFacingLocalTags.map(dbUserFacingLocalTag => [dbUserFacingLocalTag.Tag_ID, []]));
-    for (const {Tag_ID, Namespace_Name} of await TagsNamespaces.selectMappedByTagIDs(dbs, dbUserFacingLocalTags.map(tag => tag.Tag_ID))) {
+    for (const {Tag_ID, Namespace_Name} of await TagsNamespaces.selectManyMappedByTagIDs(dbs, dbUserFacingLocalTags.map(tag => tag.Tag_ID))) {
         tagsNamespaces.get(Tag_ID).push(Namespace_Name);
     }
 
@@ -344,6 +344,13 @@ export class Tags {
         const dbTags = await dball(dbs, `INSERT INTO Tags(Tag_Created_Date) VALUES ${dbtuples(amount, 1)} RETURNING *;`, nows);
         return dbTags.map(mapDBTag);
     }
+
+    /**
+     * @param {Databases} dbs 
+     */
+    static async insert(dbs) {
+        return (await Tags.insertMany(dbs, 1))[0];
+    }
 }
 
 
@@ -449,9 +456,13 @@ export class LocalTags {
      * @param {Databases} dbs 
      * @param {PreInsertLocalTag[]} localTags 
      * @param {number} localTagServiceID
+     * @param {DBTag[]=} preCreatedTags
      * @returns {Promise<DBLocalTag[]>}
      */
-    static async insertMany(dbs, localTags, localTagServiceID) {
+    static async insertMany(dbs, localTags, localTagServiceID, preCreatedTags) {
+        if (preCreatedTags !== undefined && preCreatedTags.length !== localTags.length) {
+            throw "Pre-created tags were provided to insert local tags, but the length of the pre-created tags did not match the local tags length";
+        }
         if (localTags.length === 0) {
             return [];
         }
@@ -460,12 +471,12 @@ export class LocalTags {
             return slices.flat();
         }
 
-        const dbTags = await Tags.insertMany(dbs, localTags.length);
+        preCreatedTags ??= await Tags.insertMany(dbs, localTags.length);
 
         const tagInsertionParams = [];
         for (let i = 0; i < localTags.length; ++i) {
             const localTag = localTags[i];
-            tagInsertionParams.push(Number(dbTags[i].Tag_ID));
+            tagInsertionParams.push(Number(preCreatedTags[i].Tag_ID));
             tagInsertionParams.push(localTagServiceID);
             tagInsertionParams.push(localTag.Lookup_Name);
             tagInsertionParams.push(localTag.Source_Name);
@@ -487,14 +498,15 @@ export class LocalTags {
         );
         return dbLocalTags.map(mapDBLocalTag);
     }
-    
+
     /**
      * @param {Databases} dbs 
      * @param {PreInsertLocalTag} localTag
      * @param {number} localTagServiceID
+     * @param {DBTag=} preCreatedTag
      */
-    static async insert(dbs, localTag, localTagServiceID) {
-        return (await LocalTags.insertMany(dbs, [localTag], localTagServiceID))[0];
+    static async insert(dbs, localTag, localTagServiceID, preCreatedTag) {
+        return (await LocalTags.insertMany(dbs, [localTag], localTagServiceID, [preCreatedTag]))[0];
     }
 
     /**
@@ -573,11 +585,10 @@ export class FileExtensions {
             return [];
         }
 
-        const insertedHasFileExtensionTags = await LocalTags.insertMany(dbs, fileExtensions.map(fileExtension => ({
-            Source_Name: "System generated",
-            Display_Name: `system:has file extension:${fileExtension}`,
-            Lookup_Name: `system:has file extension:${fileExtension}`
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        const insertedHasFileExtensionTags = await LocalTags.insertMany(dbs, fileExtensions.map(fileExtension => normalPreInsertLocalTag(
+            `system:has file extension:${fileExtension}`,
+            "System generated"
+        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
         const fileExtensionInsertionParams = [];
         for (let i = 0; i < fileExtensions.length; ++i) {
@@ -661,11 +672,11 @@ export class TagsNamespaces {
      * @param {bigint[]} tagIDs
      * @returns {Promise<{Namespace_Name: string, Tag_ID: bigint}[]>}
      */
-    static async selectMappedByTagIDs(dbs, tagIDs) {
+    static async selectManyMappedByTagIDs(dbs, tagIDs) {
         if (tagIDs.length === 0) {
             return [];
         }
-
+        
         return (await dballselect(dbs, `
             SELECT N.Namespace_Name, TN.Tag_ID
               FROM Tags_Namespaces TN
@@ -691,6 +702,23 @@ export class TagsNamespaces {
         const dbTagsNamespaces = await dballselect(dbs,
             `SELECT * FROM Tags_Namespaces WHERE Tags_Namespaces_PK_Hash IN ${dbvariablelist(tagsNamespaces.length)};`,
             tagsNamespaces.map(tagNamespace => tagNamespace.Tags_Namespaces_PK_Hash)
+        );
+        return dbTagsNamespaces.map(mapDBTagNamespace);
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number[]} namespaceIDs
+     */
+    static async selectManyByNamespaceIDs(dbs, namespaceIDs) {
+        if (namespaceIDs.length === 0) {
+            return [];
+        }
+
+        /** @type {DBTagNamespace[]} */
+        const dbTagsNamespaces = await dballselect(dbs,
+            `SELECT * FROM Tags_Namespaces WHERE Namespace_ID IN ${dbvariablelist(namespaceIDs.length)};`,
+            namespaceIDs
         );
         return dbTagsNamespaces.map(mapDBTagNamespace);
     }
@@ -769,6 +797,15 @@ export class Namespaces {
 
         /** @type {DBNamespace[]} */
         const dbNamespaces = await dballselect(dbs, `SELECT * FROM Namespaces WHERE Namespace_Name IN ${dbvariablelist(namespaces.length)};`, namespaces);
+        return dbNamespaces;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     */
+    static async selectAll(dbs) {
+        /** @type {DBNamespace[]} */
+        const dbNamespaces = await dballselect(dbs, `SELECT * FROM Namespaces;`);
         return dbNamespaces;
     }
 
@@ -853,11 +890,10 @@ export class URLs {
             return [];
         }
 
-        const insertedHasURLTags = await LocalTags.insertMany(dbs, urls.map(url => ({
-            Source_Name: "System generated",
-            Display_Name: `system:has url:${url}`,
-            Lookup_Name: `system:has url:${url}`
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        const insertedHasURLTags = await LocalTags.insertMany(dbs, urls.map(url => normalPreInsertLocalTag(
+            `system:has url:${url}`,
+            "System generated"
+        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
         const urlInsertionParams = [];
         for (let i = 0; i < urls.length; ++i) {
@@ -970,11 +1006,10 @@ export class URLAssociations {
 
         const urlAssociationsMap = new Map(urlAssociations.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]));
 
-        const insertedHasURLAssociationTags = await LocalTags.insertMany(dbs, urlAssociations.map(urlAssociation => ({
-            Source_Name: "System generated",
-            Display_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`,
-            Lookup_Name: `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        const insertedHasURLAssociationTags = await LocalTags.insertMany(dbs, urlAssociations.map(urlAssociation => normalPreInsertLocalTag(
+            `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`,
+            "System generated"
+        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
         const urlAssociationInsertionParams = [];
         for (let i = 0; i < urlAssociations.length; ++i) {

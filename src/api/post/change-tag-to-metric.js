@@ -1,5 +1,6 @@
 /**
  * @import {APIFunction} from "../api-types.js"
+ * @import {DBLocalTag} from "../../db/tags.js"
  */
 
 import { z } from "zod";
@@ -20,8 +21,11 @@ export async function validate(dbs, req, res) {
     if (!metricValue.success) return metricValue.error.message;
 
     const localTag = await LocalTags.selectByID(dbs, localTagID.data);
+    if (localTag === undefined) {
+        return "local tag ID did not exist";
+    }
 
-    req.sanitizedBody = {
+    return {
         localTag,
         removeExistingTag,
         localMetricID: localMetricID.data,
@@ -36,27 +40,28 @@ export const PERMISSIONS_REQUIRED = [{
     TYPE: PERMISSIONS.LOCAL_TAG_SERVICES,
     BITS: PERMISSION_BITS.READ | PERMISSION_BITS.DELETE
 }];
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export async function checkPermission(dbs, req, res) {
-    const localMetricServiceToCheck = await LocalMetricServices.selectByLocalMetricID(dbs, req.sanitizedBody.localMetricID);
+    const localMetricServiceToCheck = await LocalMetricServices.selectByLocalMetricID(dbs, req.body.localMetricID);
     const localMetricService = await LocalMetricServices.userSelectByID(dbs, req.user, PERMISSION_BITS.READ, localMetricServiceToCheck.Local_Metric_Service_ID);
 
-    const localTagServicePermissionsRequired = req.sanitizedBody.removeExistingTag ? PERMISSION_BITS.READ | PERMISSION_BITS.DELETE : PERMISSION_BITS.READ;
-    const localTagService = await LocalTagServices.userSelectByID(dbs, req.user, localTagServicePermissionsRequired, req.sanitizedBody.localTag.Local_Tag_Service_ID);
+    const localTagServicePermissionsRequired = req.body.removeExistingTag ? PERMISSION_BITS.READ | PERMISSION_BITS.DELETE : PERMISSION_BITS.READ;
+    const localTagService = await LocalTagServices.userSelectByID(dbs, req.user, localTagServicePermissionsRequired, req.body.localTag.Local_Tag_Service_ID);
     
     return localMetricService !== undefined && localTagService !== undefined;
 }
 
-/** @type {APIFunction} */
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
     await AppliedMetrics.userConvertFromLocalTag(
         dbs, 
-        req.sanitizedBody.localTag,
+        req.body.localTag,
         {
-            Local_Metric_ID: req.sanitizedBody.localMetricID,
+            Local_Metric_ID: req.body.localMetricID,
             User_ID: req.user.id(),
-            Applied_Value: req.sanitizedBody.metricValue
+            Applied_Value: req.body.metricValue
         },
-        req.sanitizedBody.removeExistingTag,
+        req.body.removeExistingTag,
         req.user
     );
     res.status(200).send("Tag to metric done");

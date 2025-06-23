@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { IS_FILE_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
+import { IS_FILE_TAG, normalPreInsertLocalTag, SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import {asyncDataSlicer, dball, dballselect, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
@@ -292,9 +292,15 @@ export class Taggables {
             return [];
         }
 
-        const {taggables} = await dbs.perfTags.search(PerfTags.searchIntersect([searchCriteria, PerfTags.searchUnion(
+        let constructedSearch = PerfTags.searchUnion(
             inLocalTaggableServiceTagIDs.map(inLocalTaggableServiceTagID => PerfTags.searchTag(inLocalTaggableServiceTagID))
-        )]), dbs.inTransaction);
+        );
+
+        if (searchCriteria !== "") {
+            constructedSearch = PerfTags.searchIntersect([searchCriteria, constructedSearch])
+        }
+
+        const {taggables} = await dbs.perfTags.search(constructedSearch, dbs.inTransaction);
         return await Taggables.selectManyByIDs(dbs, taggables);
     }
     
@@ -476,13 +482,10 @@ export class Files {
 
         const fileToSourceLocationMap = new Map(files.map(file => [file.File_Hash.toString("hex"), file.sourceLocation]));
 
-        const hasFileHashTags = await LocalTags.insertMany(dbs, files.map(file => ({
-            Source_Name: "System generated",
-            Display_Name: `system:has hash:${file.File_Hash.toString("hex")}`,
-            Lookup_Name: `system:has hash:${file.File_Hash.toString("hex")}`,
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
-
-
+        const hasFileHashTags = await LocalTags.insertMany(dbs, files.map(file => normalPreInsertLocalTag(
+            `system:has hash:${file.File_Hash.toString("hex")}`,
+            "System generated"
+        )));
 
         /** @type {{fileLocation: string, hash: Buffer}[]} */
         const thumbnailsGenerated = [];

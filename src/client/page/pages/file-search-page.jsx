@@ -26,15 +26,10 @@ const FileSearchPage = ({user, pushModal, existingState}) => {
                 <TagsSelector
                     user={user}
                     pushModal={pushModal}
-                    onSearchChanged={async (searchObjects) => {
-                        const searchQuery = searchObjects.map(searchObject => searchObject.flat(Infinity).map(searchTag => ({
-                            Local_Tag_ID: searchTag.localTagID,
-                            exclude: searchTag.exclude
-                        })));
-
+                    onSearchChanged={async (clientSearchQuery) => {
                         const response = await fetch("/api/post/search-taggables", {
                             body: JSON.stringify({
-                                searchQuery
+                                searchQuery: clientSearchQuery
                             }),
                             headers: {
                               "Content-Type": "application/json",

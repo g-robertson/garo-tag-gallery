@@ -249,9 +249,11 @@ async function main() {
       }
 
       let canPerformAction = false;
-      const validationMessage = await api.validate(dbs, req, res);
-      if (validationMessage !== undefined) {
-        return res.status(400).send(validationMessage);
+      const validationResult = await api.validate(dbs, req, res);
+      if (typeof validationResult === "string") {
+        return res.status(400).send(validationResult);
+      } else {
+        req.body = validationResult;
       }
       let userHasGlobalPermissions = true;
       for (const {TYPE, BITS} of api.permissionsRequired) {

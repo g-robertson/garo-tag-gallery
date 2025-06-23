@@ -13,7 +13,7 @@ export function validate(dbs, req, res) {
     const taggableIDs = z.array(z.number().nonnegative().int()).safeParse(req?.body?.taggableIDs, {path: ["taggableIDs"]});
     if (!taggableIDs.success) return taggableIDs.error.message;
 
-    req.sanitizedBody = {
+    return {
         taggableIDs: taggableIDs.data.map(taggableID => BigInt(taggableID))
     };
 }
@@ -26,8 +26,9 @@ export const PERMISSIONS_REQUIRED = [
     TYPE: PERMISSIONS.LOCAL_TAG_SERVICES,
     BITS: PERMISSION_BITS.READ
 }];
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export async function checkPermission(dbs, req, res) {
-    const localTaggableServicesToCheck = await LocalTaggableServices.selectManyByTaggableIDs(dbs, req.sanitizedBody.taggableIDs);
+    const localTaggableServicesToCheck = await LocalTaggableServices.selectManyByTaggableIDs(dbs, req.body.taggableIDs);
     const localTaggableServices = await LocalTaggableServices.userSelectManyByIDs(
         dbs,
         req.user,
@@ -38,13 +39,13 @@ export async function checkPermission(dbs, req, res) {
 }
 
 
-/** @type {APIFunction} */
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {
     const localTagServices = await LocalTagServices.userSelectAll(dbs, req.user, PERMISSION_BITS.READ);
     const localMetricServices = await LocalMetricServices.userSelectAll(dbs, req.user, PERMISSION_BITS.READ);
     const userFacingTaggables = await UserFacingLocalFiles.selectManyByTaggableIDs(
         dbs,
-        req.sanitizedBody.taggableIDs,
+        req.body.taggableIDs,
         req.user.id(),
         localTagServices.map(localTagService => localTagService.Local_Tag_Service_ID),
         localMetricServices.map(localMetricService => localMetricService.Local_Metric_Service_ID)

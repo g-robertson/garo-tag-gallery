@@ -7,10 +7,10 @@
 
 import { normalPreInsertLocalTag, SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
-import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
+import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js"
 import { Users } from "./user.js";
-import { LocalTags } from "./tags.js";
+import { LocalTags, Tags } from "./tags.js";
 import { Taggables } from "./taggables.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 
@@ -163,12 +163,10 @@ export class LocalMetricServices {
 
         const serviceID = await Services.insert(dbs, serviceName);
         await ServicesUsersPermissions.insert(dbs, serviceID, user.id(), PERMISSION_BITS.ALL);
-        const hasMetricFromLocalMetricServiceTag = await LocalTags.insert(
-            dbs,
-            normalPreInsertLocalTag(`system:has metric from local metric service:${serviceName}`, "System generated"),
-            SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID
-        );
-        await dbrun(dbs, `
+
+        const tag = await Tags.insert(dbs, SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        /** @type {number} */
+        const localMetricServiceID = (await dbget(dbs, `
             INSERT INTO Local_Metric_Services(
                 Service_ID,
                 Has_Metric_From_Local_Metric_Service_Tag_ID,
@@ -177,11 +175,18 @@ export class LocalMetricServices {
                 $serviceID,
                 $hasMetricFromLocalMetricServiceTagID,
                 1 
-            );
+            ) RETURNING Local_Metric_Service_ID;
         `, {
             $serviceID: serviceID,
-            $hasMetricFromLocalMetricServiceTagID: Number(hasMetricFromLocalMetricServiceTag.Tag_ID)
-        });
+            $hasMetricFromLocalMetricServiceTagID: Number(tag.Tag_ID)
+        })).Local_Metric_Service_ID;
+        
+        await LocalTags.insert(
+            dbs,
+            normalPreInsertLocalTag(`system:has metric from local metric service:${localMetricServiceID}`, "System generated"),
+            SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
+            tag
+        );
 
         await dbEndTransaction(dbs);
     }
@@ -260,13 +265,28 @@ export class AppliedMetrics {
         return dbAppliedMetrics.map(mapDBAppliedMetric);
     }
 
-    static async userSelectManyByLocalMetricID(dbs, userID, localMetricID) {
+    /**
+     * 
+     * @param {Databases} dbs 
+     * @param {number} userID 
+     * @param {number[]} localMetricIDs 
+     */
+    static async userSelectManyByLocalMetricIDs(dbs, userID, localMetricIDs) {
         /** @type {DBAppliedMetric[]} */
         const dbAppliedMetrics = await dballselect(dbs,
-            `SELECT * FROM Local_Applied_Metrics WHERE User_ID = ? AND Local_Metric_ID = ?;`,
-            [userID, localMetricID]
+            `SELECT * FROM Local_Applied_Metrics WHERE User_ID = ? AND Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)};`,
+            [userID, ...localMetricIDs]
         );
         return dbAppliedMetrics.map(mapDBAppliedMetric);
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} userID 
+     * @param {number} localMetricID 
+     */
+    static async userSelectManyByLocalMetricID(dbs, userID, localMetricID) {
+        return await AppliedMetrics.userSelectManyByLocalMetricIDs(dbs, userID, [localMetricID]);
     }
 
     
@@ -300,11 +320,10 @@ export class AppliedMetrics {
             return [];
         }
 
-        const insertedAppliedMetricTags = await LocalTags.insertMany(dbs, appliedMetrics.map(appliedMetric => ({
-            Source_Name: "System generated",
-            Display_Name: `system:applied metric:${appliedMetric.Applied_Value} on ${appliedMetric.Local_Metric_Name} with user ${appliedMetric.User_Name}`,
-            Lookup_Name: `system:applied metric:${appliedMetric.Applied_Value} on ${appliedMetric.Local_Metric_ID} with user ${appliedMetric.User_ID}`
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        const insertedAppliedMetricTags = await LocalTags.insertMany(dbs, appliedMetrics.map(appliedMetric => normalPreInsertLocalTag(
+            `system:applied metric:${appliedMetric.Applied_Value} on ${appliedMetric.Local_Metric_ID} with user ${appliedMetric.User_ID}`,
+            "System generated"
+        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
         const appliedMetricsInsertionParams = [];
         for (let i = 0; i < appliedMetrics.length; ++i) {
@@ -482,13 +501,9 @@ export class LocalMetrics {
             preInsertLocalMetric.Local_Metric_Upper_Bound = null;
         }
 
-        const hasLocalMetricTag = await LocalTags.insert(
-            dbs,
-            normalPreInsertLocalTag(`system:has local metric:${preInsertLocalMetric.Local_Metric_Name}`, "System generated"),
-            SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID
-        );
 
-        await dbrun(dbs, `
+        const tag = await Tags.insert(dbs, SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        const localMetricID = (await dbget(dbs, `
             INSERT INTO Local_Metrics(
                 Local_Metric_Service_ID,
                 Local_Metric_Name,
@@ -505,7 +520,7 @@ export class LocalMetrics {
                 $localMetricPrecision,
                 $localMetricType,
                 $hasLocalMetricTagID
-            );
+            ) RETURNING Local_Metric_ID;
         `, {
             $localMetricServiceID: localMetricServiceID,
             $localMetricName: preInsertLocalMetric.Local_Metric_Name,
@@ -513,8 +528,14 @@ export class LocalMetrics {
             $localMetricUpperBound: preInsertLocalMetric.Local_Metric_Upper_Bound,
             $localMetricPrecision: preInsertLocalMetric.Local_Metric_Precision,
             $localMetricType: preInsertLocalMetric.Local_Metric_Type,
-            $hasLocalMetricTagID: Number(hasLocalMetricTag.Tag_ID)
-        });
+            $hasLocalMetricTagID: Number(tag.Tag_ID)
+        })).Local_Metric_ID;
+        await LocalTags.insert(
+            dbs,
+            normalPreInsertLocalTag(`system:has local metric:${localMetricID}`, "System generated"),
+            SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
+            tag
+        );
 
         await dbEndTransaction(dbs);
     }

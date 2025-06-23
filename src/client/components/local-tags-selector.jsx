@@ -1,25 +1,59 @@
-import LazyTagSelector from "./lazy-tag-selector.jsx";
+import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
 import { useState } from "react";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../js/tags.js";
 import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
 
 /** @import {ClientTag} from "../../api/client-get/tags-from-local-tag-services.js" */
-
-
-const SYSTEM_TAGS = [];
+/** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
 
 /**
+ * @param {ClientTag[]} clientTags 
+ */
+export async function MAP_TO_CLIENT_TAGS(clientTags) {
+    return clientTags;
+}
+/**
+ * @param {ClientTag[]} clientTags 
+ * @param {(modalName: string, extraProperties: any) => Promise<any>} pushModal
+ */
+export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags, pushModal) {
+    /** @type {ClientSearchQuery[]} */
+    const mapped = [];
+    for (let i = clientTags.length - 1; i >= 0; --i) {
+        const tag = clientTags[i];
+        if (tag.modalTagInfo !== undefined) {
+            const modalTags = await pushModal(tag.modalTagInfo.modalName);
+            mapped.push(...modalTags);
+        } else {
+            mapped.push({
+                ...tag,
+                type: "tagByLocalTagID",
+                localTagID: tag.localTagID
+            });
+        }
+    }
+
+    return mapped.reverse();
+}
+
+/**
+ * @template {any} [T=ClientTag]
  * @param {{
  *  localTagServices: DBPermissionedLocalTagService[]
  *  multiSelect?: boolean
  *  excludeable?: boolean
- *  onTagsSelected?: (tags: ClientTag[], isExcludeOn: boolean) => void
+ *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
+ *  allowSystemTags?: boolean
+ *  valueMappingFunction: (tags: ClientTag[], pushModal: (modalName: string, extraProperties: any) => Promise<any>) => Promise<T>[]
+ *  onTagsSelected?: (tags: T[], isExcludeOn: boolean) => void
  * }} param0
  */
-const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, onTagsSelected}) => {
+const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, pushModal, allowSystemTags, valueMappingFunction, onTagsSelected}) => {
     excludeable ??= true;
     multiSelect ??= true;
+    allowSystemTags ??= true;
+    valueMappingFunction ??= MAP_TO_CLIENT_TAGS;
     onTagsSelected ??= () => {};
     /** @type {[ClientTag[], (tags: ClientTag[]) => void]} */
     const [tags, setTags] = useState([]);
@@ -57,8 +91,8 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, onTagsSe
             }
             
             <div style={{flex: 5}}>
-                <LazyTagSelector
-                    tags={
+                <LazyTextObjectSelector
+                    textObjects={
                         tags.filter(tag => {
                             const colonSplitTagFilter = tagFilterValue.split(':');
                             let tagNameMatchedPartsFrom = colonSplitTagFilter.length;
@@ -90,10 +124,11 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, onTagsSe
                             return true;
                         })
                     }
-                    onValuesDoubleClicked={(valuesSelected) => {
-                        onTagsSelected(valuesSelected, isExcludeOn);
+                    onValuesDoubleClicked={async (valuesSelected) => {
+                        const mappedValues = await valueMappingFunction(valuesSelected, pushModal);
+                        onTagsSelected(mappedValues, isExcludeOn);
                     }}
-                    customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== undefined ? ` (${realizedValue.tagCount})` : ""}</>}
+                    customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== Infinity ? ` (${realizedValue.tagCount})` : ""}</>}
                     customTitleRealizer={(realizedValue) => realizedValue.displayName}
                     multiSelect={multiSelect}
                 />

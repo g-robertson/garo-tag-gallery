@@ -1,5 +1,6 @@
 import { fjsonParse } from "../../client/js/client-util.js";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
+import { MODAL_PROPERTIES as CREATE_AGGREGATE_TAG_MODAL_PROPERTIES } from "../../client/modal/modals/create-aggregate-tag.jsx";
 
 /**
  * @typedef {Object} ClientTag
@@ -9,11 +10,35 @@ import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
  * @property {string} displayName
  * @property {string[]} namespaces
  * @property {number} tagCount
+ * @property {{
+ *     modalName: string
+ * }=} modalTagInfo
  */
+
+/**
+ * @param {string} displayName
+ * @param {string} modalName
+ * @returns {ClientTag}
+ */
+function modalSystemClientTag(displayName, modalName) {
+    return {
+        localTagID: -1,
+        localTagServiceID: 0,
+        tagName: displayName,
+        displayName: `system:${displayName}`,
+        namespaces: ['system'],
+        tagCount: Infinity,
+        modalTagInfo: {
+            modalName
+        }
+    }
+}
 
 /** @type {Map<number, ClientTag[]} */
 const CACHED = new Map([
-    [SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, []]
+    [SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, [
+        modalSystemClientTag("aggregate tags", CREATE_AGGREGATE_TAG_MODAL_PROPERTIES.modalName)
+    ]]
 ]);
 
 /**

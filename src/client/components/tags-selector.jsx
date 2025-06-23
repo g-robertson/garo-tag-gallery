@@ -3,136 +3,138 @@ import '../global.css';
 import { PERMISSION_BITS, User } from '../js/user.js';
 
 import { MODAL_PROPERTIES as CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES } from '../modal/modals/create-or-search-group.jsx';
-import LazyTagSelector from './lazy-tag-selector.jsx';
-import LocalTagsSelector from './local-tags-selector.jsx';
+import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
+import LocalTagsSelector, { MAP_TO_CLIENT_SEARCH_QUERY } from './local-tags-selector.jsx';
 
 /** @import {ClientTag} from "./local-tags-selector.jsx" */
+/** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
 
 /**
- * @typedef {ClientTag & {
- *     exclude: boolean
- * }} SearchTag
- */
-
-/**
- * @typedef {(SearchTag | SearchObject)[]} SearchObject
- */
-
-/**
- * @param {SearchObject | SearchTag} searchObject
+ * @param {ClientSearchQuery} clientSearchQuery 
  * @returns {string}
  */
-function searchObjectToHash(searchObject) {
-    if (searchObject instanceof Array) {
-        return searchObject.map(innerSearchObject => searchObjectToHash(innerSearchObject)).join('\x01');
-    }
-
-    return `${(searchObject.exclude ? '\x02' : '\x03')}${searchObject.localTagID}`;
-}
-
-/**
- * @param {SearchObject | SearchTag} searchObject 
- */
-function searchObjectToDisplayName(searchObject) {
-    if (searchObject instanceof Array) {
-        if (searchObject.length === 1) {
-            return searchObjectToDisplayName(searchObject[0]);
+function clientSearchQueryToDisplayName(clientSearchQuery) {
+    if (clientSearchQuery.type === "union") {
+        if (clientSearchQuery.value.length === 1) {
+            return clientSearchQueryToDisplayName(clientSearchQuery.value[0]);
         } else {
-            return `OR: ${searchObject.map(innerSearchObject => searchObjectToDisplayName(innerSearchObject)).join(' ')}`;
+            return `(${clientSearchQuery.value.map(clientSearchQueryToDisplayName).join(' OR ')})`
         }
+    } else if (clientSearchQuery.type === "intersect") {
+        if (clientSearchQuery.value.length === 1) {
+            return clientSearchQueryToDisplayName(clientSearchQuery.value[0]);
+        } else {
+            return `(${clientSearchQuery.value.map(clientSearchQueryToDisplayName).join(' AND ')})`
+        }
+    } else if (clientSearchQuery.type === "complement") {
+        return `-${clientSearchQueryToDisplayName(clientSearchQuery.value)}`
+    } else {
+        return clientSearchQuery.displayName;
     }
-
-    return `${(searchObject.exclude ? '-' : '')}${searchObject.displayName}`;
-
 }
 
 /**
  * @param {{
  *  user: User
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *  initialSelectedTags?: Map<string, SearchObject>
- *  searchObjectsOut?: {out: Map<string, SearchObject>}
- *  onSearchChanged?: (searchObjects: SearchObject[]) => void
+ *  initialSelectedTags?: ClientSearchQuery[]
+ *  searchObjectsOut?: {out: ClientSearchQuery}
+ *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery) => void
+ *  searchType?: "intersect" | "union"
  *  existingState?: any
  * }} param0
  */
-const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, onSearchChanged, existingState}) => {
+const TagsSelector = ({user, pushModal, initialSelectedTags, searchObjectsOut, onSearchChanged, searchType, existingState}) => {
     existingState ??= {};
     searchObjectsOut ??= {};
     onSearchChanged ??= () => {};
+    searchType ??= "intersect";
 
-    /** @type {[Map<string, SearchObject>, (searchObjects: Map<string, SearchObject>) => void]} */
-    const [searchObjects, setSearchObjects] = useState(existingState.searchObjects ?? initialSelectedTags ?? new Map());
-    useEffect(() => {existingState.searchObjects = searchObjects;}, [searchObjects]);
-    searchObjectsOut.out = searchObjects;
+    /** @type {[ClientSearchQuery[], (clientSearchQuery: ClientSearchQuery[]) => void]} */
+    const [clientSearchQuery, setClientSearchQuery] = useState(existingState.clientSearchQuery ?? initialSelectedTags ?? []);
+    useEffect(() => {existingState.clientSearchQuery = clientSearchQuery;}, [clientSearchQuery]);
+    
 
     useEffect(() => {
-        onSearchChanged([...searchObjects.values()]);
-    }, [searchObjects]);
+        onSearchChanged({
+            type: searchType,
+            value: clientSearchQuery
+        });
+        searchObjectsOut.out = {
+            type: searchType,
+            value: clientSearchQuery
+        };
+    }, [clientSearchQuery]);
 
     return (
         <div style={{width: "100%", flexDirection: "column", margin: 4}}>
             Search:
             <div style={{flex: 1}}>
-                <LazyTagSelector
-                    tags={[...searchObjects.values()].map(searchObject => {
-                        return searchObject;
-                    })}
-                    onValuesDoubleClicked={(searchObjects_ => {
-                        for (const searchObject of searchObjects_) {
-                            searchObjects.delete(searchObjectToHash(searchObject));
+                <LazyTextObjectSelector
+                    textObjects={clientSearchQuery}
+                    onValuesDoubleClicked={((_, indices) => {
+                        for (const index of indices.sort((a, b) => b - a)) {
+                            clientSearchQuery.splice(index, 1);
                         }
 
-                        setSearchObjects(new Map([...searchObjects]));
+                        setClientSearchQuery([...clientSearchQuery]);
                     })}
-                    customItemComponent={({realizedValue}) => (<div style={{width: "100%", position: "relative"}}>
+                    customItemComponent={({realizedValue, index}) => (<div style={{width: "100%", position: "relative"}}>
                         <input type="button" style={{position: "absolute", top:0, right: 4}} value="OR" onClick={async () => {
-                            const orGroupSearchObjects = await pushModal(CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {initialSelectedTags: new Map(
-                                realizedValue.map(tag => [searchObjectToHash([tag]), [tag]])
-                            )});
-                            if (orGroupSearchObjects === undefined) {
+                            const orGroupSearchQuery = await pushModal(CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {initialSelectedTags: [realizedValue]});
+                            if (orGroupSearchQuery === null || orGroupSearchQuery === undefined) {
                                 return;
                             }
 
-                            searchObjects.delete(searchObjectToHash(realizedValue));
-                            if (orGroupSearchObjects.length !== 0) {
-                                searchObjects.set(searchObjectToHash(orGroupSearchObjects), orGroupSearchObjects);
+                            if (orGroupSearchQuery.value.length === 0) {
+                                clientSearchQuery.splice(index, 1);
+                            } else {
+                                clientSearchQuery[index] = orGroupSearchQuery;
                             }
-
-                            setSearchObjects(new Map([...searchObjects]));
+                            setClientSearchQuery([...clientSearchQuery]);
                         }} />
-                        <div className="lazy-selector-selectable-item-portion" style={{width: "100%", overflowX: "hidden"}}>{searchObjectToDisplayName(realizedValue)}</div>
+                        <div className="lazy-selector-selectable-item-portion" style={{width: "100%", overflowX: "hidden"}}>{clientSearchQueryToDisplayName(realizedValue)}</div>
                     </div>)}
-                    customTitleRealizer={(value) => searchObjectToDisplayName(value)}
+                    customTitleRealizer={(value) => clientSearchQueryToDisplayName(value)}
                 />
             </div>
             <div style={{flex: 3}}>
                 <LocalTagsSelector 
                     localTagServices={user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)}
-                    onTagsSelected={(tags, isExcludeOn) => {
-                        for (const tag of tags) {
-                            const searchObject = [{
-                                ...tag,
-                                exclude: isExcludeOn
-                            }];
-
-                            const searchObjectHash = searchObjectToHash(searchObject);
-                            if (searchObjects.has(searchObjectHash)) {
-                                searchObjects.delete(searchObjectHash);
-                            } else {
-                                const oppositeExcludedVersion = [{
-                                    ...tag,
-                                    exclude: !isExcludeOn
-                                }];
-                                const oppositeExcludedVersionHash = searchObjectToHash(oppositeExcludedVersion)
-                                searchObjects.delete(oppositeExcludedVersionHash);
-
-                                searchObjects.set(searchObjectHash, searchObject);
+                    onTagsSelected={(clientQueriesToAdd, isExcludeOn) => {
+                        for (let clientSearchQueryToAdd of clientQueriesToAdd) {
+                            /** @type {ClientSearchQuery} */
+                            if (isExcludeOn) {
+                                clientSearchQueryToAdd = {
+                                    type: "complement",
+                                    value: clientSearchQueryToAdd
+                                };
                             }
+                            const sameItemIndex = clientSearchQuery.findIndex(clientSearchQuery => {
+                                if (clientSearchQuery.type === "tagByLocalTagID" && clientSearchQuery.localTagID === tag.localTagID) {
+                                    return true;
+                                }
+                                if (clientSearchQuery.type === "complement" && clientSearchQuery.value.type === "tagByLocalTagID" && clientSearchQuery.value.localTagID === tag.localTagID) {
+                                    return true;
+                                }
+                                return false;
+                            });
 
+                            if (sameItemIndex !== -1) {
+                                const isComplement = clientSearchQuery[sameItemIndex].type === "complement";
+                                if (isComplement === isExcludeOn) {
+                                    clientSearchQuery.splice(sameItemIndex, 1);
+                                } else {
+                                    clientSearchQuery[sameItemIndex] = clientSearchQueryToAdd;
+                                }
+                            } else {
+                                clientSearchQuery.push(clientSearchQueryToAdd);
+                            }
                         }
-                        setSearchObjects(new Map([...searchObjects]));
+                        setClientSearchQuery([...clientSearchQuery]);
                     }}
+                    valueMappingFunction={MAP_TO_CLIENT_SEARCH_QUERY}
+                    pushModal={pushModal}
                 />
             </div>
         </div>

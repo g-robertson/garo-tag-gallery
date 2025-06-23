@@ -57,7 +57,7 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                     <span>Create a new partial upload location to upload to: </span>
                     <input style={{display: "inline-block"}} id="newPartialUploadLocation" type="text" placeholder="New Partial Upload Location" />
                     <input style={{display: "inline-block", marginLeft: "4px"}} type="button" value="Create" onClick={() => {
-                        setPartialUploadSelections(new Set([...partialUploadSelections, document.getElementById("newPartialUploadLocation").value]));
+                        setPartialUploadSelections(new Set(partialUploadSelections, document.getElementById("newPartialUploadLocation").value));
                     }} />
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>

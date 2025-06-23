@@ -16,12 +16,12 @@ import Scrollbar from './scrollbar.jsx';
  * @template R
  * @param {{
  *  values: T[]
- *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[]) => void
- *  onValuesDoubleClicked?: (realizedValuesSelected: Awaited<R>[]) => void
+ *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[], indices: number[]) => void
+ *  onValuesDoubleClicked?: (realizedValuesSelected: Awaited<R>[], indices: number[]) => void
  *  valuesRealizer: (values: T[]) => R
  *  valueRealizationRange?: number
  *  valueRealizationDelay?: number
- *  customItemComponent?: (param0: {realizedValue: Awaited<R>, setRealizedValue: (realizedValue: Awaited<R> => void) width: number, height: number}) => JSX.Element
+ *  customItemComponent?: (param0: {realizedValue: Awaited<R>, index: number, setRealizedValue: (realizedValue: Awaited<R> => void) width: number, height: number}) => JSX.Element
  *  customTitleRealizer?: (realizedValue: Awaited<R>) => string,
  *  itemWidth: number | "100%"
  *  itemHeight: number | "100%"
@@ -375,7 +375,7 @@ function LazySelector({
                 }
             }
 
-            onValuesSelected([...selectedIndices].map(selectedIndex => realizedValues[selectedIndex]));
+            onValuesSelected([...selectedIndices].map(selectedIndex => realizedValues[selectedIndex]), [...selectedIndices]);
         })();
     }, [selectedIndices]);
 
@@ -440,9 +440,9 @@ function LazySelector({
                                                 } else if (e.shiftKey) {
                                                     if (preShiftClickIndices === null) {
                                                         newSelectedIndices = selectedIndices;
-                                                        setPreShiftClickIndices(new Set([...selectedIndices]));
+                                                        setPreShiftClickIndices(new Set(selectedIndices));
                                                     } else {
-                                                        newSelectedIndices = new Set([...preShiftClickIndices]);
+                                                        newSelectedIndices = new Set(preShiftClickIndices);
                                                     }
                                                     let from = lastClickedIndex;
                                                     let to = itemIndex;
@@ -461,7 +461,7 @@ function LazySelector({
                                                 }
 
                                                 if (newSelectedIndices !== undefined) {
-                                                    setSelectedIndices(new Set([...newSelectedIndices]));
+                                                    setSelectedIndices(new Set(newSelectedIndices));
                                                 }
                                              }}
                                              onDoubleClick={async (e) => {
@@ -484,12 +484,11 @@ function LazySelector({
                                                     }
                                                 }
 
-                                                onValuesDoubleClicked(realizedValuesDoubleClicked);
+                                                onValuesDoubleClicked(realizedValuesDoubleClicked, [...selectedIndices]);
                                              }}
                                         >
-                                            {customItemComponent({realizedValue, setRealizedValue: (realizedValue) => {
+                                            {customItemComponent({realizedValue, index: itemIndex, setRealizedValue: (realizedValue) => {
                                                 realizedValues[itemIndex] = realizedValue;
-                                                console.log("realizing");
                                                 setRealizedValues([...realizedValues]);
                                             }})}
                                         </div>

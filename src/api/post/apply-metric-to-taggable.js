@@ -17,7 +17,7 @@ export async function validate(dbs, req, res) {
     const metricValue = z.coerce.number().finite().safeParse(req?.body?.metricValue, {path: ["metricValue"]});
     if (!metricValue.success) return metricValue.error.message;
 
-    req.sanitizedBody = {
+    return {
         taggableID: taggableID.data,
         localMetricID: localMetricID.data,
         metricValue: metricValue.data
@@ -31,26 +31,27 @@ export const PERMISSIONS_REQUIRED = [{
     TYPE: PERMISSIONS.LOCAL_TAGGABLE_SERVICES,
     BITS: PERMISSION_BITS.READ
 }];
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export async function checkPermission(dbs, req, res) {
-    const localMetricServiceToCheck = await LocalMetricServices.selectByLocalMetricID(dbs, req.sanitizedBody.localMetricID);
+    const localMetricServiceToCheck = await LocalMetricServices.selectByLocalMetricID(dbs, req.body.localMetricID);
     const localMetricService = await LocalMetricServices.userSelectByID(dbs, req.user, PERMISSION_BITS.READ, localMetricServiceToCheck.Local_Metric_Service_ID);
 
-    const localTaggableServiceToCheck = await LocalTaggableServices.selectByTaggableID(dbs, req.sanitizedBody.taggableID);
+    const localTaggableServiceToCheck = await LocalTaggableServices.selectByTaggableID(dbs, req.body.taggableID);
     const localTaggableService = await LocalTaggableServices.userSelectByID(dbs, req.user, PERMISSION_BITS.READ, localTaggableServiceToCheck.Local_Taggable_Service_ID);
     
     return localMetricService !== undefined && localTaggableService !== undefined;
 }
 
-/** @type {APIFunction} */
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
     const appliedMetric = await AppliedMetrics.upsert(dbs, {
-        Local_Metric_ID: req.sanitizedBody.localMetricID,
+        Local_Metric_ID: req.body.localMetricID,
         User_ID: req.user.id(),
-        Applied_Value: req.sanitizedBody.metricValue
+        Applied_Value: req.body.metricValue
     });
     await AppliedMetrics.applyToTaggable(
         dbs,
-        req.sanitizedBody.taggableID,
+        req.body.taggableID,
         appliedMetric
     );
     res.status(200).send("Tag to metric done");

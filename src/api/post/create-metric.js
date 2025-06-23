@@ -31,21 +31,22 @@ export async function validate(dbs, req, res) {
     };
 
 
-    req.sanitizedBody = {
+    return {
         localMetricServiceID: localMetricServiceID.data,
         preInsertLocalMetric
     };
 }
 
 export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.LOCAL_METRIC_SERVICES, BITS: PERMISSION_BITS.CREATE};
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export async function checkPermission(dbs, req, res) {
-    const localMetricServiceIDToCheck = req.sanitizedBody.localMetricServiceID;
+    const localMetricServiceIDToCheck = req.body.localMetricServiceID;
     const localMetricService = await LocalMetricServices.userSelectByID(dbs, req.user, PERMISSION_BITS.CREATE, localMetricServiceIDToCheck);
     return localMetricService !== undefined;
 }
 
-/** @type {APIFunction} */
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
-    await LocalMetrics.insert(dbs, req.sanitizedBody.preInsertLocalMetric, req.sanitizedBody.localMetricServiceID);
+    await LocalMetrics.insert(dbs, req.body.preInsertLocalMetric, req.body.localMetricServiceID);
     res.status(200).send("Metric service created");
 }

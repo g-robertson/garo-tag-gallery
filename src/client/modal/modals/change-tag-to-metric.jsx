@@ -3,7 +3,7 @@ import { User } from '../js/user.js';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
-import LazyTagSelector from '../../components/lazy-tag-selector.jsx';
+import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
 import { useState } from 'react';
 
 /** @import {ClientTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
@@ -11,10 +11,11 @@ import { useState } from 'react';
 /** 
  * @param {{
  *  user: User
+ *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  popModal: () => void
  * }}
 */
-const ChangeTagToMetric = ({user, popModal}) => {
+const ChangeTagToMetric = ({user, pushModal, popModal}) => {
     /** @type {[null | ClientTag, (tag: null | ClientTag) => void]} */
     const [tag, setTag] = useState(null);
     const tags = tag === null ? [] : [tag];
@@ -23,12 +24,19 @@ const ChangeTagToMetric = ({user, popModal}) => {
     return (
         <div style={{width: "100%", flexDirection: "column"}}>
             <div style={{flex: 4, margin: 8}}>
-                <LocalTagsSelector localTagServices={user.localTagServices()} multiSelect={false} excludeable={false} onTagsSelected={(tags) => {
-                    setTag(tags[0]);
-                }}/>
+                <LocalTagsSelector
+                    localTagServices={user.localTagServices()}
+                    multiSelect={false}
+                    excludeable={false}
+                    pushModal={pushModal}
+                    allowSystemTags={false}
+                    onTagsSelected={(tags) => {
+                        setTag(tags[0]);
+                    }}
+                />
             </div>
             <div style={{marginLeft: 8}}>
-                Select a tag from above: <div style={{height: 20, flexGrow: 100}}><LazyTagSelector tags={tags} elementsSelectable={false} scrollbarWidth={0} /></div>
+                Select a tag from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjects={tags} elementsSelectable={false} scrollbarWidth={0} /></div>
             </div>
             <form style={{flex: 5}} action="/api/post/change-tag-to-metric" target="frame" method="POST">
                 <LocalMetricSelector user={user} />

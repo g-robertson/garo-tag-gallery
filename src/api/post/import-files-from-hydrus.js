@@ -20,20 +20,11 @@ export async function validate(dbs, req, res) {
     const localTaggableServiceID = z.coerce.number().nonnegative().int().safeParse(req?.body?.localTaggableServiceID, {path: ["localTaggableServiceID"]});
     if (!localTaggableServiceID.success) return localTaggableServiceID.error.message;
 
-    const localTagService = await LocalTagServices.userSelectByID(dbs, req.user, PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE, localTagServiceID.data);
-    if (localTagService === undefined) {
-        return "User did not have (create | update) access to local tag service";
-    }
-    const localTaggableService = await LocalTaggableServices.userSelectByID(dbs, req.user, PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE, localTaggableServiceID.data);
-    if (localTaggableService === undefined) {
-        return "User did not have (create | update) access to local taggable service";
-    }
-
-    req.sanitizedBody = {
+    return {
         partialUploadPath: partialUploadPath.data,
         partialFilePaths: partialFilePaths.data,
-        localTagService,
-        localTaggableService
+        localTagServiceID: localTagServiceID.data,
+        localTaggableServiceID: localTaggableServiceID.data
     };
 }
 
@@ -44,18 +35,21 @@ export const PERMISSIONS_REQUIRED = [{
     TYPE: PERMISSIONS.LOCAL_TAG_SERVICES,
     BITS: PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE
 }];
-export async function checkPermission() {
-    return false;
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function checkPermission(dbs, req, res) {
+    const localTagService = await LocalTagServices.userSelectByID(dbs, req.user, PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE, req.body.localTagServiceID);
+    const localTaggableService = await LocalTaggableServices.userSelectByID(dbs, req.user, PERMISSION_BITS.CREATE | PERMISSION_BITS.UPDATE, req.body.localTaggableServiceID);
+    return localTagService !== undefined && localTaggableService !== undefined;
 }
 
-/** @type {APIFunction} */
+/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
     dbs.jobManager.addJobToRunner(req.user.id(), importFilesFromHydrusJob(
         dbs,
-        req.sanitizedBody.partialUploadPath,
-        req.sanitizedBody.partialFilePaths,
-        req.sanitizedBody.localTagService,
-        req.sanitizedBody.localTaggableService
+        req.body.partialUploadPath,
+        req.body.partialFilePaths,
+        req.body.localTagServiceID,
+        req.body.localTaggableServiceID
     ));
     res.status(200).send("Summoned job");
 }
