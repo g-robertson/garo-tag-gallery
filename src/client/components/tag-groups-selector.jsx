@@ -38,7 +38,7 @@ const TagGroupsSelector = ({user, multiSelect, onTagGroupsSelected}) => {
         tagGroups = tagGroups.concat(user.localMetricServices().map(localMetricService => localMetricService.Local_Metrics).flat().map(localMetric => ({
             type: "applied-metrics",
             displayName: `aggregate metric:${localMetric.Local_Metric_Name}`,
-            localMetricID: localMetric.Local_Metric_ID,
+            Local_Metric_ID: localMetric.Local_Metric_ID,
             extraInfo: {
                 localMetric
             }

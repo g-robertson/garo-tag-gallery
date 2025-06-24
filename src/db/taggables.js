@@ -39,7 +39,7 @@ export class LocalTaggableServices {
         return await LocalTags.selectManyByLookups(dbs, localTaggableServiceIDs.map(localTaggableServiceID => ({
             Lookup_Name: createInLocalTaggableServiceLookupName(localTaggableServiceID),
             Source_Name: SYSTEM_GENERATED
-        })));
+        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
     }
 
     /**
@@ -300,7 +300,7 @@ export class Taggables {
 
         const taggableHasURLTagPairings = new Map([...taggableURLAssociationPairings.entries()].map(([taggableID, urlAssociations]) => [
             taggableID,
-            [...new Set(urlAssociations.map(urlAssociation => urlAssociation.URL))].map(url => urlMap.get(createHasURLTagLookupName(url).Tag_ID))
+            [...new Set(urlAssociations.map(urlAssociation => urlAssociation.URL))].map(url => urlMap.get(createHasURLTagLookupName(url)).Tag_ID)
         ]));
 
         await dbs.perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggableHasURLTagPairings), dbs.inTransaction);
@@ -683,6 +683,7 @@ export class LocalFiles {
             Lookup_Name: createHasFileHashLookupName(localFile.File_Hash.toString("hex")),
             Source_Name: SYSTEM_GENERATED
         })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+
         const {taggables} = await dbs.perfTags.search(PerfTags.searchIntersect([
             PerfTags.searchTag(inLocalTaggableServiceTagID),
             PerfTags.searchUnion(hasFileHashTags.map(hasFileHashTag => PerfTags.searchTag(hasFileHashTag.Tag_ID)))

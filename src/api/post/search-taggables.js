@@ -13,6 +13,9 @@ import PerfTags from "../../perf-tags-binding/perf-tags.js";
 import { localTagsPKHash, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import { AppliedMetrics, LocalMetrics, LocalMetricServices } from "../../db/metrics.js";
 
+const Z_CLIENT_COMPARATOR = z.literal("<").or(z.literal("<=")).or(z.literal(">")).or(z.literal(">="));
+/** @typedef {z.infer<typeof Z_CLIENT_COMPARATOR>} ClientComparator */
+
 const Z_CLIENT_SEARCH_TAG_BY_LOOKUP = z.object({
     type: z.literal("tagByLookup"),
     Lookup_Name: z.string(),
@@ -29,14 +32,14 @@ const Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID = z.object({
 
 const Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID = z.object({
     type: z.literal("hasLocalMetricID"),
-    localMetricID: z.number()
+    Local_Metric_ID: z.number()
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID>} ClientSearchTagHasMetricID */
 
 const Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID = z.object({
     type: z.literal("inLocalMetricServiceID"),
     localMetricServiceID: z.number()
-})
+});
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID>} ClientSearchTagInLocalMetricServiceID */
 
 const Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC = z.object({
@@ -46,11 +49,20 @@ const Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC = z.object({
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC>} ClientSearchTagAppliedLocalMetric */
 
+const Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON = z.object({
+    type: z.literal("localMetricComparison"),
+    comparator: Z_CLIENT_COMPARATOR,
+    Local_Metric_ID: z.number(),
+    metricComparisonValue: z.number().finite()
+});
+/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON} ClientSearchTagLocalMetricComparison */
+
 const Z_CLIENT_SEARCH_TAG = Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID
     .or(Z_CLIENT_SEARCH_TAG_BY_LOOKUP)
     .or(Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID)
     .or(Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID)
-    .or(Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC);
+    .or(Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC)
+    .or(Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON);
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG>} ClientSearchTag */
 
 const Z_AGGREGATE_TAG_CONDITIONS = z.object({
@@ -65,7 +77,7 @@ const Z_NAMESPACE_AGGREGATE_TAG_GROUP = z.object({
 });
 const Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP = z.object({
     type: z.literal("applied-metrics"),
-    localMetricID: z.number()
+    Local_Metric_ID: z.number()
 });
 
 const Z_AGGREGATE_TAG_GROUP = Z_NAMESPACE_AGGREGATE_TAG_GROUP.or(Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP);
@@ -102,7 +114,6 @@ const Z_SEARCH_QUERY = z.object({
  *     value: ClientSearchQuery
  * } | ClientSearchTag | ClientAggregateTag} ClientSearchQuery
  **/
-/**
 
 /**
  * @typedef {{
@@ -160,7 +171,28 @@ function isClientSearchTag(step) {
         || step.type === "tagByLookup"
         || step.type === "hasLocalMetricID"
         || step.type === "inLocalMetricServiceID"
-        || step.type === "appliedLocalMetric";
+        || step.type === "appliedLocalMetric"
+        || step.type === "localMetricComparison";
+}
+
+/**
+ * @param {number} lhs 
+ * @param {"<" | "<=" | ">" | ">="} comparator 
+ * @param {number} rhs 
+ */
+function dynamicComparison(lhs, comparator, rhs) {
+    if (comparator === "<") {
+        return lhs < rhs;
+    } else if (comparator === "<=") {
+        return lhs <= rhs;
+    } else if (comparator === ">") {
+        return lhs > rhs; 
+    } else if (comparator === ">=") {
+        return lhs >= rhs;
+    } else {
+        console.log(comparator);
+        throw "Unexpected comparator value";
+    }
 }
 
 /**
@@ -180,11 +212,21 @@ function transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, 
     } else if (clientSearchTag.type === "tagByLookup") {
         tagID = tagLookupsMap.get(clientSearchTag.localTagServiceID).get(localTagsPKHash(clientSearchTag.Lookup_Name, clientSearchTag.Source_Name));
     } else if (clientSearchTag.type === "hasLocalMetricID") {
-        tagID = localMetricsMap.get(clientSearchTag.localMetricID);
+        tagID = localMetricsMap.get(clientSearchTag.Local_Metric_ID);
     } else if (clientSearchTag.type === "inLocalMetricServiceID") {
         tagID = localMetricServicesMap.get(clientSearchTag.localMetricServiceID).Has_Metric_From_Local_Metric_Service_Tag.Tag_ID;
     } else if (clientSearchTag.type === "appliedLocalMetric") {
         tagID = appliedMetricsMap.get(clientSearchTag.Local_Metric_ID).get(clientSearchTag.Applied_Value);
+    } else if (clientSearchTag.type === "localMetricComparison") {
+        return {
+            type: "union",
+            value: [...appliedMetricsMap.get(clientSearchTag.Local_Metric_ID).entries()].filter(([appliedValue,]) => {
+                return dynamicComparison(appliedValue, clientSearchTag.comparator, clientSearchTag.metricComparisonValue);
+            }).map(([_, appliedMetricValueTagID]) => ({
+                type: "tag",
+                tagID: appliedMetricValueTagID
+            }))
+        };
     } else {
         console.log(clientSearchTag);
         throw "Unrecognized client search tag type";
@@ -221,10 +263,12 @@ function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTag
         }
         pkHashToTagLookupMap.set(localTagsPKHash(Lookup_Name, Source_Name), {Lookup_Name, Source_Name});
     } else if (clientSearchTag.type === "hasLocalMetricID") {
-        allLocalMetricIDs.add(clientSearchTag.localMetricID);
+        allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);
     } else if (clientSearchTag.type === "inLocalMetricServiceID") {
         allLocalMetricServiceIDs.add(clientSearchTag.localMetricServiceID);
     } else if (clientSearchTag.type === "appliedLocalMetric") {
+        allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);
+    } else if (clientSearchTag.type === "localMetricComparison") {
         allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);
     } else {
         console.log(clientSearchTag);
@@ -252,7 +296,7 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
             /** @type {Set<bigint>} */
             let tagsOfAggregate;
             if (aggregateTag.tagGroup.type === "applied-metrics") {
-                tagsOfAggregate = new Set(appliedMetricsMap.get(aggregateTag.tagGroup.localMetricID).values());
+                tagsOfAggregate = new Set(appliedMetricsMap.get(aggregateTag.tagGroup.Local_Metric_ID).values());
             } else if (aggregateTag.tagGroup.type === "namespace") {
                 tagsOfAggregate = new Set(tagsNamespacesMap.get(aggregateTag.tagGroup.namespaceID));
             }
@@ -386,7 +430,7 @@ export async function validate(dbs, req, res) {
         } else if (step.type === "aggregateTag") {
             const aggregateTag = step.value;
             if (aggregateTag.tagGroup.type === "applied-metrics") {
-                allLocalMetricIDs.add(aggregateTag.tagGroup.localMetricID);
+                allLocalMetricIDs.add(aggregateTag.tagGroup.Local_Metric_ID);
             } else if (aggregateTag.tagGroup.type === "namespace") {
                 allNamespaceIDs.add(aggregateTag.tagGroup.namespaceID);
             }

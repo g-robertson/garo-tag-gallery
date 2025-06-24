@@ -437,7 +437,8 @@ export default class PerfTags {
         }
 
         if (expressions.length === 0) {
-            return "";
+            // Empty set
+            return "E";
         }
 
         if (expressions.length === 1) {

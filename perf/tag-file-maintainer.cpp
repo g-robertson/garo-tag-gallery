@@ -351,6 +351,8 @@ void TagFileMaintainer::readTaggablesTags(std::string_view input, void (*writer)
 
 namespace {
     const char FIRST_OP = '\x00';
+    const char EMPTY_SET = 'E';
+    const char UNIVERSE_SET = 'U';
     const char TAG_TAGGABLE_LIST = 'T';
     const char TAGGABLE_LIST = 'L';
     const char OPEN_GROUP = '(';
@@ -423,6 +425,12 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
                 subSearch.second.complement();
             }
             context = SET_OPERATIONS.at(op)(std::move(context), std::move(subSearch.second));
+        } else if (input[0] == UNIVERSE_SET) {
+            input = input.substr(1);
+            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, universe));
+        } else if (input[0] == EMPTY_SET) {
+            input = input.substr(1);
+            context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, &EMPTY_TAGGABLES.physicalContents()));
         }
     }
 

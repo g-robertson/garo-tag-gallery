@@ -448,7 +448,7 @@ export class AppliedMetrics {
         const appliedMetric = await AppliedMetrics.tagMap(dbs, await AppliedMetrics.upsert(dbs, preInsertAppliedMetric));
 
         const taggables = await Taggables.searchWithUser(dbs, PerfTags.searchTag(localTag.Tag_ID), user);
-        await AppliedMetrics.applyToTaggable(dbs, taggables.map(taggable => taggable.Taggable_ID), appliedMetric);
+        await AppliedMetrics.applyToTaggables(dbs, taggables.map(taggable => taggable.Taggable_ID), appliedMetric);
 
         if (deleteExistingTag) {
             await LocalTags.delete(dbs, localTag);
@@ -470,7 +470,7 @@ export class AppliedMetrics {
             dbs,
             await AppliedMetrics.userSelectManyByLocalMetricID(dbs, appliedMetric.User_ID, appliedMetric.Local_Metric_ID
         ));
-        await dbs.perfTags.deleteTagPairings(new Map(otherAppliedMetrics.map(appliedMetric => [appliedMetric.Local_Applied_Metric_Tag.Tag_ID, taggableIDs])), dbs.inTransaction);
+        await dbs.perfTags.deleteTagPairings(new Map(otherAppliedMetrics.map(otherAppliedMetric => [otherAppliedMetric.Local_Applied_Metric_Tag.Tag_ID, taggableIDs])), dbs.inTransaction);
 
         const localHasMetricTag = await LocalMetrics.selectTagMapping(dbs, appliedMetric.Local_Metric_ID);
         const localMetricService = await LocalMetricServices.selectByLocalMetricID(dbs, appliedMetric.Local_Metric_ID);
