@@ -1,16 +1,16 @@
 import path from "path";
 import { extractWith7Z, getAllFileEntries, sha256 } from "../util.js";
 import { dbBeginTransaction, dbEndTransaction } from "./db-util.js";
-import { LocalTags, URLs, URLAssociations, Namespaces, FileExtensions, TagsNamespaces, Tags } from "./tags.js";
-import { normalPreInsertLocalTag, localTagsPKHash } from "../client/js/tags.js";
-import { LocalFiles, Taggables } from "./taggables.js";
+import { LocalTags, Namespaces, TagsNamespaces, Tags } from "./tags.js";
+import { normalPreInsertLocalTag, localTagsPKHash, normalizeFileExtension } from "../client/js/tags.js";
+import { LocalFiles, LocalTaggableServices, Taggables } from "./taggables.js";
 import { addNotesToTaggables } from "./notes.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import { Job } from "./job-manager.js";
 import { readFile } from "fs/promises";
 /**
  * @import {Databases} from "./db-util.js"
- * @import {PreInsertLocalTag, DBFileExtension, DBJoinedURLAssociation} from "./tags.js"
+ * @import {PreInsertLocalTag, URLAssociation} from "./tags.js"
  * @import {PreInsertLocalFile} from "./taggables.js"
  * @import {PreInsertNote} from "./notes.js"
  */
@@ -83,9 +83,9 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
         const newImportChunks = () => {
             return {
                 length: 0,
-                /** @type {Map<string, Omit<PreInsertLocalFile, keyof DBFileExtension> & {File_Extension: string}} */
+                /** @type {Map<string, PreInsertLocalFile} */
                 filePairings: new Map(),
-                /** @type {Map<string, {URL: string, URL_Association: string}[]} */
+                /** @type {Map<string, URLAssociation[]} */
                 urlPairings: new Map(),
                 /** @type {Map<string, PreInsertNote[]} */
                 notePairings: new Map(),
@@ -106,36 +106,20 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
 
         let importChunks = newImportChunks();
 
+        const inLocalTaggableServiceTagID = (await LocalTaggableServices.selectTagMapping(localTaggableServiceID)).Tag_ID;
 
         const insertImportChunks = async () => {
             const dbsTransaction = await dbBeginTransaction(dbs);
 
-            // insert file extensions
-            const fileExtensionsSet = new Set();
-            for (const value of importChunks.filePairings.values()) {
-                fileExtensionsSet.add(value.File_Extension);
-            }
-
-            const fileExtensionMap = new Map((await FileExtensions.upsertMany(dbsTransaction, [...fileExtensionsSet])).map(dbFileExtension => [dbFileExtension.File_Extension, dbFileExtension]));
-
             // insert file info
-            /** @type {PreInsertLocalFile[]} */
-            const localFiles = [];
-            for (const file of importChunks.filePairings.values()) {
-                localFiles.push({
-                    ...file,
-                    ...fileExtensionMap.get(file.File_Extension)
-                });
-            }
-
-            const {dbLocalFiles, finalizeFileMove} = await LocalFiles.upsertMany(dbsTransaction, localFiles, localTaggableServiceID);
+            const {dbLocalFiles, finalizeFileMove} = await LocalFiles.upsertMany(dbsTransaction, [...importChunks.filePairings.values()], inLocalTaggableServiceTagID);
             const dbLocalFilesMap = new Map(dbLocalFiles.map(dbFile => [dbFile.File_Hash.toString("hex"), dbFile]));
             /** @type {Map<string, string>} */
             const dbFileHashMap = new Map();
             for (const [fileName, fileInfo] of importChunks.filePairings.entries()) {
                 dbFileHashMap.set(fileName, fileInfo.File_Hash.toString("hex"));
             }
-
+            
             // insert notes
             /** @type {Map<bigint, PreInsertNote[]>} */
             const notePairings = new Map();
@@ -145,43 +129,16 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
             }
             await addNotesToTaggables(dbsTransaction, notePairings);
 
-            /** @type {({URL: string, URL_Association: string})[]} */
-            const allUrls = [];
-            for (const urls of importChunks.urlPairings.values()) {
-                for (const url of urls) {
-                    allUrls.push(url);
-                }
-            }
-
-            // insert all urls
-            const dbURLMap = new Map((await URLs.upsertMany(dbsTransaction, allUrls.map(url => url.URL))).map(dbURL => [dbURL.URL, dbURL]));
-            const dbJoinedURLAssociationMap = new Map((await URLAssociations.upsertMany(dbsTransaction, allUrls.map(url => {
-                return {
-                    ...dbURLMap.get(url.URL),
-                    URL_Association: url.URL_Association
-                };
-            }))).map(dbUrlAssociation => [dbUrlAssociation.URL_Associations_PK_Hash, dbUrlAssociation]));
-
-
             // upsert urls to taggables
-            /** @type {Map<bigint, DBJoinedURLAssociation[]>} */
+            /** @type {Map<bigint, URLAssociation[]>} */
             const taggableURLAssociationPairings = new Map();
-            for (const [fileName, urls] of importChunks.urlPairings.entries()) {
-                for (const url of urls) {
-                    const preparedURLAssociation = URLAssociations.preparePreInsert({
-                        ...dbURLMap.get(url.URL),
-                        URL_Association: url.URL_Association
-                    });
-                    const dbLocalFileTaggable = dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID;
-
-                    const dbJoinedURLAssociation = dbJoinedURLAssociationMap.get(preparedURLAssociation.URL_Associations_PK_Hash);
-                    if (taggableURLAssociationPairings.get(dbLocalFileTaggable) === undefined) {
-                        taggableURLAssociationPairings.set(dbLocalFileTaggable, []);
-                    }
-                    taggableURLAssociationPairings.get(dbLocalFileTaggable).push(dbJoinedURLAssociation);
-                }
+            for (const [fileName, urlAssociations] of importChunks.urlPairings.entries()) {
+                const dbLocalFileTaggable = dbLocalFilesMap.get(dbFileHashMap.get(fileName)).Taggable_ID;
+                taggableURLAssociationPairings.set(dbLocalFileTaggable, urlAssociations)
             }
-            await URLAssociations.upsertToTaggables(dbsTransaction, taggableURLAssociationPairings);
+            console.log("pre url assocs");
+            await Taggables.upsertURLAssociations(dbsTransaction, taggableURLAssociationPairings);
+            console.log("post url assocs");
 
             // insert dates
             const createdDatePairings = new Map();
@@ -221,7 +178,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
             const dbNamespacesMap = new Map((await Namespaces.upsertMany(dbsTransaction, [...allNamespacesSet])).map(dbNamespace => [dbNamespace.Namespace_Name, dbNamespace]));
             // upsert tags
             const dbLocalTagsMap = new Map((await LocalTags.upsertMany(dbsTransaction, allTags, localTagServiceID)).map(dbTag => [dbTag.Local_Tags_PK_Hash, dbTag]));
-
+            console.log("upserted tags");
             /** @type {Map<bigint, bigint[]>} */
             const taggablePairings = new Map();
             for (const fileName of importChunks.filePairings.keys()) {
@@ -276,7 +233,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
             importChunks.filePairings.set(fileName, {
                 File_Hash: sha256(await readFile(fileInfoEntry['fileLocation'])),
                 Taggable_Name: fileName,
-                File_Extension: FileExtensions.normalize(path.extname(fileName)),
+                File_Extension: normalizeFileExtension(path.extname(fileName)),
                 sourceLocation: fileInfoEntry['fileLocation']
             });
 

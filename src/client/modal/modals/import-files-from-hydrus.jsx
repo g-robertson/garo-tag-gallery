@@ -40,3 +40,4 @@ export const MODAL_PROPERTIES = {
     modalName: "import-files-from-hydrus",
     displayName: "Import Files From Hydrus"
 };
+export const IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES = MODAL_PROPERTIES;

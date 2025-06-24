@@ -24,7 +24,9 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags, pushModal) {
         const tag = clientTags[i];
         if (tag.modalTagInfo !== undefined) {
             const modalTags = await pushModal(tag.modalTagInfo.modalName);
-            mapped.push(...modalTags);
+            if (modalTags !== undefined && modalTags !== null) {
+                mapped.push(modalTags);
+            }
         } else {
             mapped.push({
                 ...tag,
@@ -62,6 +64,7 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, pushModa
     /** @type {[boolean, (isExcludeOn: boolean) => void]} */
     const [isExcludeOn, setIsExcludeOn] = useState(false);
 
+    // TODO: Separate out top half of this from the LazyTextObjectSelector
     return (
         <div style={{flexDirection: "column", width: "100%"}}>
             <div>Tag services to view:</div>

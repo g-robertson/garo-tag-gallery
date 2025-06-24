@@ -248,38 +248,11 @@ export const MIGRATION = {
                 Tags_Namespaces_PK_Hash TEXT NOT NULL
             ); 
         `),
-        dbsqlcommand(`
-            CREATE TABLE URLs(
-                URL_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                URL Text NOT NULL,
-                Has_URL_Tag_ID INTEGER NOT NULL,
-                URL_Created_Date INTEGER NOT NULL DEFAULT (unixepoch('now'))
-            );
-        `),
-        dbsqlcommand(`
-            CREATE TABLE URL_Associations(
-                URL_Association_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                URL_ID INTEGER NOT NULL,
-                URL_Association TEXT,
-                URL_Associations_PK_Hash TEXT NOT NULL,
-                Has_URL_With_Association_Tag_ID INTEGER NOT NULL,
-                URL_Association_Created_Date INTEGER NOT NULL DEFAULT (unixepoch('now'))
-            ); 
-        `),
         ...insertsystemtag(HAS_URL_TAG),
-        dbsqlcommand(`
-            CREATE TABLE File_Extensions(
-                File_Extension_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Has_File_Extension_Tag_ID INTEGER NOT NULL,
-                File_Extension TEXT NOT NULL,
-                File_Extension_Created_Date INTEGER NOT NULL DEFAULT (unixepoch('now'))
-            );
-        `),
         dbsqlcommand(`
             CREATE TABLE Local_Taggable_Services(
                 Local_Taggable_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Service_ID INTEGER NOT NULL,
-                In_Local_Taggable_Service_Tag_ID INTEGER NOT NULL
+                Service_ID INTEGER NOT NULL
             );
         `),
         ...insertsystemtag(IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG),
@@ -294,17 +267,14 @@ export const MIGRATION = {
         dbsqlcommand(`
             INSERT INTO Local_Taggable_Services(
                 Local_Taggable_Service_ID,
-                Service_ID,
-                In_Local_Taggable_Service_Tag_ID
+                Service_ID
             ) VALUES (
                 $defaultLocalTaggableLocalTaggableServiceID,
-                $defaultLocalTaggableServiceID,
-                $defaultLocalTaggableServiceTagID
+                $defaultLocalTaggableServiceID
             );
         `, {
             $defaultLocalTaggableLocalTaggableServiceID: DEFAULT_LOCAL_TAGGABLE_SERVICE.Local_Taggable_Service_ID,
             $defaultLocalTaggableServiceID: DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_ID,
-            $defaultLocalTaggableServiceTagID: Number(IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG.Tag_ID)
         }),
         dbsqlcommand(`
             CREATE TABLE Taggables(
@@ -337,8 +307,7 @@ export const MIGRATION = {
                 Exact_Bitmap_Hash BLOB,
                 Prethumbnail_Hash BLOB,
                 Thumbnail_Hash BLOB,
-                Has_File_Hash_Tag_ID INTEGER NOT NULL,
-                File_Extension_ID INTEGER NOT NULL
+                File_Extension TEXT
             );
         `),
         ...insertsystemtag(IS_FILE_TAG),
@@ -361,7 +330,6 @@ export const MIGRATION = {
             CREATE TABLE Local_Metric_Services(
                 Local_Metric_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Service_ID INTEGER NOT NULL,
-                Has_Metric_From_Local_Metric_Service_Tag_ID INTEGER NOT NULL,
                 User_Editable INTEGER NOT NULL
             ); 
         `),
@@ -369,7 +337,6 @@ export const MIGRATION = {
             CREATE TABLE Local_Metrics(
                 Local_Metric_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Local_Metric_Service_ID INTEGER NOT NULL,
-                Has_Local_Metric_Tag_ID INTEGER NOT NULL,
                 Local_Metric_Name TEXT NOT NULL,
                 Local_Metric_Lower_Bound REAL,
                 Local_Metric_Upper_Bound REAL,
@@ -383,22 +350,19 @@ export const MIGRATION = {
                 Local_Metric_ID INTEGER NOT NULL,
                 User_ID INTEGER,
                 Applied_Value REAL NOT NULL,
-                Local_Applied_Metric_PK_Hash TEXT NOT NULL,
-                Local_Applied_Metric_Tag_ID INTEGER NOT NULL
+                Local_Applied_Metric_PK_Hash TEXT NOT NULL
             );
         `),
         dbsqlcommand(`
             CREATE TABLE Local_URL_Generator_Services(
                 Local_URL_Generator_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Service_ID INTEGER NOT NULL,
-                Has_URL_From_Local_URL_Generator_Service_Tag_ID INTEGER NOT NULL
+                Service_ID INTEGER NOT NULL
             );
         `),
         dbsqlcommand(`
             CREATE TABLE Local_URL_Generators(
                 Local_URL_Generator_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Local_URL_Generator_Service_ID INTEGER NOT NULL,
-                Has_URL_From_Local_URL_Generator_Tag_ID INTEGER NOT NULL,
                 Local_URL_Generator_Name TEXT NOT NULL,
                 LocaL_URL_Generator_JSON TEXT NOT NULL
             );
@@ -406,15 +370,13 @@ export const MIGRATION = {
         dbsqlcommand(`
             CREATE TABLE Local_URL_Classifier_Services(
                 Local_URL_Classifier_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Service_ID INTEGER NOT NULL,
-                Has_URL_From_Local_URL_Classifier_Service_Tag_ID INTEGER NOT NULL
+                Service_ID INTEGER NOT NULL
             );
         `),
         dbsqlcommand(`
             CREATE TABLE Local_URL_Classifiers(
                 Local_URL_Classifier_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Local_URL_Classifier_Service_ID INTEGER NOT NULL,
-                Has_URL_From_Local_URL_Classifier_Tag_ID INTEGER NOT NULL,
                 Local_URL_Classifier_Name TEXT NOT NULL,
                 LocaL_URL_Classifier_JSON TEXT NOT NULL
             );
@@ -422,15 +384,13 @@ export const MIGRATION = {
         dbsqlcommand(`
             CREATE TABLE Local_Parser_Services(
                 Local_Parser_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Service_ID INTEGER NOT NULL,
-                From_Local_Parser_Service_Tag_ID INTEGER NOT NULL
+                Service_ID INTEGER NOT NULL
             );
         `),
         dbsqlcommand(`
             CREATE TABLE Local_Parsers(
                 Local_Parser_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Local_Parser_Service_ID INTEGER NOT NULL,
-                From_Local_Parser_Tag_ID INTEGER NOT NULL,
                 Local_Parser_Name TEXT NOT NULL,
                 LocaL_Parser_JSON TEXT NOT NULL
             );

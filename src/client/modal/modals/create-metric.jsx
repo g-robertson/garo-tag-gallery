@@ -151,3 +151,4 @@ export const MODAL_PROPERTIES = {
     modalName: "create-metric",
     displayName: "Create Metric"
 };
+export const CREATE_METRIC_MODAL_PROPERTIES = MODAL_PROPERTIES;

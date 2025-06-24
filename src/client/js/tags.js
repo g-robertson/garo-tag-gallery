@@ -1,7 +1,6 @@
 import { randomID } from "./client-util.js";
 
 /**
- * 
  * @param {bigint} Tag_ID 
  * @param {PreInsertLocalTag} preInsertLocalTag
  */
@@ -24,23 +23,25 @@ export const DEFAULT_LOCAL_TAG_SERVICE = {
     Service_Name: "Default local tags"
 };
 
+export const SYSTEM_GENERATED = "System generated";
+
 export const HAS_NOTES_TAG = createSystemTag(0n, {
-    Source_Name: "System generated",
+    Source_Name: SYSTEM_GENERATED,
     Display_Name: "system:has notes",
     Lookup_Name: "system:has notes",
 });
 export const HAS_URL_TAG = createSystemTag(1n, {
-    Source_Name: "System generated",
+    Source_Name: SYSTEM_GENERATED,
     Display_Name: "system:has url",
     Lookup_Name: "system:has url"
 });
 export const IS_FILE_TAG = createSystemTag(2n, {
-    Source_Name: "System generated",
+    Source_Name: SYSTEM_GENERATED,
     Display_Name: "system:is file",
     Lookup_Name: "system:is file"
 });
 export const LAST_SYSTEM_TAG = createSystemTag(0xFFFFn, {
-    Source_Name: "System generated",
+    Source_Name: SYSTEM_GENERATED,
     Display_Name: "system:reserved:user should not see",
     Lookup_Name: randomID(64)
 });
@@ -61,6 +62,58 @@ export function normalPreInsertLocalTag(tagName, Source_Name) {
     };
 }
 
+/**
+ * @param {string} fileExtension 
+ */
+export function normalizeFileExtension(fileExtension) {
+    fileExtension = fileExtension.toLowerCase();
+    if (fileExtension === ".jpeg") {
+        return ".jpg";
+    }
+    if (fileExtension === ".tif") {
+        return ".tiff";
+    }
+
+    return fileExtension;
+}
+
+/**
+ * @param {string} fileExtension 
+ */
+export function createFileExtensionLookupName(fileExtension) {
+    fileExtension = normalizeFileExtension(fileExtension);
+    return `system:has file extension:${fileExtension}`;
+}
+
+/**
+ * @param {string} fileHash 
+ */
+export function createHasFileHashLookupName(fileHash) {
+    fileHash = fileHash.toLowerCase();
+    return `system:has file hash:${fileHash}`;
+}
+
+/**
+ * @param {string} url 
+ */
+export function createHasURLTagLookupName(url) {
+    return `system:has url:${url}`;
+}
+
+/**
+ * @typedef {Object} URLAssociation
+ * @property {string} URL
+ * @property {string} URL_Association
+ */
+
+/**
+ * @param {URLAssociation} urlAssocation 
+ */
+export function createURLAssociationTagLookupName(urlAssociation) {
+    // " with with " => URL = " with"
+    // " with with " => URL = "" URL_Association = "with "
+    return `system:has url with association:${urlAssociation.URL} with\x01 ${urlAssociation.URL_Association}`;
+}
 
 /**
  * @param {string} lookupName 

@@ -34,3 +34,4 @@ export const MODAL_PROPERTIES = {
     hasBorder: false,
     moveWithIndex: 0
 };
+export const GALLERY_MODAL_PROPERTIES = MODAL_PROPERTIES;

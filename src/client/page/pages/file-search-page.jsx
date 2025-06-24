@@ -5,7 +5,7 @@ import { fjsonParse } from '../../js/client-util.js';
 import { User } from '../js/user.js';
 import LazyThumbnailGallery from '../../components/lazy-thumbnail-gallery.jsx';
 
-import { MODAL_PROPERTIES as GALLERY_MODAL_PROPERTIES } from '../../modal/modals/gallery.jsx';
+import { GALLERY_MODAL_PROPERTIES } from '../../modal/modals/gallery.jsx';
 
 /** @import {SearchObject} from "../../components/tags-selector.jsx" */
 

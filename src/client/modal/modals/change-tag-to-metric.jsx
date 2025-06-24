@@ -67,3 +67,4 @@ export const MODAL_PROPERTIES = {
     modalName: "change-tag-to-metric",
     displayName: "Change Tag to Metric"
 };
+export const CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES = MODAL_PROPERTIES;

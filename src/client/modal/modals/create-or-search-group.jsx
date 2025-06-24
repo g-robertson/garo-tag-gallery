@@ -37,3 +37,4 @@ export const MODAL_PROPERTIES = {
     modalName: "create-or-search-group",
     displayName: "Create OR search group"
 };
+export const CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES = MODAL_PROPERTIES;

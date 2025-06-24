@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import './global.css';
-import { MODAL_PROPERTIES as IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES } from './modal/modals/import-files-from-hydrus.jsx';
-import { MODAL_PROPERTIES as CREATE_METRIC_MODAL_PROPERTIES } from './modal/modals/create-metric.jsx';
-import { MODAL_PROPERTIES as CREATE_METRIC_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-metric-service.jsx';
-import { MODAL_PROPERTIES as CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES } from './modal/modals/change-tag-to-metric.jsx';
+import { IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES } from './modal/modals/import-files-from-hydrus.jsx';
+import { CREATE_METRIC_MODAL_PROPERTIES } from './modal/modals/create-metric.jsx';
+import { CREATE_METRIC_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-metric-service.jsx';
+import { CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES } from './modal/modals/change-tag-to-metric.jsx';
 import { PAGE_NAME as FILE_SEARCH_PAGE_NAME, PAGE_DEFAULT_DISPLAY_NAME as FILE_SEARCH_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
 import { randomID } from './js/client-util.js';
 

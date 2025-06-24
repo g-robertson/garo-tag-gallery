@@ -43,3 +43,4 @@ export const MODAL_PROPERTIES = {
     modalName: "select-list-of-tags",
     displayName: "Select list of tags"
 };
+export const SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES = MODAL_PROPERTIES;

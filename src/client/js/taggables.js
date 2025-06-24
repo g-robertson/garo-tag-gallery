@@ -1,4 +1,25 @@
-import { createSystemTag } from "./tags.js";
+import { createSystemTag, SYSTEM_GENERATED } from "./tags.js";
+
+/**
+ * @param {number} localTaggableServiceID 
+ */
+export function createInLocalTaggableServiceLookupName(localTaggableServiceID) {
+    return `system:in local taggable service:${localTaggableServiceID}`;
+}
+
+/**
+ * @param {string} lookupName 
+ */
+export function isInLocalTaggableServiceLookupName(lookupName) {
+    return lookupName.startsWith("system:in local taggable service:");
+}
+
+/**
+ * @param {string} lookupName 
+ */
+export function revertInLocalTaggableServiceLookupName(lookupName) {
+    return Number(lookupName.slice("system:in local taggable service:".length));
+}
 
 export const DEFAULT_LOCAL_TAGGABLE_SERVICE = {
     Service_ID: 2,
@@ -7,7 +28,7 @@ export const DEFAULT_LOCAL_TAGGABLE_SERVICE = {
     In_Local_Taggable_Service_Tag_ID: 3n
 };
 export const IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG = createSystemTag(3n, {
-    Source_Name: "System generated",
+    Source_Name: SYSTEM_GENERATED,
     Display_Name: `system:in local taggable service:${DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_Name}`,
-    Lookup_Name: `system:in local taggable service:${DEFAULT_LOCAL_TAGGABLE_SERVICE.Local_Taggable_Service_ID}`
+    Lookup_Name: createInLocalTaggableServiceLookupName(DEFAULT_LOCAL_TAGGABLE_SERVICE.Local_Taggable_Service_ID)
 });

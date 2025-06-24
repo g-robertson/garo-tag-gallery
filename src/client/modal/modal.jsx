@@ -23,7 +23,7 @@ import '../global.css';
 const MODALS = {};
 
 (async () => {
-    const modals = [
+    const modals =  [
         await import("./modals/gallery.jsx"),
         await import('./modals/create-or-search-group.jsx'),
         await import('./modals/import-files-from-hydrus.jsx'),
@@ -32,7 +32,8 @@ const MODALS = {};
         await import('./modals/change-tag-to-metric.jsx'),
         await import('./modals/create-aggregate-tag.jsx'),
         await import("./modals/tag-selector-modal.jsx"),
-        await import("./modals/select-from-list-of-tags-modal.jsx")
+        await import("./modals/select-from-list-of-tags-modal.jsx"),
+        await import("./modals/create-metric-tag.jsx")
     ];
     
     for (const modal of modals) {

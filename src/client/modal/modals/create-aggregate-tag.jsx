@@ -2,9 +2,8 @@ import '../../global.css';
 import TagGroupsSelector from '../../components/tag-groups-selector.jsx';
 import { useState } from 'react';
 import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
-import { MODAL_PROPERTIES as SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES } from "./select-from-list-of-tags-modal.jsx"
-import { SYSTEM_LOCAL_TAG_SERVICE } from '../../js/tags.js';
-import { createAppliedMetricDisplayName, createAppliedMetricLookupName } from '../../js/metrics.js';
+import { SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES } from "./select-from-list-of-tags-modal.jsx"
+import { createAppliedMetricDisplayName } from '../../js/metrics.js';
 import getTagsFromNamespaceID from '../../../api/client-get/tags-from-namespace.js';
 
 /** @import {User} from "../../js/user.js" */
@@ -43,7 +42,11 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                 <div style={{marginTop: 4}}>Where the tags within the group must follow any selected conditions below</div>
                 <div style={{marginTop: 4}}>Conditions selected:</div>
                 <div style={{height: 100, marginTop: 4}}>
-                    <LazyTextObjectSelector textObjects={conditions} elementsSelectable={false} />
+                    <LazyTextObjectSelector textObjects={conditions} multiSelect={false} onValuesDoubleClicked={(_, indicesSelected) => {
+                        conditions.splice(indicesSelected[0], 1);
+
+                        setConditions([...conditions]);
+                    }} />
                 </div>
                 <div style={{marginTop: 8, flexDirection: "column"}}>
                     <div>
@@ -60,12 +63,11 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                                     const step = Math.pow(10, localMetric.Local_Metric_Precision);
                                     for (let i = localMetric.Local_Metric_Lower_Bound; i <= localMetric.Local_Metric_Upper_Bound; i += step) {
                                         tags.push({
-                                            type: "tagByLookup",
-                                            lookupName: createAppliedMetricLookupName(localMetric.Local_Metric_ID, user.id(), i),
-                                            displayName: createAppliedMetricDisplayName(localMetric.Local_Metric_Name, user.name(), i),
-                                            sourceName: "System generated",
-                                            localTagServiceID: SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID
-                                        })
+                                            type: "appliedLocalMetric",
+                                            Local_Metric_ID: localMetric.Local_Metric_ID,
+                                            Applied_Value: i,
+                                            displayName: createAppliedMetricDisplayName(localMetric.Local_Metric_Name, user.name(), i)
+                                        });
                                     }
                                 }
                             } else if (tagGroup.type === "namespace") {
@@ -82,6 +84,10 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                             const notInTagList = await pushModal(SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES.modalName, {
                                 tags
                             });
+                            if (notInTagList === null || notInTagList === undefined) {
+                                return;
+                            }
+
                             conditions.push({
                                 type: "is-not-in-tag-list",
                                 value: notInTagList,
@@ -100,12 +106,11 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                                 tagGroup: tagGroups[0],
                                 conditions
                             },
-                            displayName: `system:aggregate tag with group:${tagGroups[0].displayName} WHERE ${conditions.map(condition => condition.displayName).join(" AND ")}`
+                            displayName: `system:aggregate tag with group:${tagGroups[0].displayName}${conditions.length !== 0 ? " WHERE " : ""}${conditions.map(condition => condition.displayName).join(" AND ")}`
                         }
 
-                        console.log(aggregateTag);
                         delete aggregateTag.value.tagGroup['extraInfo'];
-                        modalOptions.resolve([aggregateTag]);
+                        modalOptions.resolve(aggregateTag);
                         popModal();
                     }}/>
                 </div>
@@ -120,3 +125,4 @@ export const MODAL_PROPERTIES = {
     modalName: "create-aggregate-tag",
     displayName: "Create Aggregate Tag"
 };
+export const CREATE_AGGREGATE_TAG_MODAL_PROPERTIES = MODAL_PROPERTIES;

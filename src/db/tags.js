@@ -1,4 +1,4 @@
-import { HAS_URL_TAG, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash, normalPreInsertLocalTag } from "../client/js/tags.js";
+import { HAS_URL_TAG, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash } from "../client/js/tags.js";
 import { PERMISSIONS, User } from "../client/js/user.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
 import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
@@ -183,6 +183,8 @@ export class LocalTagServices {
  * @property {number} Local_Tag_ID
  * @property {number} Local_Tag_Service_ID
  * @property {bigint} Tag_ID
+ * @property {string} Lookup_Name
+ * @property {string} Source_Name
  * @property {string} Display_Name
  * @property {string} Tag_Name
  * @property {string[]} Namespaces
@@ -266,7 +268,7 @@ export class UserFacingLocalTags {
     static async selectManyByNamespaceIDs(dbs, namespaceIDs, localTagServiceIDs) {
         /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
         const dbUserFacingLocalTags = await dballselect(dbs, `
-            SELECT LT.Tag_ID, LT.Local_Tag_ID, LT.Display_Name, LT.Local_Tag_Service_ID
+            SELECT LT.Tag_ID, LT.Local_Tag_ID, LT.Display_Name, LT.Lookup_Name, LT.Source_Name, LT.Local_Tag_Service_ID
               FROM Local_Tags LT
               JOIN Tags T ON LT.Tag_ID = T.Tag_ID
               JOIN Tags_Namespaces TN ON T.Tag_ID = TN.Tag_ID
@@ -294,7 +296,7 @@ export class UserFacingLocalTags {
     static async selectManyByLocalTagServiceIDs(dbs, localTagServiceIDs) {
         /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
         const dbUserFacingLocalTags = await dballselect(dbs, `
-            SELECT Tag_ID, Local_Tag_ID, Display_Name, Local_Tag_Service_ID
+            SELECT Tag_ID, Local_Tag_ID, Display_Name, Lookup_Name, Source_Name, Local_Tag_Service_ID
               FROM Local_Tags
              WHERE Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
             ;`, localTagServiceIDs
@@ -322,7 +324,7 @@ export class UserFacingLocalTags {
 
         /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
         const dbUserFacingLocalTags = await dballselect(dbs, `
-            SELECT Tag_ID, Local_Tag_ID, Display_Name, Local_Tag_Service_ID
+            SELECT Tag_ID, Local_Tag_ID, Display_Name, Lookup_Name, Source_Name, Local_Tag_Service_ID
               FROM Local_Tags
             WHERE Tag_ID IN ${dbvariablelist(tagIDs.length)}
             AND Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
@@ -447,6 +449,20 @@ export class LocalTags {
 
     /**
      * @param {Databases} dbs 
+     * @param {bigint[]} tagIDs 
+     */
+    static async selectManyByTagIDs(dbs, tagIDs) {
+        if (tagIDs.length === 0) {
+            return [];
+        }
+
+        /** @type {DBLocalTag[]} */
+        const dbLocalTags = await dballselect(dbs, `SELECT * FROM Local_Tags WHERE Tag_ID IN ${dbvariablelist(tagIDs.length)}`, tagIDs.map(tagID => Number(tagID)));
+        return dbLocalTags.map(mapDBLocalTag);
+    }
+
+    /**
+     * @param {Databases} dbs 
      * @param {number[]} localTagIDs 
      */
     static async selectManyByIDs(dbs, localTagIDs) {
@@ -485,15 +501,20 @@ export class LocalTags {
 
     /**
      * @param {Databases} dbs 
+     * @param {{Lookup_Name: string, Source_Name: string}} tagLookup
+     * @param {number} localTagServiceID
+     */
+    static async selectByLookup(dbs, tagLookup, localTagServiceID) {
+        return (await LocalTags.selectManyByLookups(dbs, [tagLookup], localTagServiceID))[0];
+    }
+
+    /**
+     * @param {Databases} dbs 
      * @param {PreInsertLocalTag[]} localTags 
      * @param {number} localTagServiceID
-     * @param {DBTag[]=} preCreatedTags
      * @returns {Promise<DBLocalTag[]>}
      */
-    static async insertMany(dbs, localTags, localTagServiceID, preCreatedTags) {
-        if (preCreatedTags !== undefined && preCreatedTags.length !== localTags.length) {
-            throw "Pre-created tags were provided to insert local tags, but the length of the pre-created tags did not match the local tags length";
-        }
+    static async insertMany(dbs, localTags, localTagServiceID) {
         if (localTags.length === 0) {
             return [];
         }
@@ -502,12 +523,12 @@ export class LocalTags {
             return slices.flat();
         }
 
-        preCreatedTags ??= await Tags.insertMany(dbs, localTags.length);
+        const tags = await Tags.insertMany(dbs, localTags.length);
 
         const tagInsertionParams = [];
         for (let i = 0; i < localTags.length; ++i) {
             const localTag = localTags[i];
-            tagInsertionParams.push(Number(preCreatedTags[i].Tag_ID));
+            tagInsertionParams.push(Number(tags[i].Tag_ID));
             tagInsertionParams.push(localTagServiceID);
             tagInsertionParams.push(localTag.Lookup_Name);
             tagInsertionParams.push(localTag.Source_Name);
@@ -534,10 +555,9 @@ export class LocalTags {
      * @param {Databases} dbs 
      * @param {PreInsertLocalTag} localTag
      * @param {number} localTagServiceID
-     * @param {DBTag=} preCreatedTag
      */
-    static async insert(dbs, localTag, localTagServiceID, preCreatedTag) {
-        return (await LocalTags.insertMany(dbs, [localTag], localTagServiceID, [preCreatedTag]))[0];
+    static async insert(dbs, localTag, localTagServiceID) {
+        return (await LocalTags.insertMany(dbs, [localTag], localTagServiceID))[0];
     }
 
     /**
@@ -560,106 +580,6 @@ export class LocalTags {
         return dbLocalTags.concat(insertedDBTags);
     }
 };
-
-/**
- * @typedef {Object} DBFileExtension
- * @property {number} File_Extension_ID
- * @property {bigint} Has_File_Extension_Tag_ID
- * @property {string} File_Extension
- * @property {number} File_Extension_Created_Date
- */
-
-
-/**
- * @param {DBFileExtension} dbFileExtension
- */
-function mapDBFileExtension(dbFileExtension) {
-    return {
-        ...dbFileExtension,
-        Has_File_Extension_Tag_ID: BigInt(dbFileExtension.Has_File_Extension_Tag_ID)
-    };
-}
-
-export class FileExtensions {
-    /**
-     * @param {string} fileExtension 
-     */
-    static normalize(fileExtension) {
-        fileExtension = fileExtension.toLowerCase();
-        if (fileExtension === ".jpeg") {
-            return ".jpg";
-        }
-        if (fileExtension === ".tif") {
-            return ".tiff";
-        }
-
-        return fileExtension;
-    }
-
-
-    /**
-     * @param {Databases} dbs 
-     * @param {string[]} fileExtensions
-     */
-    static async selectMany(dbs, fileExtensions) {
-        /** @type {DBFileExtension[]} */
-        const dbFileExtensions = await dballselect(dbs, `SELECT * FROM File_Extensions WHERE File_Extension IN ${dbvariablelist(fileExtensions.length)};`, fileExtensions);
-        return dbFileExtensions.map(mapDBFileExtension);
-    }
-
-    /**
-     * @param {Databases} dbs 
-     * @param {string[]} fileExtensions
-     */
-    static async insertMany(dbs, fileExtensions) {
-        if (fileExtensions.length === 0) {
-            return [];
-        }
-
-        const insertedHasFileExtensionTags = await LocalTags.insertMany(dbs, fileExtensions.map(fileExtension => normalPreInsertLocalTag(
-            `system:has file extension:${fileExtension}`,
-            "System generated"
-        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
-
-        const fileExtensionInsertionParams = [];
-        for (let i = 0; i < fileExtensions.length; ++i) {
-            fileExtensionInsertionParams.push(fileExtensions[i]);
-            fileExtensionInsertionParams.push(Number(insertedHasFileExtensionTags[i].Tag_ID));
-        }
-
-        /** @type {DBFileExtension[]} */
-        const insertedDBFileExtensions = await dball(dbs, `
-            INSERT INTO File_Extensions(
-                File_Extension,
-                Has_File_Extension_Tag_ID
-            ) VALUES ${dbtuples(fileExtensions.length, 2)} RETURNING *;
-            `, fileExtensionInsertionParams
-        );
-
-        return insertedDBFileExtensions.map(mapDBFileExtension);
-    }
-
-    /**
-     * @param {Databases} dbs
-     * @param {string[]} fileExtensions 
-     */
-    static async upsertMany(dbs, fileExtensions) {
-        if (fileExtensions.length === 0) {
-            return [];
-        }
-        fileExtensions = fileExtensions.map(FileExtensions.normalize);
-        // dedupe
-        fileExtensions = [...new Set(fileExtensions)];
-
-        const dbFileExtensions = await FileExtensions.selectMany(dbs, fileExtensions);
-        const dbFileExtensionsExisting = new Set(dbFileExtensions.map(dbFileExtension => dbFileExtension.File_Extension));
-        const fileExtensionsToInsert = fileExtensions.filter(fileExtension => !dbFileExtensionsExisting.has(fileExtension));
-        const insertedDBFileExtensions = await FileExtensions.insertMany(dbs, fileExtensionsToInsert);
-
-        return dbFileExtensions.concat(insertedDBFileExtensions);
-    }
-};
-
 
 /**
  * @typedef {Object} DBTagNamespace
@@ -876,236 +796,5 @@ export class Namespaces {
         const insertedDBNamespaces = await Namespaces.insertMany(dbs, namespacesToInsert);
 
         return dbNamespaces.concat(insertedDBNamespaces);
-    }
-}
-
-/**
- * @typedef {Object} DBURL
- * @property {number} URL_ID
- * @property {string} URL
- * @property {bigint} Has_URL_Tag_ID
- * @property {number} URL_Created_Date
- */
-
-/**
- * @param {DBURL} dbURL 
- */
-function mapDBURL(dbURL) {
-    return {
-        ...dbURL,
-        Has_URL_Tag_ID: BigInt(dbURL.Has_URL_Tag_ID)
-    };
-}
-
-export class URLs {
-    /**
-     * @param {Databases} dbs 
-     * @param {string[]} urls 
-     */
-    static async selectMany(dbs, urls) {
-        if (urls.length === 0) {
-            return [];
-        }
-
-        /** @type {DBURL[]} */
-        const dbURLs = await dballselect(dbs, `SELECT * FROM URLs WHERE URL IN ${dbvariablelist(urls.length)};`, urls);
-        return dbURLs.map(mapDBURL);
-    }
-
-    /**
-     * @param {Databases} dbs
-     * @param {string[]} urls
-     */
-    static async insertMany(dbs, urls) {
-        if (urls.length === 0) {
-            return [];
-        }
-
-        const insertedHasURLTags = await LocalTags.insertMany(dbs, urls.map(url => normalPreInsertLocalTag(
-            `system:has url:${url}`,
-            "System generated"
-        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
-
-        const urlInsertionParams = [];
-        for (let i = 0; i < urls.length; ++i) {
-            urlInsertionParams.push(urls[i]);
-            urlInsertionParams.push(Number(insertedHasURLTags[i].Tag_ID));
-        }
-
-        /** @type {DBURL[]} */
-        const insertedDBURLs = await dball(dbs, `
-            INSERT INTO URLs(
-                URL,
-                Has_URL_Tag_ID
-            ) VALUES ${dbtuples(urls.length, 2)} RETURNING *;
-            `, urlInsertionParams
-        );
-
-        return insertedDBURLs.map(mapDBURL);
-    }
-
-    /**
-     * @param {Databases} dbs
-     * @param {string[]} urls 
-     */
-    static async upsertMany(dbs, urls) {
-        if (urls.length === 0) {
-            return [];
-        }
-
-        // dedupe
-        urls = [...new Set(urls)];
-
-        const dbURLs = await URLs.selectMany(dbs, urls);
-        const dbURLsExisting = new Set(dbURLs.map(dbURL => dbURL.URL));
-        const urlsToInsert = urls.filter(url => !dbURLsExisting.has(url));
-        const insertedDBURLs = await URLs.insertMany(dbs, urlsToInsert);
-        return dbURLs.concat(insertedDBURLs);
-    }
-}
-
-/**
- * @typedef {Object} DBURLAssociation
- * @property {number} URL_Association_ID
- * @property {number} URL_ID
- * @property {string} URL_Association
- * @property {string} URL_Associations_PK_Hash
- * @property {bigint} Has_URL_With_Association_Tag_ID
- * @property {number} URL_Association_Created_Date
- */
-
-/** @typedef {DBURL & DBURLAssociation} DBJoinedURLAssociation */
-
-/**
- * @typedef {DBURL & {URL_Association: string}} PreInsertURLAssociation
- * @typedef {PreInsertURLAssociation & {URL_Associations_PK_Hash: string} PreparedPreInsertURLAssociation}
- */
-
-
-/**
- * @param {DBURLAssociation} dbURLAssociation
- * @param {PreInsertURLAssociation} preInsertURLAssociation
- * @returns {DBJoinedURLAssociation}
- */
-function mapDBURLAssociation(dbURLAssociation, preInsertURLAssociation) {
-    return {
-        ...preInsertURLAssociation,
-        ...dbURLAssociation,
-        Has_URL_With_Association_Tag_ID: BigInt(dbURLAssociation.Has_URL_With_Association_Tag_ID)
-    };
-}
-
-export class URLAssociations {
-    /**
-     * @param {PreInsertURLAssociation} urlAssociation 
-     * @returns {PreparedPreInsertURLAssociation}
-     */
-    static preparePreInsert(urlAssociation) {
-        return {
-            ...urlAssociation,
-            URL_Associations_PK_Hash: `${urlAssociation.URL_ID}\x01${urlAssociation.URL_Association}`
-        };
-    }
-
-    /**
-     * @param {Databases} dbs 
-     * @param {PreparedPreInsertURLAssociation[]} urlAssociations 
-     */
-    static async selectMany(dbs, urlAssociations) {
-        if (urlAssociations.length === 0) {
-            return [];
-        }
-
-        const urlAssociationsMap = new Map(urlAssociations.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]));
-
-        /** @type {DBURLAssociation[]} */
-        const dbURLAssociations = await dballselect(dbs,
-            `SELECT * FROM URL_Associations WHERE URL_Associations_PK_Hash IN ${dbvariablelist(urlAssociations.length)};`,
-            urlAssociations.map(urlAssociation => urlAssociation.URL_Associations_PK_Hash)
-        );
-        return dbURLAssociations.map(dbURLAssociation => mapDBURLAssociation(dbURLAssociation, urlAssociationsMap.get(dbURLAssociation.URL_Associations_PK_Hash)));
-    }
-
-    /**
-     * @param {Databases} dbs 
-     * @param {PreparedPreInsertURLAssociation[]} urlAssociations 
-     */
-    static async insertMany(dbs, urlAssociations) {
-        if (urlAssociations.length === 0) {
-            return [];
-        }
-
-        const urlAssociationsMap = new Map(urlAssociations.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]));
-
-        const insertedHasURLAssociationTags = await LocalTags.insertMany(dbs, urlAssociations.map(urlAssociation => normalPreInsertLocalTag(
-            `system:has url with association:${urlAssociation.URL} with association ${urlAssociation.URL_Association}`,
-            "System generated"
-        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
-
-        const urlAssociationInsertionParams = [];
-        for (let i = 0; i < urlAssociations.length; ++i) {
-            urlAssociationInsertionParams.push(urlAssociations[i].URL_ID);
-            urlAssociationInsertionParams.push(urlAssociations[i].URL_Association);
-            urlAssociationInsertionParams.push(urlAssociations[i].URL_Associations_PK_Hash);
-            urlAssociationInsertionParams.push(Number(insertedHasURLAssociationTags[i].Tag_ID));
-        }
-
-        /** @type {DBURLAssociation[]} */
-        const insertedDBURLAssociations = await dball(dbs, `
-            INSERT INTO URL_Associations(
-                URL_ID,
-                URL_Association,
-                URL_Associations_PK_Hash,
-                Has_URL_With_Association_Tag_ID
-            ) VALUES ${dbtuples(urlAssociations.length, 4)} RETURNING *;
-            `, urlAssociationInsertionParams
-        );
-
-
-        return insertedDBURLAssociations.map(dbURLAssociation => mapDBURLAssociation(dbURLAssociation, urlAssociationsMap.get(dbURLAssociation.URL_Associations_PK_Hash)));
-    }
-
-    /**
-     * @param {Databases} dbs
-     * @param {PreInsertURLAssociation[]} urlAssociations
-     */
-    static async upsertMany(dbs, urlAssociations) {
-        if (urlAssociations.length === 0) {
-            return [];
-        }
-
-        let preparedURLAssociations = urlAssociations.map(URLAssociations.preparePreInsert);
-        // dedupe
-        preparedURLAssociations = [...(new Map(preparedURLAssociations.map(urlAssociation => [urlAssociation.URL_Associations_PK_Hash, urlAssociation]))).values()];
-        const dbURLAssociations = await URLAssociations.selectMany(dbs, preparedURLAssociations);
-        const dbURLAssociationsExisting = new Set(dbURLAssociations.map(dbURLAssociation => dbURLAssociation.URL_Associations_PK_Hash));
-        const urlAssociationsToInsert = preparedURLAssociations.filter(urlAssociation => !dbURLAssociationsExisting.has(urlAssociation.URL_Associations_PK_Hash));
-        const dbURLAssociationsInserted = await URLAssociations.insertMany(dbs, urlAssociationsToInsert);
-
-        return dbURLAssociations.concat(dbURLAssociationsInserted);
-    }
-
-    /**
-     * @param {Databases} dbs 
-     * @param {Map<bigint, DBJoinedURLAssociation[]>} taggableURLAssociationPairings
-     */
-    static async upsertToTaggables(dbs, taggableURLAssociationPairings) {
-        /** @type {Map<bigint, bigint[]>} */
-        const tagPairings = new Map([[HAS_URL_TAG.Tag_ID, []]]);
-        for (const [taggableID, dbJoinedURLAssociations] of taggableURLAssociationPairings) {
-            for (const dbJoinedURLAssociation of dbJoinedURLAssociations) {
-                if (tagPairings.get(dbJoinedURLAssociation.Has_URL_Tag_ID) === undefined) {
-                    tagPairings.set(dbJoinedURLAssociation.Has_URL_Tag_ID, [])
-                }
-                if (tagPairings.get(dbJoinedURLAssociation.Has_URL_With_Association_Tag_ID) === undefined) {
-                    tagPairings.set(dbJoinedURLAssociation.Has_URL_With_Association_Tag_ID, []);
-                }
-                tagPairings.get(dbJoinedURLAssociation.Has_URL_Tag_ID).push(taggableID);
-                tagPairings.get(dbJoinedURLAssociation.Has_URL_With_Association_Tag_ID).push(taggableID);
-                tagPairings.get(HAS_URL_TAG.Tag_ID).push(taggableID);
-            }
-        }
-
-        await dbs.perfTags.insertTagPairings(tagPairings, dbs.inTransaction);
     }
 }

@@ -64,6 +64,7 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
         customItemComponent={({realizedValue, setRealizedValue}) => {
             if (visibleTaggableID.current !== realizedValue.Taggable_ID) {
                 visibleTaggableID.current = realizedValue.Taggable_ID;
+                console.log(realizedValue);
                 setMetricValuesMap(new Map(realizedValue.Metrics.map(metric => [metric.Local_Metric_ID, metric])));
             }
             const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];

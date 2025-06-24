@@ -53,3 +53,4 @@ export const MODAL_PROPERTIES = {
     modalName: "tag-selector-modal",
     displayName: "Tag Selector"
 };
+export const TAG_SELECTOR_MODAL_PROPERTIES = MODAL_PROPERTIES;

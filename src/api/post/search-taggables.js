@@ -1,36 +1,63 @@
 /**
  * @import {APIFunction} from "../api-types.js"
  * @import {DBTaggable} from "../../db/taggables.js"
- * @import {DBAppliedMetric} from "../../db/metrics.js"
+ * @import {DBAppliedMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js"
  */
 
-import { bjsonStringify } from "../../client/js/client-util.js";
+import { bjsonStringify, replaceObject } from "../../client/js/client-util.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { Taggables } from "../../db/taggables.js";
 import { LocalTags, LocalTagServices, TagsNamespaces } from "../../db/tags.js";
 import z from "zod";
 import PerfTags from "../../perf-tags-binding/perf-tags.js";
 import { localTagsPKHash, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
-import { AppliedMetrics, LocalMetricServices } from "../../db/metrics.js";
+import { AppliedMetrics, LocalMetrics, LocalMetricServices } from "../../db/metrics.js";
 
 const Z_CLIENT_SEARCH_TAG_BY_LOOKUP = z.object({
     type: z.literal("tagByLookup"),
-    lookupName: z.string(),
-    sourceName: z.string(),
-    localTagServiceID: z.number()
+    Lookup_Name: z.string(),
+    Source_Name: z.string(),
+    localTagServiceID: z.number().nonnegative().refine((localTagServiceID => localTagServiceID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID))
 });
+/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_BY_LOOKUP>} ClientSearchTagByLookup */
 
 const Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID = z.object({
     type: z.literal("tagByLocalTagID"),
     localTagID: z.number()
 });
+/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID>} ClientSearchTagByLocalTagID */
 
-const Z_CLIENT_SEARCH_TAG = Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID.or(Z_CLIENT_SEARCH_TAG_BY_LOOKUP);
+const Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID = z.object({
+    type: z.literal("hasLocalMetricID"),
+    localMetricID: z.number()
+});
+/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID>} ClientSearchTagHasMetricID */
+
+const Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID = z.object({
+    type: z.literal("inLocalMetricServiceID"),
+    localMetricServiceID: z.number()
+})
+/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID>} ClientSearchTagInLocalMetricServiceID */
+
+const Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC = z.object({
+    type: z.literal("appliedLocalMetric"),
+    Local_Metric_ID: z.number(),
+    Applied_Value: z.number()
+});
+/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC>} ClientSearchTagAppliedLocalMetric */
+
+const Z_CLIENT_SEARCH_TAG = Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID
+    .or(Z_CLIENT_SEARCH_TAG_BY_LOOKUP)
+    .or(Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID)
+    .or(Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID)
+    .or(Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC);
+/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG>} ClientSearchTag */
 
 const Z_AGGREGATE_TAG_CONDITIONS = z.object({
     type: z.literal("is-not-in-tag-list"),
     value: z.array(Z_CLIENT_SEARCH_TAG)
 });
+/** @typedef {z.infer<typeof Z_AGGREGATE_TAG_CONDITIONS>} ClientAggregateTagCondition */
 
 const Z_NAMESPACE_AGGREGATE_TAG_GROUP = z.object({
     type: z.literal("namespace"),
@@ -42,6 +69,7 @@ const Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP = z.object({
 });
 
 const Z_AGGREGATE_TAG_GROUP = Z_NAMESPACE_AGGREGATE_TAG_GROUP.or(Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP);
+/** @typedef {z.infer<typeof Z_AGGREGATE_TAG_GROUP>} ClientTagGroup */
 
 const Z_AGGREGATE_TAG = z.object({
     type: z.literal("aggregateTag"),
@@ -50,6 +78,7 @@ const Z_AGGREGATE_TAG = z.object({
         conditions: z.array(Z_AGGREGATE_TAG_CONDITIONS)
     })
 });
+/** @typedef {z.infer<typeof Z_AGGREGATE_TAG>} ClientAggregateTag */
 
 /** @type {z.ZodAny} */
 const Z_SEARCH_QUERY = z.object({
@@ -64,16 +93,6 @@ const Z_SEARCH_QUERY = z.object({
 }))
 .or(Z_CLIENT_SEARCH_TAG)
 .or(Z_AGGREGATE_TAG);
-
-/**
- * @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_BY_LOOKUP} ClientSearchTagByLookup
- * @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG>} ClientSearchTag
- * @typedef {z.infer<typeof Z_AGGREGATE_TAG_CONDITIONS>} ClientAggregateTagCondition
- * @typedef {z.infer<typeof Z_AGGREGATE_TAG>} ClientAggregateTag
- * @typedef {z.infer<typeof Z_AGGREGATE_TAG_GROUP>} ClientTagGroup
-*/
-
-
 /**
  * @typedef {{
  *     type: "union" | "intersect",
@@ -83,6 +102,7 @@ const Z_SEARCH_QUERY = z.object({
  *     value: ClientSearchQuery
  * } | ClientSearchTag | ClientAggregateTag} ClientSearchQuery
  **/
+/**
 
 /**
  * @typedef {{
@@ -93,7 +113,7 @@ const Z_SEARCH_QUERY = z.object({
  *     value: SearchQueryRecursive
  * } | {
  *     type: "tag",
- *     value: bigint
+ *     tagID: bigint
  * }} SearchQueryRecursive
  */
 
@@ -110,7 +130,7 @@ const Z_SEARCH_QUERY = z.object({
  *     value: PreSearchQuery
  * } | {
  *     type: "tag",
- *     value: bigint
+ *     tagID: bigint
  * } | {
  *     type: "universe" | "complement-universe"
  * }} PreSearchQuery
@@ -133,53 +153,124 @@ function walkSearchQuery(searchQuery, callback) {
 }
 
 /**
- * @param {ClientSearchQuery} clientSearchQuery 
+ * @param {ClientSearchQuery} step 
+ */
+function isClientSearchTag(step) {
+    return step.type === "tagByLocalTagID"
+        || step.type === "tagByLookup"
+        || step.type === "hasLocalMetricID"
+        || step.type === "inLocalMetricServiceID"
+        || step.type === "appliedLocalMetric";
+}
+
+/**
+ * @param {ClientSearchTag} clientSearchTag 
  * @param {Map<number, bigint>} localTagsMap 
  * @param {Map<number, Map<string, bigint>>} tagLookupsMap 
- * @param {Map<number, Map<number, bigint>>} appliedMetricMap
+ * @param {Map<number, DBPermissionedLocalMetricService>} localMetricServicesMap
+ * @param {Map<number, bigint>} localMetricsMap
+ * @param {Map<number, Map<number, bigint>>} appliedMetricsMap
+ * @returns {ClientSearchQuery}
+ */
+function transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap) {
+    /** @type {bigint} */
+    let tagID;
+    if (clientSearchTag.type === "tagByLocalTagID") {
+        tagID = localTagsMap.get(clientSearchTag.localTagID)
+    } else if (clientSearchTag.type === "tagByLookup") {
+        tagID = tagLookupsMap.get(clientSearchTag.localTagServiceID).get(localTagsPKHash(clientSearchTag.Lookup_Name, clientSearchTag.Source_Name));
+    } else if (clientSearchTag.type === "hasLocalMetricID") {
+        tagID = localMetricsMap.get(clientSearchTag.localMetricID);
+    } else if (clientSearchTag.type === "inLocalMetricServiceID") {
+        tagID = localMetricServicesMap.get(clientSearchTag.localMetricServiceID).Has_Metric_From_Local_Metric_Service_Tag.Tag_ID;
+    } else if (clientSearchTag.type === "appliedLocalMetric") {
+        tagID = appliedMetricsMap.get(clientSearchTag.Local_Metric_ID).get(clientSearchTag.Applied_Value);
+    } else {
+        console.log(clientSearchTag);
+        throw "Unrecognized client search tag type";
+    }
+
+    if (tagID === undefined) {
+        return {
+            type: "complement-universe"
+        };
+    } else {
+        return {
+            type: "tag",
+            tagID
+        };
+    }
+}
+
+/**
+ * @param {ClientSearchTag} clientSearchTag 
+ * @param {Set<number>} allLocalTagIDs
+ * @param {Set<number>} allLocalMetricIDs
+ * @param {Set<number>} allLocalMetricServiceIDs
+ * @param {Map<number, Map<string, {Lookup_Name: string, Source_Name: string}>>} allTagLookups 
+ */
+function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs) {
+    if (clientSearchTag.type === "tagByLocalTagID") {
+        allLocalTagIDs.add(clientSearchTag.localTagID);
+    } else if (clientSearchTag.type === "tagByLookup") {
+        const {localTagServiceID, Lookup_Name, Source_Name} = clientSearchTag;
+        let pkHashToTagLookupMap = allTagLookups.get(localTagServiceID);
+        if (pkHashToTagLookupMap === undefined) {
+            pkHashToTagLookupMap = new Map();
+            allTagLookups.set(localTagServiceID, pkHashToTagLookupMap);
+        }
+        pkHashToTagLookupMap.set(localTagsPKHash(Lookup_Name, Source_Name), {Lookup_Name, Source_Name});
+    } else if (clientSearchTag.type === "hasLocalMetricID") {
+        allLocalMetricIDs.add(clientSearchTag.localMetricID);
+    } else if (clientSearchTag.type === "inLocalMetricServiceID") {
+        allLocalMetricServiceIDs.add(clientSearchTag.localMetricServiceID);
+    } else if (clientSearchTag.type === "appliedLocalMetric") {
+        allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);
+    } else {
+        console.log(clientSearchTag);
+        throw "Unrecognized client search tag type";
+    }
+}
+
+/**
+ * @param {ClientSearchQuery} clientSearchQuery 
+ * @param {Map<number, bigint>} localTagsMap 
+ * @param {Map<number, Map<string, bigint>>} tagLookupsMap
+ * @param {Map<number, DBPermissionedLocalMetricService>} localMetricServicesMap
+ * @param {Map<number, bigint>} localMetricsMap
+ * @param {Map<number, Map<number, bigint>>} appliedMetricsMap
  * @param {Map<number, bigint[]>} tagsNamespacesMap
  */
-function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap, tagLookupsMap, appliedMetricMap, tagsNamespacesMap) {
+function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap, tagsNamespacesMap) {
     // transform client search query into pre search query
     walkSearchQuery(clientSearchQuery, step => {
-        if (step.type === "tagByLocalTagID") {
-            step.type = "tag";
-            step.value = localTagsMap.get(step.localTagID);
-        } else if (step.type === "tagByLookup") {
-            const tagID = tagLookupsMap.get(step.localTagServiceID).get(localTagsPKHash(step.lookupName, step.sourceName));
-            if (tagID === undefined) {
-                step.type = "complement-universe";
-            } else {
-                step.type = "tag";
-                step.value = tagID;
-            }
+        if (isClientSearchTag(step)) {
+            replaceObject(step, transformClientSearchTag(step, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap));
         } else if (step.type === "aggregateTag") {
             const aggregateTag = step.value;
             step.type = "union";
             /** @type {Set<bigint>} */
             let tagsOfAggregate;
             if (aggregateTag.tagGroup.type === "applied-metrics") {
-                tagsOfAggregate = new Set(appliedMetricMap.get(aggregateTag.tagGroup.localMetricID).values());
+                tagsOfAggregate = new Set(appliedMetricsMap.get(aggregateTag.tagGroup.localMetricID).values());
             } else if (aggregateTag.tagGroup.type === "namespace") {
                 tagsOfAggregate = new Set(tagsNamespacesMap.get(aggregateTag.tagGroup.namespaceID));
             }
 
             for (const condition of aggregateTag.conditions) {
                 if (condition.type === "is-not-in-tag-list") {
-                    for (const clientTag of condition.value) {
-                        if (clientTag.type === "tagByLocalTagID") {
-                            tagsOfAggregate.delete(localTagsMap.get(clientTag.localTagID));
-                        } else if (clientTag.type === "tagByLookup") {
-                            tagsOfAggregate.delete(tagLookupsMap.get(clientTag.localTagServiceID).get(localTagsPKHash(clientTag.lookupName, clientTag.sourceName)));
-                        }
+                    for (const clientSearchTag of condition.value) {
+                        tagsOfAggregate.delete(transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap).tagID)
                     }
                 }
             }
-            
-            step.value = [...tagsOfAggregate].map(tagID => ({
-                type: "tag",
-                value: tagID
-            }));
+            replaceObject(step, {
+                type: "union",
+                value: [...tagsOfAggregate].map(tagID => ({
+                    type: "tag",
+                    tagID
+                }))
+            });
         }
     });
     /** @type {PreSearchQuery} */
@@ -191,22 +282,18 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
         walkSearchQuery(preSearchQuery, step => {
             if (step.type === "complement") {
                 if (step.value.type === "complement-universe") {
-                    step.type = "universe";
-                    delete step.value;
+                    replaceObject(step, {type: "universe"});
                     performedSimplification = true;
                 } else if (step.value.type === "universe") {
-                    step.type = "complement-universe";
-                    delete step.value;
+                    replaceObject(step, {type: "complement-universe"});
                     performedSimplification = true;
                 } else if (step.value.type === "complement") {
-                    step.type = step.value.value.type;
-                    step.value = step.value.value.value;
+                    replaceObject(step, step.value.value);
                     performedSimplification = true;
                 }
             } else if (step.type === "union") {
                 if (step.value.find(unionItem => unionItem.type === "universe")) {
-                    step.type = "universe";
-                    delete step.value;
+                    replaceObject(step, {type: "universe"});
                     performedSimplification = true;
                 } else {
                     const filteredValue = step.value.filter(unionItem => unionItem.type !== "complement-universe");
@@ -215,15 +302,13 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
                         performedSimplification = true;
                     }
                     if (step.value.length === 0) {
-                        step.type = "complement-universe";
-                        delete step.value;
+                        replaceObject(step, {type: "complement-universe"});
                         performedSimplification = true;
                     }
                 }
             } else if (step.type === "intersect") {
                 if (step.value.find(unionItem => unionItem.type === "complement-universe")) {
-                    step.type = "complement-universe";
-                    delete step.value;
+                    replaceObject(step, {type: "complement-universe"});
                     performedSimplification = true;
                 } else {
                     const filteredValue = step.value.filter(unionItem => unionItem.type !== "universe");
@@ -232,8 +317,7 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
                         performedSimplification = true;
                     }
                     if (step.value.length === 0) {
-                        step.type = "universe";
-                        delete step.value;
+                        replaceObject(step, {type: "universe"});
                         performedSimplification = true;
                     }
                 }
@@ -257,7 +341,7 @@ function constructSearchCriteriaFromRecursiveSearchQuery(recursiveSearchQuery) {
     } else if (recursiveSearchQuery.type === "complement") {
         return PerfTags.searchComplement(constructSearchCriteriaFromRecursiveSearchQuery(recursiveSearchQuery.value));
     } else if (recursiveSearchQuery.type === "tag") {
-        return PerfTags.searchTag(recursiveSearchQuery.value)
+        return PerfTags.searchTag(recursiveSearchQuery.tagID)
     } else {
         console.log(recursiveSearchQuery);
         throw "Irregular recursive search query type was used ^";
@@ -277,20 +361,6 @@ function constructSearchCriteriaFromSearchQuery(searchQuery) {
     }
 }
 
-/**
- * @param {Map<number, Map<string, bigint>>} tagLookupMap
- * @param {ClientSearchTagByLookup} searchTagByLookup 
- */
-function addSearchTagByLookupToTagLookupMap(tagLookupMap, searchTagByLookup) {
-    const {localTagServiceID, lookupName, sourceName} = searchTagByLookup;
-    let pkHashToTagLookupMap = tagLookupMap.get(localTagServiceID);
-    if (pkHashToTagLookupMap === undefined) {
-        pkHashToTagLookupMap = new Map();
-        allTagLookups.set(localTagServiceID, pkHashToTagLookupMap);
-    }
-    pkHashToTagLookupMap.set(localTagsPKHash(lookupName, sourceName), {lookupName, sourceName});
-}
-
 export async function validate(dbs, req, res) {
     const tryClientSearchQuery = Z_SEARCH_QUERY.safeParse(req?.body?.searchQuery, {path: ["searchQuery"]});
     if (!tryClientSearchQuery.success) return tryClientSearchQuery.error.message;
@@ -299,20 +369,20 @@ export async function validate(dbs, req, res) {
 
     /** @type {Set<number>} */
     const allLocalTagIDs = new Set();
-    /** @type {Map<number, Map<string, {lookupName: string, sourceName: string}>>} */
+    /** @type {Map<number, Map<string, {Lookup_Name: string, Source_Name: string}>>} */
     const allTagLookups = new Map();
     
     /** @type {Set<number>} */
     const allLocalMetricIDs = new Set();
+    /** @type {Set<number>} */
+    const allLocalMetricServiceIDs = new Set();
 
     /** @type {Set<number>} */
     const allNamespaceIDs = new Set();
 
     walkSearchQuery(clientSearchQuery, step => {
-        if (step.type === "tagByLocalTagID") {
-            allLocalTagIDs.add(step.localTagID);
-        } else if (step.type === "tagByLookup") {
-            addSearchTagByLookupToTagLookupMap(allTagLookups, step);
+        if (isClientSearchTag(step)) {
+            addClientSearchTagToCollections(step, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs);
         } else if (step.type === "aggregateTag") {
             const aggregateTag = step.value;
             if (aggregateTag.tagGroup.type === "applied-metrics") {
@@ -324,22 +394,41 @@ export async function validate(dbs, req, res) {
             for (const condition of aggregateTag.conditions) {
                 if (condition.type === "is-not-in-tag-list") {
                     for (const clientSearchTag of condition.value) {
-                        if (clientSearchTag.type === "tagByLocalTagID") {
-                            allLocalTagIDs.add(clientSearchTag.localTagID);
-                        } else if (clientSearchTag.type === "tagByLookup") {
-                            addSearchTagByLookupToTagLookupMap(allTagLookups, clientSearchTag);
-                        }
+                        addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs);
                     }
                 }
             }
         }
     });
 
+    const localMetricServicesToCheckFromLocalMetricIDs = await LocalMetricServices.selectManyByLocalMetricIDs(dbs, allLocalMetricIDs);
+    const localMetricServiceIDsToCheck = [...new Set([
+        ...localMetricServicesToCheckFromLocalMetricIDs.map(localMetricService => localMetricService.Local_Metric_Service_ID),
+        ...allLocalMetricServiceIDs
+    ])];
+    const localMetricServicesMap = new Map((await LocalMetricServices.userSelectManyByIDs(
+        dbs,
+        req.user,
+        PERMISSION_BITS.READ,
+        localMetricServiceIDsToCheck
+    )).map(localMetricService => [localMetricService.Local_Metric_Service_ID, localMetricService]));
+
+    if (localMetricServiceIDsToCheck.length !== localMetricServicesMap.size) {
+        return "User did not have permission to view all local metric services requested";
+    }
+
+    for (const localMetricServiceID of allLocalMetricServiceIDs) {
+        for (const localMetric of localMetricServicesMap.get(localMetricServiceID).Local_Metrics) {
+            allLocalMetricIDs.add(localMetric.Local_Metric_ID);
+        }
+    }
+
     return {
         clientSearchQuery,
         allLocalTagIDs: [...allLocalTagIDs],
         allTagLookups,
         allLocalMetricIDs: [...allLocalMetricIDs],
+        localMetricServicesMap,
         allNamespaceIDs: [...allNamespaceIDs]
     };
 }
@@ -361,14 +450,7 @@ export async function checkPermission(dbs, req, res) {
 
     const localTagServices = await LocalTagServices.userSelectManyByIDs(dbs, req.user, PERMISSION_BITS.READ, localTagServiceIDsToCheck);
 
-    const localMetricServicesToCheck = await LocalMetricServices.selectManyByLocalMetricIDs(dbs, req.body.allLocalMetricIDs);
-    const localMetricServices = await LocalMetricServices.userSelectManyByIDs(
-        dbs,
-        req.user,
-        PERMISSION_BITS.READ,
-        localMetricServicesToCheck.map(localMetricService => localMetricService.Local_Metric_Service_ID)
-    );
-    return localTagServices.length === localTagServiceIDsToCheck.length && localMetricServicesToCheck.length === localMetricServices.length;
+    return localTagServices.length === localTagServiceIDsToCheck.length;
 }
 
 
@@ -390,10 +472,16 @@ export default async function get(dbs, req, res) {
         );
     }
 
+    const localMetricsMap = new Map((await LocalMetrics.tagMapped(dbs, (await LocalMetrics.selectManyByIDs(dbs, req.body.allLocalMetricIDs)))).map(localMetric => [
+        localMetric.Local_Metric_ID,
+        localMetric.Has_Local_Metric_Tag.Tag_ID
+    ]));
+
     /** @type {Map<number, Map<number, bigint>>} */
-    const localMetricsMap = new Map(req.body.allLocalMetricIDs.map(localMetricID => [localMetricID, new Map()]));
-    for (const appliedMetric of await AppliedMetrics.userSelectManyByLocalMetricIDs(dbs, req.user.id(), req.body.allLocalMetricIDs)) {
-        localMetricsMap.get(appliedMetric.Local_Metric_ID).set(appliedMetric.Local_Applied_Metric_ID, appliedMetric.Local_Applied_Metric_Tag_ID);
+    const appliedMetricsMap = new Map(req.body.allLocalMetricIDs.map(localMetricID => [localMetricID, new Map()]));
+    const appliedMetrics = await AppliedMetrics.tagMapped(dbs, await AppliedMetrics.userSelectManyByLocalMetricIDs(dbs, req.user.id(), req.body.allLocalMetricIDs));
+    for (const appliedMetric of appliedMetrics) {
+        appliedMetricsMap.get(appliedMetric.Local_Metric_ID).set(appliedMetric.Applied_Value, appliedMetric.Local_Applied_Metric_Tag.Tag_ID);
     }
 
     /** @type {Map<number, bigint[]>} */
@@ -402,7 +490,15 @@ export default async function get(dbs, req, res) {
         tagsNamespacesMap.get(tagNamespace.Namespace_ID).push(tagNamespace.Tag_ID);
     }
 
-    const searchQuery = transformClientSearchQueryToSearchQuery(req.body.clientSearchQuery, localTagsMap, tagLookupsMap, localMetricsMap, tagsNamespacesMap);
+    const searchQuery = transformClientSearchQueryToSearchQuery(
+        req.body.clientSearchQuery,
+        localTagsMap,
+        tagLookupsMap,
+        req.body.localMetricServicesMap,
+        localMetricsMap,
+        appliedMetricsMap,
+        tagsNamespacesMap
+    );
     /** @type {DBTaggable[]} */
     let taggables = [];
     /** @type {string} */

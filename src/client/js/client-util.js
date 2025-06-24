@@ -76,7 +76,6 @@ export function bjsonParse(json) {
 /**
  * @param {Set} set1 
  * @param {Set} set2 
- * @returns 
  */
 export function setEquals(set1, set2) {
     if (set1.size !== set2.size) {
@@ -90,6 +89,15 @@ export function setEquals(set1, set2) {
     }
 
     return true;
+}
+
+export function replaceObject(objDest, objSrc) {
+    for (const key in objDest) {
+        delete objDest[key];
+    }
+    for (const key in objSrc) {
+        objDest[key] = objSrc[key];
+    }
 }
 
 /**

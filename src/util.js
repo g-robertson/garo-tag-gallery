@@ -41,7 +41,7 @@ export async function extractWith7Z(archiveName, outputDirectory) {
         return;
     }
 
-    const ret = spawn(get7ZExecutableName(), ['x', archiveName, `-o${outputDirectory}`]);
+    const ret = spawn(get7ZExecutableName(), ['x', archiveName, `-o${outputDirectory}`, '-y']);
     await new Promise(resolve => {
         ret.on("exit", () => {
             resolve();

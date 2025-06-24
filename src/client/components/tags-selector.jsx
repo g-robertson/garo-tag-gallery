@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import '../global.css';
 import { PERMISSION_BITS, User } from '../js/user.js';
 
-import { MODAL_PROPERTIES as CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES } from '../modal/modals/create-or-search-group.jsx';
+import { CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES } from '../modal/modals/create-or-search-group.jsx';
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
 import LocalTagsSelector, { MAP_TO_CLIENT_SEARCH_QUERY } from './local-tags-selector.jsx';
 
@@ -44,7 +44,6 @@ function clientSearchQueryToDisplayName(clientSearchQuery) {
  * }} param0
  */
 const TagsSelector = ({user, pushModal, initialSelectedTags, onSearchChanged, searchType, existingState}) => {
-    console.log(initialSelectedTags);
     existingState ??= {};
     onSearchChanged ??= () => {};
     searchType ??= "intersect";

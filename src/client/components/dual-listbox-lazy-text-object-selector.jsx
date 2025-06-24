@@ -47,6 +47,7 @@ const DualListboxLazyTextObjectSelector = ({
                         }
                         setSelectedItems(new Set(selectedItemIndices));
                     })}
+                    multiSelect={true}
                     customItemComponent={({realizedValue, index}) => customItemSelectedComponent({realizedValue: items[realizedValue], index})}
                     customTitleRealizer={customTitleRealizer}
                 />
@@ -65,6 +66,7 @@ const DualListboxLazyTextObjectSelector = ({
                         }
                         setSelectedItems(new Set(selectedItemIndices));
                     }}
+                    multiSelect={true}
                     customItemComponent={customItemSelectorComponent}
                     customTitleRealizer={customTitleRealizer}
                 />

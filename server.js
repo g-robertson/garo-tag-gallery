@@ -52,7 +52,8 @@ async function main() {
   dbs.perfTags.__addStderrListener((data) => {
     appendFileSync("database/perf-tags-stderr.log", data);
   });
-  // await dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
+  //await dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
+  //await dbs.fileStorage.extractAllTo("./partial-zips/hydrus import small/export-path/hydrus export");
 
   await dbrun(dbs, "PRAGMA foreign_keys = OFF;");
   await dbrun(dbs, "PRAGMA journal_mode = WAL;");

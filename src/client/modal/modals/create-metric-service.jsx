@@ -38,3 +38,4 @@ export const MODAL_PROPERTIES = {
     modalName: "create-metric-service",
     displayName: "Create Metric Service"
 };
+export const CREATE_METRIC_SERVICE_MODAL_PROPERTIES = MODAL_PROPERTIES;
