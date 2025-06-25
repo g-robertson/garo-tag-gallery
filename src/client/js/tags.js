@@ -122,3 +122,27 @@ export function createURLAssociationTagLookupName(urlAssociation) {
 export function localTagsPKHash(lookupName, sourceName) {
     return `${lookupName}\x01${sourceName}`;
 }
+
+/**
+ * @param {ClientSearchQuery} clientSearchQuery 
+ * @returns {string}
+ */
+export function clientSearchQueryToDisplayName(clientSearchQuery) {
+    if (clientSearchQuery.type === "union") {
+        if (clientSearchQuery.value.length === 1) {
+            return clientSearchQueryToDisplayName(clientSearchQuery.value[0]);
+        } else {
+            return `(${clientSearchQuery.value.map(clientSearchQueryToDisplayName).join(' OR ')})`
+        }
+    } else if (clientSearchQuery.type === "intersect") {
+        if (clientSearchQuery.value.length === 1) {
+            return clientSearchQueryToDisplayName(clientSearchQuery.value[0]);
+        } else {
+            return `(${clientSearchQuery.value.map(clientSearchQueryToDisplayName).join(' AND ')})`
+        }
+    } else if (clientSearchQuery.type === "complement") {
+        return `-${clientSearchQueryToDisplayName(clientSearchQuery.value)}`
+    } else {
+        return clientSearchQuery.displayName;
+    }
+}

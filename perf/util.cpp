@@ -20,6 +20,10 @@ void util::serializeUInt64(const uint64_t& i, std::string& str, std::size_t& loc
     location += 8;
 }
 
+const uint8_t DESERIALIZE_FLOAT_INDEX_0 = (std::endian::native == std::endian::little) ? 0 : 3;
+const uint8_t DESERIALIZE_FLOAT_INDEX_1 = (std::endian::native == std::endian::little) ? 1 : 2;
+const uint8_t DESERIALIZE_FLOAT_INDEX_2 = (std::endian::native == std::endian::little) ? 2 : 1;
+const uint8_t DESERIALIZE_FLOAT_INDEX_3 = (std::endian::native == std::endian::little) ? 3 : 0;
 
 uint64_t util::deserializeUInt64(std::string_view str) {
     uint64_t i = (
@@ -34,6 +38,15 @@ uint64_t util::deserializeUInt64(std::string_view str) {
     );
 
     return i;
+}
+
+float util::deserializeFloat(std::string_view str) {
+    static unsigned char DESERIALIZATION_ARRAY[4];
+    DESERIALIZATION_ARRAY[DESERIALIZE_FLOAT_INDEX_0] = std::bit_cast<unsigned char>(str[0]);
+    DESERIALIZATION_ARRAY[DESERIALIZE_FLOAT_INDEX_1] = std::bit_cast<unsigned char>(str[1]);
+    DESERIALIZATION_ARRAY[DESERIALIZE_FLOAT_INDEX_2] = std::bit_cast<unsigned char>(str[2]);
+    DESERIALIZATION_ARRAY[DESERIALIZE_FLOAT_INDEX_3] = std::bit_cast<unsigned char>(str[3]);
+    return std::bit_cast<float>(DESERIALIZATION_ARRAY);
 }
 
 void util::serializeChar(char c, std::string& str, std::size_t& location) {

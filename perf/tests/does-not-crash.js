@@ -134,6 +134,14 @@ const TESTS = {
     "erasing_non_existent_tag_pairings_should_not_crash": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.deleteTagPairings(new Map([[1n, [1n,2n,3n,4n]]]));
+    },
+    "cache_file_should_not_revert_to_empty": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.__override("fail_tags_insert_between_pairings_and_singles_writes");
+        perfTags.__expectError();
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n]]])));
+        perfTags.__kill();
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
     }
 };
 export default TESTS;

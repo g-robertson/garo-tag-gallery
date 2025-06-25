@@ -351,15 +351,19 @@ void TagFileMaintainer::readTaggablesTags(std::string_view input, void (*writer)
 
 namespace {
     const char FIRST_OP = '\x00';
+    const char AGGREGATE_TAGS = 'A';
     const char EMPTY_SET = 'E';
     const char UNIVERSE_SET = 'U';
     const char TAG_TAGGABLE_LIST = 'T';
     const char TAGGABLE_LIST = 'L';
     const char OPEN_GROUP = '(';
     const char CLOSE_GROUP = ')';
+    const char COUNT_OP = 'C';
+    const char PERCENTAGE_OP = 'P';
+    const char FILTERED_PERCENTAGE_OP = 'F';
     const char COMPLEMENT_OP = '~';
     const char RIGHT_HAND_SIDE_OP = '\xFF';
-    const std::unordered_map<char, SetEvaluation(*)(SetEvaluation set1, SetEvaluation set2)> SET_OPERATIONS = {
+    const std::unordered_map<char, SetEvaluation(*)(SetEvaluation&& set1, SetEvaluation set2)> SET_OPERATIONS = {
         {'^', SetEvaluation::symmetricDifference},
         {'-', SetEvaluation::difference},
         {'&', SetEvaluation::intersect},
@@ -374,6 +378,54 @@ void TagFileMaintainer::search(std::string_view input, void (*writer)(const std:
     writer(serializeSingles(taggables));
 }
 
+namespace {
+    struct PreemptiveComparison {
+        bool isPossible;
+        bool comparison;
+    };
+
+    template <class T>
+    PreemptiveComparison tryPreemptiveCompare(T lhs, std::string_view comparator, T rhs) {
+        if (comparator == "< ") {
+            return PreemptiveComparison {
+                .isPossible = lhs < rhs,
+                .comparison = true
+            };
+        } else if (comparator == "<=") {
+            return PreemptiveComparison {
+                .isPossible = lhs <= rhs,
+                .comparison = true
+            };
+        } else if (comparator == "> ") {
+            return PreemptiveComparison {
+                .isPossible = lhs <= rhs,
+                .comparison = false
+            };
+        } else if (comparator == ">=") {
+            return PreemptiveComparison {
+                .isPossible = lhs < rhs,
+                .comparison = false
+            };
+        } else {
+            throw std::logic_error(std::string("Invalid comparator '" + std::string(comparator) + "' was provided to preemptive compare"));
+        }
+    }
+
+    template <class T>
+    bool compare(T lhs, std::string_view comparator, T rhs) {
+        if (comparator == "< ") {
+            return lhs < rhs;
+        } else if (comparator == "<=") {
+            return lhs <= rhs;
+        } else if (comparator == "> ") {
+            return lhs > rhs;
+        } else if (comparator == ">=") {
+            return lhs >= rhs;
+        } else {
+            throw std::logic_error(std::string("Invalid comparator '" + std::string(comparator) + "' was provided to compare"));
+        }
+    }
+}
 
 std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::string_view input) {
     static auto EMPTY_TAGGABLES = IdPairSecond(&taggableBucket->contents());
@@ -391,7 +443,7 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
         if (op == CLOSE_GROUP) {
             return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
         }
-
+            
         bool isComplement = false;
         if (input[0] == COMPLEMENT_OP) {
             isComplement = true;
@@ -400,7 +452,7 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
 
         if (input[0] == TAG_TAGGABLE_LIST) {
             input = input.substr(1);
-            uint64_t tag = util::deserializeUInt64(input);
+            auto tag = util::deserializeUInt64(input);
             input = input.substr(8);
             const auto* taggables = getTagBucket(tag).firstContents(tag);
             if (taggables == nullptr) {
@@ -409,7 +461,7 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
             context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(taggables->isComplement() ^ isComplement, universe, &taggables->physicalContents()));
         } else if (input[0] == TAGGABLE_LIST) {
             input = input.substr(1);
-            uint64_t taggableCount = util::deserializeUInt64(input);
+            auto taggableCount = util::deserializeUInt64(input);
             input = input.substr(8);
             std::unordered_set<uint64_t> taggables;
             for (std::size_t i = 0; i < taggableCount; ++i) {
@@ -417,6 +469,128 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
                 input = input.substr(8);
             }
             context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, std::move(taggables)));
+        } else if (input[0] == AGGREGATE_TAGS) {
+            input = input.substr(1);
+            // Aggregate Operations looks like A{tag count}{tags}{many conditions})
+            char aggregateOp = 0;
+            auto tagCount = util::deserializeUInt64(input);
+            input = input.substr(8);
+            std::unordered_set<uint64_t> aggregateTags;
+            for (std::size_t i = 0; i < tagCount; ++i) {
+                aggregateTags.insert(util::deserializeUInt64(input));
+                input = input.substr(8);
+            }
+
+            while (input.size() != 0 && aggregateOp != CLOSE_GROUP) {
+                char aggregateOp = input[0];
+                input = input.substr(1);
+                if (aggregateOp == COUNT_OP) {
+                    // Count Operation looks like C{comparator}{occurrences}{expression})
+                    // Restricts {tags} to where the tag is represented with {comparator} {occurrences} within {expression}
+                    std::string_view comparator = input.substr(0, 2);
+                    input = input.substr(2);
+                    auto occurrences = util::deserializeUInt64(input);
+                    input = input.substr(8);
+                    
+                    auto representationContext = search_(input);
+                    input = representationContext.first;
+                    const auto& immutableRepresentationContext = representationContext.second;
+
+                    std::vector<uint64_t> tagsToRemove;
+                    for (auto tag : aggregateTags) {
+                        const auto* taggables = getTagBucket(tag).firstContents(tag);
+                        if (taggables == nullptr) {
+                            taggables = &EMPTY_TAGGABLES;
+                        }
+                        auto preemptiveComparison = tryPreemptiveCompare(taggables->size(), comparator, occurrences);
+                        if (preemptiveComparison.isPossible) {
+                            if (!preemptiveComparison.comparison) {
+                                tagsToRemove.push_back(tag);
+                            }
+                            continue;
+                        } else {
+                            auto tagsRepresentation = SetEvaluation::intersect(immutableRepresentationContext, SetEvaluation(taggables->isComplement(), universe, &taggables->physicalContents()));
+                            if (!compare(tagsRepresentation.size(), comparator, occurrences)) {
+                                tagsToRemove.push_back(tag);
+                            }
+                        }
+                    }
+                    for (auto tag : tagsToRemove) {
+                        aggregateTags.erase(tag);
+                    }
+                } else if (aggregateOp == PERCENTAGE_OP) {
+                    // Percentage Operation looks like {LHS}P{comparator}{percentage}{expression})
+                    // Restricts {tags} to where the tag is represented with {comparator} {percentage} within {LHS}
+                    std::string_view comparator = input.substr(0, 2);
+                    input = input.substr(2);
+                    auto percentage = util::deserializeFloat(input);
+                    input = input.substr(4);
+                    
+                    auto representationContext = search_(input);
+                    input = representationContext.first;
+                    const auto& immutableRepresentationContext = representationContext.second;
+
+                    std::vector<uint64_t> tagsToRemove;
+                    for (auto tag : aggregateTags) {
+                        const auto* taggables = getTagBucket(tag).firstContents(tag);
+                        if (taggables == nullptr) {
+                            taggables = &EMPTY_TAGGABLES;
+                        }
+                    
+                        auto tagsRepresentation = SetEvaluation::intersect(immutableRepresentationContext, SetEvaluation(taggables->isComplement(), universe, &taggables->physicalContents()));
+                        if (!compare(static_cast<float>(tagsRepresentation.size()) / static_cast<float>(taggables->size()), comparator, percentage)) {
+                            tagsToRemove.push_back(tag);
+                        }
+                    }
+                    for (auto tag : tagsToRemove) {
+                        aggregateTags.erase(tag);
+                    }
+                } else if (aggregateOp == FILTERED_PERCENTAGE_OP) {
+                    // Count Operation looks like P{comparator}{percentage}{filteringExpression}){expression})
+                    // Gets a union of all {tags} where the tag's taggables that are filtered by {LHS} are represented with {comparator} {percentage} within {expression}
+                    std::string_view comparator = input.substr(0, 2);
+                    input = input.substr(2);
+                    auto percentage = util::deserializeFloat(input);
+                    input = input.substr(4);
+                
+                    auto filteringContext = search_(input);
+                    input = filteringContext.first;
+                    const auto& immutableFilteringContext = filteringContext.second;
+                
+                    auto representationContext = search_(input);
+                    input = representationContext.first;
+                    const auto& immutableRepresentationContext = representationContext.second;
+                
+                    std::vector<uint64_t> tagsToRemove;
+                    for (auto tag : aggregateTags) {
+                        const auto* taggables = getTagBucket(tag).firstContents(tag);
+                        if (taggables == nullptr) {
+                            taggables = &EMPTY_TAGGABLES;
+                        }
+                    
+                        auto filteredTaggables = SetEvaluation::intersect(immutableFilteringContext, SetEvaluation(taggables->isComplement(), universe, &taggables->physicalContents()));
+                        auto filteredTaggableCount = filteredTaggables.size();
+                        auto tagsRepresentation = SetEvaluation::intersect(immutableRepresentationContext, std::move(filteredTaggables));
+                        if (!compare(static_cast<float>(tagsRepresentation.size()) / static_cast<float>(filteredTaggableCount), comparator, percentage)) {
+                            tagsToRemove.push_back(tag);    
+                        }
+                    }
+                    for (auto tag : tagsToRemove) {
+                        aggregateTags.erase(tag);
+                    }
+                }
+            }
+            
+            auto unionAggregateTags = SetEvaluation(isComplement, universe, std::unordered_set<uint64_t>());
+            for (auto tag : aggregateTags) {
+                const auto* taggables = getTagBucket(tag).firstContents(tag);
+                if (taggables == nullptr) {
+                    taggables = &EMPTY_TAGGABLES;
+                }
+                unionAggregateTags = SetEvaluation::setUnion(std::move(unionAggregateTags), SetEvaluation(taggables->isComplement(), universe, &taggables->physicalContents()));
+            }
+            
+            context = SET_OPERATIONS.at(op)(std::move(context), std::move(unionAggregateTags));
         } else if (input[0] == OPEN_GROUP) {
             input = input.substr(1);
             auto subSearch = search_(input);

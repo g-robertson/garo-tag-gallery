@@ -4,8 +4,10 @@ import path from 'path';
 import { serializeUint64 } from '../client/js/client-util.js';
 import { Mutex } from 'async-mutex';
 import { mkdir, readFile, writeFile } from 'fs/promises';
+import { serializeFloat } from '../util.js';
 
 /** @import {Databases} from "../db/db-util.js" */
+/** @import {ClientComparator} from "../api/post/search-taggables.js" */
 
 const THIRTY_MINUTES = 30 * 60 * 1000;
 
@@ -157,7 +159,7 @@ export default class PerfTags {
         for (const number of numbers) {
             offset = buffer.writeBigUInt64BE(number, offset);
         }
-        return buffer;
+        return buffer.toString("binary");
     }
 
     /**
@@ -416,7 +418,7 @@ export default class PerfTags {
      * @param {bigint} tag
      */
     static searchTag(tag) {
-        return `T${PerfTags.#serializeSingles([tag]).toString("binary")}`;
+        return `T${PerfTags.#serializeSingles([tag])}`;
     }
 
     /**
@@ -425,6 +427,9 @@ export default class PerfTags {
     static searchComplement(expression) {
         return `~${expression}`;
     }
+
+    static SEARCH_UNIVERSE = "U";
+    static SEARCH_EMPTY_SET = "E";
 
     /**
      * @param {string[]} expressions
@@ -438,7 +443,7 @@ export default class PerfTags {
 
         if (expressions.length === 0) {
             // Empty set
-            return "E";
+            return PerfTags.SEARCH_EMPTY_SET;
         }
 
         if (expressions.length === 1) {
@@ -460,7 +465,7 @@ export default class PerfTags {
         }
 
         if (expressions.length === 0) {
-            return "";
+            return PerfTags.SEARCH_UNIVERSE;
         }
         
         if (expressions.length === 1) {
@@ -471,25 +476,58 @@ export default class PerfTags {
     }
 
     /**
-     * @description Gets all taggables with {tags} where that tag is represented over {occurrences} amount of times within {expression}
-     * @param {string} expression 
-     * @param {bigint[]} tags 
-     * @param {number} occurrences
+     * @param {ClientComparator} comparator 
      */
-    static searchTagOccurrencesOverNWithinExpression(expression, tags, occurrences) {
-        throw "unimplemented";
-        return `(${expression}C>${serializeUint64(occurrences)}${serializeUint64(tags.length)}${this.#serializeSingles(tags)})`;
+    static __comparatorToPerfTagsComparator(comparator) {
+        if (comparator === "<") {
+            return "< ";
+        } else if (comparator === ">") {
+            return "> ";
+        } else {
+            return comparator;
+        }
     }
 
-        /**
-     * @description Gets all taggables with {tags} where that tag is represented under {occurrences} amount of times within {expression}
+    /**
+     * @param {string[]} conditions 
+     * @param {bigint[]} tags
+     */
+    static searchAggregateConditions(tags, conditions) {
+        return `A${serializeUint64(BigInt(tags.length))}${this.#serializeSingles(tags)}${conditions.join('')})`;
+    }
+
+    /**
+     * @description Gets all taggables with tags where that tag is represented {comparator} {occurrences} amount of times within {expression}
      * @param {string} expression 
-     * @param {bigint[]} tags 
+     * @param {ClientComparator} comparator
      * @param {number} occurrences
      */
-    static searchTagOccurrencesOverNWithinExpression(expression, tags, occurrences) {
-        throw "unimplemented";
-        return `(${expression}C<${serializeUint64(occurrences)}${serializeUint64(tags.length)}${this.#serializeSingles(tags)})`;
+    static aggregateConditionTagOccurrencesComparedToNWithinExpression(expression, comparator, occurrences) {
+        if (!Number.isSafeInteger(occurrences)) {
+            throw "occurrences was not a safe integer";
+        }
+        return `C${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeUint64(BigInt(occurrences))}${expression})`;
+    }
+    
+    /**
+     * @description Gets all taggables with tags where that tag is represented {comparator} {percentage} within {expression}
+     * @param {string} expression 
+     * @param {ClientComparator} comparator
+     * @param {number} percentage
+     */
+    static aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(expression, comparator, percentage) {
+        return `P${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeFloat(percentage)}${expression})`;
+    }
+    
+    /**
+     * @description Gets all taggables filtered by {filteringExpression} with tags where that tag is represented {comparator} {percentage} within {expression}
+     * @param {string} filteringExpression
+     * @param {string} expression 
+     * @param {ClientComparator} comparator
+     * @param {number} percentage
+     */
+    static aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(filteringExpression, expression, comparator, percentage) {
+        return `F${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeFloat(percentage)}${filteringExpression})${expression})`;
     }
 
     async beginTransaction() {
@@ -560,14 +598,14 @@ export default class PerfTags {
      */
     async __writeToWriteInputFile(buffer) {
         await mkdir(path.dirname(this.#writeInputFileName), {recursive: true});
-        await writeFile(this.#writeInputFileName, buffer);
+        await writeFile(this.#writeInputFileName, buffer, {encoding: "binary"});
     }
     /**
      * @param {Buffer} buffer 
      */
     async __writeToReadInputFile(buffer) {
         await mkdir(path.dirname(this.#readInputFileName), {recursive: true});
-        await writeFile(this.#readInputFileName, buffer);
+        await writeFile(this.#readInputFileName, buffer, {encoding: "binary"});
     }
     async __readFromOutputFile() {
         return await readFile(this.#readOutputFileName);

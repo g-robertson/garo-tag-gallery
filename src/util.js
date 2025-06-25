@@ -72,6 +72,22 @@ export async function extractFirstFrameWithFFMPEG(inputFileName, outputFileName)
     });
 }
 
+const SERIALIZATION_BUF = Buffer.allocUnsafe(4);
+/**
+ * @param {number} float
+ */
+export function serializeFloat(float) {
+    SERIALIZATION_BUF.writeFloatLE(float);
+    return SERIALIZATION_BUF.toString("binary");
+}
+
+/**
+ * @param {Buffer} buffer 
+ */
+export function deserializeFloat(buffer) {
+    return buffer.readFloatLE();
+}
+
 /**
  * 
  * @param {string} directory 

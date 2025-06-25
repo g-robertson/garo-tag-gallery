@@ -101,7 +101,6 @@ export function replaceObject(objDest, objSrc) {
 }
 
 /**
- * 
  * @param {bigint} num 
  */
 export function serializeUint64(num) {
@@ -117,7 +116,6 @@ export function serializeUint64(num) {
     return serialized;
 }
 /**
- * 
  * @param {string} str 
  */
 export function deserializeUint64(str) {

@@ -65,10 +65,10 @@ std::size_t SetEvaluation::size() const {
     }
 }
 
-SetEvaluation SetEvaluation::rightHandSide(SetEvaluation lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::rightHandSide(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
     return SetEvaluation(rhsSet.isComplement, rhsSet.universe, std::unordered_set<uint64_t>(*rhsSet.itemsPtr));
 }
-SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
     if (lhsSet.universe != rhsSet.universe) {
         throw std::logic_error("Sets had different universe values");
     }
@@ -92,7 +92,7 @@ SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation lhsSet, SetEvalua
         }
     }
 }
-SetEvaluation SetEvaluation::difference(SetEvaluation lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::difference(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
     if (lhsSet.universe != rhsSet.universe) {
         throw std::logic_error("Sets had different universe values");
     }
@@ -116,7 +116,8 @@ SetEvaluation SetEvaluation::difference(SetEvaluation lhsSet, SetEvaluation rhsS
         }
     }
 }
-SetEvaluation SetEvaluation::intersect(SetEvaluation lhsSet, SetEvaluation rhsSet) {
+
+SetEvaluation SetEvaluation::intersect(const SetEvaluation& lhsSet, SetEvaluation rhsSet) {
     if (lhsSet.universe != rhsSet.universe) {
         throw std::logic_error("Sets had different universe values");
     }
@@ -139,9 +140,14 @@ SetEvaluation SetEvaluation::intersect(SetEvaluation lhsSet, SetEvaluation rhsSe
             return SetEvaluation(false, universe, usetIntersect_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
         }
     }
-
 }
-SetEvaluation SetEvaluation::setUnion(SetEvaluation lhsSet, SetEvaluation rhsSet) {
+
+SetEvaluation SetEvaluation::intersect(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
+    const auto& immutableLHSSet = lhsSet;
+    return intersect(immutableLHSSet, std::move(rhsSet));
+}
+
+SetEvaluation SetEvaluation::setUnion(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
     if (!lhsSet.items.has_value()) {
         throw std::logic_error("LHS did not have real value");
     }

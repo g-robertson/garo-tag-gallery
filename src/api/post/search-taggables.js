@@ -65,46 +65,64 @@ const Z_CLIENT_SEARCH_TAG = Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID
     .or(Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON);
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG>} ClientSearchTag */
 
-const Z_AGGREGATE_TAG_CONDITIONS = z.object({
-    type: z.literal("is-not-in-tag-list"),
-    value: z.array(Z_CLIENT_SEARCH_TAG)
-});
-/** @typedef {z.infer<typeof Z_AGGREGATE_TAG_CONDITIONS>} ClientAggregateTagCondition */
-
 const Z_NAMESPACE_AGGREGATE_TAG_GROUP = z.object({
     type: z.literal("namespace"),
-    namespaceID: z.number()
+    namespaceID: z.number().nonnegative().finite()
 });
 const Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP = z.object({
     type: z.literal("applied-metrics"),
-    Local_Metric_ID: z.number()
+    Local_Metric_ID: z.number().nonnegative().finite()
 });
 
 const Z_AGGREGATE_TAG_GROUP = Z_NAMESPACE_AGGREGATE_TAG_GROUP.or(Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP);
 /** @typedef {z.infer<typeof Z_AGGREGATE_TAG_GROUP>} ClientTagGroup */
 
-const Z_AGGREGATE_TAG = z.object({
+const Z_AGGREGATE_TAG_CONDITION = z.object({
+    type: z.literal("tag-occurrences-compared-to-n-within-expression"),
+    comparator: Z_CLIENT_COMPARATOR,
+    occurrences: z.number().nonnegative().finite(),
+    expression: z.lazy(() => Z_SEARCH_QUERY)
+}).or(z.object({
+    type: z.literal("tag-occurrences-compared-to-n-percent-within-expression"),
+    comparator: Z_CLIENT_COMPARATOR,
+    percentage: z.number().min(0).max(1),
+    expression: z.lazy(() => Z_SEARCH_QUERY)
+})).or(z.object({
+    type: z.literal("filtered-tag-occurrences-compared-to-n-percent-within-expression"),
+    comparator: Z_CLIENT_COMPARATOR,
+    percentage: z.number().min(0).max(1),
+    filteringExpression: z.lazy(() => Z_SEARCH_QUERY),
+    expression: z.lazy(() => Z_SEARCH_QUERY)
+}));
+/** @typedef {z.infer<typeof Z_AGGREGATE_TAG_CONDITION>} AggregateTagCondition */
+
+const Z_CLIENT_AGGREGATE_TAG_CONDITION =Z_AGGREGATE_TAG_CONDITION.or(z.object({
+    type: z.literal("is-not-in-tag-list"),
+    list: z.array(Z_CLIENT_SEARCH_TAG)
+}));
+/** @typedef {z.infer<typeof Z_CLIENT_AGGREGATE_TAG_CONDITION>} ClientAggregateTagCondition */
+
+const Z_CLIENT_AGGREGATE_TAG = z.object({
     type: z.literal("aggregateTag"),
-    value: z.object({
-        tagGroup: Z_AGGREGATE_TAG_GROUP,
-        conditions: z.array(Z_AGGREGATE_TAG_CONDITIONS)
-    })
+    tagGroup: Z_AGGREGATE_TAG_GROUP,
+    conditions: z.array(Z_CLIENT_AGGREGATE_TAG_CONDITION)
 });
-/** @typedef {z.infer<typeof Z_AGGREGATE_TAG>} ClientAggregateTag */
+/** @typedef {z.infer<typeof Z_CLIENT_AGGREGATE_TAG>} ClientAggregateTag */
 
 /** @type {z.ZodAny} */
 const Z_SEARCH_QUERY = z.object({
     type: z.literal("union"),
-    value: z.lazy(() => z.array(Z_SEARCH_QUERY))
+    value: z.array(z.lazy(() => Z_SEARCH_QUERY))
 }).or(z.object({
     type: z.literal("intersect"),
-    value: z.lazy(() => z.array(Z_SEARCH_QUERY))
+    value: z.array(z.lazy(() => Z_SEARCH_QUERY))
 })).or(z.object({
     type: z.literal("complement"),
     value: z.lazy(() => Z_SEARCH_QUERY)  
 }))
 .or(Z_CLIENT_SEARCH_TAG)
-.or(Z_AGGREGATE_TAG);
+.or(Z_CLIENT_AGGREGATE_TAG);
+
 /**
  * @typedef {{
  *     type: "union" | "intersect",
@@ -119,6 +137,10 @@ const Z_SEARCH_QUERY = z.object({
  * @typedef {{
  *     type: "union" | "intersect",
  *     value: SearchQueryRecursive[]
+ * } | {
+ *     type: "aggregateTag",
+ *     tags: bigint[],
+ *     conditions: AggregateTagCondition[]
  * } | {
  *     type: "complement",
  *     value: SearchQueryRecursive
@@ -137,6 +159,25 @@ const Z_SEARCH_QUERY = z.object({
  *     type: "union" | "intersect",
  *     value: PreSearchQuery[]
  * } | {
+ *     type: "tag-occurrences-compared-to-n-within-expression",
+ *     comparator: ClientComparator
+ *     occurrences: number,
+ *     tags: bigint[],
+ *     expression: PreSearchQuery
+ * } | {
+ *     type: "tag-occurrences-compared-to-n-percent-within-expression",
+ *     comparator: ClientComparator
+ *     percentage: number,
+ *     tags: bigint[],
+ *     expression: PreSearchQuery
+ * } | {
+ *     type: "filtered-tag-occurrences-compared-to-n-percent-within-expression",
+ *     comparator: ClientComparator
+ *     percentage: number,
+ *     tags: bigint[],
+ *     filteringExpression: PreSearchQuery,
+ *     expression: PreSearchQuery
+ * } | {
  *     type: "complement",
  *     value: PreSearchQuery
  * } | {
@@ -153,14 +194,27 @@ const Z_SEARCH_QUERY = z.object({
  * @param {(step: T) => void} callback
  */
 function walkSearchQuery(searchQuery, callback) {
-    callback(searchQuery);
     if (searchQuery.type === "union" || searchQuery.type === "intersect") {
         for (const innerClientSearchQuery of searchQuery.value) {
             walkSearchQuery(innerClientSearchQuery, callback);
         }
+    } else if (searchQuery.type === "aggregateTag") {
+        for (const condition of searchQuery.conditions) {
+            if (condition.type === "tag-occurrences-compared-to-n-within-expression" || condition.type === "tag-occurrences-compared-to-n-percent-within-expression") {
+                walkSearchQuery(condition.expression, callback);
+            } else if (condition.type === "filtered-tag-occurrences-compared-to-n-percent-within-expression") {
+                walkSearchQuery(condition.filteringExpression, callback);
+                walkSearchQuery(condition.expression, callback);
+            } else if (condition.type === "is-not-in-tag-list") {
+                for (const clientTag of condition.list) {
+                    walkSearchQuery(clientTag);
+                }
+            }
+        }
     } else if (searchQuery.type === "complement") {
         walkSearchQuery(searchQuery.value, callback);
     }
+    callback(searchQuery);
 }
 
 /**
@@ -291,29 +345,37 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
         if (isClientSearchTag(step)) {
             replaceObject(step, transformClientSearchTag(step, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap));
         } else if (step.type === "aggregateTag") {
-            const aggregateTag = step.value;
-            step.type = "union";
             /** @type {Set<bigint>} */
             let tagsOfAggregate;
-            if (aggregateTag.tagGroup.type === "applied-metrics") {
-                tagsOfAggregate = new Set(appliedMetricsMap.get(aggregateTag.tagGroup.Local_Metric_ID).values());
-            } else if (aggregateTag.tagGroup.type === "namespace") {
-                tagsOfAggregate = new Set(tagsNamespacesMap.get(aggregateTag.tagGroup.namespaceID));
+            if (step.tagGroup.type === "applied-metrics") {
+                tagsOfAggregate = new Set(appliedMetricsMap.get(step.tagGroup.Local_Metric_ID).values());
+            } else if (step.tagGroup.type === "namespace") {
+                tagsOfAggregate = new Set(tagsNamespacesMap.get(step.tagGroup.namespaceID));
             }
 
-            for (const condition of aggregateTag.conditions) {
+            for (const condition of step.conditions) {
                 if (condition.type === "is-not-in-tag-list") {
-                    for (const clientSearchTag of condition.value) {
+                    for (const clientSearchTag of condition.list) {
                         tagsOfAggregate.delete(transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap).tagID)
                     }
                 }
             }
+
+            /** @type {PreSearchQuery[]} */
+            const additionalConditions = [];
+            for (const condition of step.conditions) {
+                if (condition.type === "tag-occurrences-compared-to-n-within-expression"
+                 || condition.type === "tag-occurrences-compared-to-n-percent-within-expression"
+                 || condition.type === "filtered-tag-occurrences-compared-to-n-percent-within-expression"
+                ) {
+                    additionalConditions.push(condition);
+                }
+            }
+
             replaceObject(step, {
-                type: "union",
-                value: [...tagsOfAggregate].map(tagID => ({
-                    type: "tag",
-                    tagID
-                }))
+                type: "aggregateTag",
+                tags: [...tagsOfAggregate],
+                conditions: additionalConditions
             });
         }
     });
@@ -382,6 +444,30 @@ function constructSearchCriteriaFromRecursiveSearchQuery(recursiveSearchQuery) {
         return PerfTags.searchUnion(recursiveSearchQuery.value.map(constructSearchCriteriaFromRecursiveSearchQuery));
     } else if (recursiveSearchQuery.type === "intersect") {
         return PerfTags.searchIntersect(recursiveSearchQuery.value.map(constructSearchCriteriaFromRecursiveSearchQuery));
+    } else if (recursiveSearchQuery.type === "aggregateTag") {
+        return PerfTags.searchAggregateConditions(recursiveSearchQuery.tags, recursiveSearchQuery.conditions.map(condition => {
+            if (condition.type === "tag-occurrences-compared-to-n-within-expression") {
+                return PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(
+                    constructSearchCriteriaFromRecursiveSearchQuery(condition.expression),
+                    condition.comparator,
+                    condition.occurrences
+                );
+            } else if (condition.type === "tag-occurrences-compared-to-n-percent-within-expression") {
+                return PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(
+                    constructSearchCriteriaFromRecursiveSearchQuery(condition.expression),
+                    condition.comparator,
+                    condition.percentage
+                );
+            } else if (condition.type === "filtered-tag-occurrences-compared-to-n-percent-within-expression") {
+                return PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(
+                    constructSearchCriteriaFromRecursiveSearchQuery(condition.filteringExpression),
+                    constructSearchCriteriaFromRecursiveSearchQuery(condition.expression),
+                    condition.comparator,
+                    condition.percentage
+                );
+            }
+        }));
+            
     } else if (recursiveSearchQuery.type === "complement") {
         return PerfTags.searchComplement(constructSearchCriteriaFromRecursiveSearchQuery(recursiveSearchQuery.value));
     } else if (recursiveSearchQuery.type === "tag") {
@@ -428,19 +514,10 @@ export async function validate(dbs, req, res) {
         if (isClientSearchTag(step)) {
             addClientSearchTagToCollections(step, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs);
         } else if (step.type === "aggregateTag") {
-            const aggregateTag = step.value;
-            if (aggregateTag.tagGroup.type === "applied-metrics") {
-                allLocalMetricIDs.add(aggregateTag.tagGroup.Local_Metric_ID);
-            } else if (aggregateTag.tagGroup.type === "namespace") {
-                allNamespaceIDs.add(aggregateTag.tagGroup.namespaceID);
-            }
-
-            for (const condition of aggregateTag.conditions) {
-                if (condition.type === "is-not-in-tag-list") {
-                    for (const clientSearchTag of condition.value) {
-                        addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs);
-                    }
-                }
+            if (step.tagGroup.type === "applied-metrics") {
+                allLocalMetricIDs.add(step.tagGroup.Local_Metric_ID);
+            } else if (step.tagGroup.type === "namespace") {
+                allNamespaceIDs.add(step.tagGroup.namespaceID);
             }
         }
     });

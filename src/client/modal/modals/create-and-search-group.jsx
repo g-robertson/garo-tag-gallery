@@ -12,7 +12,7 @@ import { TagSelectorModal } from './tag-selector-modal.jsx';
  *  popModal: () => void
  * }}
 */
-const CreateOrSearchGroup = ({user, modalOptions, pushModal, popModal}) => {
+const CreateAndSearchGroup = ({user, modalOptions, pushModal, popModal}) => {
     return (
         <TagSelectorModal
             user={user}
@@ -20,9 +20,9 @@ const CreateOrSearchGroup = ({user, modalOptions, pushModal, popModal}) => {
                 ...modalOptions,
                 extraProperties: {
                     ...modalOptions.extraProperties,
-                    searchType: "union",
-                    titleText: modalOptions.extraProperties.titleText ?? "Select tags for your OR group:",
-                    selectionButtonText: modalOptions.extraProperties.selectionButtonText ?? "Select OR Group"
+                    searchType: "intersect",
+                    titleText: modalOptions.extraProperties.titleText ?? "Select tags for your AND group:",
+                    selectionButtonText: modalOptions.extraProperties.selectionButtonText ?? "Select AND Group"
                 }
             }}
             pushModal={pushModal}
@@ -31,10 +31,10 @@ const CreateOrSearchGroup = ({user, modalOptions, pushModal, popModal}) => {
     );
 };
 
-export default CreateOrSearchGroup;
+export default CreateAndSearchGroup;
 
 export const MODAL_PROPERTIES = {
-    modalName: "create-or-search-group",
-    displayName: "Create OR search group"
+    modalName: "create-and-search-group",
+    displayName: "Create AND search group"
 };
-export const CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES = MODAL_PROPERTIES;
+export const CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES = MODAL_PROPERTIES;

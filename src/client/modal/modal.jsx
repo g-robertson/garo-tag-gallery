@@ -26,6 +26,7 @@ const MODALS = {};
     const modals =  [
         await import("./modals/gallery.jsx"),
         await import('./modals/create-or-search-group.jsx'),
+        await import('./modals/create-and-search-group.jsx'),
         await import('./modals/import-files-from-hydrus.jsx'),
         await import('./modals/create-metric-service.jsx'),
         await import('./modals/create-metric.jsx'),
@@ -66,7 +67,7 @@ const MODALS = {};
  */
 const Modal = ({modalOptions, pushModal, popModal, user, setUser, index}) => {
     const {component, modalProperties} = MODALS[modalOptions.modalName];
-
+    modalOptions.extraProperties ??= {};
     const hasTopbar = modalProperties.hasTopbar ?? true;
     const hasBorder = modalProperties.hasBorder ?? true;
     const width = modalProperties.width ?? 80;

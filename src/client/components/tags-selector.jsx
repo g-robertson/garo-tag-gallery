@@ -5,33 +5,10 @@ import { PERMISSION_BITS, User } from '../js/user.js';
 import { CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES } from '../modal/modals/create-or-search-group.jsx';
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
 import LocalTagsSelector, { MAP_TO_CLIENT_SEARCH_QUERY } from './local-tags-selector.jsx';
+import { clientSearchQueryToDisplayName } from '../js/tags.js';
 
 /** @import {ClientTag} from "./local-tags-selector.jsx" */
 /** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
-
-/**
- * @param {ClientSearchQuery} clientSearchQuery 
- * @returns {string}
- */
-function clientSearchQueryToDisplayName(clientSearchQuery) {
-    if (clientSearchQuery.type === "union") {
-        if (clientSearchQuery.value.length === 1) {
-            return clientSearchQueryToDisplayName(clientSearchQuery.value[0]);
-        } else {
-            return `(${clientSearchQuery.value.map(clientSearchQueryToDisplayName).join(' OR ')})`
-        }
-    } else if (clientSearchQuery.type === "intersect") {
-        if (clientSearchQuery.value.length === 1) {
-            return clientSearchQueryToDisplayName(clientSearchQuery.value[0]);
-        } else {
-            return `(${clientSearchQuery.value.map(clientSearchQueryToDisplayName).join(' AND ')})`
-        }
-    } else if (clientSearchQuery.type === "complement") {
-        return `-${clientSearchQueryToDisplayName(clientSearchQuery.value)}`
-    } else {
-        return clientSearchQuery.displayName;
-    }
-}
 
 /**
  * @param {{

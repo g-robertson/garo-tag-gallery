@@ -1,4 +1,4 @@
-import { statSync } from "fs";
+import { appendFileSync, statSync } from "fs";
 import { strTaggablePairingsToStrTagPairings, getPairingsFromStrPairings, getStrPairingsFromPairings, TEST_DEFAULT_PERF_TAGS_ARGS, getTotalDirectoryBytes, TEST_DEFAULT_DATABASE_DIR } from "./helpers.js";
 import PerfTags from "../../src/perf-tags-binding/perf-tags.js"
 /** @import {TestFunction} from "./helpers.js" */
@@ -66,7 +66,7 @@ const TESTS = {
             throw "Taggable pairings tgbl0001 lacks one of the placed tags";
         }
     },
-    "insert_tags between toggle tag pairings should not cause problem": async (createPerfTags) => {
+    "insert_tags_between_toggle_tag_pairings_should_not_cause_problem": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
         await perfTags.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
@@ -639,13 +639,296 @@ const TESTS = {
             throw "Could not find one of the assigned taggable's tags"
         }
     },
-    "cache_file_should_not_revert_to_empty": async (createPerfTags) => {
+    "simple_tag_occurrences_compared_to_n": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-        await perfTags.__override("fail_tags_insert_between_pairings_and_singles_writes");
-        perfTags.__expectError();
-        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n]]])));
-        perfTags.__kill();
-        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-    }
+        const taggablePairings = new Map([
+            [1n, [1n]],
+            [2n, [1n]],
+            [3n, [1n]],
+            [4n, [1n,2n]],
+            [5n, [2n]],
+            [6n, [2n]],
+        ]);
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
+        let {taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n],[PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.SEARCH_UNIVERSE, ">", 3)]));
+        if (taggables.length !== 4
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 1";
+        }
+        
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n],[PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.SEARCH_UNIVERSE, ">=", 3)])));
+        if (taggables.length !== 6
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 2";
+        }
+
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n],[PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.SEARCH_UNIVERSE, "<", 4)])));
+        if (taggables.length !== 3
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 3";
+        }
+
+        
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n],[PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.SEARCH_UNIVERSE, "<=", 4)])));
+        if (taggables.length !== 6
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 4";
+        }
+    },
+    "complex_tag_occurrences_compared_to_n": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const taggablePairings = new Map([
+            [1n, [1n,   3n,      6n]],
+            [2n, [1n,   3n,      6n]],
+            [3n, [1n,   3n,      6n]],
+            [4n, [1n,2n,      5n   ]],
+            [5n, [   2n,   4n,5n   ]],
+            [6n, [   2n,   4n,   6n]],
+        ]);
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
+        let {taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.searchUnion([
+            PerfTags.searchTag(3n),
+            PerfTags.searchTag(4n)
+        ]), ">", 3)]));
+        if (taggables.length !== 0) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 1";
+        }
+        
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.searchUnion([
+            PerfTags.searchTag(3n),
+            PerfTags.searchTag(4n)
+        ]), ">=", 3)])));
+        if (taggables.length !== 4
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 2";
+        }
+
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.searchUnion([
+            PerfTags.searchTag(3n),
+            PerfTags.searchTag(4n)
+        ]), "<=", 3)])));
+        if (taggables.length !== 6
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 3";
+        }
+        
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.searchUnion([
+            PerfTags.searchTag(3n),
+            PerfTags.searchTag(4n)
+        ]), "<", 3)])));
+        if (taggables.length !== 3
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 4";
+        }
+    },
+    "complex_tag_occurrences_compared_to_n_percent": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const taggablePairings = new Map([
+            [1n, [1n,   3n,      6n]],
+            [2n, [1n,   3n,      6n]],
+            [3n, [1n,   3n,      6n]],
+            [4n, [1n,2n,      5n   ]],
+            [5n, [   2n,   4n,5n   ]],
+            [6n, [   2n,   4n,   6n]],
+        ]);
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
+        let {taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), ">", 0.7)
+        ]));
+        if (taggables.length !== 4
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 1";
+        }
+        
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), "<", 0.7)
+        ])));
+        if (taggables.length !== 3
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 2";
+        }
+
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), "<=", 0.75)
+        ])));
+        if (taggables.length !== 6
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 3";
+        }
+        
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), ">", 0.65)
+        ])));
+        if (taggables.length !== 6
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 4";
+        }
+    },
+    "complex_filtered_tag_occurrences_compared_to_n_percent": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const taggablePairings = new Map([
+            [1n , [1n,   3n,      6n]], // FILTERED
+            [2n , [1n,   3n,   5n   ]], // FILTERED
+            [3n , [1n,   3n,        ]], // FILTERED
+            [4n , [1n,              ]],
+            [5n , [1n,      4n,5n   ]], // FILTERED
+            [6n , [1n,2n,      5n   ]],
+            [7n , [   2n,   4n,5n   ]], // FILTERED
+            [8n , [   2n,   4n,     ]], // FILTERED
+            [9n , [   2n,   4n,5n,6n]], // FILTERED
+            [10n, [   2n,           ]],
+        ]);
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
+        let {taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), PerfTags.searchUnion([
+                PerfTags.searchTag(5n),
+                PerfTags.searchTag(6n)
+            ]), ">", 0.7)
+        ]));
+
+        if (taggables.length !== 6
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 1";
+        }
+        
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), PerfTags.searchUnion([
+                PerfTags.searchTag(5n),
+                PerfTags.searchTag(6n)
+            ]), "<", 0.7)
+        ])));
+        if (taggables.length !== 5
+         || taggables.indexOf(6n) === -1
+         || taggables.indexOf(7n) === -1
+         || taggables.indexOf(8n) === -1
+         || taggables.indexOf(9n) === -1
+         || taggables.indexOf(10n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 2";
+        }
+
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), PerfTags.searchUnion([
+                PerfTags.searchTag(5n),
+                PerfTags.searchTag(6n)
+            ]), "<=", 0.75)
+        ])))
+        if (taggables.length !== 10
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+         || taggables.indexOf(7n) === -1
+         || taggables.indexOf(8n) === -1
+         || taggables.indexOf(9n) === -1
+         || taggables.indexOf(10n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 3";
+        }
+        
+        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), PerfTags.searchUnion([
+                PerfTags.searchTag(5n),
+                PerfTags.searchTag(6n)
+            ]), ">", 0.65)
+        ])))
+        if (taggables.length !== 10
+         || taggables.indexOf(1n) === -1
+         || taggables.indexOf(2n) === -1
+         || taggables.indexOf(3n) === -1
+         || taggables.indexOf(4n) === -1
+         || taggables.indexOf(5n) === -1
+         || taggables.indexOf(6n) === -1
+         || taggables.indexOf(7n) === -1
+         || taggables.indexOf(8n) === -1
+         || taggables.indexOf(9n) === -1
+         || taggables.indexOf(10n) === -1
+        ) {
+            throw "Could not find one of the taggables that was supposed to be returned from case 4";
+        }
+    },
 };
 export default TESTS;

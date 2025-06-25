@@ -1,6 +1,7 @@
 import '../../global.css';
 import { useState } from 'react';
 import LocalMetricSelector from '../../components/local-metric-selector.jsx';
+import NumericInput from '../../components/numeric-input.jsx';
 
 /** @import {User} from "../../js/user.js" */
 /** @import {ModalOptions} from "../modal.jsx" */
@@ -40,8 +41,6 @@ const CreateMetricTag = ({user, modalOptions, pushModal, popModal}) => {
     const [localMetric, setLocalMetric] = useState(null);
 
     const [metricComparisonValue, setMetricComparisonValue] = useState(0);
-    const [metricComparisonTextValue, setMetricComparisonTextValue] = useState("0");
-
 
     return (
         <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
@@ -89,16 +88,8 @@ const CreateMetricTag = ({user, modalOptions, pushModal, popModal}) => {
                     modalOptions.resolve(createLocalMetricComparison(localMetric, ">=", metricComparisonValue));
                     popModal();
                 }} />
-                <input type="text" value={metricComparisonTextValue} onChange={e => {
-                    setMetricComparisonTextValue(e.currentTarget.value);
-                }} onBlur={e => {
-                    const newMetricComparisonValue = Number(metricComparisonTextValue);
-                    if (Number.isFinite(newMetricComparisonValue)) {
-                        setMetricComparisonValue(newMetricComparisonValue);
-                        setMetricComparisonTextValue(newMetricComparisonValue.toString())
-                    } else {
-                        setMetricComparisonTextValue(metricComparisonValue.toString())
-                    }
+                <NumericInput onChange={(num) => {
+                    setMetricComparisonValue(num);
                 }} />
             </div>
         </div>
