@@ -22,7 +22,7 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
     const [metricValuesMap, setMetricValuesMap] = useState(new Map());
     const [metricStarsHovered, setMetricStarsHovered] = useState({localMetricID: -1, starsHovered: -1});
     const galleryID = useRef(randomID(32));
-    const visibleTaggableID = useRef(-1);
+    const [visibleTaggableID, setVisibleTaggableID] = useState(-1n);
     let initialLastClickedIndex = taggableIDs.indexOf(initialTaggableID);
     if (initialLastClickedIndex === -1) {
         initialLastClickedIndex = 0;
@@ -35,7 +35,7 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
         if (vid !== null) {
             vid.load();
         }
-    }, [metricValuesMap]);
+    }, [visibleTaggableID]);
 
     return <LazySelector
         values={taggableIDs}
@@ -62,9 +62,8 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
             return values.map(taggableID => taggablesResponseMap.get(taggableID));
         }}
         customItemComponent={({realizedValue, setRealizedValue}) => {
-            if (visibleTaggableID.current !== realizedValue.Taggable_ID) {
-                visibleTaggableID.current = realizedValue.Taggable_ID;
-                console.log(realizedValue);
+            if (visibleTaggableID !== realizedValue.Taggable_ID) {
+                setVisibleTaggableID(realizedValue.Taggable_ID);
                 setMetricValuesMap(new Map(realizedValue.Metrics.map(metric => [metric.Local_Metric_ID, metric])));
             }
             const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];
@@ -88,7 +87,6 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
                                                   newMetricStarsHighlighted = i;
                                               }
 
-                                              await applyMetricToTaggable(Number(realizedValue.Taggable_ID), localMetric.Local_Metric_ID, i);
 
                                               const newAppliedMetric = {
                                                 ...realizedValue.Metrics.find(metric => metric.Local_Metric_ID === localMetric.Local_Metric_ID),
@@ -105,6 +103,8 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
                                                     newAppliedMetric
                                                 ]
                                               });
+                                              
+                                              await applyMetricToTaggable(Number(realizedValue.Taggable_ID), localMetric.Local_Metric_ID, i);
                                           }}
                                           onMouseOver={() => {
                                             setMetricStarsHovered({localMetricID: localMetric.Local_Metric_ID, starsHovered: i});

@@ -195,7 +195,7 @@ export class LocalMetricServices {
             $serviceID: serviceID
         })).Local_Metric_Service_ID;
         
-        await LocalTags.insertSystemTag(createInLocalMetricServiceLookupName(localMetricServiceID));
+        await LocalTags.insertSystemTag(dbs, createInLocalMetricServiceLookupName(localMetricServiceID));
 
         await dbEndTransaction(dbs);
     }
@@ -609,7 +609,7 @@ export class LocalMetrics {
             $localMetricType: preInsertLocalMetric.Local_Metric_Type
         })).Local_Metric_ID;
 
-        await LocalTags.insertSystemTag(createLocalMetricLookupName(localMetricID));
+        await LocalTags.insertSystemTag(dbs, createLocalMetricLookupName(localMetricID));
 
         await dbEndTransaction(dbs);
     }

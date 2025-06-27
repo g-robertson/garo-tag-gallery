@@ -30,6 +30,11 @@ body {
     font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
 }
 
+a {
+    text-decoration: none;
+    color: var(--foreground);
+}
+
 div {
     display: flex;
 }

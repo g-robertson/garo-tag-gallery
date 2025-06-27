@@ -235,7 +235,7 @@ export class UserFacingLocalTags {
      */
     static async selectMappedByTaggableIDs(dbs, taggableIDs, localTagServiceIDs) {
         /** @type {Map<bigint, UserFacingLocalTag[]>} */
-        const taggablesUserFacingLocalTags = new Map();
+        const taggablesUserFacingLocalTags = new Map(taggableIDs.map(taggableID => [taggableID, []]));
         if (localTagServiceIDs.length === 0) {
             return taggablesUserFacingLocalTags;
         }
@@ -311,6 +311,7 @@ export class UserFacingLocalTags {
      * @param {number[]} localTagServiceIDs
      * @returns {Promise<UserFacingLocalTag[]>}
      */
+    // TODO: this could be sped up by using a select all with limit cache if the count of tag id's is not too many but not too few (ie. 10K < x < 10M)
     static async selectManyByTagIDs(dbs, tagIDsIterable, localTagServiceIDs) {
         const tagIDs = [...tagIDsIterable].map(tagID => Number(tagID));
 

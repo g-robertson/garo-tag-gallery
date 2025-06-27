@@ -48,7 +48,7 @@ export default async function get(dbs, req, res) {
         req.body.taggableIDs,
         req.user.id(),
         localTagServices.map(localTagService => localTagService.Local_Tag_Service_ID),
-        localMetricServices.map(localMetricService => localMetricService.Local_Metric_Service_ID)
+        localMetricServices
     );
 
     return res.status(200).send(bjsonStringify(userFacingTaggables));

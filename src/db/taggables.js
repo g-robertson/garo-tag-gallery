@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, IS_FILE_TAG, normalizeFileExtension,SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
+import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, IS_FILE_TAG, isURLAssociationTagLookupName, normalizeFileExtension,revertURLAssociationTagLookupName,SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
@@ -17,7 +17,8 @@ import { isAppliedMetricLookupName, revertAppliedMetricLookupName } from "../cli
 /** @import {DBService} from "./services.js" */
 /** @import {DBUser, PermissionInt} from "./user.js" */
 /** @import {Databases} from "./db-util.js" */
-/** @import {DBJoinedURLAssociation, UserFacingLocalTag} from "./tags.js" */
+/** @import {UserFacingLocalTag} from "./tags.js" */
+/** @import {DBPermissionedLocalMetricService} from "./metrics.js" */
 
 /**
  * @typedef {Object} DBLocalTaggableService
@@ -281,7 +282,7 @@ export class Taggables {
             }
         }
         const urlAssociationTagMap = new Map((await LocalTags.upsertManySystemTags(dbs, [...allURLAssociationLookupNames])).map(urlAssociationTag => [urlAssociationTag.Lookup_Name, urlAssociationTag]));
-        const urlMap = new Map((await LocalTags.upsertManySystemTags(dbs, [...allURLs])).map(tag => [tag.Lookup_Name, tag]));
+        const urlMap = new Map((await LocalTags.upsertManySystemTags(dbs, [...allURLs].map(createHasURLTagLookupName))).map(tag => [tag.Lookup_Name, tag]));
 
         const taggableURLAssociationTagPairings = new Map([...taggableURLAssociationPairings.entries()].map(([taggableID, urlAssociations]) => [
             taggableID,
@@ -352,8 +353,10 @@ export class Taggables {
  * @property {number} Taggable_Last_Modified_Date
  * @property {number} Taggable_Last_Viewed_Date
  * @property {number} Taggable_Deleted_Date
+ * @property {number} Local_Taggable_Service_ID
+ * @property {URLAssociation[]} URL_Associations
  * @property {UserFacingLocalTag[]} Tags
- * @property {DBAppliedMetric[]} Metrics
+ * @property {(DBAppliedMetric & {Local_Metric_Service_ID: number})[]} Metrics
  */
 
 /**
@@ -361,9 +364,9 @@ export class Taggables {
  * @param {Omit<DBUserFacingLocalFile, "Tags">[]} dbUserFacingLocalFiles
  * @param {number} userID
  * @param {number[]} localTagServiceIDs
- * @param {number[]} localMetricServiceIDs
+ * @param {DBPermissionedLocalMetricService[]} localMetricServices
  */
-async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, localTagServiceIDs, localMetricServiceIDs) {
+async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, localTagServiceIDs, localMetricServices) {
     dbUserFacingLocalFiles = dbUserFacingLocalFiles.map(dbUserFacingLocalFile => ({
         ...dbUserFacingLocalFile,
         Taggable_ID: BigInt(dbUserFacingLocalFile.Taggable_ID)
@@ -376,33 +379,58 @@ async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, lo
         [SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, ...localTagServiceIDs]
     );
 
-    /** @type {Set<string>} */
-    const allSystemTagLookupNames = new Set();
+    /** @type {Map<string, bigint>} */
+    const allSystemTagLookups = new Map();
     for (const tags of taggablesTags.values()) {
         for (const tag of tags) {
             if (tag.Local_Tag_Service_ID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID) {
-                allSystemTagLookupNames.add(tag.Lookup_Name);
+                allSystemTagLookups.set(tag.Lookup_Name, tag.Tag_ID);
             }
         }
     }
+    const allSystemTagLookupNames = [...allSystemTagLookups.keys()];
 
-    const preInsertAppliedMetrics = [...allSystemTagLookupNames].filter(isAppliedMetricLookupName)
-        .map(revertAppliedMetricLookupName)
-        .filter(preInsertAppliedMetric => preInsertAppliedMetric.User_ID === userID);
-    const appliedMetricsMap = new Map((await AppliedMetrics.tagMapped(dbs, 
-        await AppliedMetrics.selectManyByPreInsertAppliedMetrics(dbs, preInsertAppliedMetrics)
-    )).map(appliedMetric => [
-        appliedMetric.Local_Applied_Metric_Tag.Tag_ID,
-        appliedMetric
-    ]));
+    /** @type {Map<number, number>} */
+    const localMetricIDToLocalMetricServiceIDMap = new Map();
+    for (const localMetricService of localMetricServices) {
+        for (const localMetric of localMetricService.Local_Metrics) {
+            localMetricIDToLocalMetricServiceIDMap.set(localMetric.Local_Metric_ID, localMetricService.Local_Metric_Service_ID);
+        }
+    }
+
+    const appliedMetricsMap = new Map(allSystemTagLookupNames.filter(isAppliedMetricLookupName)
+        .map(lookupName => {
+            const appliedMetric = revertAppliedMetricLookupName(lookupName);
+
+            return [
+                allSystemTagLookups.get(lookupName),
+                {
+                    ...appliedMetric,
+                    Local_Metric_Service_ID: localMetricIDToLocalMetricServiceIDMap.get(appliedMetric.Local_Metric_ID)
+                }
+            ];
+        })
+    );
+    for (const [tagID, appliedMetric] of appliedMetricsMap) {
+        if (appliedMetric.User_ID !== userID || !localMetricIDToLocalMetricServiceIDMap.has(appliedMetric.Local_Metric_ID)) {
+            appliedMetricsMap.delete(tagID);
+        }
+    }
+
+    const localTaggableServiceIDsMap = new Map(allSystemTagLookupNames.filter(isInLocalTaggableServiceLookupName)
+        .map(lookupName => [allSystemTagLookups.get(lookupName), revertInLocalTaggableServiceLookupName(lookupName)])
+    );
+
+    const urlAssociationsMap = new Map(allSystemTagLookupNames.filter(isURLAssociationTagLookupName)
+        .map(lookupName => [allSystemTagLookups.get(lookupName), revertURLAssociationTagLookupName(lookupName)])
+    );
 
     return dbUserFacingLocalFiles.map(dbUserFacingLocalFile => ({
         ...dbUserFacingLocalFile,
-        Tags: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID).filter?.((tag => tag.Local_Tag_Service_ID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)) ?? [],
-        Metrics: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID).filter?.(tag => (
-            tag.Local_Tag_Service_ID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID
-         && isAppliedMetricLookupName(tag.Lookup_Name)
-        ))?.map(tag => appliedMetricsMap.get(tag.Tag_ID)) ?? []
+        Local_Taggable_Service_ID: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID).map(tag => localTaggableServiceIDsMap.get(tag.Tag_ID)).filter(localTaggableServiceID => localTaggableServiceID !== undefined)[0],
+        URL_Associations: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID).map(tag => urlAssociationsMap.get(tag.Tag_ID)).filter(urlAssociation => urlAssociation !== undefined) ?? [],
+        Tags: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID).filter((tag => tag.Local_Tag_Service_ID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)) ?? [],
+        Metrics: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID).map(tag => appliedMetricsMap.get(tag.Tag_ID)).filter(appliedMetric => appliedMetric !== undefined) ?? []
     }));
 }
 
@@ -413,15 +441,15 @@ export class UserFacingLocalFiles {
      * @param {Omit<DBUserFacingLocalFile, "Tags">[]} dbUserFacingLocalFiles
      * @param {number} userID
      * @param {number[]} localTagServiceIDs
-     * @param {number[]} localMetricServiceIDs
+     * @param {DBPermissionedLocalMetricService[]} localMetricServices
      * @returns {Promise<DBUserFacingLocalFile[]>}
      */
-    static async selectManyByTaggableIDs(dbs, taggableIDs, userID, localTagServiceIDs, localMetricServiceIDs) {
+    static async selectManyByTaggableIDs(dbs, taggableIDs, userID, localTagServiceIDs, localMetricServices) {
         if (taggableIDs.length === 0) {
             return [];
         }
         if (taggableIDs.length > 10000) {
-            const slices = await asyncDataSlicer(taggableIDs, 10000, (sliced) => selectUserFacingTaggables(dbs, sliced, userID, localTagServiceIDs, localMetricServiceIDs));
+            const slices = await asyncDataSlicer(taggableIDs, 10000, (sliced) => UserFacingLocalFiles.selectManyByTaggableIDs(dbs, sliced, userID, localTagServiceIDs, localMetricServices));
             return slices.flat();
         }
 
@@ -443,7 +471,7 @@ export class UserFacingLocalFiles {
         `, [...taggableIDs.map(taggableID => Number(taggableID))]
         );
 
-        return await mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, localTagServiceIDs, localMetricServiceIDs);
+        return await mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, localTagServiceIDs, localMetricServices);
     }
 }
 

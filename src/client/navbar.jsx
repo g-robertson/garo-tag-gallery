@@ -7,6 +7,7 @@ import { CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES } from './modal/modals/change-tag
 import { PAGE_NAME as FILE_SEARCH_PAGE_NAME, PAGE_DEFAULT_DISPLAY_NAME as FILE_SEARCH_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
 import { randomID } from './js/client-util.js';
 import { CREATE_URL_GENERATOR_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-url-generator-service.jsx';
+import { DOWNLOAD_BACKUP_MODAL_PROPERTIES } from './modal/modals/download-backup.jsx';
 
 const FILE_MENU = "file";
 const PAGES_MENU = "pages";
@@ -41,6 +42,9 @@ const Navbar = ({setters, states, pushModal}) => {
                         setMenuOpened(null);
                         pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES.modalName);
                     }}>Import files from Hydrus</div>
+                    <a href="/api/get/backup" download="garo-backup.json"><div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                    }}>Download backup</div></a>
                 </div>
             </div>
             

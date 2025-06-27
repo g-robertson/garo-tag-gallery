@@ -52,6 +52,21 @@ export function randomID(size) {
 const BIG_INT_IDENTIFIER = "BigInt_fuihi873ohr87hnfuidwnfufh3e2oi8fwefa";
 
 /**
+ * @param {any[]} obj 
+ */
+export function* abjsonStringify(obj) {
+    yield "[";
+    if (obj.length !== 0) {
+        yield bjsonStringify(obj[0]);
+        for (const elem of obj.slice(1)) {
+            yield ",";
+            yield bjsonStringify(elem);
+        }
+    }
+    yield "]";
+}
+
+/**
  * @param {any} obj 
  * @returns {string} 
  */

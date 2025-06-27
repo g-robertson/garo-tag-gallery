@@ -49,7 +49,7 @@ const LazyThumbnailGallery = ({taggableIDs, onValuesDoubleClicked}) => {
                 {VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_Extension) !== -1
                  ? <img className="lazy-selector-selectable-item-portion"
                          src="assets/video.png"
-                         style={{position: "absolute", width: THUMB_WIDTH, height: THUMB_HEIGHT, opacity: .4}}
+                         style={{position: "absolute", width: THUMB_WIDTH, height: THUMB_HEIGHT, opacity: .7}}
                     />
                  : ""}
                 <img className="lazy-selector-selectable-item-portion"

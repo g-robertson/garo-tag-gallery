@@ -117,6 +117,24 @@ export function createURLAssociationTagLookupName(urlAssociation) {
 
 /**
  * @param {string} lookupName 
+ */
+export function isURLAssociationTagLookupName(lookupName) {
+    return lookupName.startsWith("system:has url with association:");
+}
+
+/**
+ * @param {string} lookupName 
+ */
+export function revertURLAssociationTagLookupName(lookupName) {
+    const parts = lookupName.slice("system:has url with association:".length).split(" with\x01 ");
+    return {
+        URL: parts[0],
+        URL_Association: parts[1]
+    };
+}
+
+/**
+ * @param {string} lookupName 
  * @param {string} sourceName 
  */
 export function localTagsPKHash(lookupName, sourceName) {
