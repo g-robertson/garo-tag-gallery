@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, IS_FILE_TAG, normalizeFileExtension, normalPreInsertLocalTag, SYSTEM_GENERATED, SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
+import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, IS_FILE_TAG, normalizeFileExtension,SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
@@ -7,7 +7,7 @@ import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
 import { LocalTags, UserFacingLocalTags } from "./tags.js";
 import { extractFirstFrameWithFFMPEG, sha256 } from "../util.js";
 import { readFile } from "fs/promises";
-import { AppliedMetrics, appliedMetricsPKHash } from "./metrics.js";
+import { AppliedMetrics } from "./metrics.js";
 import { createInLocalTaggableServiceLookupName, isInLocalTaggableServiceLookupName, revertInLocalTaggableServiceLookupName } from "../client/js/taggables.js";
 import { isAppliedMetricLookupName, revertAppliedMetricLookupName } from "../client/js/metrics.js";
 
@@ -33,13 +33,10 @@ import { isAppliedMetricLookupName, revertAppliedMetricLookupName } from "../cli
 export class LocalTaggableServices {
     /**
      * @param {Databases} dbs 
-     * @param {number[]} localTaggableServiceIDs 
+     * @param {number[]} localTaggableServiceIDs
      */
     static async selectTagMappings(dbs, localTaggableServiceIDs) {
-        return await LocalTags.selectManyByLookups(dbs, localTaggableServiceIDs.map(localTaggableServiceID => ({
-            Lookup_Name: createInLocalTaggableServiceLookupName(localTaggableServiceID),
-            Source_Name: SYSTEM_GENERATED
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        return await LocalTags.selectManySystemTagsByLookupNames(dbs, localTaggableServiceIDs.map(createInLocalTaggableServiceLookupName));
     }
 
     /**
@@ -283,15 +280,8 @@ export class Taggables {
                 allURLs.add(urlAssociation.URL);
             }
         }
-        const urlAssociationTagMap = new Map((await LocalTags.upsertMany(dbs, [...allURLAssociationLookupNames.values()].map(urlAssociationLookupName => normalPreInsertLocalTag(
-            urlAssociationLookupName,
-            SYSTEM_GENERATED
-        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)).map(urlAssociationTag => [urlAssociationTag.Lookup_Name, urlAssociationTag]));
-
-        const urlMap = new Map((await LocalTags.upsertMany(dbs, [...allURLs].map(url => normalPreInsertLocalTag(
-            createHasURLTagLookupName(url),
-            SYSTEM_GENERATED
-        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)).map(tag => [tag.Lookup_Name, tag]));
+        const urlAssociationTagMap = new Map((await LocalTags.upsertManySystemTags(dbs, [...allURLAssociationLookupNames])).map(urlAssociationTag => [urlAssociationTag.Lookup_Name, urlAssociationTag]));
+        const urlMap = new Map((await LocalTags.upsertManySystemTags(dbs, [...allURLs])).map(tag => [tag.Lookup_Name, tag]));
 
         const taggableURLAssociationTagPairings = new Map([...taggableURLAssociationPairings.entries()].map(([taggableID, urlAssociations]) => [
             taggableID,
@@ -346,10 +336,7 @@ export class Taggables {
      */
     static async searchWithUser(dbs, searchCriteria, user) {
         const taggableServices = await LocalTaggableServices.userSelectAll(dbs, user, PERMISSION_BITS.READ);
-        const inLocalTaggableServicesTags = await LocalTags.selectManyByLookups(dbs, taggableServices.map(taggableService => ({
-            Lookup_Name: createInLocalTaggableServiceLookupName(taggableService.Local_Taggable_Service_ID),
-            Source_Name: SYSTEM_GENERATED
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        const inLocalTaggableServicesTags = await LocalTaggableServices.selectTagMappings(dbs, taggableServices.map(taggableService => taggableService.Local_Taggable_Service_ID));
         return await Taggables.search(dbs, searchCriteria, inLocalTaggableServicesTags.map(tag => tag.Tag_ID));
     }
 }
@@ -679,10 +666,7 @@ export class LocalFiles {
      * @param {bigint} inLocalTaggableServiceTagID
      */
     static async selectMany(dbs, localFiles, inLocalTaggableServiceTagID) {
-        const hasFileHashTags = await LocalTags.selectManyByLookups(dbs, localFiles.map(localFile => ({
-            Lookup_Name: createHasFileHashLookupName(localFile.File_Hash.toString("hex")),
-            Source_Name: SYSTEM_GENERATED
-        })), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        const hasFileHashTags = await LocalTags.selectManySystemTagsByLookupNames(dbs, localFiles.map(localFile => createHasFileHashLookupName(localFile.File_Hash.toString("hex"))));
 
         const {taggables} = await dbs.perfTags.search(PerfTags.searchIntersect([
             PerfTags.searchTag(inLocalTaggableServiceTagID),
@@ -727,24 +711,20 @@ export class LocalFiles {
         );
         const mappedInsertedDBLocalFiles = insertedDBLocalFiles.map((dbLocalFile, i) => mapDBLocalFile(dbLocalFile, localFiles[i]));
 
-        const fileExtensions = new Set();
+        const fileExtensionLookupNames = new Set();
         for (const localFile of localFiles) {
-            fileExtensions.add(normalizeFileExtension(localFile.File_Extension));
+            fileExtensionLookupNames.add(createFileExtensionLookupName(normalizeFileExtension(localFile.File_Extension)));
         }
-        const fileExtensionTags = new Map((await LocalTags.upsertMany(dbs, [...fileExtensions].map(fileExtension => normalPreInsertLocalTag(
-            createFileExtensionLookupName(fileExtension),
-            SYSTEM_GENERATED
-        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)).map(tag => [tag.Lookup_Name, tag]),);
+        const fileExtensionTags = new Map((await LocalTags.upsertManySystemTags(dbs, [...fileExtensionLookupNames])).map(tag => [tag.Lookup_Name, tag]),);
 
-        const hasFileHashTags = new Map((await LocalTags.upsertMany(dbs, localFiles.map(localFile => normalPreInsertLocalTag(
-            createHasFileHashLookupName(localFile.File_Hash.toString("hex")),
-            SYSTEM_GENERATED
-        )), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)).map(tag => [tag.Lookup_Name, tag]));
+        const hasFileHashTags = new Map((await LocalTags.upsertManySystemTags(dbs, localFiles.map(localFile => createHasFileHashLookupName(localFile.File_Hash.toString("hex"))))).map(tag => 
+            [tag.Lookup_Name, tag]
+        ));
 
         await dbs.perfTags.insertTagPairings(new Map([
             [inLocalTaggableServiceTagID, mappedInsertedDBLocalFiles.map(dbLocalFile => dbLocalFile.Taggable_ID)],
             [IS_FILE_TAG.Tag_ID, mappedInsertedDBLocalFiles.map(dbLocalFile => dbLocalFile.Taggable_ID)],
-            ...localFiles.map((localFile, i) => [fileExtensionTags.get(createFileExtensionLookupName(localFile.File_Extension)).Tag_ID, [insertedTaggables[i].Taggable_ID]]),
+            ...localFiles.map((localFile, i) => [fileExtensionTags.get(createFileExtensionLookupName(normalizeFileExtension(localFile.File_Extension))).Tag_ID, [insertedTaggables[i].Taggable_ID]]),
             ...localFiles.map((localFile, i) => [hasFileHashTags.get(createHasFileHashLookupName(localFile.File_Hash.toString("hex"))).Tag_ID, [insertedTaggables[i].Taggable_ID]])
         ]), dbs.inTransaction);
 

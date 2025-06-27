@@ -247,13 +247,13 @@ std::size_t IdPairSecond::size() const {
 }
 
 IdPairContainer::IdPairContainer(const std::unordered_set<uint64_t>* secondUniverse)
-    : secondUniverse(secondUniverse)
+    : secondUniverse_(secondUniverse)
 {}
 
-IdPairContainer::IdPairContainer(const std::unordered_set<uint64_t>* secondUniverse_, std::unordered_map<uint64_t, IdPairSecond> container_)
-    : container(std::move(container_)), secondUniverse(secondUniverse_)
+IdPairContainer::IdPairContainer(const std::unordered_set<uint64_t>* secondUniverse, std::unordered_map<uint64_t, IdPairSecond> container)
+    : secondUniverse_(secondUniverse), container_(std::move(container))
 {
-    for (const auto& pair : container) {
+    for (const auto& pair : container_) {
         if (pair.second.isComplement()) {
             firstComplements_.insert(pair.first);
         }
@@ -263,17 +263,17 @@ IdPairContainer::IdPairContainer(const std::unordered_set<uint64_t>* secondUnive
 }
 
 IdPairInsertReturnType IdPairContainer::insert(std::pair<uint64_t, uint64_t> item) {
-    if (secondUniverse == nullptr) {
+    if (secondUniverse_ == nullptr) {
         throw std::logic_error("Second universe must exist when using IdPairContainer");
     }
     // gross implementation detail leakage, FAKER must be allowed regardless of if it is in second universe
-    if (!secondUniverse->contains(item.second) && item.second != 0xFFFFFFFFFFFFFFFFULL) {
+    if (!secondUniverse_->contains(item.second) && item.second != 0xFFFFFFFFFFFFFFFFULL) {
         throw std::logic_error("Second universe must contain second in order to insert");
     }
 
-    auto firstIt = container.find(item.first);
-    if (firstIt == container.end()) {
-        firstIt = container.insert({item.first, IdPairSecond(secondUniverse)}).first;
+    auto firstIt = container_.find(item.first);
+    if (firstIt == container_.end()) {
+        firstIt = container_.insert({item.first, IdPairSecond(secondUniverse_)}).first;
     }
 
     physicalSize_ -= firstIt->second.physicalSize();
@@ -288,17 +288,17 @@ IdPairInsertReturnType IdPairContainer::insert(std::pair<uint64_t, uint64_t> ite
  
 
 IdPairInsertReturnType IdPairContainer::erase(std::pair<uint64_t, uint64_t> item) {
-    if (secondUniverse == nullptr) {
+    if (secondUniverse_ == nullptr) {
         throw std::logic_error("Second universe must exist when using IdPairContainer");
     }
     // gross implementation detail leakage, FAKER must be allowed regardless of if it is in second universe
-    if (!secondUniverse->contains(item.second) && item.second != 0xFFFFFFFFFFFFFFFFULL) {
+    if (!secondUniverse_->contains(item.second) && item.second != 0xFFFFFFFFFFFFFFFFULL) {
         throw std::logic_error("Second universe must contain second in order to erase");
     }
 
-    auto firstIt = container.find(item.first);
-    if (firstIt == container.end()) {
-        firstIt = container.insert({item.first, IdPairSecond(secondUniverse)}).first;
+    auto firstIt = container_.find(item.first);
+    if (firstIt == container_.end()) {
+        firstIt = container_.insert({item.first, IdPairSecond(secondUniverse_)}).first;
     }
 
     physicalSize_ -= firstIt->second.physicalSize();
@@ -313,7 +313,7 @@ IdPairInsertReturnType IdPairContainer::erase(std::pair<uint64_t, uint64_t> item
 }
 
 void IdPairContainer::insertComplement(uint64_t second) {
-    if (secondUniverse == nullptr) {
+    if (secondUniverse_ == nullptr) {
         throw std::logic_error("Second universe must exist when using IdPairContainer");
     }
     if (firstComplements_.empty()) {
@@ -321,7 +321,7 @@ void IdPairContainer::insertComplement(uint64_t second) {
     }
 
     for (auto first : firstComplements_) {
-        auto& secondContainer = container.at(first);
+        auto& secondContainer = container_.at(first);
         physicalSize_ -= secondContainer.physicalSize();
         secondContainer.insertComplement(second);
         physicalSize_ += secondContainer.physicalSize();
@@ -331,8 +331,8 @@ void IdPairContainer::insertComplement(uint64_t second) {
 }
 
 bool IdPairContainer::contains(std::pair<uint64_t, uint64_t> item) const {
-    auto firstIt = container.find(item.first);
-    if (firstIt == container.end()) {
+    auto firstIt = container_.find(item.first);
+    if (firstIt == container_.end()) {
         return false;
     }
 
@@ -348,25 +348,25 @@ std::size_t IdPairContainer::physicalSize() const {
 }
 
 void IdPairContainer::clear() {
-    container.clear();
+    container_.clear();
     size_ = 0;
     physicalSize_ = 0;
 }
 
 const std::unordered_map<uint64_t, IdPairSecond>& IdPairContainer::allContents() const {
-    return container;
+    return container_;
 }
 
 const IdPairSecond* IdPairContainer::firstContents(uint64_t first) const {
-    auto it = container.find(first);
-    if (it == container.end()) {
+    auto it = container_.find(first);
+    if (it == container_.end()) {
         return nullptr;
     }
     return &it->second;
 }
 
 void IdPairContainer::updateComplement(uint64_t first) {
-    auto firstIsComplement = container.at(first).isComplement();
+    auto firstIsComplement = container_.at(first).isComplement();
     if (firstIsComplement && !firstComplements_.contains(first)) {
         firstComplements_.insert(first);
     } else if (!firstIsComplement && firstComplements_.contains(first)) {
@@ -384,10 +384,10 @@ std::string IdPairContainer::serialize() const {
     std::string pairingsStr;
 
     // 8 bytes for each second, + 17 bytes for each (first + length + complement indicator)
-    pairingsStr.resize((8 * physicalSize()) + (17 * container.size()));
+    pairingsStr.resize((8 * physicalSize()) + (17 * container_.size()));
     std::size_t location = 0;
     std::size_t complementsSerialized = 0;
-    for (const auto& pair : container) {
+    for (const auto& pair : container_) {
         if (pair.second.size() == 0) {
             continue;
         }
@@ -429,7 +429,7 @@ IdPairContainer IdPairContainer::deserialize(std::string_view str, const std::un
             str = str.substr(8);
             secondItems.insert(secondItem);
         }
-        auto it = output.insert({first, IdPairSecond(secondUniverse, isComplement, std::move(secondItems))});
+        output.insert({first, IdPairSecond(secondUniverse, isComplement, std::move(secondItems))});
     }
 
     return IdPairContainer(secondUniverse, std::move(output));

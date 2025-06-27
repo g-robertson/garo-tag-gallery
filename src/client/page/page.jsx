@@ -10,7 +10,7 @@ import FileSearchPage, { PAGE_NAME as FILE_SEARCH_PAGE_NAME } from './pages/file
  *         user: User
  *         pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *         existingState: any
- *         onUpdateExistingState: () => void
+ *         updateExistingStateProp: (key: string, value: any)
  *     }) => JSX.Element, pageDisplayName: string
  * }}
  **/
@@ -36,11 +36,11 @@ const PAGES = {
  *     page: PageType
  *     user: User
  *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *     onUpdateExistingState: () => void
+ *     updatePage: (page: PageType) => Promise<void>
  * }} param0 
  * @returns 
  */
-const Page = ({page, user, pushModal}) => {
+const Page = ({page, user, pushModal, updatePage}) => {
     page.existingState ??= {};
     return (<div key={page.pageID} className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}>
         <div className="page-topbar">
@@ -52,7 +52,10 @@ const Page = ({page, user, pushModal}) => {
         <div className="page-contents">
             {(() => {
                 if (page.pageName === FILE_SEARCH_PAGE_NAME) {
-                    return <FileSearchPage user={user} pushModal={pushModal} existingState={page.existingState} />
+                    return <FileSearchPage user={user} pushModal={pushModal} existingState={page.existingState} updateExistingStateProp={(key, value) => {
+                        page.existingState[key] = value;
+                        updatePage(page);
+                    }} />
                 }
             })()}
         </div>

@@ -1,4 +1,4 @@
-import {bjsonStringify} from "./client-util.js"
+import {bjsonStringify, tjsonParse} from "./client-util.js"
 /** @import {DBJoinedUser} from "../../db/user.js" */
 
 export const PERMISSIONS = Object.freeze({
@@ -53,6 +53,9 @@ export class User {
     #localTaggableServices;
     #localTagServices;
     #localMetricServices;
+    #localURLGeneratorServices;
+
+    #pages;
 
     #userManagementPermission;
     #localFileServicesPermission;
@@ -63,10 +66,10 @@ export class User {
     #globalTagServicesPermission;
     #localTagRelationsServicesPermission;
     #globalTagRelationsServicesPermission;
-    #localUrlGeneratorServicesPermission;
-    #globalUrlGeneratorServicesPermission;
-    #localUrlClassifierServicesPermission;
-    #globalUrlClassifierServicesPermission;
+    #localURLGeneratorServicesPermission;
+    #globalURLGeneratorServicesPermission;
+    #localURLClassifierServicesPermission;
+    #globalURLClassifierServicesPermission;
     #localParserServicesPermission;
     #globalParserServicesPermission;
     #settingsPermission;
@@ -78,30 +81,35 @@ export class User {
      * @param {DBJoinedUser} json 
      */
     constructor(json) {
-        this.#id = json.User_ID;
-        this.#name = json.User_Name;
-        this.#createdDate = json.User_Created_Date;
-        this.#isAdmin = json.Is_Administrator;
-        this.#localTagServices = json.Local_Tag_Services;
-        this.#localTaggableServices = json.Local_Taggable_Services;
-        this.#localMetricServices = json.Local_Metric_Services;
-        this.#userManagementPermission = json.User_Management_Permission;
-        this.#localFileServicesPermission = json.Local_Taggable_Services_Permission;
-        this.#globalFileServicesPermission = json.Global_Taggable_Services_Permission;
-        this.#localMetricServicesPermission = json.Local_Metric_Services_Permission;
-        this.#globalMetricServicesPermission = json.Global_Metric_Services_Permission;
-        this.#localTagServicesPermission = json.Local_Tag_Services_Permission;
-        this.#globalTagServicesPermission = json.Global_Tag_Services_Permission;
-        this.#localTagRelationsServicesPermission = json.Local_Tag_Relations_Services_Permission;
-        this.#globalTagRelationsServicesPermission = json.Global_Tag_Relations_Services_Permission;
-        this.#localUrlGeneratorServicesPermission = json.Local_URL_Generator_Services_Permission;
-        this.#globalUrlGeneratorServicesPermission = json.Global_URL_Generator_Services_Permission;
-        this.#localUrlClassifierServicesPermission = json.Local_URL_Classifier_Services_Permission;
-        this.#globalUrlClassifierServicesPermission = json.Global_URL_Classifier_Services_Permission;
-        this.#localParserServicesPermission = json.Local_Parser_Services_Permission;
-        this.#globalParserServicesPermission = json.Global_Parser_Services_Permission;
-        this.#settingsPermission = json.Settings_Permission;
-        this.#advancedSettingsPermission = json.Advanced_Settings_Permission;
+        this.#id = json.User_ID ?? -1;
+        this.#name = json.User_Name ?? "";
+        this.#createdDate = json.User_Created_Date ?? 0;
+        this.#isAdmin = json.Is_Administrator ?? false;
+
+        this.#localTagServices = json.Local_Tag_Services ?? [];
+        this.#localTaggableServices = json.Local_Taggable_Services ?? [];
+        this.#localMetricServices = json.Local_Metric_Services ?? [];
+        this.#localURLGeneratorServices = json.Local_URL_Generator_Services ?? [];
+
+        this.#pages = json.JSON_Pages ?? [];
+
+        this.#userManagementPermission = json.User_Management_Permission ?? 0;
+        this.#localFileServicesPermission = json.Local_Taggable_Services_Permission ?? 0;
+        this.#globalFileServicesPermission = json.Global_Taggable_Services_Permission ?? 0;
+        this.#localMetricServicesPermission = json.Local_Metric_Services_Permission ?? 0;
+        this.#globalMetricServicesPermission = json.Global_Metric_Services_Permission ?? 0;
+        this.#localTagServicesPermission = json.Local_Tag_Services_Permission ?? 0;
+        this.#globalTagServicesPermission = json.Global_Tag_Services_Permission ?? 0;
+        this.#localTagRelationsServicesPermission = json.Local_Tag_Relations_Services_Permission ?? 0;
+        this.#globalTagRelationsServicesPermission = json.Global_Tag_Relations_Services_Permission ?? 0;
+        this.#localURLGeneratorServicesPermission = json.Local_URL_Generator_Services_Permission ?? 0;
+        this.#globalURLGeneratorServicesPermission = json.Global_URL_Generator_Services_Permission ?? 0;
+        this.#localURLClassifierServicesPermission = json.Local_URL_Classifier_Services_Permission ?? 0;
+        this.#globalURLClassifierServicesPermission = json.Global_URL_Classifier_Services_Permission ?? 0;
+        this.#localParserServicesPermission = json.Local_Parser_Services_Permission ?? 0;
+        this.#globalParserServicesPermission = json.Global_Parser_Services_Permission ?? 0;
+        this.#settingsPermission = json.Settings_Permission ?? 0;
+        this.#advancedSettingsPermission = json.Advanced_Settings_Permission ?? 0;
     }
 
     id() {
@@ -160,6 +168,28 @@ export class User {
         this.#localMetricServices = localMetricServices;
     }
 
+    localURLGeneratorServices() {
+        return this.#localURLGeneratorServices;
+    }
+
+    /**
+     * @param {ReturnType<typeof this.localURLGeneratorServices>} localURLGeneratorServices 
+     */
+    setLocalURLGeneratorServices(localURLGeneratorServices) {
+        this.#localURLGeneratorServices = localURLGeneratorServices;
+    }
+
+    pages() {
+        return this.#pages;
+    }
+
+    /**
+     * @param {ReturnType<typeof this.pages>} pages 
+     */
+    setPages(pages) {
+        this.#pages = pages;
+    }
+
     /**
      * @param {HTTPMethod | PermissionInt} permissionBitsToCheck 
      * @param {PermissionType | PermissionType[]} permissionTypes
@@ -215,13 +245,13 @@ export class User {
         } else if (permissionType === PERMISSIONS.GLOBAL_TAG_RELATIONS_SERVICES) {
             return this.#globalTagRelationsServicesPermission;
         } else if (permissionType === PERMISSIONS.LOCAL_URL_GENERATOR_SERVICES) {
-            return this.#localUrlGeneratorServicesPermission;
+            return this.#localURLGeneratorServicesPermission;
         } else if (permissionType === PERMISSIONS.GLOBAL_URL_GENERATOR_SERVICES) {
-            return this.#globalUrlGeneratorServicesPermission;
+            return this.#globalURLGeneratorServicesPermission;
         } else if (permissionType === PERMISSIONS.LOCAL_URL_CLASSIFIER_SERVICES) {
-            return this.#localUrlClassifierServicesPermission;
+            return this.#localURLClassifierServicesPermission;
         } else if (permissionType === PERMISSIONS.GLOBAL_URL_CLASSIFIER_SERVICES) {
-            return this.#globalUrlClassifierServicesPermission;
+            return this.#globalURLClassifierServicesPermission;
         } else if (permissionType === PERMISSIONS.LOCAL_PARSER_SERVICES) {
             return this.#localParserServicesPermission;
         } else if (permissionType === PERMISSIONS.GLOBAL_PARSER_SERVICES) {
@@ -242,9 +272,14 @@ export class User {
             User_Name: this.#name,
             User_Created_Date: this.#createdDate,
             Is_Administrator: this.#isAdmin,
+
             Local_Tag_Services: this.#localTagServices,
             Local_Taggable_Services: this.#localTaggableServices,
             Local_Metric_Services: this.#localMetricServices,
+            Local_URL_Generator_Services: this.#localURLGeneratorServices,
+
+            JSON_Pages: this.#pages,
+
             Local_Taggable_Services_Permission: this.#localFileServicesPermission,
             Global_Taggable_Services_Permission: this.#globalFileServicesPermission,
             Local_Metric_Services_Permission: this.#localMetricServicesPermission,
@@ -253,10 +288,10 @@ export class User {
             Global_Tag_Services_Permission: this.#globalTagServicesPermission,
             Local_Tag_Relations_Services_Permission: this.#localTagRelationsServicesPermission,
             Global_Tag_Relations_Services_Permission: this.#globalTagRelationsServicesPermission,
-            Local_URL_Generator_Services_Permission: this.#localUrlGeneratorServicesPermission,
-            Global_URL_Generator_Services_Permission: this.#globalUrlGeneratorServicesPermission,
-            Local_URL_Classifier_Services_Permission: this.#localUrlClassifierServicesPermission,
-            Global_URL_Classifier_Services_Permission: this.#globalUrlClassifierServicesPermission,
+            Local_URL_Generator_Services_Permission: this.#localURLGeneratorServicesPermission,
+            Global_URL_Generator_Services_Permission: this.#globalURLGeneratorServicesPermission,
+            Local_URL_Classifier_Services_Permission: this.#localURLClassifierServicesPermission,
+            Global_URL_Classifier_Services_Permission: this.#globalURLClassifierServicesPermission,
             Local_Parser_Services_Permission: this.#localParserServicesPermission,
             Global_Parser_Services_Permission: this.#globalParserServicesPermission,
             Settings_Permission: this.#settingsPermission,

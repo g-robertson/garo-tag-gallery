@@ -930,5 +930,39 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 4";
         }
     },
+    
+    "complex_filtered_tag_occurrences_compared_to_n_percent_with_intersect_works": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const taggablePairings = new Map([
+            [1n , [1n,   3n,      6n]], // FILTERED
+            [2n , [1n,   3n,   5n   ]], // FILTERED
+            [3n , [1n,   3n,        ]], // FILTERED
+            [4n , [1n,              ]],
+            [5n , [1n,      4n,5n   ]], // FILTERED
+            [6n , [1n,2n,      5n   ]],
+            [7n , [   2n,   4n,5n   ]], // FILTERED
+            [8n , [   2n,   4n,     ]], // FILTERED
+            [9n , [   2n,   4n,5n,6n]], // FILTERED
+            [10n, [   2n,           ]],
+        ]);
+        await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
+        let {taggables} = await perfTags.search(PerfTags.searchIntersect([PerfTags.searchAggregateConditions([1n,2n], [
+            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+                PerfTags.searchTag(3n),
+                PerfTags.searchTag(4n)
+            ]), PerfTags.searchUnion([
+                PerfTags.searchTag(5n),
+                PerfTags.searchTag(6n)
+            ]), ">", 0.7)
+        ]), PerfTags.searchTag(3n)]));
+
+        if (taggables.length !== 3
+         && taggables.indexOf(1n) !== -1
+         && taggables.indexOf(2n) !== -1
+         && taggables.indexOf(3n) !== -1
+        ) {
+            throw "Missing taggables from expected set of returned taggables";
+        }
+    },
 };
 export default TESTS;

@@ -66,8 +66,8 @@ void TagFileMaintainer::readCacheFile() {
         cacheFile >> currentBucketCount;
     }
 
-    taggableBucket = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "taggable-bucket", totalFiles);
-    tagBucket = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "tag-bucket", totalTags);
+    taggableBucket_ = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "taggable-bucket", totalFiles);
+    tagBucket_ = std::make_unique<SingleBucket>(folderPath_ / "buckets" / "tag-bucket", totalTags);
 
     for (std::size_t i = 0; i < currentBucketCount; ++i) {
         std::size_t bucketTotalTagsToTaggables = 0;
@@ -87,8 +87,8 @@ void TagFileMaintainer::readCacheFile() {
 
         std::string tagTaggableFolderName = std::string("tag-to-taggable-") + std::to_string(i);
         std::string taggableTagFolderName = std::string("taggable-to-tag-") + std::to_string(i);
-        tagTaggableBuckets.push_back(PairingBucket(folderPath_ / "buckets" / tagTaggableFolderName, bucketTotalTagsToTaggables, bucketTagsToTaggablesComplementCount, &taggableBucket->contents()));
-        taggableTagBuckets.push_back(PairingBucket(folderPath_ / "buckets" / taggableTagFolderName, bucketTotalTaggablesToTags, bucketTaggablesToTagsComplementCount, &tagBucket->contents()));
+        tagTaggableBuckets.push_back(PairingBucket(folderPath_ / "buckets" / tagTaggableFolderName, bucketTotalTagsToTaggables, bucketTagsToTaggablesComplementCount, &taggableBucket_->contents()));
+        taggableTagBuckets.push_back(PairingBucket(folderPath_ / "buckets" / taggableTagFolderName, bucketTotalTaggablesToTags, bucketTaggablesToTagsComplementCount, &tagBucket_->contents()));
     }
 
     if (!cacheFile.fail()) {
@@ -111,9 +111,9 @@ void TagFileMaintainer::writeCacheFile() {
     auto cacheFile = AtomicOfstream(cacheFilePath_);
     cacheFile << VERSION
               << " taggableBucketSize "
-              << taggableBucket->size()
+              << taggableBucket_->size()
               << " tagBucketSize "
-              << tagBucket->size()
+              << tagBucket_->size()
               << " currentBucketCount "
               << currentBucketCount;
     
@@ -134,7 +134,7 @@ void TagFileMaintainer::insertTaggables(std::string_view input) {
         for (auto& bucket : tagTaggableBuckets) {
             bucket.insertComplement(taggable);
         }
-        taggableBucket->insertItem(taggable);
+        taggableBucket_->insertItem(taggable);
     };
     processSingles(input, insertTaggable);
 
@@ -144,7 +144,7 @@ void TagFileMaintainer::insertTaggables(std::string_view input) {
         bucket.diffAhead();
     }
 
-    taggableBucket->diffAhead();
+    taggableBucket_->diffAhead();
     writeCacheFile();
 }
 void TagFileMaintainer::deleteTaggables(std::string_view input) {
@@ -164,7 +164,7 @@ void TagFileMaintainer::deleteTaggables(std::string_view input) {
             getTagBucket(taggableTagToErase.second).deleteItem({taggableTagToErase.second, taggableTagToErase.first});
         }
 
-        taggableBucket->deleteItem(taggable);
+        taggableBucket_->deleteItem(taggable);
     };
     
     processSingles(input, deleteTaggable);
@@ -178,11 +178,11 @@ void TagFileMaintainer::deleteTaggables(std::string_view input) {
         bucket.diffAhead();
     }
 
-    taggableBucket->diffAhead();
+    taggableBucket_->diffAhead();
     writeCacheFile();
 }
 void TagFileMaintainer::readTaggables(void (*writer)(const std::string&)) {
-    writer(serializeSingles(taggableBucket->contents()));
+    writer(serializeSingles(taggableBucket_->contents()));
 }
 
 void TagFileMaintainer::insertTags(std::string_view input) {
@@ -190,7 +190,7 @@ void TagFileMaintainer::insertTags(std::string_view input) {
         for (auto& bucket : taggableTagBuckets) {
             bucket.insertComplement(tag);
         }
-        tagBucket->insertItem(tag);
+        tagBucket_->insertItem(tag);
     };
     processSingles(input, insertTag);
 
@@ -200,7 +200,7 @@ void TagFileMaintainer::insertTags(std::string_view input) {
         bucket.diffAhead();
     }
 
-    tagBucket->diffAhead();
+    tagBucket_->diffAhead();
     writeCacheFile();
 }
 void TagFileMaintainer::deleteTags(std::string_view input) {
@@ -221,7 +221,7 @@ void TagFileMaintainer::deleteTags(std::string_view input) {
         }
 
 
-        tagBucket->deleteItem(tag);
+        tagBucket_->deleteItem(tag);
     };
 
     processSingles(input, deleteTag);
@@ -235,11 +235,11 @@ void TagFileMaintainer::deleteTags(std::string_view input) {
         bucket.diffAhead();
     }
 
-    tagBucket->diffAhead();
+    tagBucket_->diffAhead();
     writeCacheFile();
 }
 void TagFileMaintainer::readTags(void (*writer)(const std::string&)) {
-    writer(serializeSingles(tagBucket->contents()));
+    writer(serializeSingles(tagBucket_->contents()));
 }
 
 #include <iostream>
@@ -428,8 +428,8 @@ namespace {
 }
 
 std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::string_view input) {
-    static auto EMPTY_TAGGABLES = IdPairSecond(&taggableBucket->contents());
-    const auto* universe = &taggableBucket->contents();
+    static auto EMPTY_TAGGABLES = IdPairSecond(&taggableBucket_->contents());
+    const auto* universe = &taggableBucket_->contents();
     auto context = SetEvaluation(false, universe, universe);
     char op = FIRST_OP;
     while (input.size() != 0) {
@@ -482,8 +482,9 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
             }
 
             while (input.size() != 0 && aggregateOp != CLOSE_GROUP) {
-                char aggregateOp = input[0];
+                aggregateOp = input[0];
                 input = input.substr(1);
+
                 if (aggregateOp == COUNT_OP) {
                     // Count Operation looks like C{comparator}{occurrences}{expression})
                     // Restricts {tags} to where the tag is represented with {comparator} {occurrences} within {expression}
@@ -579,8 +580,9 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
                         aggregateTags.erase(tag);
                     }
                 }
+                
             }
-            
+
             auto unionAggregateTags = SetEvaluation(isComplement, universe, std::unordered_set<uint64_t>());
             for (auto tag : aggregateTags) {
                 const auto* taggables = getTagBucket(tag).firstContents(tag);
@@ -589,7 +591,7 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
                 }
                 unionAggregateTags = SetEvaluation::setUnion(std::move(unionAggregateTags), SetEvaluation(taggables->isComplement(), universe, &taggables->physicalContents()));
             }
-            
+
             context = SET_OPERATIONS.at(op)(std::move(context), std::move(unionAggregateTags));
         } else if (input[0] == OPEN_GROUP) {
             input = input.substr(1);
@@ -618,8 +620,8 @@ void TagFileMaintainer::flushFiles() {
     for (auto& taggableTagBucket : taggableTagBuckets) {
         taggableTagBucket.write();
     }
-    taggableBucket->write();
-    tagBucket->write();
+    taggableBucket_->write();
+    tagBucket_->write();
     writeCacheFile();
     priorCacheFile = util::readFile(cacheFilePath_);
 }
@@ -631,8 +633,8 @@ void TagFileMaintainer::purgeUnusedFiles() const {
     for (const auto& taggableTagBucket : taggableTagBuckets) {
         taggableTagBucket.purgeUnusedFiles();
     }
-    taggableBucket->purgeUnusedFiles();
-    tagBucket->purgeUnusedFiles();
+    taggableBucket_->purgeUnusedFiles();
+    tagBucket_->purgeUnusedFiles();
 }
 
 unsigned short TagFileMaintainer::getBucketIndex(uint64_t item) const {
@@ -675,8 +677,8 @@ void TagFileMaintainer::beginTransaction() {
     for (auto& taggableTagBucket : taggableTagBuckets) {
         taggableTagBucket.beginTransaction();
     }
-    taggableBucket->beginTransaction();
-    tagBucket->beginTransaction();
+    taggableBucket_->beginTransaction();
+    tagBucket_->beginTransaction();
     inTransaction = true;
 }
 void TagFileMaintainer::endTransaction() {
@@ -688,8 +690,8 @@ void TagFileMaintainer::endTransaction() {
     for (auto& taggableTagBucket : taggableTagBuckets) {
         taggableTagBucket.endTransaction();
     }
-    taggableBucket->endTransaction();
-    tagBucket->endTransaction();
+    taggableBucket_->endTransaction();
+    tagBucket_->endTransaction();
     inTransaction = false;
 
     writeCacheFile();
@@ -714,23 +716,23 @@ void TagFileMaintainer::close() {
 }
 
 PairingBucket::PairingBucket(std::filesystem::path bucketPath, std::size_t startingSize, std::size_t startingComplementCount, const std::unordered_set<uint64_t>* secondUniverse)
-    : Bucket(bucketPath, startingSize), startingComplementCount_(startingComplementCount), secondUniverse(secondUniverse)
+    : Bucket(bucketPath, startingSize), startingComplementCount_(startingComplementCount), secondUniverse_(secondUniverse)
 {
     contents_ = IdPairContainer(secondUniverse);
 }
 
 void PairingBucket::insertComplement(uint64_t second) {
-    if (secondUniverse->contains(second)) {
+    if (secondUniverse_->contains(second)) {
         return;
     }
     if (startingComplementCount_ != 0) {
-        diffContentsIsDirty = true;
+        diffContentsIsDirty_ = true;
         init();
     }
 
     // need to update only the diffs for those that start with complement
     for (auto first : startingFirstComplements) {
-        diffContents.insert(std::pair<uint64_t, uint64_t>(first, second));
+        diffContents_.insert(std::pair<uint64_t, uint64_t>(first, second));
     }
 
     const auto& firstComplements = contents_.firstComplements();
@@ -753,11 +755,11 @@ std::pair<uint64_t, uint64_t> PairingBucket::FAKER() const {
 }
 
 IdPairContainer PairingBucket::deserialize(std::string_view str) const  {
-    return IdPairContainer::deserialize(str, secondUniverse);
+    return IdPairContainer::deserialize(str, secondUniverse_);
 }
 
 IdPairDiffContainer PairingBucket::deserializeDiff(std::string_view str) const  {
-    return IdPairDiffContainer::deserialize(str, secondUniverse);
+    return IdPairDiffContainer::deserialize(str, secondUniverse_);
 }
 
 std::string PairingBucket::serialize(const IdPairContainer& contents) const {

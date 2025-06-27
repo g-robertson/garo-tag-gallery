@@ -43,7 +43,7 @@ void TestTagFileMaintainer::insertTagsFailBetweenPairingsAndSinglesWrites(std::s
         for (auto& bucket : taggableTagBuckets) {
             bucket.insertComplement(tag);
         }
-        tagBucket->insertItem(tag);
+        tagBucket_->insertItem(tag);
     };
     processSingles(input, insertTag);
 
@@ -55,6 +55,6 @@ void TestTagFileMaintainer::insertTagsFailBetweenPairingsAndSinglesWrites(std::s
 
     throw std::logic_error("COMPLETELY STAGED ERROR");
 
-    tagBucket->diffAhead();
+    tagBucket_->diffAhead();
     writeCacheFile();
 }

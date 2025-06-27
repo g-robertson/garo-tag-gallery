@@ -36,7 +36,7 @@ export function revertAppliedMetricLookupName(lookupName) {
 /**
  * @param {number} localMetricServiceID 
  */
-export function createInLocalMetricServiceLookup(localMetricServiceID) {
+export function createInLocalMetricServiceLookupName(localMetricServiceID) {
     return `system:has metric from local metric service:${localMetricServiceID}`
 }
 
@@ -44,7 +44,7 @@ export function createInLocalMetricServiceLookup(localMetricServiceID) {
 /**
  * @param {number} localMetricID 
  */
-export function createLocalMetricLookup(localMetricID) {
+export function createLocalMetricLookupName(localMetricID) {
     return `system:has local metric:${localMetricID}`;
 }
 

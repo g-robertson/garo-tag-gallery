@@ -22,6 +22,16 @@ export async function fbjsonParse(response) {
     }
 }
 
+/**
+ * @param {string} json 
+ */
+export function tjsonParse(json) {
+    try {
+        return JSON.parse(json);
+    } catch (err) {
+        return;
+    }
+}
 
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz";
 /**

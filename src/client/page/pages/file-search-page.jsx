@@ -14,9 +14,13 @@ import { GALLERY_MODAL_PROPERTIES } from '../../modal/modals/gallery.jsx';
  *  user: User
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  existingState: any
+ *  updateExistingStateProp: (key: string, value: any) => void
  * }}
 */
-const FileSearchPage = ({user, pushModal, existingState}) => {
+const FileSearchPage = ({user, pushModal, existingState, updateExistingStateProp}) => {
+    existingState ??= {};
+    updateExistingStateProp ??= () => {};
+
     const [taggableIDs, setTaggableIDs] = useState(existingState?.taggableIDs ?? []);
     existingState.tagsSelector ??= {};
 
@@ -41,6 +45,10 @@ const FileSearchPage = ({user, pushModal, existingState}) => {
                     }}
 
                     existingState={existingState.tagsSelector}
+                    updateExistingStateProp={(key, value) => {
+                        existingState.tagsSelector[key] = value;
+                        updateExistingStateProp("tagsSelector", existingState.tagsSelector);
+                    }}
                 />
             </div>
             <div style={{width: "auto", flex: 3, height: "100%"}}>

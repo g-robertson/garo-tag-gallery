@@ -22,7 +22,7 @@ class PairingBucket : public Bucket<std::pair<uint64_t, uint64_t>, IdPairContain
         void insertComplement(uint64_t second);
     private:
         std::size_t startingComplementCount_;
-        const std::unordered_set<uint64_t>* secondUniverse;
+        const std::unordered_set<uint64_t>* secondUniverse_;
         std::unordered_set<uint64_t> startingFirstComplements;
         
         std::pair<uint64_t, uint64_t> FAKER() const override;
@@ -100,6 +100,6 @@ class TagFileMaintainer {
         unsigned short currentBucketCount = 16;
         std::vector<PairingBucket> tagTaggableBuckets;
         std::vector<PairingBucket> taggableTagBuckets;
-        std::unique_ptr<SingleBucket> taggableBucket;
-        std::unique_ptr<SingleBucket> tagBucket;
+        std::unique_ptr<SingleBucket> taggableBucket_;
+        std::unique_ptr<SingleBucket> tagBucket_;
 };

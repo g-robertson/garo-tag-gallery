@@ -89,6 +89,7 @@ async function main() {
       Users.selectByAccessKey(dbs, accessKey).then(user => {
         if (user !== undefined) {
           req.user = user;
+          req.userAccessKey = accessKey;
         }
         req.next();
       })

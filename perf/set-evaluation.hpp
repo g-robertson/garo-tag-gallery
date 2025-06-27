@@ -29,8 +29,8 @@ class SetEvaluation {
         static std::unordered_set<uint64_t> usetUnion_(const std::unordered_set<uint64_t>& smallerSet, const std::unordered_set<uint64_t>& largerSet);
         static std::unordered_set<uint64_t> usetIntersectRHSComplement_(const std::unordered_set<uint64_t>& lhsSet, const std::unordered_set<uint64_t>& rhsSet);
         static std::unordered_set<uint64_t> usetSymmetricDifference_(const std::unordered_set<uint64_t>& lhsSet, const std::unordered_set<uint64_t>& rhsSet);
-        bool isComplement;
-        const std::unordered_set<uint64_t>* universe;
-        std::optional<std::unordered_set<uint64_t>> items;
-        const std::unordered_set<uint64_t>* itemsPtr;
+        bool isComplement_;
+        const std::unordered_set<uint64_t>* universe_;
+        std::optional<std::unordered_set<uint64_t>> items_;
+        const std::unordered_set<uint64_t>* itemsPtr_;
 };

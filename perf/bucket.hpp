@@ -34,18 +34,18 @@ class Bucket {
             auto insertReturn = contents_.insert(item);
             if (insertReturn.second) {
                 contentsIsDirty = true;
-                util::toggle(diffContents, item);
-                diffContentsIsDirty = true;
+                util::toggle(diffContents_, item);
+                diffContentsIsDirty_ = true;
             }
         }
 
         void toggleItem(T item) {
             init();
 
-            auto toggleReturn = util::toggle(contents_, item);
+            util::toggle(contents_, item);
             contentsIsDirty = true;
-            util::toggle(diffContents, item);
-            diffContentsIsDirty = true;
+            util::toggle(diffContents_, item);
+            diffContentsIsDirty_ = true;
         }
 
         void deleteItem(T item) {
@@ -54,8 +54,8 @@ class Bucket {
             auto eraseReturn = contents_.erase(item);
             if (isErased(eraseReturn)) {
                 contentsIsDirty = true;
-                util::toggle(diffContents, item);
-                diffContentsIsDirty = true;
+                util::toggle(diffContents_, item);
+                diffContentsIsDirty_ = true;
             }
         }
 
@@ -66,18 +66,18 @@ class Bucket {
         }
 
         void diffAhead() {
-            if (inTransaction || !diffContentsIsDirty) {
+            if (inTransaction || !diffContentsIsDirty_) {
                 return;
             }
             
             if (contents_.size() == startingSize_) {
                 util::toggle(contents_, FAKER());
-                util::toggle(diffContents, FAKER());
-                diffContentsIsDirty = true;
+                util::toggle(diffContents_, FAKER());
+                diffContentsIsDirty_ = true;
             }
         
-            util::writeFile(diffFileName, serializeDiff(diffContents));
-            diffContentsIsDirty = false;
+            util::writeFile(diffFileName, serializeDiff(diffContents_));
+            diffContentsIsDirty_ = false;
         }
 
         void write() {
@@ -87,14 +87,14 @@ class Bucket {
         
             util::writeFile(mainFileName, serialize(contents_));
             startingSize_ = contents_.size();
-            diffContents.clear();
-            diffContentsIsDirty = false;
+            diffContents_.clear();
+            diffContentsIsDirty_ = false;
             contentsIsDirty = false;
             postContentsMatchFile();
         }
 
         void purgeUnusedFiles() const {
-            if (diffContents.empty()) {
+            if (diffContents_.empty()) {
                 util::removeFile(diffFileName);
             }
         }
@@ -109,15 +109,13 @@ class Bucket {
         }
     protected:
         std::filesystem::path mainFileName;
-        bool mainDirty = false;
         std::filesystem::path diffFileName;
-        bool diffDirty = false;
         bool isRead = false;
         std::size_t startingSize_;
         TMainContainer contents_;
         bool contentsIsDirty = false;
-        TDiffContainer diffContents;
-        bool diffContentsIsDirty = false;
+        TDiffContainer diffContents_;
+        bool diffContentsIsDirty_ = false;
         bool inTransaction = false;
 
         void init() {

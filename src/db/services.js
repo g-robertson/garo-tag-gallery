@@ -1,7 +1,7 @@
 import { PERMISSION_BITS, User } from "../client/js/user.js";
 import {dbget, dbrun} from "./db-util.js";
 
-/** @import {PermissionType, PermissionInt} from "../client/js/user.js" */
+/** @import {PermissionInt} from "../client/js/user.js" */
 /** @import {Databases} from "./db-util.js" */
 
 /**

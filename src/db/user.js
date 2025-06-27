@@ -1,8 +1,9 @@
 import { User } from "../client/js/user.js";
-import { dball, dballselect, dbget, dbgetselect, dbvariablelist } from "./db-util.js";
+import { dballselect, dbget, dbgetselect, dbrun, dbvariablelist } from "./db-util.js";
 import { LocalTagServices } from "./tags.js";
 import { LocalTaggableServices } from "./taggables.js";
 import { LocalMetricServices } from "./metrics.js";
+import { LocalURLGeneratorServices } from "./url-generators.js";
 import { LRUCache } from "./lru-cache.js";
 
 /**
@@ -11,6 +12,8 @@ import { LRUCache } from "./lru-cache.js";
  * @import {DBPermissionedLocalTagService} from "./tags.js"
  * @import {DBPermissionedLocalTaggableService} from "./taggables.js"
  * @import {DBPermissionedLocalMetricService} from "./metrics.js"
+ * @import {DBPermissionedLocalURLGeneratorService} from "./url-generators.js"
+ * @import {PageType} from "../client/page/page.jsx"
  */
 export const DEFAULT_ADMINISTRATOR_USER_ID = 0;
 export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
@@ -24,10 +27,10 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @property {number | null} Local_Taggable_Services_Byte_Transfer_Limit
  * @property {PermissionInt} Global_Taggable_Services_Permission
  * @property {number | null} Global_Taggable_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Local_Rating_Services_Permission
- * @property {number | null} Local_Rating_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_Rating_Services_Permission
- * @property {number | null} Global_Rating_Services_Byte_Transfer_Limit
+ * @property {PermissionInt} Local_Metric_Services_Permission
+ * @property {number | null} Local_Metric_Services_Byte_Transfer_Limit
+ * @property {PermissionInt} Global_Metric_Services_Permission
+ * @property {number | null} Global_Metric_Services_Byte_Transfer_Limit
  * @property {PermissionInt} Local_Tag_Services_Permission
  * @property {number | null} Local_Tag_Services_Byte_Transfer_Limit
  * @property {PermissionInt} Global_Tag_Services_Permission
@@ -58,7 +61,7 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @property {string} User_Name
  * @property {DBBoolean} Is_Administrator
  * @property {number} Permission_Set_ID
- * @property {Page[]} JSON_Pages
+ * @property {PageType[]} JSON_Pages
  * @property {Object} JSON_Preferences
  * @property {number} User_Created_Date
  */
@@ -67,9 +70,10 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @typedef {DBUser &
  *           DBPermissionSet &
  *          {
- *              Local_Tag_Services: (DBPermissionedLocalTagService)[],
- *              Local_Taggable_Services: (DBPermissionedLocalTaggableService)[]
- *              Local_Metric_Services: (DBPermissionedLocalMetricService)[]
+ *              Local_Tag_Services: DBPermissionedLocalTagService[],
+ *              Local_Taggable_Services: DBPermissionedLocalTaggableService[],
+ *              Local_Metric_Services: DBPermissionedLocalMetricService[],
+ *              Local_URL_Generator_Services: DBPermissionedLocalURLGeneratorService[]
  *          }
  * } DBJoinedUser
  */
@@ -78,7 +82,10 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @param {DBUser} dbUser 
  */
 function mapDBUser(dbUser) {
-    const mappedDBUser = {...dbUser};
+    const mappedDBUser = {
+        ...dbUser,
+        JSON_Pages: JSON.parse(dbUser.JSON_Pages)
+    };
     delete mappedDBUser['Access_Key'];
     return mappedDBUser;
 }
@@ -86,6 +93,23 @@ function mapDBUser(dbUser) {
 export class Users {
     /** @type {LRUCache<string, User>} */
     static #accessKeyToUserLRUCache = new LRUCache(4096);
+
+    /**
+     * @param {Databases} dbs 
+     * @param {string} accessKey
+     * @param {PageType[]} pages
+     */
+    static async setPagesJSON(dbs, accessKey, pages) {
+        await dbrun(dbs, `
+            UPDATE Users
+            SET JSON_Pages = $pagesJSON
+            WHERE Access_Key = $accessKey
+        `, {
+            $pagesJSON: JSON.stringify(pages),
+            $accessKey: accessKey
+        });
+        Users.#accessKeyToUserLRUCache.get(accessKey).setPages(pages);
+    }
 
     /**
      * @param {Databases} dbs
@@ -114,6 +138,7 @@ export class Users {
         user.setLocalTagServices(await LocalTagServices.userSelectAll(dbs, user));
         user.setLocalTaggableServices(await LocalTaggableServices.userSelectAll(dbs, user));
         user.setLocalMetricServices(await LocalMetricServices.userSelectAll(dbs, user));
+        user.setLocalURLGeneratorServices(await LocalURLGeneratorServices.userSelectAll(dbs, user));
 
         return user;
     }
@@ -135,7 +160,7 @@ export class Users {
             if (user === undefined) {
                 return undefined;
             } else {
-                cachedUser = new User(user);
+                cachedUser = new User(mapDBUser(user));
                 this.#accessKeyToUserLRUCache.set(accessKey, cachedUser);
             }
         }

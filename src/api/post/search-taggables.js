@@ -12,6 +12,7 @@ import z from "zod";
 import PerfTags from "../../perf-tags-binding/perf-tags.js";
 import { localTagsPKHash, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import { AppliedMetrics, LocalMetrics, LocalMetricServices } from "../../db/metrics.js";
+import {writeFileSync} from "fs";
 
 const Z_CLIENT_COMPARATOR = z.literal("<").or(z.literal("<=")).or(z.literal(">")).or(z.literal(">="));
 /** @typedef {z.infer<typeof Z_CLIENT_COMPARATOR>} ClientComparator */

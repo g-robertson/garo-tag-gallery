@@ -4,140 +4,140 @@
 #include <iostream>
 
 SetEvaluation::SetEvaluation(bool isComplement, const std::unordered_set<uint64_t>* universe, std::unordered_set<uint64_t> items)
-    : isComplement(isComplement), universe(universe), items(std::move(items)), itemsPtr(&this->items.value())
+    : isComplement_(isComplement), universe_(universe), items_(std::move(items)), itemsPtr_(&this->items_.value())
 {}
 
 SetEvaluation::SetEvaluation(bool isComplement, const std::unordered_set<uint64_t>* universe, const std::unordered_set<uint64_t>* items)
-    : isComplement(isComplement), universe(universe), itemsPtr(items)
+    : isComplement_(isComplement), universe_(universe), itemsPtr_(items)
 {}
 
 SetEvaluation::SetEvaluation(SetEvaluation&& setEvaluation) {
-    if (setEvaluation.items.has_value()) {
-        items = std::move(setEvaluation.items);
-        itemsPtr = &items.value();
+    if (setEvaluation.items_.has_value()) {
+        items_ = std::move(setEvaluation.items_);
+        itemsPtr_ = &items_.value();
     } else {
-        itemsPtr = setEvaluation.itemsPtr;
+        itemsPtr_ = setEvaluation.itemsPtr_;
     }
     
-    universe = setEvaluation.universe;
-    isComplement = setEvaluation.isComplement;
+    universe_ = setEvaluation.universe_;
+    isComplement_ = setEvaluation.isComplement_;
 }
 
 SetEvaluation& SetEvaluation::operator=(SetEvaluation&& setEvaluation) {
-    if (setEvaluation.items.has_value()) {
-        items = std::move(setEvaluation.items);
-        itemsPtr = &items.value();
+    if (setEvaluation.items_.has_value()) {
+        items_ = std::move(setEvaluation.items_);
+        itemsPtr_ = &items_.value();
     } else {
-        itemsPtr = setEvaluation.itemsPtr;
+        itemsPtr_ = setEvaluation.itemsPtr_;
     }
     
-    universe = setEvaluation.universe;
-    isComplement = setEvaluation.isComplement;
+    universe_ = setEvaluation.universe_;
+    isComplement_ = setEvaluation.isComplement_;
 
     return *this;
 }
 
 std::unordered_set<uint64_t> SetEvaluation::releaseResult() {
-    if (isComplement) {
+    if (isComplement_) {
         std::unordered_set<uint64_t> itemsComplement;
-        for (auto item : *universe) {
-            if (!itemsPtr->contains(item)) {
+        for (auto item : *universe_) {
+            if (!itemsPtr_->contains(item)) {
                 itemsComplement.insert(item);
             }
         }
-        return std::move(itemsComplement);
-    } else if (items) {
-        return std::move(items.value());
+        return itemsComplement;
+    } else if (items_) {
+        return std::move(items_.value());
     } else {
-        return *itemsPtr;
+        return *itemsPtr_;
     }
 }
 
 void SetEvaluation::complement() {
-    isComplement = !isComplement;
+    isComplement_ = !isComplement_;
 }
 
 std::size_t SetEvaluation::size() const {
-    if (isComplement) {
-        return universe->size() - itemsPtr->size();
+    if (isComplement_) {
+        return universe_->size() - itemsPtr_->size();
     } else {
-        return itemsPtr->size();
+        return itemsPtr_->size();
     }
 }
 
 SetEvaluation SetEvaluation::rightHandSide(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
-    return SetEvaluation(rhsSet.isComplement, rhsSet.universe, std::unordered_set<uint64_t>(*rhsSet.itemsPtr));
+    return SetEvaluation(rhsSet.isComplement_, rhsSet.universe_, std::unordered_set<uint64_t>(*rhsSet.itemsPtr_));
 }
 SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
-    if (lhsSet.universe != rhsSet.universe) {
+    if (lhsSet.universe_ != rhsSet.universe_) {
         throw std::logic_error("Sets had different universe values");
     }
-    const auto* universe = lhsSet.universe;
+    const auto* universe = lhsSet.universe_;
 
-    if (lhsSet.isComplement) {
-        if (rhsSet.isComplement) {
+    if (lhsSet.isComplement_) {
+        if (rhsSet.isComplement_) {
             // ~A ^ ~B <=> A ^ B
-            return SetEvaluation(false, universe, usetSymmetricDifference_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(false, universe, usetSymmetricDifference_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         } else {
             // (A ^ ~B) <=> (A N B) U (~A N ~B)  <=> (A U (~A U ~B)) N (B U (~A U ~B)) <=> (A U ~B) N (~A U B) <=> ~(~A N B) N ~(A N ~B) <=> ~((~A N B) U (A N ~B)) <=> ~(A ^ B)
-            return SetEvaluation(true, universe, usetSymmetricDifference_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(true, universe, usetSymmetricDifference_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         }
     } else {
-        if (rhsSet.isComplement) {
+        if (rhsSet.isComplement_) {
             // (A ^ ~B) <=> (A N B) U (~A N ~B)  <=> (A U (~A U ~B)) N (B U (~A U ~B)) <=> (A U ~B) N (~A U B) <=> ~(~A N B) N ~(A N ~B) <=> ~((~A N B) U (A N ~B)) <=> ~(A ^ B)
-            return SetEvaluation(true, universe, usetSymmetricDifference_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(true, universe, usetSymmetricDifference_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         } else {
             // A ^ B
-            return SetEvaluation(false, universe, usetSymmetricDifference_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(false, universe, usetSymmetricDifference_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         }
     }
 }
 SetEvaluation SetEvaluation::difference(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
-    if (lhsSet.universe != rhsSet.universe) {
+    if (lhsSet.universe_ != rhsSet.universe_) {
         throw std::logic_error("Sets had different universe values");
     }
-    const auto* universe = lhsSet.universe;
+    const auto* universe = lhsSet.universe_;
 
-    if (lhsSet.isComplement) {
-        if (rhsSet.isComplement) {
+    if (lhsSet.isComplement_) {
+        if (rhsSet.isComplement_) {
             // ~A - ~B <=> ~A N B <=> B N ~A
-            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*rhsSet.itemsPtr, *lhsSet.itemsPtr));
+            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*rhsSet.itemsPtr_, *lhsSet.itemsPtr_));
         } else {
             // ~A - B <=> ~A N ~B <=> ~(A U B)
-            return SetEvaluation(true, universe, usetUnion_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(true, universe, usetUnion_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         }
     } else {
-        if (rhsSet.isComplement) {
+        if (rhsSet.isComplement_) {
             // A - ~B <=> A N B
-            return SetEvaluation(false, universe, usetIntersect_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(false, universe, usetIntersect_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         } else {
             // A - B <=> A N ~B
-            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         }
     }
 }
 
 SetEvaluation SetEvaluation::intersect(const SetEvaluation& lhsSet, SetEvaluation rhsSet) {
-    if (lhsSet.universe != rhsSet.universe) {
+    if (lhsSet.universe_ != rhsSet.universe_) {
         throw std::logic_error("Sets had different universe values");
     }
-    const auto* universe = lhsSet.universe;
+    const auto* universe = lhsSet.universe_;
 
-    if (lhsSet.isComplement) {
-        if (rhsSet.isComplement) {
+    if (lhsSet.isComplement_) {
+        if (rhsSet.isComplement_) {
             // ~A N ~B <=> ~(A U B)
-            return SetEvaluation(true, universe, usetUnion_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(true, universe, usetUnion_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         } else {
             // ~A N B <=> B N ~A
-            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*rhsSet.itemsPtr, *lhsSet.itemsPtr));
+            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*rhsSet.itemsPtr_, *lhsSet.itemsPtr_));
         }
     } else {
-        if (rhsSet.isComplement) {
+        if (rhsSet.isComplement_) {
             // A N ~B
-            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         } else {
             // A N B
-            return SetEvaluation(false, universe, usetIntersect_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(false, universe, usetIntersect_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         }
     }
 }
@@ -148,30 +148,30 @@ SetEvaluation SetEvaluation::intersect(SetEvaluation&& lhsSet, SetEvaluation rhs
 }
 
 SetEvaluation SetEvaluation::setUnion(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
-    if (!lhsSet.items.has_value()) {
+    if (!lhsSet.items_.has_value()) {
         throw std::logic_error("LHS did not have real value");
     }
-    if (lhsSet.universe != rhsSet.universe) {
+    if (lhsSet.universe_ != rhsSet.universe_) {
         throw std::logic_error("Sets had different universe values");
     }
-    const auto* universe = lhsSet.universe;
+    const auto* universe_ = lhsSet.universe_;
 
-    if (lhsSet.isComplement) {
-        if (rhsSet.isComplement) {
+    if (lhsSet.isComplement_) {
+        if (rhsSet.isComplement_) {
             // ~A U ~B <=> ~(A N B)
-            return SetEvaluation(true, universe, usetIntersect_(std::move(*lhsSet.items), *rhsSet.itemsPtr));
+            return SetEvaluation(true, universe_, usetIntersect_(std::move(*lhsSet.items_), *rhsSet.itemsPtr_));
         } else {
             // ~A U B <=> ~(A N ~B)
-            return SetEvaluation(true, universe, usetIntersectRHSComplement_(*lhsSet.itemsPtr, *rhsSet.itemsPtr));
+            return SetEvaluation(true, universe_, usetIntersectRHSComplement_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         }
     } else {
-        if (rhsSet.isComplement) {
+        if (rhsSet.isComplement_) {
             // A U ~B <=> ~(~A N B) <=> ~(B N ~A)
-            return SetEvaluation(true, universe, usetIntersectRHSComplement_(*rhsSet.itemsPtr, *lhsSet.itemsPtr));
+            return SetEvaluation(true, universe_, usetIntersectRHSComplement_(*rhsSet.itemsPtr_, *lhsSet.itemsPtr_));
         } else {
             // A U B
-            usetUnion_(*lhsSet.items, *rhsSet.itemsPtr);
-            return SetEvaluation(false, universe, std::move(*lhsSet.items));
+            usetUnion_(*lhsSet.items_, *rhsSet.itemsPtr_);
+            return SetEvaluation(false, universe_, std::move(*lhsSet.items_));
         }
     }
 }

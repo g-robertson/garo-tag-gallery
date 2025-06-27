@@ -34,7 +34,8 @@ const MODALS = {};
         await import('./modals/create-aggregate-tag.jsx'),
         await import("./modals/tag-selector-modal.jsx"),
         await import("./modals/select-from-list-of-tags-modal.jsx"),
-        await import("./modals/create-metric-tag.jsx")
+        await import("./modals/create-metric-tag.jsx"),
+        await import("./modals/create-url-generator-service.jsx")
     ];
     
     for (const modal of modals) {

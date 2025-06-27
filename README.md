@@ -8,6 +8,8 @@ Before doing your tag-file mapping export, convert all your ratings into tags in
 
 To import tag-file mappings from hydrus into b-hydrus, open hydrus and select all of your files, then right click a file and click into the share->export files button.
 
+A limitation of the import is that which hydrus file service your image is in, or which hydrus tag service your tag is in is lost. To counteract this you can mark every file in a specific file service with a tag, and then move every file with that tag into a separate file (taggable) service after importing. With tags there is no real way around this unless you know how to script a namespace to the front of each tag, I do not intend to add this functionality for the time being
+
 Change the export path to either be to the database\import-from-hydrus\file-tag-mappings folder if you are doing this on the computer hosting the server. Or to wherever you want if you are importing from another computer.
 
 Change the filenames field to "{hash}"

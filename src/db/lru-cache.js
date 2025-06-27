@@ -49,7 +49,23 @@ export class LRUCache {
         }), 1);
     }
 
+    /**
+     * @param {K} key 
+     */
     get(key) {
-        return this.#backingMap.get(key)?.value;
+        const value = this.#backingMap.get(key)?.value;
+        if (value === undefined) {
+            return;
+        }
+
+        const timestamp = Date.now();
+        this.delete(key);
+        this.#backingMap.set(key, {value, timestamp});
+        this.#sortedItems.push({
+            key,
+            timestamp
+        });
+
+        return value;
     }
 }

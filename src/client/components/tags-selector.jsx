@@ -18,16 +18,18 @@ import { clientSearchQueryToDisplayName } from '../js/tags.js';
  *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery) => void
  *  searchType?: "intersect" | "union"
  *  existingState?: any
+ *  updateExistingStateProp: (key: string, value: any) => void
  * }} param0
  */
-const TagsSelector = ({user, pushModal, initialSelectedTags, onSearchChanged, searchType, existingState}) => {
+const TagsSelector = ({user, pushModal, initialSelectedTags, onSearchChanged, searchType, existingState, updateExistingStateProp}) => {
     existingState ??= {};
+    updateExistingStateProp ??= () => {};
     onSearchChanged ??= () => {};
     searchType ??= "intersect";
 
     /** @type {[ClientSearchQuery[], (clientSearchQuery: ClientSearchQuery[]) => void]} */
     const [clientSearchQuery, setClientSearchQuery] = useState(existingState.clientSearchQuery ?? initialSelectedTags ?? []);
-    useEffect(() => {existingState.clientSearchQuery = clientSearchQuery;}, [clientSearchQuery]);
+    useEffect(() => {updateExistingStateProp("clientSearchQuery", clientSearchQuery);}, [clientSearchQuery]);
     
 
     useEffect(() => {

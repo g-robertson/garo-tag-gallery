@@ -1,5 +1,8 @@
 perftags:
 	g++ -std=c++23 \
+		-Wall \
+		-Wshadow \
+		-Wno-unused-function \
 		main.cpp \
 		util.cpp \
 		atomic-ofstream.cpp \
@@ -11,6 +14,9 @@ perftags:
 test:
 	g++ -std=c++23 \
 		-DTESTING_MODE=TRUE \
+		-Wall \
+		-Wshadow \
+		-Wno-unused-function \
 		main.cpp \
 		util.cpp \
 		atomic-ofstream.cpp \

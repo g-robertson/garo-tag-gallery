@@ -6,10 +6,12 @@ import { CREATE_METRIC_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-me
 import { CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES } from './modal/modals/change-tag-to-metric.jsx';
 import { PAGE_NAME as FILE_SEARCH_PAGE_NAME, PAGE_DEFAULT_DISPLAY_NAME as FILE_SEARCH_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
 import { randomID } from './js/client-util.js';
+import { CREATE_URL_GENERATOR_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-url-generator-service.jsx';
 
 const FILE_MENU = "file";
 const PAGES_MENU = "pages";
 const METRICS_MENU = "metrics";
+const PARSERS_MENU = "parsers";
 
 /** @import {Setters, States} from "./App.jsx" */
 
@@ -73,6 +75,16 @@ const Navbar = ({setters, states, pushModal}) => {
                         setMenuOpened(null);
                         pushModal(CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES.modalName);
                     }}>Change tag to metric</div>
+                </div>
+            </div>
+            <div className="topbar-dropdown">
+                <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(PARSERS_MENU)}>Parsers</div>
+                <div className="topbar-dropdown-options" style={{display: menuOpened === PARSERS_MENU ? "block" : "none"}}>
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                        pushModal(CREATE_URL_GENERATOR_SERVICE_MODAL_PROPERTIES.modalName);
+                    }}>Create new URL generator service</div>
+                    
                 </div>
             </div>
         </nav>

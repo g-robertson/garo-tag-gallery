@@ -95,9 +95,7 @@ div {
 }
 
 .page-navbar-topbar-dropdown-title {
-    display: inline-block;
     cursor: pointer;
-    padding: 4px 10px;
 }
 
 .page-navbar-topbar-dropdown-title:hover, .selected .page-navbar-topbar-dropdown-title {

@@ -81,9 +81,9 @@ class IdPairSecond {
         void updateComplement();
         void flipComplement();
 
+        const std::unordered_set<uint64_t>* universe_;
         bool isComplement_ = false;
         std::unordered_set<uint64_t> contents_;
-        const std::unordered_set<uint64_t>* universe_;
 };
 
 class IdPairContainer {
@@ -111,8 +111,8 @@ class IdPairContainer {
         void updateComplement(uint64_t first);
 
         std::unordered_set<uint64_t> firstComplements_;
-        const std::unordered_set<uint64_t>* secondUniverse;
-        std::unordered_map<uint64_t, IdPairSecond> container;
+        const std::unordered_set<uint64_t>* secondUniverse_;
+        std::unordered_map<uint64_t, IdPairSecond> container_;
 
         std::size_t size_ = 0;
         std::size_t physicalSize_ = 0;

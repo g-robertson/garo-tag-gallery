@@ -1,4 +1,4 @@
-import { HAS_URL_TAG, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash } from "../client/js/tags.js";
+import { SYSTEM_GENERATED, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash, normalPreInsertLocalTag } from "../client/js/tags.js";
 import { PERMISSIONS, User } from "../client/js/user.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
 import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
@@ -416,6 +416,13 @@ function mapDBLocalTag(dbLocalTag) {
     }
 }
 
+/**
+ * @param {string} lookupName 
+ */
+function mapLookupNameToSystemTag(lookupName) {
+    return normalPreInsertLocalTag(lookupName, SYSTEM_GENERATED);
+}
+
 export class LocalTags {
     /**
      * @param {Databases} dbs 
@@ -510,6 +517,14 @@ export class LocalTags {
 
     /**
      * @param {Databases} dbs 
+     * @param {string[]} lookupNames 
+     */
+    static async selectManySystemTagsByLookupNames(dbs, lookupNames) {
+        return await LocalTags.selectManyByLookups(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+    }
+
+    /**
+     * @param {Databases} dbs 
      * @param {PreInsertLocalTag[]} localTags 
      * @param {number} localTagServiceID
      * @returns {Promise<DBLocalTag[]>}
@@ -560,6 +575,23 @@ export class LocalTags {
         return (await LocalTags.insertMany(dbs, [localTag], localTagServiceID))[0];
     }
 
+
+    /**
+     * @param {Databases} dbs 
+     * @param {string[]} lookupNames
+     */
+    static async insertManySystemTags(dbs, lookupNames) {
+        return (await LocalTags.insertMany(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID));
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {string} lookupName
+     */
+    static async insertSystemTag(dbs, lookupName) {
+        return (await LocalTags.insertManySystemTags(dbs, [lookupName]))[0];
+    }
+
     /**
      * @param {Databases} dbs 
      * @param {PreInsertLocalTag[]} localTags
@@ -578,6 +610,14 @@ export class LocalTags {
         const insertedDBTags = await LocalTags.insertMany(dbs, tagsToInsert, localTagServiceID); 
 
         return dbLocalTags.concat(insertedDBTags);
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {string[]} lookupNames
+     */
+    static async upsertManySystemTags(dbs, lookupNames) {
+        return await LocalTags.upsertMany(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
     }
 };
 

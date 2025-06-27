@@ -6,6 +6,7 @@ import getMe from '../api/client-get/me.js';
 import { User } from './js/user.js';
 import Page from './page/page.jsx';
 import PageNavbar from './page-navbar.jsx';
+import setUserPages from '../api/client-get/set-user-pages.js';
 
 /** @import {PageType} from "./page/page.jsx" */
 /** @import {ModalOptions} from "./modal/modal.jsx" */
@@ -27,8 +28,8 @@ const App = () => {
     const [activeModals, setActiveModals] = useState([]);
     /** @type {[PageType[], (pages: PageType[]) => void]} */
     const [pages, setPages] = useState([]);
-    /** @type {[number | null, (activePageIndex: number | null) => void]} */
-    const [activePageIndex, setActivePageIndex] = useState(null);
+    /** @type {[number, (activePageIndex: number) => void]} */
+    const [activePageIndex, setActivePageIndex] = useState(-1);
     const [user, setUser] = useState(User.EMPTY_USER);
 
     useEffect(() => {
@@ -36,6 +37,10 @@ const App = () => {
             setUser(await getMe());
         })();
     }, []);
+
+    useEffect(() => {
+        setPages(user.pages());
+    }, [user]);
 
     const pushModal = async (modalName, extraProperties) => {
         return new Promise(resolve => {
@@ -71,12 +76,19 @@ const App = () => {
                     <Navbar setters={setters} states={states} pushModal={pushModal} />
                 </div>
                 <div>
-                    <PageNavbar pages={pages} setActivePageIndex={setActivePageIndex} activePageIndex={activePageIndex}></PageNavbar>
+                    <PageNavbar pages={pages} setPages={async (pages) => {
+                        setPages(pages);
+                        await setUserPages(pages);
+                    }} setActivePageIndex={setActivePageIndex} activePageIndex={activePageIndex}></PageNavbar>
                 </div>
                 <div>
                     {
-                        (activePageIndex !== null)
-                        ? (<Page page={pages[activePageIndex]} user={user} pushModal={pushModal} />)
+                        (pages[activePageIndex] !== undefined)
+                        ? (<Page page={pages[activePageIndex]} user={user} pushModal={pushModal} updatePage={async (page) => {
+                            // no rerender necessary here, just need to push to index to update db
+                            pages[activePageIndex] = page;
+                            await setUserPages(pages);
+                        }} />)
                         : (<></>)
                     }
                 </div>
