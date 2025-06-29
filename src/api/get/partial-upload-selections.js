@@ -3,6 +3,7 @@
  */
 
 import { PERMISSIONS } from "../../client/js/user.js";
+import { PARTIAL_ZIPS_FOLDER } from "../../db/db-util.js";
 import { NOT_A_PARTIAL_UPLOAD } from "../client-get/partial-upload-selections.js";
 import { readdir } from "fs/promises";
 
@@ -17,5 +18,5 @@ export async function checkPermission(dbs, req, res) {
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {
-    res.send([NOT_A_PARTIAL_UPLOAD, ...(await readdir("./partial-zips"))]);
+    res.send([NOT_A_PARTIAL_UPLOAD, ...(await readdir(PARTIAL_ZIPS_FOLDER))]);
 }

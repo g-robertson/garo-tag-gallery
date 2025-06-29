@@ -202,7 +202,6 @@ IdPairInsertReturnType IdPairSecond::insertComplement(uint64_t second) {
 
     return IdPairInsertReturnType {.second = inserted};
 }
-
 bool IdPairSecond::insertComplement_(uint64_t second) {
     if (!isComplement_) {
         throw std::logic_error("insertComplement should only be called on IdPairSecond's who are complemented");
@@ -212,6 +211,17 @@ bool IdPairSecond::insertComplement_(uint64_t second) {
     }
 
     return contents_.insert(second).second;
+}
+
+void IdPairSecond::deleteComplement(uint64_t second) {
+    if (!isComplement_) {
+        throw std::logic_error("deleteComplement should only be called on IdPairSecond's who are complemented");
+    }
+    if (!contents_.contains(second)) {
+        throw std::logic_error("deleteComplement should not be called twice for the same entry");
+    }
+
+    contents_.erase(second);
 }
 
 bool IdPairSecond::contains(uint64_t second) const {
@@ -268,7 +278,7 @@ IdPairInsertReturnType IdPairContainer::insert(std::pair<uint64_t, uint64_t> ite
     }
     // gross implementation detail leakage, FAKER must be allowed regardless of if it is in second universe
     if (!secondUniverse_->contains(item.second) && item.second != 0xFFFFFFFFFFFFFFFFULL) {
-        throw std::logic_error("Second universe must contain second in order to insert");
+        throw std::logic_error(std::string("Second universe must contain second from item (") + std::to_string(item.first) + "," + std::to_string(item.second) + ") in order to insert");
     }
 
     auto firstIt = container_.find(item.first);
@@ -324,6 +334,24 @@ void IdPairContainer::insertComplement(uint64_t second) {
         auto& secondContainer = container_.at(first);
         physicalSize_ -= secondContainer.physicalSize();
         secondContainer.insertComplement(second);
+        physicalSize_ += secondContainer.physicalSize();
+    }
+
+    return;
+}
+
+void IdPairContainer::deleteComplement(uint64_t second) {
+    if (secondUniverse_ == nullptr) {
+        throw std::logic_error("Second universe must exist when using IdPairContainer");
+    }
+    if (firstComplements_.empty()) {
+        return;
+    }
+
+    for (auto first : firstComplements_) {
+        auto& secondContainer = container_.at(first);
+        physicalSize_ -= secondContainer.physicalSize();
+        secondContainer.deleteComplement(second);
         physicalSize_ += secondContainer.physicalSize();
     }
 

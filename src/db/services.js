@@ -1,5 +1,5 @@
 import { PERMISSION_BITS, User } from "../client/js/user.js";
-import {dbget, dbrun} from "./db-util.js";
+import {dbBeginTransaction, dbEndTransaction, dbget, dbrun} from "./db-util.js";
 
 /** @import {PermissionInt} from "../client/js/user.js" */
 /** @import {Databases} from "./db-util.js" */
@@ -92,6 +92,31 @@ export class Services {
 
         return serviceID;
     }
+
+    /**
+     * @param {Databases} dbs
+     * @param {number} serviceID
+     * @param {string} serviceName 
+     */
+    static async update(dbs, serviceID, serviceName) {
+        await dbrun(dbs, `
+            UPDATE Services
+               SET Service_Name = $serviceName
+             WHERE Service_ID = $serviceID;    
+        `, {$serviceID: serviceID, $serviceName: serviceName});
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} serviceID 
+     */
+    static async deleteByID(dbs, serviceID) {
+        dbs = await dbBeginTransaction(dbs);
+        await ServicesUsersPermissions.deleteByServiceID(dbs, serviceID);
+        await dbrun(dbs, "DELETE FROM Services WHERE Service_ID = $serviceID;", { $serviceID: serviceID });
+
+        await dbEndTransaction(dbs);
+    }
 };
 
 export class ServicesUsersPermissions {
@@ -121,6 +146,14 @@ export class ServicesUsersPermissions {
             $userID: userID,
             $permissionExtent: permissionExtent
         });
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} serviceID 
+     */
+    static async deleteByServiceID(dbs, serviceID) {
+        await dbrun(dbs, "DELETE FROM Services_Users_Permissions WHERE Service_ID = $serviceID;", { $serviceID: serviceID });
     }
 };
 

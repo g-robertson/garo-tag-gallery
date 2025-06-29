@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import path from 'path';
-import { serializeUint64 } from '../client/js/client-util.js';
+import { mapNullCoalesce, serializeUint64 } from '../client/js/client-util.js';
 import { Mutex } from 'async-mutex';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { serializeFloat } from '../util.js';
@@ -329,6 +329,26 @@ export default class PerfTags {
 
         await this.__writeToWriteInputFile(PerfTags.#serializeSingles(tags));
         await this.__writeLineToStdin("delete_tags");
+        const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
+        this.#unflushedData = true;
+
+        if (!inTransaction) {
+            this.#writeMutex.release();
+        }
+        return result;
+    }
+    
+    /**
+     * @param {bigint[]} taggables
+     * @param {boolean=} inTransaction
+     */
+    async deleteTaggables(taggables, inTransaction = false) {
+        if (!inTransaction) {
+            await this.#writeMutex.acquire();
+        }
+
+        await this.__writeToWriteInputFile(PerfTags.#serializeSingles(taggables));
+        await this.__writeLineToStdin("delete_taggables");
         const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
         this.#unflushedData = true;
 
@@ -708,10 +728,8 @@ export default class PerfTags {
         const tagPairings = new Map();
         for (const [taggable, tags] of taggablePairings) {
             for (const tag of tags) {
-                if (tagPairings.get(tag) === undefined) {
-                    tagPairings.set(tag, []);
-                }
-                tagPairings.get(tag).push(taggable);
+                const tagPairing = mapNullCoalesce(tagPairings, tag, []);
+                tagPairing.push(taggable);
             }
         }
         return tagPairings;

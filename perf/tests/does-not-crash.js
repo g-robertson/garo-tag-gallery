@@ -142,6 +142,32 @@ const TESTS = {
         await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n]]])));
         perfTags.__kill();
         perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+    },
+    "delete_tag_that_doesnt_exist_should_not_crash": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.deleteTags([1n]);
+    },
+    "delete_taggable_should_delete_all_taggable_pairings_under_transaction": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n,[1n,2n,3n]]
+        ]));
+        const inTransaction = await perfTags.beginTransaction();
+        await perfTags.deleteTaggables([1n], inTransaction);
+        await perfTags.endTransaction();
+        perfTags.__kill();
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        // will crash here if taggable pairings still exist
+        await perfTags.readTagsTaggableCounts([1n]);
+    },
+    "deleting_empty_tags_should_not_crash": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTags([1n,2n,3n]);
+        await perfTags.flushData();
+        perfTags.__kill();
+        perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        // will crash here if deleting tags with no pairings causes crash
+        await perfTags.deleteTags([1n,2n]);
     }
 };
 export default TESTS;

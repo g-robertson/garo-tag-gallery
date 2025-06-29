@@ -26,8 +26,8 @@ export class FileStorage {
         const hashStr = hash.toString("hex");
         const dirUsed = path.join(this.#directory, hashStr.slice(0, 2), hashStr.slice(2, 4));
         const fileEndLocation = path.join(dirUsed, fileName);
-        mkdir(dirUsed, {recursive: true});
-        rename(from, fileEndLocation);
+        await mkdir(dirUsed, {recursive: true});
+        await rename(from, fileEndLocation);
     }
 
     /**

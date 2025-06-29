@@ -39,13 +39,14 @@ const CreateMetricTag = ({user, modalOptions, pushModal, popModal}) => {
     const [localMetricService, setLocalMetricService] = useState(null);
     /** @type {[DBLocalMetric, (localMetric: DBLocalMetric) => void]} */
     const [localMetric, setLocalMetric] = useState(null);
-
+    console.log(localMetricService, localMetric);
     const [metricComparisonValue, setMetricComparisonValue] = useState(0);
 
     return (
         <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
             <LocalMetricSelector user={user} onLocalMetricServiceSelected={(localMetricService => {
                 setLocalMetricService(localMetricService);
+                setLocalMetric(localMetricService.Local_Metrics[0] ?? null);
             })} onLocalMetricSelected={(localMetric => {
                 setLocalMetric(localMetric);
             })} />

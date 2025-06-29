@@ -7,12 +7,13 @@ import path from "path";
 import { rootedPath } from "../../util.js";
 import { z } from "zod";
 import { readdir } from "fs/promises";
+import { PARTIAL_ZIPS_FOLDER } from "../../db/db-util.js";
 
 export async function validate(dbs, req, res) {
     const partialUploadFolder = z.string().nonempty().max(40).safeParse(req?.query?.partialUploadFolder, {path: ["partialUploadFolder"]});
     if (!partialUploadFolder.success) return partialUploadFolder.error.message;
 
-    const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadFolder.data));
+    const partialUploadFolderRootedPath = rootedPath(PARTIAL_ZIPS_FOLDER, path.join(PARTIAL_ZIPS_FOLDER, partialUploadFolder.data));
     if (!partialUploadFolderRootedPath.isRooted) {
         return "partialUploadPath was not rooted in partial-zips";
     }

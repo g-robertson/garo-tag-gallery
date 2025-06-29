@@ -20,6 +20,7 @@ class PairingBucket : public Bucket<std::pair<uint64_t, uint64_t>, IdPairContain
         const IdPairSecond* firstContents(uint64_t first);
         std::size_t startingComplementCount() const;
         void insertComplement(uint64_t second);
+        void deleteComplement(uint64_t second);
     private:
         std::size_t startingComplementCount_;
         const std::unordered_set<uint64_t>* secondUniverse_;

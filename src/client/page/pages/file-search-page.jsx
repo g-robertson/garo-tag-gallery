@@ -54,15 +54,17 @@ const FileSearchPage = ({user, pushModal, existingState, updateExistingStateProp
             <div style={{width: "auto", flex: 3, height: "100%"}}>
                 <LazyThumbnailGallery 
                     taggableIDs={taggableIDs}
-                    onValuesDoubleClicked={(valuesSelected) => {
-                        if (valuesSelected.length > 1) {
+                    realizeSelectedValues={false}
+                    onValuesDoubleClicked={(_, indices, indexClicked) => {
+                        if (indices.length > 1) {
                             pushModal(GALLERY_MODAL_PROPERTIES.modalName, {
-                                taggableIDs: valuesSelected.map(value => Number(value.Taggable_ID))
+                                taggableIDs: indices.map(index => taggableIDs[index]),
+                                initialTaggableID: Number(taggableIDs[indexClicked])
                             });
-                        } else if (valuesSelected.length === 1) {
+                        } else if (indices.length === 1) {
                             pushModal(GALLERY_MODAL_PROPERTIES.modalName, {
                                 taggableIDs,
-                                initialTaggableID: Number(valuesSelected[0].Taggable_ID)
+                                initialTaggableID: Number(taggableIDs[indices[0]])
                             });
                         }
                     }}

@@ -7,6 +7,7 @@ import { PERMISSIONS } from "../../client/js/user.js";
 import { rootedPath } from "../../util.js";
 import path from "path";
 import { z } from "zod";
+import { PARTIAL_ZIPS_FOLDER } from "../../db/db-util.js";
 
 export async function validate(dbs, req, res) {
     const partialUploadSelection = z.string().nonempty().max(120).safeParse(req?.body?.partialUploadSelection, {path: ["partialUploadSelection"]});
@@ -17,13 +18,13 @@ export async function validate(dbs, req, res) {
     /** @type {Express.Multer.File} */
     const file = req.files[0];
 
-    const partialUploadFolderRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadSelection.data));
+    const partialUploadFolderRootedPath = rootedPath(PARTIAL_ZIPS_FOLDER, path.join(PARTIAL_ZIPS_FOLDER, partialUploadSelection.data));
     if (!partialUploadFolderRootedPath.isRooted) {
         return "Partial upload folder was not rooted in partial-zips";
     }
     const partialUploadFolderSafePath = partialUploadFolderRootedPath.safePath;
 
-    const partialUploadFileRootedPath = rootedPath("./partial-zips", path.join(partialUploadFolderSafePath, file.originalname));
+    const partialUploadFileRootedPath = rootedPath(PARTIAL_ZIPS_FOLDER, path.join(partialUploadFolderSafePath, file.originalname));
     if (!partialUploadFileRootedPath.isRooted) {
         return "Partial upload file path was not rooted in partial-zips";
     }

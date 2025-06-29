@@ -4,14 +4,14 @@
 
 import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { LocalMetricServices } from "../../db/metrics.js";
+import { LocalTagServices } from "../../db/tags.js";
 
 export async function validate(dbs, req, res) {
-    const serviceName = z.string().nonempty().max(200).safeParse(req?.body?.serviceName, {path: "serviceName"});
-    if (!serviceName.success) return serviceName.error.message;
+    const localTagServiceID = z.number().nonnegative().safeParse(req?.body?.localTagServiceID, {path: "localTagServiceID"});
+    if (!localTagServiceID.success) return localTagServiceID.error.message;
 
     return {
-        serviceName: serviceName.data
+        localTagServiceID: localTagServiceID.data
     };
 }
 
@@ -23,6 +23,6 @@ export async function checkPermission() {
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
-    await LocalMetricServices.userInsert(dbs, req.user, req.body.serviceName);
-    res.status(200).send("Metric service created");
+    await LocalTagServices.deleteByID(dbs, req.body.localTagServiceID);
+    res.status(200).send("Local tag service deleted");
 }

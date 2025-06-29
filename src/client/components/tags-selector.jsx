@@ -42,7 +42,7 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, onSearchChanged, se
     return (
         <div style={{width: "100%", flexDirection: "column", margin: 4}}>
             Search:
-            <div style={{flex: 1}}>
+            <div style={{flex: "3 0 15%"}}>
                 <LazyTextObjectSelector
                     textObjects={clientSearchQuery}
                     onValuesDoubleClicked={((_, indices) => {
@@ -77,7 +77,7 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, onSearchChanged, se
                     customTitleRealizer={(value) => clientSearchQueryToDisplayName(value)}
                 />
             </div>
-            <div style={{flex: 3}}>
+            <div style={{flex: "3 1 100%", height: "80%"}}>
                 <LocalTagsSelector 
                     localTagServices={user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)}
                     onTagsSelected={(clientQueriesToAdd, isExcludeOn) => {

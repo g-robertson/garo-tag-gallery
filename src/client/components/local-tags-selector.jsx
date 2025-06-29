@@ -68,7 +68,7 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, pushModa
     return (
         <div style={{flexDirection: "column", width: "100%"}}>
             <div>Tag services to view:</div>
-            <div>
+            <div style={{flex: 1, overflowY: "auto"}}>
                 <MultiSelect options={[
                     ...localTagServices.map(localTagService => ({
                         value: localTagService.Local_Tag_Service_ID.toString(),

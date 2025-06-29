@@ -34,8 +34,10 @@ const LazyTextObjectSelector = ({
         valueRealizationRange={Infinity}
         valueRealizationDelay={0}
         customTitleRealizer={customTitleRealizer}
-        itemWidth={"100%"}
-        itemHeight={20}
+        itemProperties={{
+            width: "100%",
+            height: 20
+        }}
         multiSelect={multiSelect ?? false}
         elementsSelectable={elementsSelectable ?? true}
         scrollbarWidth={scrollbarWidth}

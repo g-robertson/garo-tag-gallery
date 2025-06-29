@@ -6,13 +6,14 @@
 /** @import {DBLocalTag} from "./tags.js" */
 
 import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
-import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbtuples, dbvariablelist } from "./db-util.js";
+import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js"
 import { Users } from "./user.js";
 import { LocalTags } from "./tags.js";
 import { Taggables } from "./taggables.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import { createAppliedMetricLookupName, createInLocalMetricServiceLookupName, createLocalMetricLookupName } from "../client/js/metrics.js";
+import { mapNullCoalesce } from "../client/js/client-util.js";
 
 /**
  * @typedef {Object} DBLocalMetricService
@@ -100,6 +101,13 @@ export class LocalMetricServices {
               WHERE LMS.Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)};`, localMetricServiceIDs
         ));
     }
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localMetricServiceID
+     */
+    static async selectByID(dbs, localMetricServiceID) {
+        return (await LocalMetricServices.selectManyByIDs(dbs, [localMetricServiceID]))[0];
+    }
 
     static async selectAll(dbs) {
         return await mapLocalMetricServices(dbs, await dballselect(dbs, `
@@ -173,14 +181,14 @@ export class LocalMetricServices {
 
     /**
      * @param {Databases} dbs
-     * @param {User} user
+     * @param {number} user
      * @param {string} serviceName
      */
-    static async userInsert(dbs, user, serviceName) {
+    static async userInsert(dbs, userID, serviceName) {
         dbs = await dbBeginTransaction(dbs);
 
         const serviceID = await Services.insert(dbs, serviceName);
-        await ServicesUsersPermissions.insert(dbs, serviceID, user.id(), PERMISSION_BITS.ALL);
+        await ServicesUsersPermissions.insert(dbs, serviceID, userID, PERMISSION_BITS.ALL);
 
         /** @type {number} */
         const localMetricServiceID = (await dbget(dbs, `
@@ -196,6 +204,37 @@ export class LocalMetricServices {
         })).Local_Metric_Service_ID;
         
         await LocalTags.insertSystemTag(dbs, createInLocalMetricServiceLookupName(localMetricServiceID));
+
+        await dbEndTransaction(dbs);
+
+        return localMetricServiceID;
+    }
+
+    /**
+     * @param {Databases} dbs
+     * @param {number} localMetricServiceID
+     * @param {string} serviceName
+     */
+    static async update(dbs, localMetricServiceID, serviceName) {
+        const localMetricService = await LocalMetricServices.selectByID(dbs, localMetricServiceID);
+        await Services.update(dbs, localMetricService.Service_ID, serviceName);
+
+        return localMetricServiceID;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localMetricServiceID 
+     */
+    static async deleteByID(dbs, localMetricServiceID) {
+        dbs = await dbBeginTransaction(dbs);
+
+        const localMetricService = await LocalMetricServices.selectByID(dbs, localMetricServiceID);
+
+        await Services.deleteByID(dbs, localMetricService.Service_ID);
+        await LocalMetrics.deleteManyByIDs(dbs, localMetricService.Local_Metrics.map(localMetric => localMetric.Local_Metric_ID));
+        await LocalTags.deleteSystemTag(dbs, createInLocalMetricServiceLookupName(localMetricServiceID));
+        await dbrun(dbs, "DELETE FROM Local_Metric_Services WHERE Local_Metric_Service_ID = $localMetricServiceID;", { $localMetricServiceID: localMetricServiceID });
 
         await dbEndTransaction(dbs);
     }
@@ -302,28 +341,6 @@ export class AppliedMetrics {
 
     /**
      * @param {Databases} dbs 
-     * @param {PreInsertAppliedMetric[]} preInsertAppliedMetrics
-     * @returns {Promise<DBAppliedMetric[]}
-     */
-    static async selectManyByPreInsertAppliedMetrics(dbs, preInsertAppliedMetrics) {
-        if (preInsertAppliedMetrics.length === 0) {
-            return [];
-        }
-        if (preInsertAppliedMetrics.length > 10000) {
-            const slices = await asyncDataSlicer(preInsertAppliedMetrics, 10000, (sliced) => AppliedMetrics.selectManyByPreInsertAppliedMetrics(dbs, sliced));
-            return slices.flat();
-        }
-
-        /** @type {DBAppliedMetric[]} */
-        const dbAppliedMetrics = await dballselect(dbs,
-            `SELECT * FROM Local_Applied_Metrics WHERE Local_Applied_Metric_PK_Hash IN ${dbvariablelist(preInsertAppliedMetrics.length)};`,
-            preInsertAppliedMetrics.map(appliedMetricsPKHash)
-        );
-        return dbAppliedMetrics;
-    }
-
-    /**
-     * @param {Databases} dbs 
      * @param {number} userID 
      * @param {number} localMetricID 
      */
@@ -331,7 +348,19 @@ export class AppliedMetrics {
         return await AppliedMetrics.userSelectManyByLocalMetricIDs(dbs, userID, [localMetricID]);
     }
 
-    
+    /**
+     * @param {Databases} dbs 
+     * @param {number[]} localMetricIDs 
+     */
+    static async selectManyByLocalMetricIDs(dbs, localMetricIDs) {
+        /** @type {DBAppliedMetric[]} */
+        const dbAppliedMetrics = await dballselect(dbs,
+            `SELECT * FROM Local_Applied_Metrics WHERE Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)};`,
+            localMetricIDs
+        );
+        return dbAppliedMetrics;
+    }
+
     /**
      * @param {Databases} dbs 
      * @param {PreparedPreInsertAppliedMetric[]} appliedMetrics
@@ -341,6 +370,7 @@ export class AppliedMetrics {
         if (appliedMetrics.length === 0) {
             return [];
         }
+
         if (appliedMetrics.length > 10000) {
             const slices = await asyncDataSlicer(appliedMetrics, 10000, (sliced) => AppliedMetrics.selectMany(dbs, sliced));
             return slices.flat();
@@ -365,7 +395,7 @@ export class AppliedMetrics {
 
         dbs = await dbBeginTransaction(dbs);
 
-        await LocalTags.insertManySystemTags(dbs, appliedMetrics.map(appliedMetric => createAppliedMetricLookupName(appliedMetric)));
+        await LocalTags.insertManySystemTags(dbs, appliedMetrics.map(createAppliedMetricLookupName));
 
         const appliedMetricsInsertionParams = [];
         for (let i = 0; i < appliedMetrics.length; ++i) {
@@ -387,7 +417,7 @@ export class AppliedMetrics {
             `, appliedMetricsInsertionParams
         );
 
-        dbs = await dbEndTransaction(dbs);
+        await dbEndTransaction(dbs);
 
         return insertedDBAppliedMetrics;
     }
@@ -406,7 +436,6 @@ export class AppliedMetrics {
         const dbAppliedMetricsExisting = new Set(dbAppliedMetrics.map(dbAppliedMetric => dbAppliedMetric.Local_Applied_Metric_PK_Hash));
         const AppliedMetricsToInsert = preparedAppliedMetrics.filter(preparedAppliedMetric => !dbAppliedMetricsExisting.has(preparedAppliedMetric.Local_Applied_Metric_PK_Hash));
         const insertedDBAppliedMetrics = await AppliedMetrics.insertMany(dbs, AppliedMetricsToInsert);
-
         return dbAppliedMetrics.concat(insertedDBAppliedMetrics);
     }
 
@@ -442,29 +471,78 @@ export class AppliedMetrics {
 
     /**
      * @param {Databases} dbs 
+     * @param {Map<bigint, TagMappedDBAppliedMetric[]>} taggableMetricPairings 
+     */
+    static async applyManyMappedToTaggables(dbs, taggableMetricPairings) {
+        if (taggableMetricPairings.size === 0) {
+            return;
+        }
+
+        dbs = await dbBeginTransaction(dbs);
+        /** @type {Set<number>} */
+        const allLocalMetricIDs = new Set();
+        /** @type {Map<number, Set<number>>} */
+        const userIDToLocalMetricIDs = new Map();
+        for (const appliedMetrics of taggableMetricPairings.values()) {
+            for (const appliedMetric of appliedMetrics) {
+                allLocalMetricIDs.add(appliedMetric.Local_Metric_ID);
+                const userLocalMetricIDs = mapNullCoalesce(userIDToLocalMetricIDs, appliedMetric.User_ID, new Set());
+                userLocalMetricIDs.add(appliedMetric.Local_Metric_ID);
+            }
+        }
+        /** @type {Map<number, Map<number, bigint[]>>} */
+        const userIDToOtherAppliedMetricsMap = new Map([...allLocalMetricIDs].map(localMetricID => [localMetricID, []]));
+        for (const [userID, localMetricIDs] of userIDToLocalMetricIDs) {
+            /** @type {Map<number, bigint[]>} */
+            const otherAppliedMetricsMap = new Map([...localMetricIDs].map(localMetricID => [localMetricID, []]));
+            for (const appliedMetric of await AppliedMetrics.tagMapped(dbs, await AppliedMetrics.userSelectManyByLocalMetricIDs(dbs, userID, [...localMetricIDs]))) {
+                otherAppliedMetricsMap.get(appliedMetric.Local_Metric_ID).push(appliedMetric.Local_Applied_Metric_Tag.Tag_ID);
+            }
+            userIDToOtherAppliedMetricsMap.set(userID, otherAppliedMetricsMap);
+        }
+
+        const localMetricMap = new Map((await LocalMetrics.tagMapped(dbs, await LocalMetrics.selectManyByIDs(dbs, [...allLocalMetricIDs]))).map(localMetric => [
+            localMetric.Local_Metric_ID,
+            localMetric
+        ]));
+        const localMetricServiceMap = new Map((await LocalMetricServices.selectManyByLocalMetricIDs(dbs, [...allLocalMetricIDs])).map(localMetricService => [
+            localMetricService.Local_Metric_Service_ID,
+            localMetricService
+        ]))
+
+        // remove pre-existing metric applications of the same type
+        /** @type {Map<bigint, bigint[]>} */
+        const taggableMetricPairingsToRemove = new Map();
+        /** @type {Map<bigint, bigint[]>} */
+        const taggableMetricPairingsToInsert = new Map();
+
+        for (const [taggableID, appliedMetrics] of taggableMetricPairings) {
+            /** @type {bigint[]} */
+            const metricTagIDsToRemove = [];
+            /** @type {bigint[]} */
+            const metricTagIDsToInsert = [];
+            for (const appliedMetric of appliedMetrics) {
+                metricTagIDsToRemove.push(...userIDToOtherAppliedMetricsMap.get(appliedMetric.User_ID).get(appliedMetric.Local_Metric_ID));
+
+                metricTagIDsToInsert.push(appliedMetric.Local_Applied_Metric_Tag.Tag_ID);
+                metricTagIDsToInsert.push(localMetricMap.get(appliedMetric.Local_Metric_ID).Has_Local_Metric_Tag.Tag_ID);
+                metricTagIDsToInsert.push(localMetricServiceMap.get(localMetricMap.get(appliedMetric.Local_Metric_ID).Local_Metric_Service_ID).Has_Metric_From_Local_Metric_Service_Tag.Tag_ID);
+            }
+            taggableMetricPairingsToRemove.set(taggableID, metricTagIDsToRemove);
+            taggableMetricPairingsToInsert.set(taggableID, metricTagIDsToInsert);
+        }
+        await dbs.perfTags.deleteTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggableMetricPairingsToRemove), dbs.inTransaction);
+        await dbs.perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggableMetricPairingsToInsert), dbs.inTransaction);
+        await dbEndTransaction(dbs);
+    }
+
+    /**
+     * @param {Databases} dbs 
      * @param {bigint[]} taggableIDs 
      * @param {TagMappedDBAppliedMetric} appliedMetric 
      */
     static async applyToTaggables(dbs, taggableIDs, appliedMetric) {
-
-        // remove pre-existing metric applications of the same type
-        dbs = await dbBeginTransaction(dbs);
-        const otherAppliedMetrics = await AppliedMetrics.tagMapped(
-            dbs,
-            await AppliedMetrics.userSelectManyByLocalMetricID(dbs, appliedMetric.User_ID, appliedMetric.Local_Metric_ID
-        ));
-        await dbs.perfTags.deleteTagPairings(new Map(otherAppliedMetrics.map(otherAppliedMetric => [otherAppliedMetric.Local_Applied_Metric_Tag.Tag_ID, taggableIDs])), dbs.inTransaction);
-
-        const localHasMetricTag = await LocalMetrics.selectTagMapping(dbs, appliedMetric.Local_Metric_ID);
-        const localMetricService = await LocalMetricServices.selectByLocalMetricID(dbs, appliedMetric.Local_Metric_ID);
-        const localInMetricServiceTag = await LocalMetricServices.selectTagMapping(dbs, localMetricService.Local_Metric_Service_ID); 
-        
-        await dbs.perfTags.insertTagPairings(new Map([
-            [appliedMetric.Local_Applied_Metric_Tag.Tag_ID, taggableIDs],
-            [localHasMetricTag.Tag_ID, taggableIDs],
-            [localInMetricServiceTag.Tag_ID, taggableIDs]
-        ]), dbs.inTransaction);
-        await dbEndTransaction(dbs);
+        await AppliedMetrics.applyManyMappedToTaggables(dbs, new Map(taggableIDs.map(taggableID => [taggableID, [appliedMetric]])));
     }
     
     /**
@@ -474,6 +552,20 @@ export class AppliedMetrics {
      */
     static async applyToTaggable(dbs, taggableID, appliedMetric) {
         await AppliedMetrics.applyToTaggables(dbs, [taggableID], appliedMetric);
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number[]} localMetricIDs 
+     */
+    static async deleteManyByLocalMetricIDs(dbs, localMetricIDs) {
+        dbs = await dbBeginTransaction(dbs);
+
+        const appliedMetrics = await AppliedMetrics.selectManyByLocalMetricIDs(dbs, localMetricIDs);
+        await LocalTags.deleteManySystemTags(dbs, appliedMetrics.map(createAppliedMetricLookupName));
+        await dbrun(dbs, `DELETE FROM Local_Applied_Metrics WHERE Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)}`, localMetricIDs);
+
+        await dbEndTransaction(dbs);
     }
 };
 
@@ -548,6 +640,10 @@ export class LocalMetrics {
         return dbLocalMetrics;
     }
 
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localMetricID 
+     */
     static async selectByID(dbs, localMetricID) {
         return (await LocalMetrics.selectManyByIDs(dbs, [localMetricID]))[0];
     }
@@ -612,5 +708,65 @@ export class LocalMetrics {
         await LocalTags.insertSystemTag(dbs, createLocalMetricLookupName(localMetricID));
 
         await dbEndTransaction(dbs);
+
+        return localMetricID;
+    }
+
+    
+    /**
+     * @param {Databases} dbs
+     * @param {number} localMetricID
+     * @param {PreInsertLocalMetric} preInsertLocalMetric
+     */
+    static async update(dbs, localMetricID, preInsertLocalMetric) {
+        if (!Number.isFinite(preInsertLocalMetric.Local_Metric_Lower_Bound)) {
+            preInsertLocalMetric.Local_Metric_Lower_Bound = null;
+        }
+        if (!Number.isFinite(preInsertLocalMetric.Local_Metric_Upper_Bound)) {
+            preInsertLocalMetric.Local_Metric_Upper_Bound = null;
+        }
+
+        await dbrun(dbs, `
+            UPDATE Local_Metrics
+               SET Local_Metric_Name = $localMetricName,
+                   Local_Metric_Lower_Bound = $localMetricLowerBound,
+                   Local_Metric_Upper_Bound = $localMetricUpperBound,
+                   Local_Metric_Precision = $localMetricPrecision,
+                   Local_Metric_Type = $localMetricType
+             WHERE Local_Metric_ID = $localMetricID;
+        `, {
+            $localMetricID: localMetricID,
+            $localMetricName: preInsertLocalMetric.Local_Metric_Name,
+            $localMetricLowerBound: preInsertLocalMetric.Local_Metric_Lower_Bound,
+            $localMetricUpperBound: preInsertLocalMetric.Local_Metric_Upper_Bound,
+            $localMetricPrecision: preInsertLocalMetric.Local_Metric_Precision,
+            $localMetricType: preInsertLocalMetric.Local_Metric_Type
+        });
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number[]} localMetricIDs 
+     */
+    static async deleteManyByIDs(dbs, localMetricIDs) {
+        if (localMetricIDs.length === 0) {
+            return;
+        }
+
+        dbs = await dbBeginTransaction(dbs);
+
+        await AppliedMetrics.deleteManyByLocalMetricIDs(dbs, localMetricIDs);
+        await LocalTags.deleteManySystemTags(dbs, localMetricIDs.map(createLocalMetricLookupName));
+        await dbrun(dbs, `DELETE FROM Local_Metrics WHERE Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)}`, localMetricIDs);
+
+        await dbEndTransaction(dbs);
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localMetricID  
+     */
+    static async deleteByID(dbs, localMetricID) {
+        return await LocalMetrics.deleteManyByIDs(dbs, [localMetricID]);
     }
 };

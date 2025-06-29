@@ -100,6 +100,10 @@ void TagFileMaintainer::readCacheFile() {
 }
 
 void TagFileMaintainer::writePriorCacheFile() {
+    if (inTransaction) {
+        return;
+    }
+
     util::writeFile(cacheFilePath_, priorCacheFile);
 }
 
@@ -149,22 +153,31 @@ void TagFileMaintainer::insertTaggables(std::string_view input) {
 }
 void TagFileMaintainer::deleteTaggables(std::string_view input) {
     auto deleteTaggable = [this](uint64_t taggable) {
+        if (!taggableBucket_->contains(taggable)) {
+            return;
+        }
+
         auto& taggableTagBucket = getTaggableBucket(taggable);
         const auto* tags = taggableTagBucket.firstContents(taggable);
-        std::vector<std::pair<uint64_t, uint64_t>> taggableTagsToErase;
-        taggableTagsToErase.reserve(tags->size());
+        if (tags != nullptr) {
+            std::vector<std::pair<uint64_t, uint64_t>> taggableTagsToErase;
+            taggableTagsToErase.reserve(tags->size());
 
-        auto insertPairingErasures = [this, &taggableTagsToErase, &taggable](uint64_t tag) {
-            taggableTagsToErase.push_back({taggable, tag});
-        };
-        tags->forEach(insertPairingErasures);
+            auto insertPairingErasures = [this, &taggableTagsToErase, &taggable](uint64_t tag) {
+                taggableTagsToErase.push_back({taggable, tag});
+            };
+            tags->forEach(insertPairingErasures);
 
-        for (const auto& taggableTagToErase : taggableTagsToErase) {
-            taggableTagBucket.deleteItem(taggableTagToErase);
-            getTagBucket(taggableTagToErase.second).deleteItem({taggableTagToErase.second, taggableTagToErase.first});
+            for (const auto& taggableTagToErase : taggableTagsToErase) {
+                taggableTagBucket.deleteItem(taggableTagToErase);
+                getTagBucket(taggableTagToErase.second).deleteItem({taggableTagToErase.second, taggableTagToErase.first});
+            }
         }
 
         taggableBucket_->deleteItem(taggable);
+        for (auto& bucket : tagTaggableBuckets) {
+            bucket.deleteComplement(taggable);
+        }
     };
     
     processSingles(input, deleteTaggable);
@@ -205,23 +218,33 @@ void TagFileMaintainer::insertTags(std::string_view input) {
 }
 void TagFileMaintainer::deleteTags(std::string_view input) {
     auto deleteTag = [this](uint64_t tag) {
+        if (!tagBucket_->contains(tag)) {
+            return;
+        }
+
         auto& tagTaggableBucket = getTagBucket(tag);
         const auto* taggables = tagTaggableBucket.firstContents(tag);
-        std::vector<std::pair<uint64_t, uint64_t>> tagTaggablesToErase;
-        tagTaggablesToErase.reserve(taggables->size());
 
-        auto insertPairingErasures = [this, &tagTaggablesToErase, &tag](uint64_t taggable) {
-            tagTaggablesToErase.push_back({tag, taggable});
-        };
-        taggables->forEach(insertPairingErasures);
+        if (taggables != nullptr) {
+            std::vector<std::pair<uint64_t, uint64_t>> tagTaggablesToErase;
+            tagTaggablesToErase.reserve(taggables->size());
 
-        for (const auto& tagTaggableToErase : tagTaggablesToErase) {
-            tagTaggableBucket.deleteItem(tagTaggableToErase);
-            getTaggableBucket(tagTaggableToErase.second).deleteItem({tagTaggableToErase.second, tagTaggableToErase.first});
+            auto insertPairingErasures = [this, &tagTaggablesToErase, &tag](uint64_t taggable) {
+                tagTaggablesToErase.push_back({tag, taggable});
+            };
+            taggables->forEach(insertPairingErasures);
+            
+            for (const auto& tagTaggableToErase : tagTaggablesToErase) {
+                tagTaggableBucket.deleteItem(tagTaggableToErase);
+                getTaggableBucket(tagTaggableToErase.second).deleteItem({tagTaggableToErase.second, tagTaggableToErase.first});
+            }
         }
 
 
         tagBucket_->deleteItem(tag);
+        for (auto& bucket : taggableTagBuckets) {
+            bucket.deleteComplement(tag);
+        }
     };
 
     processSingles(input, deleteTag);
@@ -741,6 +764,29 @@ void PairingBucket::insertComplement(uint64_t second) {
     }
     contents_.insertComplement(second);
 }
+
+void PairingBucket::deleteComplement(uint64_t second) {
+    if (secondUniverse_->contains(second)) {
+        throw "Second universe contains item we are deleting complement of";
+    }
+    if (startingComplementCount_ != 0) {
+        diffContentsIsDirty_ = true;
+        init();
+    }
+
+    // need to update only the diffs for those that start with complement
+    for (auto first : startingFirstComplements) {
+        util::toggle(diffContents_, std::pair<uint64_t, uint64_t>(first, second));
+    }
+
+    const auto& firstComplements = contents_.firstComplements();
+    if (firstComplements.size() != 0) {
+        contentsIsDirty = true;
+    }
+    contents_.deleteComplement(second);
+
+}
+
 std::size_t PairingBucket::startingComplementCount() const {
     return startingComplementCount_;
 }

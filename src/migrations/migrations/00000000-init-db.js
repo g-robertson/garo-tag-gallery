@@ -23,10 +23,10 @@ export const MIGRATION = {
                 Local_Taggable_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
                 Global_Taggable_Services_Permission INTEGER NOT NULL DEFAULT 0,
                 Global_Taggable_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Local_Rating_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_Rating_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Global_Rating_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Global_Rating_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
+                Local_Metric_Services_Permission INTEGER NOT NULL DEFAULT 0,
+                Local_Metric_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
+                Global_Metric_Services_Permission INTEGER NOT NULL DEFAULT 0,
+                Global_Metric_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
                 Local_Tag_Services_Permission INTEGER NOT NULL DEFAULT 0,
                 Local_Tag_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
                 Global_Tag_Services_Permission INTEGER NOT NULL DEFAULT 0,
@@ -61,10 +61,10 @@ export const MIGRATION = {
                 Local_Taggable_Services_Byte_Transfer_Limit,
                 Global_Taggable_Services_Permission,
                 Global_Taggable_Services_Byte_Transfer_Limit,
-                Local_Rating_Services_Permission,
-                Local_Rating_Services_Byte_Transfer_Limit,
-                Global_Rating_Services_Permission,
-                Global_Rating_Services_Byte_Transfer_Limit,
+                Local_Metric_Services_Permission,
+                Local_Metric_Services_Byte_Transfer_Limit,
+                Global_Metric_Services_Permission,
+                Global_Metric_Services_Byte_Transfer_Limit,
                 Local_Tag_Services_Permission,
                 Local_Tag_Services_Byte_Transfer_Limit,
                 Global_Tag_Services_Permission,
@@ -95,9 +95,9 @@ export const MIGRATION = {
                 NULL,
                 14, /* Global_Taggable_Services_Permission */
                 NULL,
-                14, /* Local_Rating_Services_Permission */
+                14, /* Local_Metric_Services_Permission */
                 NULL,
-                14, /* Global_Rating_Services_Permission */
+                14, /* Global_Metric_Services_Permission */
                 NULL,
                 14, /* Local_Tag_Services_Permission */
                 NULL,

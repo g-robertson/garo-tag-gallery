@@ -47,6 +47,7 @@ class IdPairSecond {
         IdPairInsertReturnType insert(uint64_t second);
         IdPairInsertReturnType erase(uint64_t second);
         IdPairInsertReturnType insertComplement(uint64_t second);
+        void deleteComplement(uint64_t second);
         bool contains(uint64_t second) const;
 
         template <class T>
@@ -97,6 +98,7 @@ class IdPairContainer {
 
         IdPairInsertReturnType insert(std::pair<uint64_t, uint64_t> item);
         void insertComplement(uint64_t second);
+        void deleteComplement(uint64_t second);
         IdPairInsertReturnType erase(std::pair<uint64_t, uint64_t> item);
         bool contains(std::pair<uint64_t, uint64_t> item) const;
         // Gets all second id's associated with first id

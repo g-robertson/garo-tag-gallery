@@ -2,14 +2,14 @@ import sharp from "sharp";
 import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, IS_FILE_TAG, isURLAssociationTagLookupName, normalizeFileExtension,revertURLAssociationTagLookupName,SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
-import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist} from "./db-util.js";
-import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
+import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbtuples, dbvariablelist, TMP_FOLDER} from "./db-util.js";
+import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
 import { LocalTags, UserFacingLocalTags } from "./tags.js";
 import { extractFirstFrameWithFFMPEG, sha256 } from "../util.js";
-import { readFile } from "fs/promises";
-import { AppliedMetrics } from "./metrics.js";
+import { readFile, rm } from "fs/promises";
 import { createInLocalTaggableServiceLookupName, isInLocalTaggableServiceLookupName, revertInLocalTaggableServiceLookupName } from "../client/js/taggables.js";
 import { isAppliedMetricLookupName, revertAppliedMetricLookupName } from "../client/js/metrics.js";
+import path from "path";
 
 /** @import {User} from "../client/js/user.js" */
 /** @import {URLAssociation} from "../client/js/tags.js" */
@@ -23,12 +23,16 @@ import { isAppliedMetricLookupName, revertAppliedMetricLookupName } from "../cli
 /**
  * @typedef {Object} DBLocalTaggableService
  * @property {number} Local_Taggable_Service_ID
- * @property {bigint} In_Local_Taggable_Service_Tag_ID
  */
 
 /**
  * @typedef {DBLocalTaggableService & DBService} DBJoinedLocalTaggableService
  */
+
+/**
+ * @typedef {DBJoinedLocalTaggableService & {In_Local_Taggable_Service_Tag_ID: bigint}} TagMappedDBJoinedLocalTaggableService
+ */
+
 /** @typedef {DBJoinedLocalTaggableService & {Permission_Extent: PermissionInt}} DBPermissionedLocalTaggableService */
 
 export class LocalTaggableServices {
@@ -48,6 +52,18 @@ export class LocalTaggableServices {
         return (await LocalTaggableServices.selectTagMappings(dbs, [localTaggableServiceID]))[0];
     }
 
+    /**
+     * 
+     * @param {Databases} dbs 
+     * @param {DBJoinedLocalTaggableService} localTaggableService 
+     * @returns 
+     */
+    static async tagMap(dbs, localTaggableService) {
+        return {
+            ...localTaggableService,
+            In_Local_Taggable_Service_Tag_ID: (await LocalTaggableServices.selectTagMapping(dbs, localTaggableService.Local_Taggable_Service_ID)).Tag_ID
+        };
+    }
 
     /**
      * @param {Databases} dbs 
@@ -94,6 +110,14 @@ export class LocalTaggableServices {
         );
 
         return localTaggableServices;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localTaggableServiceID
+     */
+    static async selectByID(dbs, localTaggableServiceID) {
+        return (await LocalTaggableServices.selectManyByIDs(dbs, [localTaggableServiceID]))[0];
     }
 
     /**
@@ -174,6 +198,65 @@ export class LocalTaggableServices {
             "Local_Taggable_Service_ID",
             permissionBitsToCheck
         );
+    }
+
+    /**
+     * @param {Databases} dbs
+     * @param {number} userID
+     * @param {string} serviceName
+     */
+    static async userInsert(dbs, userID, serviceName) {
+        dbs = await dbBeginTransaction(dbs);
+
+        const serviceID = await Services.insert(dbs, serviceName);
+        await ServicesUsersPermissions.insert(dbs, serviceID, userID, PERMISSION_BITS.ALL);
+
+        /** @type {number} */
+        const localTaggableServiceID = (await dbget(dbs, `
+            INSERT INTO Local_Taggable_Services(
+                Service_ID
+            ) VALUES (
+                $serviceID
+            ) RETURNING Local_Taggable_Service_ID;
+        `, {
+            $serviceID: serviceID
+        })).Local_Taggable_Service_ID;
+        
+        await LocalTags.insertSystemTag(dbs, createInLocalTaggableServiceLookupName(localTaggableServiceID));
+
+        await dbEndTransaction(dbs);
+
+        return localTaggableServiceID;
+    }
+    
+    /**
+     * @param {Databases} dbs
+     * @param {number} localTaggableServiceID
+     * @param {string} serviceName
+     */
+    static async update(dbs, localTaggableServiceID, serviceName) {
+        const localTaggableService = await LocalTaggableServices.selectByID(dbs, localTaggableServiceID);
+        await Services.update(dbs, localTaggableService.Service_ID, serviceName);
+
+        return localTaggableServiceID;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localTaggableServiceID 
+     */
+    static async deleteByID(dbs, localTaggableServiceID) {
+        dbs = await dbBeginTransaction(dbs);
+
+        const localTaggableService = await LocalTaggableServices.tagMap(dbs, await LocalTaggableServices.selectByID(dbs, localTaggableServiceID));
+        await Services.deleteByID(dbs, localTaggableService.Service_ID);
+
+        const localTaggableServiceTaggables = await Taggables.search(dbs, "", [localTaggableService.In_Local_Taggable_Service_Tag_ID]);
+        await Taggables.deleteManyByIDs(dbs, localTaggableServiceTaggables.map(taggable => taggable.Taggable_ID));
+        await LocalTags.deleteSystemTag(dbs, createInLocalTaggableServiceLookupName(localTaggableServiceID));
+        await dbrun(dbs, "DELETE FROM Local_Taggable_Services WHERE Local_Taggable_Service_ID = $localTaggableServiceID;", { $localTaggableServiceID: localTaggableServiceID });
+
+        await dbEndTransaction(dbs);
     }
 }
 
@@ -310,6 +393,15 @@ export class Taggables {
 
     /**
      * @param {Databases} dbs 
+     * @param {string} searchCriteria 
+     */
+    static async forceSearch(dbs, searchCriteria) {
+        const {taggables} = await dbs.perfTags.search(searchCriteria, dbs.inTransaction);
+        return await Taggables.selectManyByIDs(dbs, taggables);
+    }
+
+    /**
+     * @param {Databases} dbs 
      * @param {string} searchCriteria
      * @param {bigint[]} inLocalTaggableServiceTagIDs
      */
@@ -317,7 +409,7 @@ export class Taggables {
         if (inLocalTaggableServiceTagIDs.length === 0) {
             return [];
         }
-
+        
         let constructedSearch = PerfTags.searchUnion(
             inLocalTaggableServiceTagIDs.map(inLocalTaggableServiceTagID => PerfTags.searchTag(inLocalTaggableServiceTagID))
         );
@@ -326,8 +418,7 @@ export class Taggables {
             constructedSearch = PerfTags.searchIntersect([searchCriteria, constructedSearch])
         }
 
-        const {taggables} = await dbs.perfTags.search(constructedSearch, dbs.inTransaction);
-        return await Taggables.selectManyByIDs(dbs, taggables);
+        return await Taggables.forceSearch(dbs, constructedSearch);
     }
     
     /**
@@ -339,6 +430,29 @@ export class Taggables {
         const taggableServices = await LocalTaggableServices.userSelectAll(dbs, user, PERMISSION_BITS.READ);
         const inLocalTaggableServicesTags = await LocalTaggableServices.selectTagMappings(dbs, taggableServices.map(taggableService => taggableService.Local_Taggable_Service_ID));
         return await Taggables.search(dbs, searchCriteria, inLocalTaggableServicesTags.map(tag => tag.Tag_ID));
+    }
+    
+    /**
+     * @param {Databases} dbs 
+     * @param {bigint[]} taggableIDs 
+     */
+    static async deleteManyByIDs(dbs, taggableIDs) {
+        if (taggableIDs.length === 0) {
+            return;
+        }
+
+        if (taggableIDs.length > 10000) {
+            const slices = await asyncDataSlicer(taggableIDs, 10000, (sliced) => Taggables.deleteManyByIDs(dbs, sliced));
+            return slices.flat();
+        }
+
+        dbs = await dbBeginTransaction(dbs);
+
+        await LocalFiles.deleteManyByTaggableIDs(dbs, taggableIDs);
+        await dbs.perfTags.deleteTaggables(taggableIDs, dbs.inTransaction);
+        await dbrun(dbs, `DELETE FROM Taggables WHERE Taggable_ID IN ${dbvariablelist(taggableIDs.length)}`, taggableIDs.map(Number));
+
+        await dbEndTransaction(dbs);
     }
 }
 
@@ -496,6 +610,19 @@ export class UserFacingLocalFiles {
 
 export class Files {
     /**
+     * @param {Databases} dbs
+     * @param {string} sourceLocation 
+     * @param {Buffer} fileHash 
+     * @param {string} fileExtension 
+     */
+    static getTrueSourceLocation(dbs, sourceLocation, fileHash, fileExtension) {
+        if (sourceLocation === Files.IN_DATABASE_SOURCE_LOCATION) {
+            sourceLocation = dbs.fileStorage.getFilePath(`${fileHash.toString("hex")}${fileExtension}`, fileHash.toString("hex"));
+        }
+        return sourceLocation;
+    }
+
+    /**
      * @param {Databases} dbs 
      * @param {PreInsertFile[]} files
      */
@@ -514,6 +641,8 @@ export class Files {
         return dbFiles;
     }
 
+    static IN_DATABASE_SOURCE_LOCATION = 1n;
+
     /**
      * @param {Databases} dbs 
      * @param {PreInsertFile[]} files 
@@ -526,7 +655,10 @@ export class Files {
             };
         }
 
-        const fileToSourceLocationMap = new Map(files.map(file => [file.File_Hash.toString("hex"), file.sourceLocation]));
+        const fileToSourceLocationMap = new Map(files.map(file => [
+            file.File_Hash.toString("hex"),
+            Files.getTrueSourceLocation(dbs, file.sourceLocation, file.File_Hash, file.File_Extension)
+        ]));
 
         dbs = await dbBeginTransaction(dbs);
 
@@ -546,17 +678,19 @@ export class Files {
                 }
 
                 const sourceLocation = fileToSourceLocationMap.get(file.File_Hash.toString("hex"));
+                let sourceBaseName = path.basename(sourceLocation);
                 /** @type {string} */
                 let sharpSourceLocation;
-                const sharpOutputLocation = `${sourceLocation}.thumb.jpg`
+                let preThumbnailLocation;
+                const sharpOutputLocation = path.join(TMP_FOLDER, `${sourceBaseName}.thumb.jpg`);
                 if (SHARP_IMAGE_EXTENSIONS.indexOf(fileExtension.toLowerCase()) !== -1) {
                     sharpSourceLocation = sourceLocation;
                 } else {
-                    const success = await extractFirstFrameWithFFMPEG(sourceLocation, `${sourceLocation}.prethumb.jpg`);
+                    preThumbnailLocation = path.join(TMP_FOLDER, `/${sourceBaseName}.prethumb.jpg`);
+                    const success = await extractFirstFrameWithFFMPEG(sourceLocation, preThumbnailLocation);
                     if (success) {
-                        prethumbnailHashes[i] = sha256(await readFile(`${sourceLocation}.prethumb.jpg`));
-
-                        sharpSourceLocation = `${sourceLocation}.prethumb.jpg`;
+                        prethumbnailHashes[i] = sha256(await readFile(preThumbnailLocation));
+                        sharpSourceLocation = preThumbnailLocation;
                     }
                 }
 
@@ -571,6 +705,10 @@ export class Files {
                         fileLocation: sharpOutputLocation,
                         hash: sha256(fileContents)
                     };
+                }
+
+                if (preThumbnailLocation !== undefined) {
+                    await rm(preThumbnailLocation, {force: true});
                 }
             })());
         }
@@ -668,6 +806,7 @@ function preparePreInsertLocalFile(preInsertLocalFile, dbFile) {
     };
 }
 
+
 /**
  * @typedef {Object} DBLocalFile
  * @property {number} Local_File_ID
@@ -676,8 +815,12 @@ function preparePreInsertLocalFile(preInsertLocalFile, dbFile) {
  */
 
 /**
+ * @typedef {DBFile & DBLocalFile} DBJoinedLocalFile
+ */
+
+/**
  * @param {DBLocalFile} dbLocalFile 
- * @param {PreparedPreInsertLocalFile} dbFile
+ * @param {DBFile} dbFile
  */
 function mapDBLocalFile(dbLocalFile, dbFile) {
     return {
@@ -704,9 +847,28 @@ export class LocalFiles {
         const dbFileMap = new Map(localFiles.map(dbFile => [dbFile.File_ID, dbFile]));
 
         /** @type {DBLocalFile[]} */
-        const dbLocalFiles = await dballselect(dbs, `SELECT * FROM Local_Files Where Taggable_ID IN ${dbvariablelist(taggables.length)}`, taggables);
+        const dbLocalFiles = await dballselect(dbs, `SELECT * FROM Local_Files WHERE Taggable_ID IN ${dbvariablelist(taggables.length)}`, taggables);
 
         return dbLocalFiles.map(dbLocalFile => mapDBLocalFile(dbLocalFile, dbFileMap.get(dbLocalFile.File_ID)));
+    }
+
+    static async selectManyByHashes(dbs, localFileHashes, inLocalTaggableServiceTagID) {
+        const hasFileHashTags = await LocalTags.selectManySystemTagsByLookupNames(dbs, localFileHashes.map(localFileHash => createHasFileHashLookupName(localFileHash)));
+
+        const {taggables} = await dbs.perfTags.search(PerfTags.searchIntersect([
+            PerfTags.searchTag(inLocalTaggableServiceTagID),
+            PerfTags.searchUnion(hasFileHashTags.map(hasFileHashTag => PerfTags.searchTag(hasFileHashTag.Tag_ID)))
+        ]), dbs.inTransaction);
+
+        /** @type {DBJoinedLocalFile[]} */
+        const dbJoinedLocalFiles = await dballselect(dbs, `
+            SELECT LF.*, F.*
+              FROM Local_Files LF
+              JOIN Files F ON LF.File_ID = F.File_ID
+              WHERE Taggable_ID IN ${dbvariablelist(taggables.length)}
+        `, taggables);
+
+        return dbJoinedLocalFiles.map(dbJoinedLocalFile => mapDBLocalFile(dbJoinedLocalFile, dbJoinedLocalFile));
     }
 
     /**
@@ -764,7 +926,7 @@ export class LocalFiles {
     /**
      * @param {Databases} dbs
      * @param {PreInsertLocalFile[]} preInsertLocalFiles
-     * @param {DBLocalTaggableService} inLocalTaggableServiceTagID
+     * @param {bigint} inLocalTaggableServiceTagID
      */
     static async upsertMany(dbs, preInsertLocalFiles, inLocalTaggableServiceTagID) {
         if (preInsertLocalFiles.length === 0) {
@@ -788,5 +950,13 @@ export class LocalFiles {
             dbLocalFiles: dbLocalFiles.concat(dbLocalFilesInserted),
             finalizeFileMove
         };
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {bigint[]} taggableIDs 
+     */
+    static async deleteManyByTaggableIDs(dbs, taggableIDs) {
+        await dbrun(dbs, `DELETE FROM Local_Files WHERE Taggable_ID IN ${dbvariablelist(taggableIDs.length)}`, taggableIDs.map(Number));
     }
 }

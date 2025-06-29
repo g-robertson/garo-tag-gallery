@@ -1,7 +1,7 @@
 import { SYSTEM_GENERATED, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash, normalPreInsertLocalTag } from "../client/js/tags.js";
-import { PERMISSIONS, User } from "../client/js/user.js";
-import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
-import { userSelectAllSpecificTypedServicesHelper } from "./services.js";
+import { PERMISSION_BITS, PERMISSIONS, User } from "../client/js/user.js";
+import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
+import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
 
 /** @import {DBService} from "./services.js" */
 /** @import {PermissionInt} from "../client/js/user.js" */
@@ -176,6 +176,62 @@ export class LocalTagServices {
 
         return userSelectedPermissionedLocalTagServices.filter(dbLocalTagService => dbLocalTagService.User_Editable !== 0);
     }
+    
+    /**
+     * @param {Databases} dbs
+     * @param {number} userID
+     * @param {string} serviceName
+     */
+    static async userInsert(dbs, userID, serviceName) {
+        dbs = await dbBeginTransaction(dbs);
+
+        const serviceID = await Services.insert(dbs, serviceName);
+        await ServicesUsersPermissions.insert(dbs, serviceID, userID, PERMISSION_BITS.ALL);
+
+        /** @type {number} */
+        const localTagServiceID = (await dbget(dbs, `
+            INSERT INTO Local_Tag_Services(
+                Service_ID
+            ) VALUES (
+                $serviceID
+            ) RETURNING Local_Tag_Service_ID;
+        `, {
+            $serviceID: serviceID
+        })).Local_Tag_Service_ID;
+
+        await dbEndTransaction(dbs);
+
+        return localTagServiceID;
+    }
+    
+    /**
+     * @param {Databases} dbs
+     * @param {number} localTagServiceID
+     * @param {string} serviceName
+     */
+    static async update(dbs, localTagServiceID, serviceName) {
+        const localTagService = await LocalTagServices.selectByID(dbs, localTagServiceID);
+        await Services.update(dbs, localTagService.Service_ID, serviceName);
+
+        return localTagServiceID;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localTagServiceID 
+     */
+    static async deleteByID(dbs, localTagServiceID) {
+        dbs = await dbBeginTransaction(dbs);
+
+        const localTagService = await LocalTagServices.selectByID(dbs, localTagServiceID);
+        await Services.deleteByID(dbs, localTagService.Service_ID);
+
+        const localTagServiceTags = await LocalTags.selectManyByLocalTagServiceID(dbs, localTagServiceID);
+        await LocalTags.deleteMany(dbs, localTagServiceTags);
+        await dbrun(dbs, "DELETE FROM Local_Tag_Services WHERE Local_Tag_Service_ID = $localTagServiceID;", { $localTagServiceID: localTagServiceID });
+
+        await dbEndTransaction(dbs);
+    }
 }
 
 /**
@@ -186,7 +242,7 @@ export class LocalTagServices {
  * @property {string} Lookup_Name
  * @property {string} Source_Name
  * @property {string} Display_Name
- * @property {string} Tag_Name
+ * @property {string} Client_Display_Name
  * @property {string[]} Namespaces
  */
 
@@ -197,7 +253,7 @@ export class LocalTagServices {
 async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
     dbUserFacingLocalTags = dbUserFacingLocalTags.map(dbUserFacingLocalTag => ({
         ...dbUserFacingLocalTag,
-        Tag_Name: dbUserFacingLocalTag.Display_Name,
+        Display_Name: dbUserFacingLocalTag.Display_Name,
         Tag_ID: BigInt(dbUserFacingLocalTag.Tag_ID)
     }));
 
@@ -210,18 +266,18 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
     const {tagsTaggableCounts} = await dbs.perfTags.readTagsTaggableCounts(dbUserFacingLocalTags.map(dbUserFacingLocalTag => dbUserFacingLocalTag.Tag_ID));
 
     return dbUserFacingLocalTags.map(dbUserFacingLocalTag => {
-        let {Display_Name} = dbUserFacingLocalTag;
+        let Client_Display_Name = dbUserFacingLocalTag.Display_Name;
         const Namespaces = tagsNamespaces.get(dbUserFacingLocalTag.Tag_ID);
         if (Namespaces.length === 1) {
-            Display_Name = `${Namespaces[0]}:${Display_Name}`;
+            Client_Display_Name = `${Namespaces[0]}:${Client_Display_Name}`;
         } else if (Namespaces.length > 1) {
-            Display_Name = `multi-namespaced:${Display_Name}`;
+            Client_Display_Name = `multi-namespaced:${Client_Display_Name}`;
         }
 
         return {
             ...dbUserFacingLocalTag,
             Namespaces,
-            Display_Name,
+            Client_Display_Name,
             Tag_Count: tagsTaggableCounts.get(dbUserFacingLocalTag.Tag_ID)
         }
     });
@@ -427,36 +483,6 @@ function mapLookupNameToSystemTag(lookupName) {
 export class LocalTags {
     /**
      * @param {Databases} dbs 
-     * @param {DBLocalTag[]} localTags
-     */
-    static async deleteMany(dbs, localTags) {
-        if (localTags.length === 0) {
-            return;
-        }
-
-        const localTagServices = await LocalTagServices.selectManyByLocalTagIDs(dbs, localTags.map(localTag => localTag.Local_Tag_ID));
-        if (localTagServices.some(localTagService => localTagService.User_Editable === 0)) {
-            throw "Cannot delete tag from local tag service with user editable set to 0";
-        }
-
-        dbs = await dbBeginTransaction();
-
-        await dbs.perfTags.deleteTags(localTags.map(localTag => localTag.Tag_ID), dbs.inTransaction);
-        await dbrun(dbs, `DELETE FROM Local_Tags WHERE Local_Tag_ID IN ${dbvariablelist(localTags.length)}`, localTags.map(localTag => localTag.Local_Tag_ID));
-        await dbrun(dbs, `DELETE FROM Tags WHERE Tag_ID IN ${dbvariablelist(localTags.length)}`, localTags.map(localTag => Number(localTag.Tag_ID)));
-
-        await dbEndTransaction();
-    }
-    /**
-     * @param {Databases} dbs 
-     * @param {DBLocalTag} localTag 
-     */
-    static async delete(dbs, localTag) {
-        return await LocalTags.deleteMany(dbs, [localTag]);
-    }
-
-    /**
-     * @param {Databases} dbs 
      * @param {bigint[]} tagIDs 
      */
     static async selectManyByTagIDs(dbs, tagIDs) {
@@ -488,6 +514,16 @@ export class LocalTags {
      */
     static async selectByID(dbs, localTagID) {
         return (await LocalTags.selectManyByIDs(dbs, [localTagID]))[0];
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localTagServiceID 
+     */
+    static async selectManyByLocalTagServiceID(dbs, localTagServiceID) {
+        /** @type {DBLocalTag[]} */
+        const dbLocalTags = await dballselect(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = $localTagServiceID`, { $localTagServiceID: localTagServiceID});
+        return dbLocalTags.map(mapDBLocalTag);
     }
 
     /**
@@ -620,6 +656,52 @@ export class LocalTags {
     static async upsertManySystemTags(dbs, lookupNames) {
         return await LocalTags.upsertMany(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
     }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {DBLocalTag[]} localTags
+     */
+    static async deleteMany(dbs, localTags) {
+        if (localTags.length === 0) {
+            return;
+        }
+
+        if (localTags.length > 10000) {
+            const slices = await asyncDataSlicer(localTags, 10000, (sliced) => LocalTags.deleteMany(dbs, sliced));
+            slices.flat();
+        }
+
+        dbs = await dbBeginTransaction(dbs);
+
+        await dbs.perfTags.deleteTags(localTags.map(localTag => localTag.Tag_ID), dbs.inTransaction);
+        await dbrun(dbs, `DELETE FROM Local_Tags WHERE Local_Tag_ID IN ${dbvariablelist(localTags.length)}`, localTags.map(localTag => localTag.Local_Tag_ID));
+        await dbrun(dbs, `DELETE FROM Tags WHERE Tag_ID IN ${dbvariablelist(localTags.length)}`, localTags.map(localTag => Number(localTag.Tag_ID)));
+
+        await dbEndTransaction(dbs);
+    }
+    /**
+     * @param {Databases} dbs 
+     * @param {DBLocalTag} localTag 
+     */
+    static async delete(dbs, localTag) {
+        return await LocalTags.deleteMany(dbs, [localTag]);
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {string[]} lookupNames
+     */
+    static async deleteManySystemTags(dbs, lookupNames) {
+        const systemTags = await LocalTags.selectManySystemTagsByLookupNames(dbs, lookupNames);
+        await LocalTags.deleteMany(dbs, systemTags);
+    }
+    /**
+     * @param {Databases} dbs 
+     * @param {string} lookupName
+     */
+    static async deleteSystemTag(dbs, lookupName) {
+        await LocalTags.deleteManySystemTags(dbs, [lookupName]);
+    }
 };
 
 /**
@@ -667,6 +749,11 @@ export class TagsNamespaces {
     static async selectManyMappedByTagIDs(dbs, tagIDs) {
         if (tagIDs.length === 0) {
             return [];
+        }
+
+        if (tagIDs.length > 10000) {
+            const slices = await asyncDataSlicer(tagIDs, 10000, (sliced) => TagsNamespaces.selectManyMappedByTagIDs(dbs, sliced));
+            return slices.flat();
         }
         
         return (await dballselect(dbs, `

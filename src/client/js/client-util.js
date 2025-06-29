@@ -52,6 +52,30 @@ export function randomID(size) {
 const BIG_INT_IDENTIFIER = "BigInt_fuihi873ohr87hnfuidwnfufh3e2oi8fwefa";
 
 /**
+ * @param {string} json 
+ * @returns {any} 
+ */
+export function abjsonParse(json) {
+    const items = [];
+    const itemsStr = json.slice(json.indexOf("[") + 1, json.lastIndexOf("]"));
+    let itemCount = 0;
+    const itemsSplit = itemsStr.split(`"DELIMITER__fuihi873ohr87hnfuidwnfufh3e2oi8fwefa__"`);
+    for (let itemStr of itemsSplit) {
+        ++itemCount;
+        if (itemCount === 1) {
+            itemStr = itemStr.slice(0, itemStr.lastIndexOf(","));
+        } else if (itemCount === itemsSplit.length) {
+            itemStr = itemStr.slice(itemStr.indexOf(",") + 1);
+        } else {
+            itemStr = itemStr.slice(itemStr.indexOf(",") + 1, itemStr.lastIndexOf(","));
+        }
+        items.push(bjsonParse(itemStr));
+    }
+
+    return items;
+}
+
+/**
  * @param {any[]} obj 
  */
 export function* abjsonStringify(obj) {
@@ -59,7 +83,7 @@ export function* abjsonStringify(obj) {
     if (obj.length !== 0) {
         yield bjsonStringify(obj[0]);
         for (const elem of obj.slice(1)) {
-            yield ",";
+            yield `,"DELIMITER__fuihi873ohr87hnfuidwnfufh3e2oi8fwefa__",`;
             yield bjsonStringify(elem);
         }
     }
@@ -168,4 +192,86 @@ export function clamp(number, lower, upper) {
         return upper;
     }
     return number;
+}
+
+/**
+ * @template {Map} T
+ * @param {T} map 
+ * @param {Parameters<Map<number, string>['has']>>[0]} key
+ * @param {ReturnType<T['get']>} value
+ * @returns {ReturnType<T['get']>}
+ */
+export function mapNullCoalesce(map, key, value) {
+    let mapValue = map.get(key);
+    if (mapValue === undefined) {
+        mapValue = value;
+        map.set(key, mapValue);
+    }
+    return mapValue;
+}
+
+/**
+ * @template T
+ */
+export class RealizationArray {
+    /** @type {T[]} */
+    #values = [];
+    /** @type {("filled" | "awaiting" | "empty")[]} */
+    #valueStatuses;
+    /** @type {(() => void)[][]} */
+    #valueOnFillCallbacks = [];
+
+    constructor(length) {
+        this.#valueStatuses = [];
+        for (let i = 0; i < length; ++i) {
+            this.#valueStatuses.push("empty");
+        }
+    }
+    
+    setAwaiting(index) {
+        this.#valueStatuses[index] = "awaiting";
+    }
+
+    set(index, value) {
+        this.#values[index] = value;
+        this.#valueStatuses[index] = "filled";
+        const callbacks = this.#valueOnFillCallbacks[index];
+        if (callbacks === undefined) {
+            return;
+        } else {
+            for (const callback of callbacks) {
+                callback();
+            }
+        }
+    }
+
+    async get(index) {
+        if (this.#valueStatuses[index] === "filled") {
+            return this.#values[index];
+        } else {
+            const getPromise = new Promise(resolve => {
+                this.#valueOnFillCallbacks[index] ??= [];
+                this.#valueOnFillCallbacks[index].push(() => {
+                    resolve(this.#values[index]);
+                });
+                if (this.#valueStatuses[index] === "filled") {
+                    resolve(this.#values[index]);
+                }
+            })
+
+            return getPromise;
+        }
+    }
+
+    getOrUndefined(index) {
+        if (this.#valueStatuses[index] === "filled") {
+            return this.#values[index];
+        } else {
+            return undefined;
+        }
+    }
+
+    getStatus(index) {
+        return this.#valueStatuses[index];
+    }
 }

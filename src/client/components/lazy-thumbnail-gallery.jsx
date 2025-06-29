@@ -14,12 +14,14 @@ const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH
 /**
  * @param {{
  *  taggableIDs: number[]
- *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingLocalFile[]) => void
+ *  realizeSelectedValues: boolean
+ *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingLocalFile[], indices: number[], indexClicked: number) => void
  * }} param0
  */
-const LazyThumbnailGallery = ({taggableIDs, onValuesDoubleClicked}) => {
+const LazyThumbnailGallery = ({taggableIDs, realizeSelectedValues, onValuesDoubleClicked}) => {
     return <LazySelector
         values={taggableIDs}
+        realizeSelectedValues={realizeSelectedValues}
         valuesRealizer={async (values) => {
             const response = await fetch("/api/post/select-user-facing-taggables", {
                 body: JSON.stringify({
@@ -70,10 +72,13 @@ const LazyThumbnailGallery = ({taggableIDs, onValuesDoubleClicked}) => {
         }).join(" ")}
         valueRealizationDelay={25}
         valueRealizationRange={2}
-        itemWidth={THUMB_WIDTH}
-        itemHeight={THUMB_HEIGHT}
-        horizontalMargin={4}
-        verticalMargin={4}
+        realizeMinimumCount={30}
+        itemProperties={{
+            width: THUMB_WIDTH,
+            height: THUMB_HEIGHT,
+            horizontalMargin: 4,
+            verticalMargin: 4
+        }}
         scrollbarIncrement={1}
         preloadRealizedItems={true}
     />

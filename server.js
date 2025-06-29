@@ -13,7 +13,7 @@ import { randomBytes } from 'crypto';
 import { rootedPath } from './src/util.js';
 import multer from 'multer';
 import { FileStorage } from './src/db/file-storage.js';
-import { dbrun } from './src/db/db-util.js';
+import { DATABASE_DIR, dbrun, PARTIAL_ZIPS_FOLDER, TMP_FOLDER } from './src/db/db-util.js';
 import { JobManager } from './src/db/job-manager.js';
 import { Mutex } from "async-mutex";
 import { readdir } from 'fs/promises';
@@ -22,13 +22,14 @@ import { readdir } from 'fs/promises';
 
 const ONE_YEAR = 86400000 * 365;
 
-mkdirSync("database", {recursive: true});
-mkdirSync("partial-zips", {recursive: true});
-mkdirSync("tmp", {recursive: true});
+mkdirSync(DATABASE_DIR, {recursive: true});
+mkdirSync(PARTIAL_ZIPS_FOLDER, {recursive: true});
+mkdirSync(TMP_FOLDER, {recursive: true});
+
 
 async function main() {
   const dbs = {
-    sqlite3: new sqlite3.Database("database/garo.db", err => {
+    sqlite3: new sqlite3.Database(path.join(DATABASE_DIR, "garo.db"), err => {
       if (err) {
         throw `Database failed to initialize: ${err.message}`;
       }
@@ -38,22 +39,22 @@ async function main() {
     // .\perf\perftags.exe database/perf-write-input.txt database/perf-write-output.txt database/perf-read-input.txt database/perf-read-output.txt database/perf-tags
     perfTags: new PerfTags(
       `perf/${PerfTags.EXE_NAME}`,
-      "database/perf-write-input.txt",
-      "database/perf-write-output.txt",
-      "database/perf-read-input.txt",
-      "database/perf-read-output.txt",
-      "database/perf-tags",
+      path.join(DATABASE_DIR, "perf-write-input.txt"),
+      path.join(DATABASE_DIR, "perf-write-output.txt"),
+      path.join(DATABASE_DIR, "perf-read-input.txt"),
+      path.join(DATABASE_DIR, "perf-read-output.txt"),
+      path.join(DATABASE_DIR, "perf-tags"),
       "archive-commands"
     ),
-    fileStorage: new FileStorage("database/file-storage"),
+    fileStorage: new FileStorage(path.join(DATABASE_DIR, "file-storage")),
     jobManager: new JobManager()
   };
 
   dbs.perfTags.__addStderrListener((data) => {
-    appendFileSync("database/perf-tags-stderr.log", data);
+    appendFileSync(path.join(DATABASE_DIR, "perf-tags-stderr.log"), data);
   });
-  //await dbs.fileStorage.extractAllTo("./partial-zips/hydrus import from laptop/export-path/hydrus export");
-  //await dbs.fileStorage.extractAllTo("./partial-zips/hydrus import small/export-path/hydrus export 1024");
+  //await dbs.fileStorage.extractAllTo(path.join(PARTIAL_ZIPS_FOLDER, "hydrus import from laptop/export-path/hydrus export"));
+  //await dbs.fileStorage.extractAllTo(path.join(PARTIAL_ZIPS_FOLDER, "hydrus import small/export-path/hydrus export 1024"));
 
   await dbrun(dbs, "PRAGMA foreign_keys = OFF;");
   await dbrun(dbs, "PRAGMA journal_mode = WAL;");
@@ -182,7 +183,7 @@ async function main() {
 
   app.use(multer({storage: multer.diskStorage({
     destination: function(req, file, cb) {
-      cb(null, "./tmp")
+      cb(null, TMP_FOLDER)
     },
     filename: function(req, file, cb) {
       const uniqueSuffix = randomBytes(16).toString("hex");
@@ -199,7 +200,7 @@ async function main() {
           return res.redirect("/400");
       }
 
-      const partialUploadRootedPath = rootedPath("./partial-zips", path.join("./partial-zips", partialUploadFolder));
+      const partialUploadRootedPath = rootedPath(PARTIAL_ZIPS_FOLDER, path.join(PARTIAL_ZIPS_FOLDER, partialUploadFolder));
       if (!partialUploadRootedPath.isRooted) {
           return res.redirect("/400");
       }
@@ -213,7 +214,7 @@ async function main() {
         return res.redirect("/400");
       }
       req.partialFilePaths = filePaths.map(partialUploadFileName => {
-        const partialUploadFilePath = rootedPath("./partial-zips", path.join(partialUploadPath, partialUploadFileName));
+        const partialUploadFilePath = rootedPath(PARTIAL_ZIPS_FOLDER, path.join(partialUploadPath, partialUploadFileName));
         if (!partialUploadFilePath.isRooted) {
             return res.redirect("/400");
         }

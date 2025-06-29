@@ -4,6 +4,11 @@ import PerfTags from "../perf-tags-binding/perf-tags.js";
 import { FileStorage } from "./file-storage.js";
 import { JobManager } from "./job-manager.js";
 import { Mutex } from "async-mutex";
+import path from "path";
+
+export const DATABASE_DIR = "test-database";
+export const PARTIAL_ZIPS_FOLDER = path.join(DATABASE_DIR, "_partial-zips");
+export const TMP_FOLDER = path.join(DATABASE_DIR, "_tmp");
 
 /**
  * @typedef {0 | 1} DBBoolean

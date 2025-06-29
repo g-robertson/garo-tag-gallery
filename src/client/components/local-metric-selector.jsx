@@ -10,15 +10,17 @@ import LocalMetricServiceSelector from './local-metric-service-selector.jsx';
  *  user: User
  *  onLocalMetricSelected: (localMetric: DBLocalMetric) => void
  *  onLocalMetricServiceSelected: (localMetricService: DBPermissionedLocalMetricService) => void
+ *  defaultLocalMetricService?: DBPermissionedLocalMetricService
+ *  defaultLocalMetric?: DBLocalMetric
  * }} param0
  * @returns s
  */
-const LocalMetricSelector = ({user, onLocalMetricSelected, onLocalMetricServiceSelected}) => {
+const LocalMetricSelector = ({user, onLocalMetricSelected, onLocalMetricServiceSelected, defaultLocalMetricService, defaultLocalMetric}) => {
     onLocalMetricServiceSelected ??= () => {};
     onLocalMetricSelected ??= () => {};
-    const defaultLocalMetricService = user.localMetricServices()[0];
+    defaultLocalMetricService ??= user.localMetricServices()[0];
     const [localMetricService, setLocalMetricService] = useState(defaultLocalMetricService);
-    const defaultLocalMetric = localMetricService?.Local_Metrics?.[0];
+    defaultLocalMetric ??= localMetricService?.Local_Metrics?.[0];
 
     useEffect(() => {
         onLocalMetricSelected(defaultLocalMetric);

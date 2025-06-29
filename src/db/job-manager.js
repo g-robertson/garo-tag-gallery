@@ -5,6 +5,8 @@
  * @property {number=} remainingSubtasks
  */
 
+import { mapNullCoalesce } from "../client/js/client-util.js";
+
 export class Job {
     #generator;
     #durationBetweenTasks;
@@ -89,11 +91,7 @@ export class JobManager {
      * @param {Job} job 
      */
     addJobToRunner(runner, job) {
-        let runnerJobs = this.#runnersJobs.get(runner);
-        if (runnerJobs === undefined) {
-            this.#runnersJobs.set(runner, new Set());
-            runnerJobs = this.#runnersJobs.get(runner);
-        }
+        const runnerJobs = mapNullCoalesce(this.#runnersJobs, runner, new Set());
 
         job.addOnFinishCallback(job => {
             runnerJobs.delete(job);

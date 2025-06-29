@@ -4,7 +4,7 @@
  * @import {DBAppliedMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js"
  */
 
-import { bjsonStringify, replaceObject } from "../../client/js/client-util.js";
+import { bjsonStringify, mapNullCoalesce, replaceObject } from "../../client/js/client-util.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { Taggables } from "../../db/taggables.js";
 import { LocalTags, LocalTagServices, TagsNamespaces } from "../../db/tags.js";
@@ -311,11 +311,7 @@ function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTag
         allLocalTagIDs.add(clientSearchTag.localTagID);
     } else if (clientSearchTag.type === "tagByLookup") {
         const {localTagServiceID, Lookup_Name, Source_Name} = clientSearchTag;
-        let pkHashToTagLookupMap = allTagLookups.get(localTagServiceID);
-        if (pkHashToTagLookupMap === undefined) {
-            pkHashToTagLookupMap = new Map();
-            allTagLookups.set(localTagServiceID, pkHashToTagLookupMap);
-        }
+        const pkHashToTagLookupMap = mapNullCoalesce(allTagLookups, localTagServiceID, new Map());
         pkHashToTagLookupMap.set(localTagsPKHash(Lookup_Name, Source_Name), {Lookup_Name, Source_Name});
     } else if (clientSearchTag.type === "hasLocalMetricID") {
         allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);

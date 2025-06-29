@@ -134,8 +134,10 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
         customTitleRealizer={() => ""}
         valueRealizationDelay={50}
         valueRealizationRange={5}
-        itemWidth={"100%"}
-        itemHeight={"100%"}
+        itemProperties={{
+            width: "100%",
+            height: "100%"
+        }}
         scrollbarIncrement={1}
         scrollbarWidth={0}
         preloadRealizedItems={true}
