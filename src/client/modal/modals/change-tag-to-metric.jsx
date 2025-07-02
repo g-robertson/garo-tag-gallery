@@ -1,11 +1,11 @@
 import '../../global.css';
-import { User } from '../js/user.js';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
 import { useState } from 'react';
 
+/** @import {User} from "../../js/user.js" */
 /** @import {ClientTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 
 /** 

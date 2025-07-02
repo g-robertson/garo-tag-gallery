@@ -45,14 +45,49 @@ const CACHED = new Map([
 
 /**
  * @param {number[]} localTagServiceIDs
+ * @param {number[]?} taggableIDs,
  */
-export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs) {
-    /** @type {number[]} */
-    const localTagServiceIDsUncached = localTagServiceIDs.filter(localTagServiceID => !CACHED.has(localTagServiceID));
-    if (localTagServiceIDsUncached.length !== 0) {
+export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs, taggableIDs) {
+    if (taggableIDs === undefined) {
+        /** @type {number[]} */
+        const localTagServiceIDsUncached = localTagServiceIDs.filter(localTagServiceID => !CACHED.has(localTagServiceID));
+        if (localTagServiceIDsUncached.length !== 0) {
+            const response = await fetch("/api/post/tags-from-local-tag-services", {
+                body: JSON.stringify({
+                    localTagServiceIDs: localTagServiceIDsUncached
+                }),
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                method: "POST"
+            });
+
+            /** @type {ClientTag[]} */
+            const tagsResponse = (await fjsonParse(response)).map(tag => ({
+                localTagID: tag[0],
+                localTagServiceID: tag[1],
+                displayName: tag[2],
+                tagName: tag[3],
+                namespaces: tag[4],
+                tagCount: tag[5]
+            }));
+
+            for (const localTagServiceID of localTagServiceIDsUncached) {
+                CACHED.set(localTagServiceID, []);
+            }
+            for (const tag of tagsResponse) {
+                CACHED.get(tag.localTagServiceID).push(tag);
+            }
+        }
+
+        /** @type {ClientTag[]} */
+        const clientTags = Array.prototype.concat(...localTagServiceIDs.map(localTagServiceID => CACHED.get(localTagServiceID)));
+        return clientTags;
+    } else {
         const response = await fetch("/api/post/tags-from-local-tag-services", {
             body: JSON.stringify({
-                localTagServiceIDs: localTagServiceIDsUncached
+                localTagServiceIDs: localTagServiceIDs.filter(localTagServiceID => localTagServiceID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID),
+                taggableIDs
             }),
             headers: {
               "Content-Type": "application/json",
@@ -69,16 +104,10 @@ export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs) 
             namespaces: tag[4],
             tagCount: tag[5]
         }));
-
-        for (const localTagServiceID of localTagServiceIDsUncached) {
-            CACHED.set(localTagServiceID, []);
-        }
-        for (const tag of tagsResponse) {
-            CACHED.get(tag.localTagServiceID).push(tag);
+        if (localTagServiceIDs.findIndex((localTagServiceID => localTagServiceID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)) === -1) {
+            return tagsResponse;
+        } else {
+            return CACHED.get(SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID).concat(tagsResponse);
         }
     }
-
-    /** @type {ClientTag[]} */
-    const clientTags = Array.prototype.concat(...localTagServiceIDs.map(localTagServiceID => CACHED.get(localTagServiceID)));
-    return clientTags;
 }

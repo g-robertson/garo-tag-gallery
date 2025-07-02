@@ -249,8 +249,9 @@ export class LocalTagServices {
 /**
  * @param {Databases} dbs
  * @param {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} dbUserFacingLocalTags
+ * @param {string=} tagCountSearchCriteria
  */
-async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
+async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags, tagCountSearchCriteria) {
     dbUserFacingLocalTags = dbUserFacingLocalTags.map(dbUserFacingLocalTag => ({
         ...dbUserFacingLocalTag,
         Display_Name: dbUserFacingLocalTag.Display_Name,
@@ -263,7 +264,7 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags) {
         tagsNamespaces.get(Tag_ID).push(Namespace_Name);
     }
 
-    const {tagsTaggableCounts} = await dbs.perfTags.readTagsTaggableCounts(dbUserFacingLocalTags.map(dbUserFacingLocalTag => dbUserFacingLocalTag.Tag_ID));
+    const {tagsTaggableCounts} = await dbs.perfTags.readTagsTaggableCounts(dbUserFacingLocalTags.map(dbUserFacingLocalTag => dbUserFacingLocalTag.Tag_ID), tagCountSearchCriteria);
 
     return dbUserFacingLocalTags.map(dbUserFacingLocalTag => {
         let Client_Display_Name = dbUserFacingLocalTag.Display_Name;
@@ -348,8 +349,9 @@ export class UserFacingLocalTags {
     /**
      * @param {Databases} dbs 
      * @param {number[]} localTagServiceIDs
+     * @param {string=} tagCountSearchCriteria
      */
-    static async selectManyByLocalTagServiceIDs(dbs, localTagServiceIDs) {
+    static async selectManyByLocalTagServiceIDs(dbs, localTagServiceIDs, tagCountSearchCriteria) {
         /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
         const dbUserFacingLocalTags = await dballselect(dbs, `
             SELECT Tag_ID, Local_Tag_ID, Display_Name, Lookup_Name, Source_Name, Local_Tag_Service_ID
@@ -358,7 +360,7 @@ export class UserFacingLocalTags {
             ;`, localTagServiceIDs
         );
 
-        return await mapUserFacingLocalTags(dbs, dbUserFacingLocalTags);
+        return await mapUserFacingLocalTags(dbs, dbUserFacingLocalTags, tagCountSearchCriteria);
     }
 
     /**

@@ -6,7 +6,7 @@ import { JobManager } from "./job-manager.js";
 import { Mutex } from "async-mutex";
 import path from "path";
 
-export const DATABASE_DIR = "test-database";
+export const DATABASE_DIR = "database";
 export const PARTIAL_ZIPS_FOLDER = path.join(DATABASE_DIR, "_partial-zips");
 export const TMP_FOLDER = path.join(DATABASE_DIR, "_tmp");
 

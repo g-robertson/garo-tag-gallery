@@ -15,13 +15,14 @@ import { clientSearchQueryToDisplayName } from '../js/tags.js';
  *  user: User
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  initialSelectedTags?: ClientSearchQuery[]
+ *  taggableIDs?: number[]
  *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery) => void
  *  searchType?: "intersect" | "union"
  *  existingState?: any
  *  updateExistingStateProp: (key: string, value: any) => void
  * }} param0
  */
-const TagsSelector = ({user, pushModal, initialSelectedTags, onSearchChanged, searchType, existingState, updateExistingStateProp}) => {
+const TagsSelector = ({user, pushModal, initialSelectedTags, taggableIDs, onSearchChanged, searchType, existingState, updateExistingStateProp}) => {
     existingState ??= {};
     updateExistingStateProp ??= () => {};
     onSearchChanged ??= () => {};
@@ -80,6 +81,7 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, onSearchChanged, se
             <div style={{flex: "3 1 100%", height: "80%"}}>
                 <LocalTagsSelector 
                     localTagServices={user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)}
+                    taggableIDs={taggableIDs}
                     onTagsSelected={(clientQueriesToAdd, isExcludeOn) => {
                         for (let clientSearchQueryToAdd of clientQueriesToAdd) {
                             /** @type {ClientSearchQuery} */

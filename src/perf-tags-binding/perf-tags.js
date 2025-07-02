@@ -360,11 +360,13 @@ export default class PerfTags {
 
     /**
      * @param {bigint[]} tags 
+     * @param {string=} search
      */
-    async readTagsTaggableCounts(tags) {
+    async readTagsTaggableCounts(tags, search) {
+        search ??= "";
         await this.#readMutex.acquire();
 
-        await this.__writeToReadInputFile(PerfTags.#serializeSingles(tags));
+        await this.__writeToReadInputFile(`${serializeUint64(BigInt(tags.length))}${PerfTags.#serializeSingles(tags)}${search}`);
         await this.__writeLineToStdin("read_tags_taggable_counts");
         const ok = await this.__dataOrTimeout(PerfTags.READ_OK_RESULT, 1000);
         let tagsTaggableCountsStr = await this.__readFromOutputFile();
@@ -439,6 +441,13 @@ export default class PerfTags {
      */
     static searchTag(tag) {
         return `T${PerfTags.#serializeSingles([tag])}`;
+    }
+
+    /**
+     * @param {bigint[]} taggables 
+     */
+    static searchTaggableList(taggables) {
+        return `L${serializeUint64(BigInt(taggables.length))}${PerfTags.#serializeSingles(taggables)}`;
     }
 
     /**

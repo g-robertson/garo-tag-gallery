@@ -1,6 +1,6 @@
 import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../js/tags.js";
 import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
 
@@ -43,6 +43,7 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags, pushModal) {
  * @template {any} [T=ClientTag]
  * @param {{
  *  localTagServices: DBPermissionedLocalTagService[]
+ *  taggableIDs?: number[]
  *  multiSelect?: boolean
  *  excludeable?: boolean
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
@@ -51,7 +52,7 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags, pushModal) {
  *  onTagsSelected?: (tags: T[], isExcludeOn: boolean) => void
  * }} param0
  */
-const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, pushModal, allowSystemTags, valueMappingFunction, onTagsSelected}) => {
+const LocalTagsSelector = ({localTagServices, taggableIDs, multiSelect, excludeable, pushModal, allowSystemTags, valueMappingFunction, onTagsSelected}) => {
     excludeable ??= true;
     multiSelect ??= true;
     allowSystemTags ??= true;
@@ -63,6 +64,14 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, pushModa
     const [tagFilterValue, setTagFilterValue] = useState("");
     /** @type {[boolean, (isExcludeOn: boolean) => void]} */
     const [isExcludeOn, setIsExcludeOn] = useState(false);
+    /** @type {[number[], (localTagServiceIDsSelected: number[]) => void]} */
+    const [localTagServiceIDsSelected, setLocalTagServiceIDsSelected] = useState([]);
+
+    useEffect(() => {
+        (async () => {
+            setTags((await getTagsFromLocalTagServiceIDs(localTagServiceIDsSelected, taggableIDs)).sort((a, b) => b.tagCount - a.tagCount));
+        })();
+    }, [localTagServiceIDsSelected, taggableIDs]);
 
     // TODO: Separate out top half of this from the LazyTextObjectSelector
     return (
@@ -79,7 +88,7 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, pushModa
                         displayName: SYSTEM_LOCAL_TAG_SERVICE.Service_Name
                     }
                 ]} onOptionsChange={async (optionsSelected) => {
-                    setTags((await getTagsFromLocalTagServiceIDs(optionsSelected.map(option => Number(option)))).sort((a, b) => b.tagCount - a.tagCount));
+                    setLocalTagServiceIDsSelected(optionsSelected.map(option => Number(option)));
                 }}/>
             </div>
             Select Tags:
@@ -97,6 +106,10 @@ const LocalTagsSelector = ({localTagServices, multiSelect, excludeable, pushModa
                 <LazyTextObjectSelector
                     textObjects={
                         tags.filter(tag => {
+                            if (tag.tagCount === 0) {
+                                return false;
+                            }
+                            
                             const colonSplitTagFilter = tagFilterValue.split(':');
                             let tagNameMatchedPartsFrom = colonSplitTagFilter.length;
                             for (let i = 0; i < colonSplitTagFilter.length; ++i) {

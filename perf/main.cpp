@@ -114,7 +114,7 @@ int main(int argc, const char** argv) {
         } else if (op == "read_taggables_tags") {
             tfm.readTaggablesTags(input, readOutputFileWriter);
         } else if (op == "read_tags_taggable_counts") {
-            tfm.readTagsTaggableCounts(input, readOutputFileWriter);
+            tfm.readTagsTaggableCountsWithSearch(input, readOutputFileWriter);
         } else if (op == "search") {
             tfm.search(input, readOutputFileWriter);
         } else if (op == "flush_files") {

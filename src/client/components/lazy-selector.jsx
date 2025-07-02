@@ -264,7 +264,6 @@ function LazySelector({
                 });
             }
         }
-
         if (absentValues.length < realizeMinimumCount && !mustDo) {
             return;
         }
@@ -390,25 +389,28 @@ function LazySelector({
         }
     }, [values, shownStartIndex]);
 
+    const realizedValuesRef = useRef(realizedValues);
+    realizedValuesRef.current = realizedValues;
     useEffect(() => {
         preShiftClickIndices.current = null;
         setSelectedIndices(new Set());
         updateLastClickedIndex(null);
 
         ++valuesRealizationSync.current;
-        setRealizedValues({ref: new RealizationArray(values.length)});
+        realizedValuesRef.current = {ref: new RealizationArray(values.length)};
+        setRealizedValues(realizedValuesRef.current);
     }, [values]);
 
     useEffect(() => {
         if (valueRealizationDelay === 0) {
-            realizeItems(selectedIndices, realizedValues.ref, values, shownStartIndex);
+            realizeItems(selectedIndices, realizedValuesRef.current.ref, values, shownStartIndex);
         } else {
-            const timeoutHandle = setTimeout(() => realizeItems(selectedIndices, realizedValues.ref, values, shownStartIndex), valueRealizationDelay);
+            const timeoutHandle = setTimeout(() => realizeItems(selectedIndices, realizedValuesRef.current.ref, values, shownStartIndex), valueRealizationDelay);
             return () => {
                 clearTimeout(timeoutHandle);
             };
         }
-    }, [selectedIndices, shownStartIndex, dimensionsAvailable]);
+    }, [selectedIndices, shownStartIndex, values, dimensionsAvailable]);
 
 
     useEffect(() => {

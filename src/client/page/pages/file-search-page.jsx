@@ -21,7 +21,7 @@ const FileSearchPage = ({user, pushModal, existingState, updateExistingStateProp
     existingState ??= {};
     updateExistingStateProp ??= () => {};
 
-    const [taggableIDs, setTaggableIDs] = useState(existingState?.taggableIDs ?? []);
+    const [taggableIDs, setTaggableIDs] = useState(existingState?.taggableIDs);
     existingState.tagsSelector ??= {};
 
     return (
@@ -29,6 +29,7 @@ const FileSearchPage = ({user, pushModal, existingState, updateExistingStateProp
             <div style={{flex: 1, height: "100%"}}>
                 <TagsSelector
                     user={user}
+                    taggableIDs={taggableIDs}
                     pushModal={pushModal}
                     onSearchChanged={async (clientSearchQuery) => {
                         const response = await fetch("/api/post/search-taggables", {
@@ -53,7 +54,7 @@ const FileSearchPage = ({user, pushModal, existingState, updateExistingStateProp
             </div>
             <div style={{width: "auto", flex: 3, height: "100%"}}>
                 <LazyThumbnailGallery 
-                    taggableIDs={taggableIDs}
+                    taggableIDs={taggableIDs ?? []}
                     realizeSelectedValues={false}
                     onValuesDoubleClicked={(_, indices, indexClicked) => {
                         if (indices.length > 1) {

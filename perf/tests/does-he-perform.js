@@ -964,5 +964,43 @@ const TESTS = {
             throw "Missing taggables from expected set of returned taggables";
         }
     },
+    "tags_taggable_counts_are_correct": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n,[1n,2n,3n]],
+            [2n,[3n,4n,5n]],
+            [3n,[2n,3n]],
+            [4n,[1n]],
+        ]));
+
+        const {tagsTaggableCounts} =await perfTags.readTagsTaggableCounts([1n,2n,3n,4n]);
+        if (tagsTaggableCounts.size !== 4
+         || tagsTaggableCounts.get(1n) !== 3
+         || tagsTaggableCounts.get(2n) !== 3
+         || tagsTaggableCounts.get(3n) !== 2
+         || tagsTaggableCounts.get(4n) !== 1
+        ) {
+            throw "Wrong count of tag with tags taggable counts";
+        }
+    },
+    "tags_taggable_counts_with_search_are_correct": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n,[1n,2n,3n,4n]],
+            [2n,[3n,4n,5n]],
+            [3n,[2n,3n,7n,8n]],
+            [4n,[1n]],
+        ]));
+
+        const {tagsTaggableCounts} = await perfTags.readTagsTaggableCounts([1n,2n,3n,4n], PerfTags.searchUnion([PerfTags.searchTag(3n), PerfTags.searchTag(4n)]));
+        if (tagsTaggableCounts.size !== 4
+         || tagsTaggableCounts.get(1n) !== 3
+         || tagsTaggableCounts.get(2n) !== 1
+         || tagsTaggableCounts.get(3n) !== 4
+         || tagsTaggableCounts.get(4n) !== 1
+        ) {
+            throw "Wrong count of tag with tags taggable counts";
+        }
+    }
 };
 export default TESTS;
