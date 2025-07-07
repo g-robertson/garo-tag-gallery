@@ -158,7 +158,7 @@ const TESTS = {
         perfTags.__kill();
         perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         // will crash here if taggable pairings still exist
-        await perfTags.readTagsTaggableCounts([1n]);
+        await perfTags.readTagGroupsTaggableCounts([[1n]]);
     },
     "deleting_empty_tags_should_not_crash": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);

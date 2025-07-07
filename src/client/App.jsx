@@ -7,6 +7,7 @@ import { User } from './js/user.js';
 import Page from './page/page.jsx';
 import PageNavbar from './page-navbar.jsx';
 import setUserPages from '../api/client-get/set-user-pages.js';
+import { FetchCache } from './js/client-util.js';
 
 /** @import {PageType} from "./page/page.jsx" */
 /** @import {ModalOptions} from "./modal/modal.jsx" */
@@ -31,7 +32,8 @@ const App = () => {
     /** @type {[number, (activePageIndex: number) => void]} */
     const [activePageIndex, setActivePageIndex] = useState(-1);
     const [user, setUser] = useState(User.EMPTY_USER);
-
+    const [fetchCache, setFetchCache] = useState(new FetchCache());
+    fetchCache.rerender = () => {setFetchCache(new FetchCache(fetchCache))};
     useEffect(() => {
         (async () => {
             setUser(await getMe());
@@ -65,7 +67,7 @@ const App = () => {
 
     const mappedModals = activeModals.map((modalOptions, index) => (
         <div style={{pointerEvents: activeModals.length - 1 === index ? "auto" : "none"}}>
-            <Modal modalOptions={modalOptions} pushModal={pushModal} popModal={popModal} user={user} setUser={setUser} index={index} />
+            <Modal fetchCache={fetchCache} modalOptions={modalOptions} pushModal={pushModal} popModal={popModal} user={user} setUser={setUser} index={index} />
         </div>
     ));
 
@@ -84,7 +86,7 @@ const App = () => {
                 <div>
                     {
                         (pages[activePageIndex] !== undefined)
-                        ? (<Page page={pages[activePageIndex]} user={user} pushModal={pushModal} updatePage={async (page) => {
+                        ? (<Page fetchCache={fetchCache} page={pages[activePageIndex]} user={user} pushModal={pushModal} updatePage={async (page) => {
                             // no rerender necessary here, just need to push to index to update db
                             pages[activePageIndex] = page;
                             await setUserPages(pages);

@@ -1,4 +1,5 @@
 import '../../global.css';
+import { FetchCache } from '../../js/client-util.js';
 import { User } from '../js/user.js';
 import { TagSelectorModal } from './tag-selector-modal.jsx';
 
@@ -7,14 +8,16 @@ import { TagSelectorModal } from './tag-selector-modal.jsx';
 /** 
  * @param {{
  *  user: User
+ *  fetchCache: FetchCache
  *  modalOptions: ModalOptions
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  popModal: () => void
  * }}
 */
-const CreateAndSearchGroup = ({user, modalOptions, pushModal, popModal}) => {
+const CreateAndSearchGroup = ({user, fetchCache, modalOptions, pushModal, popModal}) => {
     return (
         <TagSelectorModal
+            fetchCache={fetchCache}
             user={user}
             modalOptions={{
                 ...modalOptions,

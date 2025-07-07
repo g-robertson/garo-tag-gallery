@@ -4,24 +4,21 @@
  * @import {DBAppliedMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js"
  */
 
-import { bjsonStringify, mapNullCoalesce, replaceObject } from "../../client/js/client-util.js";
+import { bjsonStringify, replaceObject } from "../../client/js/client-util.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { Taggables } from "../../db/taggables.js";
 import { LocalTags, LocalTagServices, TagsNamespaces } from "../../db/tags.js";
 import z from "zod";
 import PerfTags from "../../perf-tags-binding/perf-tags.js";
-import { localTagsPKHash, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
+import { IN_TRASH_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import { AppliedMetrics, LocalMetrics, LocalMetricServices } from "../../db/metrics.js";
-import {writeFileSync} from "fs";
 
 const Z_CLIENT_COMPARATOR = z.literal("<").or(z.literal("<=")).or(z.literal(">")).or(z.literal(">="));
 /** @typedef {z.infer<typeof Z_CLIENT_COMPARATOR>} ClientComparator */
 
 const Z_CLIENT_SEARCH_TAG_BY_LOOKUP = z.object({
     type: z.literal("tagByLookup"),
-    Lookup_Name: z.string(),
-    Source_Name: z.string(),
-    localTagServiceID: z.number().nonnegative().refine((localTagServiceID => localTagServiceID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID))
+    Lookup_Name: z.string()
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_BY_LOOKUP>} ClientSearchTagByLookup */
 
@@ -208,7 +205,7 @@ function walkSearchQuery(searchQuery, callback) {
                 walkSearchQuery(condition.expression, callback);
             } else if (condition.type === "is-not-in-tag-list") {
                 for (const clientTag of condition.list) {
-                    walkSearchQuery(clientTag);
+                    walkSearchQuery(clientTag, callback);
                 }
             }
         }
@@ -253,11 +250,10 @@ function dynamicComparison(lhs, comparator, rhs) {
 /**
  * @param {ClientSearchTag} clientSearchTag 
  * @param {Map<number, bigint>} localTagsMap 
- * @param {Map<number, Map<string, bigint>>} tagLookupsMap 
+ * @param {Map<string, bigint[]>} tagLookupsMap 
  * @param {Map<number, DBPermissionedLocalMetricService>} localMetricServicesMap
  * @param {Map<number, bigint>} localMetricsMap
  * @param {Map<number, Map<number, bigint>>} appliedMetricsMap
- * @returns {ClientSearchQuery}
  */
 function transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap) {
     /** @type {bigint} */
@@ -265,7 +261,13 @@ function transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, 
     if (clientSearchTag.type === "tagByLocalTagID") {
         tagID = localTagsMap.get(clientSearchTag.localTagID)
     } else if (clientSearchTag.type === "tagByLookup") {
-        tagID = tagLookupsMap.get(clientSearchTag.localTagServiceID).get(localTagsPKHash(clientSearchTag.Lookup_Name, clientSearchTag.Source_Name));
+        return {
+            type: "union",
+            value: tagLookupsMap.get(clientSearchTag.Lookup_Name).map(tag => ({
+                type: "tag",
+                tagID: tag
+            }))
+        };
     } else if (clientSearchTag.type === "hasLocalMetricID") {
         tagID = localMetricsMap.get(clientSearchTag.Local_Metric_ID);
     } else if (clientSearchTag.type === "inLocalMetricServiceID") {
@@ -304,15 +306,13 @@ function transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, 
  * @param {Set<number>} allLocalTagIDs
  * @param {Set<number>} allLocalMetricIDs
  * @param {Set<number>} allLocalMetricServiceIDs
- * @param {Map<number, Map<string, {Lookup_Name: string, Source_Name: string}>>} allTagLookups 
+ * @param {Set<string>} allTagLookups 
  */
 function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs) {
     if (clientSearchTag.type === "tagByLocalTagID") {
         allLocalTagIDs.add(clientSearchTag.localTagID);
     } else if (clientSearchTag.type === "tagByLookup") {
-        const {localTagServiceID, Lookup_Name, Source_Name} = clientSearchTag;
-        const pkHashToTagLookupMap = mapNullCoalesce(allTagLookups, localTagServiceID, new Map());
-        pkHashToTagLookupMap.set(localTagsPKHash(Lookup_Name, Source_Name), {Lookup_Name, Source_Name});
+        allTagLookups.add(clientSearchTag.Lookup_Name);
     } else if (clientSearchTag.type === "hasLocalMetricID") {
         allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);
     } else if (clientSearchTag.type === "inLocalMetricServiceID") {
@@ -330,7 +330,7 @@ function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTag
 /**
  * @param {ClientSearchQuery} clientSearchQuery 
  * @param {Map<number, bigint>} localTagsMap 
- * @param {Map<number, Map<string, bigint>>} tagLookupsMap
+ * @param {Map<string, bigint[]>} tagLookupsMap
  * @param {Map<number, DBPermissionedLocalMetricService>} localMetricServicesMap
  * @param {Map<number, bigint>} localMetricsMap
  * @param {Map<number, Map<number, bigint>>} appliedMetricsMap
@@ -352,8 +352,14 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
 
             for (const condition of step.conditions) {
                 if (condition.type === "is-not-in-tag-list") {
-                    for (const clientSearchTag of condition.list) {
-                        tagsOfAggregate.delete(transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap).tagID)
+                    for (const transformedClientTag of condition.list) {
+                        if (transformedClientTag.value !== undefined) {
+                            for (const tag of transformedClientTag.value) {
+                                tagsOfAggregate.delete(tag.tagID);
+                            }
+                        } else {
+                            tagsOfAggregate.delete(transformedClientTag.tagID);
+                        }
                     }
                 }
             }
@@ -493,11 +499,16 @@ export async function validate(dbs, req, res) {
     if (!tryClientSearchQuery.success) return tryClientSearchQuery.error.message;
     /** @type {ClientSearchQuery} */
     const clientSearchQuery = tryClientSearchQuery.data;
+    
+    const localTagServiceIDs = z.array(z.number().nonnegative().int()
+        .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
+    ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
+    if (!localTagServiceIDs.success) return localTagServiceIDs.error.message;
 
     /** @type {Set<number>} */
     const allLocalTagIDs = new Set();
-    /** @type {Map<number, Map<string, {Lookup_Name: string, Source_Name: string}>>} */
-    const allTagLookups = new Map();
+    /** @type {Set<string>} */
+    const allTagLookups = new Set();
     
     /** @type {Set<number>} */
     const allLocalMetricIDs = new Set();
@@ -543,8 +554,9 @@ export async function validate(dbs, req, res) {
 
     return {
         clientSearchQuery,
+        localTagServiceIDs: localTagServiceIDs.data,
         allLocalTagIDs: [...allLocalTagIDs],
-        allTagLookups,
+        allTagLookups: [...allTagLookups],
         allLocalMetricIDs: [...allLocalMetricIDs],
         localMetricServicesMap,
         allNamespaceIDs: [...allNamespaceIDs]
@@ -563,7 +575,7 @@ export async function checkPermission(dbs, req, res) {
     const localTagServicesToCheckFromLocalTagIDs = await LocalTagServices.selectManyByLocalTagIDs(dbs, req.body.allLocalTagIDs);
     const localTagServiceIDsToCheck = [...new Set([
         ...localTagServicesToCheckFromLocalTagIDs.map(localTagService => localTagService.Local_Tag_Service_ID),
-        ...req.body.allTagLookups.keys()
+        ...req.body.localTagServiceIDs
     ])].filter(localTagServiceID => localTagServiceID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
     const localTagServices = await LocalTagServices.userSelectManyByIDs(dbs, req.user, PERMISSION_BITS.READ, localTagServiceIDsToCheck);
@@ -578,16 +590,10 @@ export default async function get(dbs, req, res) {
     if (localTagsMap.size !== req.body.allLocalTagIDs.length) {
         return res.status(400).send("One of the local tag IDs sent in did not exist");
     }
-    /** @type {Map<number, Map<string, bigint>} */
-    const tagLookupsMap = new Map();
-    for (const [localTagServiceID, pkHashToTagLookupMap] of req.body.allTagLookups) {
-        tagLookupsMap.set(
-            localTagServiceID,
-            new Map((await LocalTags.selectManyByLookups(dbs, [...pkHashToTagLookupMap.values()], localTagServiceID)).map(dbLocalTag => [
-                dbLocalTag.Local_Tags_PK_Hash,
-                dbLocalTag.Tag_ID
-            ]))
-        );
+    /** @type {Map<string, bigint[]>} */
+    const tagLookupsMap = new Map(req.body.allTagLookups.map(lookupName => [lookupName, []]));
+    for (const dbLocalTag of await LocalTags.selectManyByLookupNames(dbs, req.body.allTagLookups, req.body.localTagServiceIDs)) {
+        tagLookupsMap.get(dbLocalTag.Lookup_Name).push(dbLocalTag.Tag_ID);
     }
 
     const localMetricsMap = new Map((await LocalMetrics.tagMapped(dbs, (await LocalMetrics.selectManyByIDs(dbs, req.body.allLocalMetricIDs)))).map(localMetric => [
@@ -624,7 +630,7 @@ export default async function get(dbs, req, res) {
         const searchCriteria = constructSearchCriteriaFromSearchQuery(searchQuery);
         taggables = await Taggables.searchWithUser(
             dbs,
-            searchCriteria,
+            PerfTags.searchIntersect([PerfTags.searchComplement(PerfTags.searchTag(IN_TRASH_TAG.Tag_ID)), searchCriteria]),
             req.user
         );
     }

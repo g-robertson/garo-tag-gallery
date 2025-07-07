@@ -7,14 +7,16 @@ import { TagSelectorModal } from './tag-selector-modal.jsx';
 /** 
  * @param {{
  *  user: User
+ *  fetchCache: FetchCache
  *  modalOptions: ModalOptions
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  popModal: () => void
  * }}
 */
-const CreateOrSearchGroup = ({user, modalOptions, pushModal, popModal}) => {
+const CreateOrSearchGroup = ({user, fetchCache, modalOptions, pushModal, popModal}) => {
     return (
         <TagSelectorModal
+            fetchCache={fetchCache}
             user={user}
             modalOptions={{
                 ...modalOptions,

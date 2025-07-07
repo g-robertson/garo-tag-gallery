@@ -32,7 +32,7 @@ const UpdateLocalTagService = ({user, setUser, popModal}) => {
             </form>
             <div style={{marginLeft: "8px"}}>
                 <input disabled={selectedLocalTagService === undefined} type="button" value="Delete selected tag service" onClick={() => {
-                    const confirm = window.confirm("Are you sure you want to delete this tag service");
+                    const confirm = window.confirm("Are you sure you want to delete this tag service?\nWARNING: This will remove every tag that exists under this tag service");
                     if (confirm) {
                         (async () => {
                             await deleteLocalTagService(selectedLocalTagService.Local_Tag_Service_ID);

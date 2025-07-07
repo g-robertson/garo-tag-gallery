@@ -1,8 +1,8 @@
 import {dbGenerateAccessKey, dbsqlcommand} from "../../db/db-util.js"
 import { DEFAULT_ADMINISTRATOR_PERMISSION_ID, DEFAULT_ADMINISTRATOR_USER_ID } from "../../db/user.js";
 import { insertsystemtag } from "../../db/tags.js";
-import { DEFAULT_LOCAL_TAG_SERVICE, HAS_NOTES_TAG, HAS_URL_TAG, IS_FILE_TAG, LAST_SYSTEM_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
-import { DEFAULT_LOCAL_TAGGABLE_SERVICE, IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG } from "../../client/js/taggables.js";
+import { DEFAULT_LOCAL_TAG_SERVICE, HAS_NOTES_TAG, HAS_URL_TAG, IN_TRASH_TAG, IS_FILE_TAG, IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG, LAST_SYSTEM_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
+import { DEFAULT_LOCAL_TAGGABLE_SERVICE } from "../../client/js/taggables.js";
 
 const accessKey = dbGenerateAccessKey();
 
@@ -90,37 +90,37 @@ export const MIGRATION = {
             ) VALUES (
                 $defaultAdminPermissionId, /* ID */
                 'Default Administrator Permission Set',
-                4, /* User_Management_Permission */
-                14, /* Local_Taggable_Services_Permission */
+                15, /* User_Management_Permission */
+                15, /* Local_Taggable_Services_Permission */
                 NULL,
-                14, /* Global_Taggable_Services_Permission */
+                15, /* Global_Taggable_Services_Permission */
                 NULL,
-                14, /* Local_Metric_Services_Permission */
+                15, /* Local_Metric_Services_Permission */
                 NULL,
-                14, /* Global_Metric_Services_Permission */
+                15, /* Global_Metric_Services_Permission */
                 NULL,
-                14, /* Local_Tag_Services_Permission */
+                15, /* Local_Tag_Services_Permission */
                 NULL,
-                14, /* Global_Tag_Services_Permission, */
+                15, /* Global_Tag_Services_Permission, */
                 NULL,
-                14, /* Local_Tag_Relations_Services_Permission */
+                15, /* Local_Tag_Relations_Services_Permission */
                 NULL,
-                14, /* Global_Tag_Relations_Services_Permission */
+                15, /* Global_Tag_Relations_Services_Permission */
                 NULL,
-                14, /* Local_URL_Generator_Services_Permission */
+                15, /* Local_URL_Generator_Services_Permission */
                 NULL,
-                14, /* Global_URL_Generator_Services_Permission */
+                15, /* Global_URL_Generator_Services_Permission */
                 NULL,
-                14, /* Local_URL_Classifier_Services_Permission */
+                15, /* Local_URL_Classifier_Services_Permission */
                 NULL,
-                14, /* Global_URL_Classifier_Services_Permission */
+                15, /* Global_URL_Classifier_Services_Permission */
                 NULL,
-                14, /* Local_Parser_Services_Permission */
+                15, /* Local_Parser_Services_Permission */
                 NULL,
-                14, /* Global_Parser_Services_Permission */
+                15, /* Global_Parser_Services_Permission */
                 NULL,
-                6, /* Settings_Permission */
-                4 /* Advanced_Settings_Permission */
+                15, /* Settings_Permission */
+                15 /* Advanced_Settings_Permission */
             );
             `,
             {
@@ -367,6 +367,7 @@ export const MIGRATION = {
                 LocaL_URL_Generator_JSON TEXT NOT NULL
             );
         `),
+        ...insertsystemtag(IN_TRASH_TAG),
         dbsqlcommand(`
             CREATE TABLE Local_URL_Classifier_Services(
                 Local_URL_Classifier_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,

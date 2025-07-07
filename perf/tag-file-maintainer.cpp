@@ -308,49 +308,57 @@ void TagFileMaintainer::deletePairings(std::string_view input) {
     modifyPairings(input, &PairingBucket::deleteItem);
 }
 
-void TagFileMaintainer::readTagsTaggableCountsWithSearch(std::string_view input, void (*writer)(const std::string&)) {
-    uint64_t tagCount = util::deserializeUInt64(input);
+void TagFileMaintainer::readTagGroupsTaggableCountsWithSearch(std::string_view input, void (*writer)(const std::string&)) {
+    uint64_t tagGroupCount = util::deserializeUInt64(input);
     input = input.substr(8);
-    std::unordered_map<uint64_t, uint64_t> tagTaggableCounts;
-    tagTaggableCounts.reserve(tagCount);
-    auto addToTag = [&tagTaggableCounts](uint64_t tag) {
-        if (tagTaggableCounts.contains(tag)) {
-            ++tagTaggableCounts.at(tag);
-        }
-    };
-    for (std::size_t i = 0; i < tagCount; ++i) {
-        auto tag = util::deserializeUInt64(input);
+    std::vector<uint64_t> tagGroupsTaggableCounts;
+    tagGroupsTaggableCounts.resize(tagGroupCount, 0);
+    std::unordered_map<uint64_t, std::vector<std::size_t>> tagToTagGroupIndices;
+    tagToTagGroupIndices.reserve(tagGroupCount);
+
+    for (std::size_t i = 0; i < tagGroupCount; ++i) {
+        auto tagCount = util::deserializeUInt64(input);
         input = input.substr(8);
-        tagTaggableCounts.insert({tag, 0});
+
+        for (std::size_t j = 0; j < tagCount; ++j) {
+            auto tag = util::deserializeUInt64(input);
+            input = input.substr(8);
+            auto tagGroupIndices = tagToTagGroupIndices.find(tag);
+            if (tagGroupIndices == tagToTagGroupIndices.end()) {
+                tagGroupIndices = tagToTagGroupIndices.insert({tag, std::vector<std::size_t>()}).first;
+            }
+            tagGroupIndices->second.push_back(i);
+        }
     }
 
-    if (input.length() == 0) {
-        for (const auto& tagTaggableCount : tagTaggableCounts) {
-            auto tag = tagTaggableCount.first;
-            auto& tagBucket = getTagBucket(tag);
-            const auto* tagsTaggables = tagBucket.firstContents(tag);
-            if (tagsTaggables != nullptr) {
-                tagTaggableCounts[tag] = tagsTaggables->size();
-            }
-        }
-    } else {
-        auto search = search_(input);
-        auto result = search.second.releaseResult();
+    auto search = search_(input);
+    auto result = search.second.releaseResult();
 
-        for (auto taggable : result) {
-            auto& taggableBucket = getTaggableBucket(taggable);
-            const auto* taggablesTags = taggableBucket.firstContents(taggable);
-            if (taggablesTags != nullptr) {
-                taggablesTags->forEach(addToTag);
+    std::unordered_set<std::size_t> tagGroupIndicesToAddTo;
+    auto gatherTagGroupIndices = [&tagToTagGroupIndices, &tagGroupIndicesToAddTo](uint64_t tag) {
+        if (tagToTagGroupIndices.contains(tag)) {
+            for (auto index : tagToTagGroupIndices.at(tag)) {
+                tagGroupIndicesToAddTo.insert(index);
             }
         }
+    };
+    for (auto taggable : result) {
+        auto& taggableBucket = getTaggableBucket(taggable);
+        const auto* taggablesTags = taggableBucket.firstContents(taggable);
+        if (taggablesTags != nullptr) {
+            taggablesTags->forEach(gatherTagGroupIndices);
+        }
+
+        for (auto index : tagGroupIndicesToAddTo) {
+            ++tagGroupsTaggableCounts[index];
+        }
+        tagGroupIndicesToAddTo.clear();
     }
 
     std::string output;
     std::size_t outputIndex = 0;
-    for (const auto& tagTaggableCount : tagTaggableCounts) {
-        util::serializeUInt64(tagTaggableCount.first, output, outputIndex);
-        util::serializeUInt64(tagTaggableCount.second, output, outputIndex);
+    for (const auto& tagGroupTaggableCount : tagGroupsTaggableCounts) {
+        util::serializeUInt64(tagGroupTaggableCount, output, outputIndex);
     }
 
     writer(output);

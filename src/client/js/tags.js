@@ -1,4 +1,7 @@
 import { randomID } from "./client-util.js";
+import { createInLocalTaggableServiceLookupName, DEFAULT_LOCAL_TAGGABLE_SERVICE } from "./taggables.js";
+
+/** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
 
 /**
  * @param {bigint} Tag_ID 
@@ -39,6 +42,16 @@ export const IS_FILE_TAG = createSystemTag(2n, {
     Source_Name: SYSTEM_GENERATED,
     Display_Name: "system:is file",
     Lookup_Name: "system:is file"
+});
+export const IN_TRASH_TAG = createSystemTag(3n, {
+    Source_Name: SYSTEM_GENERATED,
+    Display_Name: "system:in trash",
+    Lookup_Name: "system:in trash"
+});
+export const IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG = createSystemTag(0xFFFEn, {
+    Source_Name: SYSTEM_GENERATED,
+    Display_Name: `system:in local taggable service:${DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_Name}`,
+    Lookup_Name: createInLocalTaggableServiceLookupName(DEFAULT_LOCAL_TAGGABLE_SERVICE.Local_Taggable_Service_ID)
 });
 export const LAST_SYSTEM_TAG = createSystemTag(0xFFFFn, {
     Source_Name: SYSTEM_GENERATED,
@@ -162,5 +175,28 @@ export function clientSearchQueryToDisplayName(clientSearchQuery) {
         return `-${clientSearchQueryToDisplayName(clientSearchQuery.value)}`
     } else {
         return clientSearchQuery.displayName;
+    }
+}
+
+/**
+ * @param {ClientSearchQuery} clientSearchQuery1
+ * @param {ClientSearchQuery} clientSearchQuery2
+ */
+export function isConflictingClientSearchQuery(clientSearchQuery1, clientSearchQuery2) {
+    while (clientSearchQuery1.type === "complement") {
+        clientSearchQuery1 = clientSearchQuery1.value;
+    }
+    while (clientSearchQuery2.type === "complement") {
+        clientSearchQuery2 = clientSearchQuery2.value;
+    }
+
+    if (clientSearchQuery1.type !== clientSearchQuery2.type) {
+        return false;
+    }
+
+    if (clientSearchQuery1.type === "tagByLocalTagID") {
+        return clientSearchQuery1.localTagID === clientSearchQuery2.localTagID;
+    } else if (clientSearchQuery1.type === "tagByLookup") {
+        return clientSearchQuery1.Lookup_Name === clientSearchQuery2.Lookup_Name;
     }
 }

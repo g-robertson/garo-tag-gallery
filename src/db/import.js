@@ -98,8 +98,6 @@ export async function importChunks(dbs, importables) {
 
     /** @type {Map<number, (PreInsertLocalTag & {Namespaces: string[]})[]>} */
     const localTagServiceToAllTags = new Map();
-    /** @type {Set<string>} */
-    const allNamespacesSet = new Set();
     /** @type {Map<bigint, PreInsertLocalFile[]>} */
     const localTaggableServiceToPreInsertLocalFiles = new Map();
     /** @type {PreInsertAppliedMetric[]} */
@@ -116,9 +114,6 @@ export async function importChunks(dbs, importables) {
         }
 
         for (const tag of importable.Tags) {
-            for (const namespace of tag.Namespaces) {
-                allNamespacesSet.add(namespace);
-            }
             const localTagServiceTags = mapNullCoalesce(localTagServiceToAllTags, tag.Local_Tag_Service_ID, []);
             localTagServiceTags.push({
                 Display_Name: tag.Display_Name,
@@ -146,25 +141,18 @@ export async function importChunks(dbs, importables) {
         }
     }
     
-    // upsert namespaces
-    const dbNamespacesMap = new Map((await Namespaces.upsertMany(dbs, [...allNamespacesSet])).map(dbNamespace => [dbNamespace.Namespace_Name, dbNamespace]));
     // upsert tags
     /** @type {Map<number, Map<string, DBLocalTag>>} */
     const dbLocalTagsMap = new Map();
     // upsert tags namespaces
-    /** @type {Map<bigint, Set<number>>} */
+    /** @type {Map<bigint, Set<string>>} */
     const tagsNamespaces = new Map();
     for (const [localTagServiceID, allTags] of localTagServiceToAllTags) {
         const dbLocalTagServiceLocalTagsMap = new Map((await LocalTags.upsertMany(dbs, allTags, localTagServiceID)).map(dbTag => [dbTag.Local_Tags_PK_Hash, dbTag]));
         dbLocalTagsMap.set(localTagServiceID, dbLocalTagServiceLocalTagsMap);
         for (const tag of allTags) {
             const dbTag = dbLocalTagServiceLocalTagsMap.get(localTagsPKHash(tag.Lookup_Name, tag.Source_Name));
-            if (tag.Namespaces.length !== 0) {
-                const tagNamespaces = mapNullCoalesce(tagsNamespaces, dbTag.Tag_ID, new Set());
-                for (const namespace of tag.Namespaces) {
-                    tagNamespaces.add(dbNamespacesMap.get(namespace).Namespace_ID);
-                }
-            }
+            tagsNamespaces.set(dbTag.Tag_ID, new Set(tag.Namespaces));
         }
     }
     await TagsNamespaces.upsertMany(dbs, tagsNamespaces);
@@ -214,7 +202,7 @@ export async function importChunks(dbs, importables) {
     await Taggables.updateManyLastModifiedDates(dbs, lastModifiedDatePairings);
     await Taggables.updateManyLastViewedDates(dbs, lastViewedDatePairings);
     await Taggables.updateManyDeletedDates(dbs, deletedDatePairings);
-    await Tags.upsertMappedToTaggables(dbs, PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
+    await Tags.upsertTagPairingsToTaggables(dbs, PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
     await AppliedMetrics.applyManyMappedToTaggables(dbs, taggableMetricPairings);
     for (const finalizeFileMove of finalizeFileMoves) {
         await finalizeFileMove();

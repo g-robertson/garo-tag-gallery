@@ -211,31 +211,31 @@ export function mapNullCoalesce(map, key, value) {
 }
 
 /**
- * @template T
+ * @template K, V
  */
-export class RealizationArray {
-    /** @type {T[]} */
-    #values = [];
-    /** @type {("filled" | "awaiting" | "empty")[]} */
-    #valueStatuses;
-    /** @type {(() => void)[][]} */
-    #valueOnFillCallbacks = [];
-
-    constructor(length) {
-        this.#valueStatuses = [];
-        for (let i = 0; i < length; ++i) {
-            this.#valueStatuses.push("empty");
-        }
-    }
+export class RealizationMap {
+    /** @type {Map<K, T>} */
+    #values = new Map();
+    /** @type {Map<string, "filled" | "awaiting">} */
+    #valueStatuses = new Map();
+    /** @type {Map<K, (() => void)[]>} */
+    #valueOnFillCallbacks = new Map();
     
-    setAwaiting(index) {
-        this.#valueStatuses[index] = "awaiting";
+    /**
+     * @param {K} key 
+     */
+    setAwaiting(key) {
+        this.#valueStatuses.set(key, "awaiting");
     }
 
-    set(index, value) {
-        this.#values[index] = value;
-        this.#valueStatuses[index] = "filled";
-        const callbacks = this.#valueOnFillCallbacks[index];
+    /**
+     * @param {K} key 
+     * @param {V} value
+     */
+    set(key, value) {
+        this.#values.set(key, value);
+        this.#valueStatuses.set(key, "filled");
+        const callbacks = this.#valueOnFillCallbacks.get(key);
         if (callbacks === undefined) {
             return;
         } else {
@@ -245,17 +245,20 @@ export class RealizationArray {
         }
     }
 
-    async get(index) {
-        if (this.#valueStatuses[index] === "filled") {
-            return this.#values[index];
+    /**
+     * @param {K} key 
+     */
+    async get(key) {
+        if (this.#valueStatuses.get(key) === "filled") {
+            return this.#values.get(key);
         } else {
             const getPromise = new Promise(resolve => {
-                this.#valueOnFillCallbacks[index] ??= [];
-                this.#valueOnFillCallbacks[index].push(() => {
-                    resolve(this.#values[index]);
+                mapNullCoalesce(this.#valueOnFillCallbacks, key, []);
+                this.#valueOnFillCallbacks.get(key).push(() => {
+                    resolve(this.#values.get(key));
                 });
-                if (this.#valueStatuses[index] === "filled") {
-                    resolve(this.#values[index]);
+                if (this.#valueStatuses.get(key) === "filled") {
+                    resolve(this.#values.get(key));
                 }
             })
 
@@ -263,15 +266,100 @@ export class RealizationArray {
         }
     }
 
-    getOrUndefined(index) {
-        if (this.#valueStatuses[index] === "filled") {
-            return this.#values[index];
+    /**
+     * @param {K} key 
+     */
+    getOrUndefined(key) {
+        if (this.#valueStatuses.get(key) === "filled") {
+            return this.#values.get(key);
         } else {
             return undefined;
         }
     }
 
-    getStatus(index) {
-        return this.#valueStatuses[index];
+    /**
+     * @param {K} key 
+     */
+    getStatus(key) {
+        return this.#valueStatuses.get(key) ?? "empty";
+    }
+
+    size() {
+        return this.#valueStatuses.size;
+    }
+}
+
+/**
+ * @template T
+ * @param {Set<T>[]} sets 
+ */
+export function setIntersect(sets) {
+    if (sets.length === 0) {
+        return new Set();
+    }
+
+    const intersection = new Set(sets[0]);
+    for (let i = 1; i < sets.length; ++i) {
+        const set = sets[i];
+        for (const item of intersection) {
+            if (!set.has(item)) {
+                intersection.delete(item);
+            }
+        }
+    }
+
+    return intersection;
+}
+
+/**
+ * @template K, V
+ * @param {Map<K, V>[]} maps 
+ */
+export function mapUnion(maps) {
+    if (maps.length === 0) {
+        return new Map();
+    }
+
+    const union = new Map(maps[0]);
+    for (let i = 1; i < maps.length; ++i) {
+        const map = maps[i];
+        for (const [key, value] of map) {
+            union.set(key, value);
+        }
+    }
+    
+    return union;
+}
+
+const ENDPOINTS = Object.freeze({
+    "tags-from-local-tag-services": 0,
+    "search-taggables": 0
+});
+
+export class FetchCache {
+    /** @type {Map<keyof ENDPOINTS, RealizationMap<string, any>>} */
+    #cache;
+    rerender = () => {};
+
+    constructor() {
+        this.#generateTagsCache();
+    }
+
+    #generateTagsCache() {
+        this.#cache = new Map(Object.keys(ENDPOINTS).map(endpoint => [
+            endpoint,
+            new RealizationMap()
+        ]));
+    }
+
+    regenerateTagsCache() {
+        this.rerender();
+    }
+
+    /**
+     * @param {keyof ENDPOINTS} cache 
+     */
+    cache(cache) {
+        return this.#cache.get(cache);
     }
 }

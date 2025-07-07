@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { LocalMetricServices } from "../../db/metrics.js";
+import { LocalTagServices } from "../../db/tags.js";
 
 export async function validate(dbs, req, res) {
     const serviceName = z.string().nonempty().max(200).safeParse(req?.body?.serviceName, {path: "serviceName"});
@@ -23,6 +23,6 @@ export async function checkPermission() {
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
-    await LocalMetricServices.userInsert(dbs, req.user.id(), req.body.serviceName);
-    res.status(200).send("Local metric service created");
+    await LocalTagServices.userInsert(dbs, req.user.id(), req.body.serviceName);
+    res.status(200).send("Local tag service created");
 }

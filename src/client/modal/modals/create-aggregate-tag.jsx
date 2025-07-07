@@ -85,11 +85,11 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                                 }
                             } else if (tagGroup.type === "namespace") {
                                 const tagsFromNamespaces = await getTagsFromNamespaceID(tagGroup.namespaceID);
-                                for (const tag of tagsFromNamespaces) {
+                                for (const tagGroup of tagsFromNamespaces) {
                                     tags.push({
-                                        type: "tagByLocalTagID",
-                                        localTagID: tag.localTagID,
-                                        displayName: tag.displayName
+                                        type: "tagByLookup",
+                                        Lookup_Name: tagGroup.tagName,
+                                        displayName: tagGroup.displayName
                                     });
                                 }
                             }

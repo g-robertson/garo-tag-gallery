@@ -1,3 +1,4 @@
+import { mapNullCoalesce } from "../client/js/client-util.js";
 import { SYSTEM_GENERATED, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash, normalPreInsertLocalTag } from "../client/js/tags.js";
 import { PERMISSION_BITS, PERMISSIONS, User } from "../client/js/user.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
@@ -242,13 +243,20 @@ export class LocalTagServices {
  * @property {string} Lookup_Name
  * @property {string} Source_Name
  * @property {string} Display_Name
- * @property {string} Client_Display_Name
+ */
+
+/**
+ * @typedef {Object} UserFacingLocalTagGroup
  * @property {string[]} Namespaces
+ * @property {string} Client_Display_Name
+ * @property {string} Lookup_Name
+ * @property {number} Tag_Count
+ * @property {UserFacingLocalTag[]} tags
  */
 
 /**
  * @param {Databases} dbs
- * @param {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} dbUserFacingLocalTags
+ * @param {Omit<UserFacingLocalTag, "Namespaces" | "Client_Display_Name">[]} dbUserFacingLocalTags
  * @param {string=} tagCountSearchCriteria
  */
 async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags, tagCountSearchCriteria) {
@@ -264,24 +272,36 @@ async function mapUserFacingLocalTags(dbs, dbUserFacingLocalTags, tagCountSearch
         tagsNamespaces.get(Tag_ID).push(Namespace_Name);
     }
 
-    const {tagsTaggableCounts} = await dbs.perfTags.readTagsTaggableCounts(dbUserFacingLocalTags.map(dbUserFacingLocalTag => dbUserFacingLocalTag.Tag_ID), tagCountSearchCriteria);
-
-    return dbUserFacingLocalTags.map(dbUserFacingLocalTag => {
-        let Client_Display_Name = dbUserFacingLocalTag.Display_Name;
+    /** @type {Map<string, UserFacingLocalTagGroup>} */
+    const userFacingTagGroups = new Map();
+    for (const dbUserFacingLocalTag of dbUserFacingLocalTags) {
         const Namespaces = tagsNamespaces.get(dbUserFacingLocalTag.Tag_ID);
+        let Client_Display_Name = dbUserFacingLocalTag.Display_Name;
         if (Namespaces.length === 1) {
             Client_Display_Name = `${Namespaces[0]}:${Client_Display_Name}`;
         } else if (Namespaces.length > 1) {
             Client_Display_Name = `multi-namespaced:${Client_Display_Name}`;
         }
 
-        return {
-            ...dbUserFacingLocalTag,
+        const tagGroupName = `${Namespaces.join('\x01')}\x02${dbUserFacingLocalTag.Lookup_Name}`;
+        const tagGroup = mapNullCoalesce(userFacingTagGroups, tagGroupName, {
             Namespaces,
             Client_Display_Name,
-            Tag_Count: tagsTaggableCounts.get(dbUserFacingLocalTag.Tag_ID)
-        }
-    });
+            Lookup_Name: dbUserFacingLocalTag.Lookup_Name,
+            tags: []
+        });
+        
+        tagGroup.tags.push(dbUserFacingLocalTag);
+    }
+
+    const tagGroups = [...userFacingTagGroups.values()];
+    const tagGroupTagIDs = tagGroups.map(tagGroup => tagGroup.tags.map(tag => tag.Tag_ID));
+    const {tagGroupsTaggableCounts} = await dbs.perfTags.readTagGroupsTaggableCounts(tagGroupTagIDs, tagCountSearchCriteria);
+
+    return tagGroups.map((tagGroup, index) => ({
+        ...tagGroup,
+        Tag_Count: tagGroupsTaggableCounts[index]
+    }));
 }
 
 export class UserFacingLocalTags {
@@ -289,9 +309,10 @@ export class UserFacingLocalTags {
      * @param {Databases} dbs 
      * @param {bigint[]} taggableIDs 
      * @param {number[]} localTagServiceIDs 
+     * @param {string=} tagCountSearchCriteria
      */
-    static async selectMappedByTaggableIDs(dbs, taggableIDs, localTagServiceIDs) {
-        /** @type {Map<bigint, UserFacingLocalTag[]>} */
+    static async selectMappedByTaggableIDs(dbs, taggableIDs, localTagServiceIDs, tagCountSearchCriteria) {
+        /** @type {Map<bigint, Awaited<ReturnType<UserFacingLocalTags.selectManyByTagIDs>>>} */
         const taggablesUserFacingLocalTags = new Map(taggableIDs.map(taggableID => [taggableID, []]));
         if (localTagServiceIDs.length === 0) {
             return taggablesUserFacingLocalTags;
@@ -304,14 +325,19 @@ export class UserFacingLocalTags {
                 allTagIDs.add(tagID);
             }
         }
-
-        const userFacingLocalTags = await UserFacingLocalTags.selectManyByTagIDs(dbs, allTagIDs, localTagServiceIDs);
-        const userFacingLocalTagsMap = new Map(userFacingLocalTags.map(userFacingLocalTag => [userFacingLocalTag.Tag_ID, userFacingLocalTag]));
+        
+        const userFacingLocalTags = await UserFacingLocalTags.selectManyByTagIDs(dbs, allTagIDs, localTagServiceIDs, tagCountSearchCriteria);
+        const userFacingLocalTagsMap = new Map();
+        for (const userFacingLocalTag of userFacingLocalTags) {
+            for (const tag of userFacingLocalTag.tags) {
+                userFacingLocalTagsMap.set(tag.Tag_ID, userFacingLocalTag);
+            }
+        }
 
         for (const [taggableID, tagIDs] of taggablePairings) {
-            taggablesUserFacingLocalTags.set(taggableID, tagIDs.map(
+            taggablesUserFacingLocalTags.set(taggableID, [...new Set(tagIDs.map(
                 tagID => userFacingLocalTagsMap.get(tagID)
-            ).filter(tag => tag !== undefined));
+            ).filter(tag => tag !== undefined))]);
         }
 
         return taggablesUserFacingLocalTags;
@@ -367,17 +393,18 @@ export class UserFacingLocalTags {
      * @param {Databases} dbs 
      * @param {Iterable<bigint>} tagIDsIterable 
      * @param {number[]} localTagServiceIDs
-     * @returns {Promise<UserFacingLocalTag[]>}
+     * @param {string=} tagCountSearchCriteria
+     * @returns {ReturnType<typeof mapUserFacingLocalTags>}
      */
     // TODO: this could be sped up by using a select all with limit cache if the count of tag id's is not too many but not too few (ie. 10K < x < 10M)
-    static async selectManyByTagIDs(dbs, tagIDsIterable, localTagServiceIDs) {
+    static async selectManyByTagIDs(dbs, tagIDsIterable, localTagServiceIDs, tagCountSearchCriteria) {
         const tagIDs = [...tagIDsIterable].map(tagID => Number(tagID));
 
         if (tagIDs.length === 0 || localTagServiceIDs.length === 0) {
             return [];
         }
         if (tagIDs.length > 10000) {
-            const slices = await asyncDataSlicer(tagIDs, 10000, (sliced) => UserFacingLocalTags.selectManyByTagIDs(dbs, sliced, localTagServiceIDs));
+            const slices = await asyncDataSlicer(tagIDs, 10000, (sliced) => UserFacingLocalTags.selectManyByTagIDs(dbs, sliced, localTagServiceIDs, tagCountSearchCriteria));
             return slices.flat();
         }
 
@@ -388,7 +415,7 @@ export class UserFacingLocalTags {
             WHERE Tag_ID IN ${dbvariablelist(tagIDs.length)}
             AND Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
         `, [...tagIDs, ...localTagServiceIDs]);
-        return await mapUserFacingLocalTags(dbs, dbUserFacingLocalTags);
+        return await mapUserFacingLocalTags(dbs, dbUserFacingLocalTags, tagCountSearchCriteria);
     }
 };
 
@@ -413,8 +440,20 @@ export class Tags {
      * @param {Databases} dbs
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
-    static async upsertMappedToTaggables(dbs, tagPairings) {
+    static async upsertTagPairingsToTaggables(dbs, tagPairings) {
         const ok = await dbs.perfTags.insertTagPairings(tagPairings, dbs.inTransaction);
+        if (!ok) {
+            console.log(dbs.perfTags);
+            throw "Perf tags failed to insert tag pairings";
+        }
+    }
+
+    /**
+     * @param {Databases} dbs
+     * @param {Map<bigint, bigint[]>} tagPairings 
+     */
+    static async deleteTagPairingsFromTaggables(dbs, tagPairings) {
+        const ok = await dbs.perfTags.deleteTagPairings(tagPairings, dbs.inTransaction);
         if (!ok) {
             console.log(dbs.perfTags);
             throw "Perf tags failed to insert tag pairings";
@@ -533,7 +572,7 @@ export class LocalTags {
      * @param {{Lookup_Name: string, Source_Name: string}[]} tagLookups 
      * @param {number} localTagServiceID
      */
-    static async selectManyByLookups(dbs, tagLookups, localTagServiceID) {
+    static async selectManyByFullLookups(dbs, tagLookups, localTagServiceID) {
         if (tagLookups.length === 0) {
             return [];
         }
@@ -544,14 +583,26 @@ export class LocalTags {
         const dbLocalTags = await dballselect(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = ? AND Local_Tags_PK_Hash IN ${dbvariablelist(tagPKHashes.length)};`, [localTagServiceID, ...tagPKHashes]);
         return dbLocalTags.map(mapDBLocalTag);
     }
-
+    
     /**
      * @param {Databases} dbs 
-     * @param {{Lookup_Name: string, Source_Name: string}} tagLookup
-     * @param {number} localTagServiceID
+     * @param {string[]} lookupNames 
+     * @param {number[]} localTagServiceIDs
      */
-    static async selectByLookup(dbs, tagLookup, localTagServiceID) {
-        return (await LocalTags.selectManyByLookups(dbs, [tagLookup], localTagServiceID))[0];
+    static async selectManyByLookupNames(dbs, lookupNames, localTagServiceIDs) {
+        if (lookupNames.length === 0 || localTagServiceIDs.length === 0) {
+            return [];
+        }
+
+        /** @type {DBLocalTag[]} */
+        const dbLocalTags = await dballselect(dbs, `
+            SELECT *
+              FROM Local_Tags
+             WHERE Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)}
+               AND Lookup_Name IN ${dbvariablelist(lookupNames.length)};`,
+            [...localTagServiceIDs, ...lookupNames]
+        );
+        return dbLocalTags.map(mapDBLocalTag);
     }
 
     /**
@@ -559,7 +610,7 @@ export class LocalTags {
      * @param {string[]} lookupNames 
      */
     static async selectManySystemTagsByLookupNames(dbs, lookupNames) {
-        return await LocalTags.selectManyByLookups(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        return await LocalTags.selectManyByFullLookups(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
     }
 
     /**
@@ -569,11 +620,17 @@ export class LocalTags {
      * @returns {Promise<DBLocalTag[]>}
      */
     static async insertMany(dbs, localTags, localTagServiceID) {
+        if (typeof localTagServiceID !== "number") {
+            throw "Tag insert call had non-numeric local tag service ID";
+        }
+
         if (localTags.length === 0) {
             return [];
         }
         if (localTags.length > 2000) {
+            dbs = await dbBeginTransaction(dbs);
             const slices = await asyncDataSlicer(localTags, 2000, (sliced) => LocalTags.insertMany(dbs, sliced, localTagServiceID));
+            await dbEndTransaction(dbs);
             return slices.flat();
         }
 
@@ -643,7 +700,7 @@ export class LocalTags {
         // dedupe
         localTags = [...(new Map(localTags.map(tag => [localTagsPKHash(tag.Lookup_Name, tag.Source_Name), tag]))).values()];
 
-        const dbLocalTags = await LocalTags.selectManyByLookups(dbs, localTags, localTagServiceID);
+        const dbLocalTags = await LocalTags.selectManyByFullLookups(dbs, localTags, localTagServiceID);
         const dbLocalTagsExisting = new Set(dbLocalTags.map(dbTag => dbTag.Local_Tags_PK_Hash));
         const tagsToInsert = localTags.filter(localTag => !dbLocalTagsExisting.has(localTagsPKHash(localTag.Lookup_Name, localTag.Source_Name)));
         const insertedDBTags = await LocalTags.insertMany(dbs, tagsToInsert, localTagServiceID); 
@@ -669,8 +726,9 @@ export class LocalTags {
         }
 
         if (localTags.length > 10000) {
-            const slices = await asyncDataSlicer(localTags, 10000, (sliced) => LocalTags.deleteMany(dbs, sliced));
-            slices.flat();
+            dbs = await dbBeginTransaction(dbs);
+            await asyncDataSlicer(localTags, 10000, (sliced) => LocalTags.deleteMany(dbs, sliced));
+            await dbEndTransaction(dbs);
         }
 
         dbs = await dbBeginTransaction(dbs);
@@ -833,16 +891,33 @@ export class TagsNamespaces {
 
     /**
      * @param {Databases} dbs 
-     * @param {Map<bigint, Iterable<number>>} tagNamespacePairings 
+     * @param {Map<bigint, Iterable<string>>} tagNamespacePairings 
      */
     static async upsertMany(dbs, tagNamespacePairings) {
+        if (tagNamespacePairings.size === 0) {
+            return [];
+        }
+
+        /** @type {Set<string>} */
+        const allNamespaces = new Set();
+
+        for (const Namespace_Names of tagNamespacePairings.values()) {
+            for (const Namespace_Name of Namespace_Names) {
+                allNamespaces.add(Namespace_Name);
+            }
+        }
+        const namespaceMap = new Map((await Namespaces.upsertMany(dbs, [...allNamespaces])).map(dbNamespace => [
+            dbNamespace.Namespace_Name,
+            dbNamespace.Namespace_ID
+        ]));
+
         /** @type {PreparedPreInsertTagNamespace[]} */
         let preparedTagsNamespaces = [];
-        for (const [Tag_ID, Namespace_IDs] of tagNamespacePairings) {
-            for (const Namespace_ID of Namespace_IDs) {
+        for (const [Tag_ID, Namespace_Names] of tagNamespacePairings) {
+            for (const Namespace_Name of Namespace_Names) {
                 preparedTagsNamespaces.push(TagsNamespaces.preparePreInsert({
                     Tag_ID,
-                    Namespace_ID
+                    Namespace_ID: namespaceMap.get(Namespace_Name)
                 }));
             }
         }

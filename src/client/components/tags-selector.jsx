@@ -5,24 +5,26 @@ import { PERMISSION_BITS, User } from '../js/user.js';
 import { CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES } from '../modal/modals/create-or-search-group.jsx';
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
 import LocalTagsSelector, { MAP_TO_CLIENT_SEARCH_QUERY } from './local-tags-selector.jsx';
-import { clientSearchQueryToDisplayName } from '../js/tags.js';
+import { clientSearchQueryToDisplayName, isConflictingClientSearchQuery, SYSTEM_LOCAL_TAG_SERVICE } from '../js/tags.js';
+import { FetchCache } from '../js/client-util.js';
 
-/** @import {ClientTag} from "./local-tags-selector.jsx" */
 /** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
+/** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
 
 /**
  * @param {{
+ *  fetchCache: FetchCache
  *  user: User
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  initialSelectedTags?: ClientSearchQuery[]
  *  taggableIDs?: number[]
- *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery) => void
+ *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery, localTagServiceIDs: number[]) => void
  *  searchType?: "intersect" | "union"
  *  existingState?: any
  *  updateExistingStateProp: (key: string, value: any) => void
  * }} param0
  */
-const TagsSelector = ({user, pushModal, initialSelectedTags, taggableIDs, onSearchChanged, searchType, existingState, updateExistingStateProp}) => {
+const TagsSelector = ({fetchCache, user, pushModal, initialSelectedTags, taggableIDs, onSearchChanged, searchType, existingState, updateExistingStateProp}) => {
     existingState ??= {};
     updateExistingStateProp ??= () => {};
     onSearchChanged ??= () => {};
@@ -31,14 +33,23 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, taggableIDs, onSear
     /** @type {[ClientSearchQuery[], (clientSearchQuery: ClientSearchQuery[]) => void]} */
     const [clientSearchQuery, setClientSearchQuery] = useState(existingState.clientSearchQuery ?? initialSelectedTags ?? []);
     useEffect(() => {updateExistingStateProp("clientSearchQuery", clientSearchQuery);}, [clientSearchQuery]);
-    
+
+    const localTagServicesAvailable = [SYSTEM_LOCAL_TAG_SERVICE].concat(
+        user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)
+    );
+
+    /** @type {number[]} */
+    let defaultLocalTagServiceIDsSelected = existingState.localTagServiceIDsSelected ?? localTagServicesAvailable.map(localTagService => localTagService.Local_Tag_Service_ID);
+    defaultLocalTagServiceIDsSelected = defaultLocalTagServiceIDsSelected.filter(localTagServiceID => localTagServicesAvailable.some(localTagService => localTagService.Local_Tag_Service_ID === localTagServiceID));
+    const [localTagServiceIDsSelected, setLocalTagServiceIDsSelected] = useState(defaultLocalTagServiceIDsSelected);
+    useEffect(() => {updateExistingStateProp("localTagServiceIDsSelected", localTagServiceIDsSelected);}, [localTagServiceIDsSelected]);
 
     useEffect(() => {
         onSearchChanged({
             type: searchType,
             value: clientSearchQuery
-        });
-    }, [clientSearchQuery]);
+        }, localTagServiceIDsSelected);
+    }, [clientSearchQuery, localTagServiceIDsSelected]);
 
     return (
         <div style={{width: "100%", flexDirection: "column", margin: 4}}>
@@ -80,8 +91,13 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, taggableIDs, onSear
             </div>
             <div style={{flex: "3 1 100%", height: "80%"}}>
                 <LocalTagsSelector 
-                    localTagServices={user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)}
+                    fetchCache={fetchCache}
+                    localTagServices={localTagServicesAvailable}
+                    onLocalTagServiceIDsChanged={localTagServiceIDs => {
+                        setLocalTagServiceIDsSelected(localTagServiceIDs);
+                    }}
                     taggableIDs={taggableIDs}
+                    defaultLocalTagServiceIDsSelected={defaultLocalTagServiceIDsSelected}
                     onTagsSelected={(clientQueriesToAdd, isExcludeOn) => {
                         for (let clientSearchQueryToAdd of clientQueriesToAdd) {
                             /** @type {ClientSearchQuery} */
@@ -91,11 +107,9 @@ const TagsSelector = ({user, pushModal, initialSelectedTags, taggableIDs, onSear
                                     value: clientSearchQueryToAdd
                                 };
                             }
+
                             const sameItemIndex = clientSearchQuery.findIndex(clientSearchQuery => {
-                                if (clientSearchQuery.type === "tagByLocalTagID" && clientSearchQuery.localTagID === clientSearchQueryToAdd.localTagID) {
-                                    return true;
-                                }
-                                if (clientSearchQuery.type === "complement" && clientSearchQuery.value.type === "tagByLocalTagID" && clientSearchQuery.value.localTagID === clientSearchQueryToAdd.localTagID) {
+                                if (isConflictingClientSearchQuery(clientSearchQuery, clientSearchQueryToAdd)) {
                                     return true;
                                 }
                                 return false;

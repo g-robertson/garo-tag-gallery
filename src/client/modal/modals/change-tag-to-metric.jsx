@@ -4,32 +4,34 @@ import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
 import { useState } from 'react';
+import { FetchCache } from '../../js/client-util.js';
 
 /** @import {User} from "../../js/user.js" */
-/** @import {ClientTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
+/** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 
 /** 
  * @param {{
+ *  fetchCache: FetchCache
  *  user: User
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  popModal: () => void
  * }}
 */
-const ChangeTagToMetric = ({user, pushModal, popModal}) => {
-    /** @type {[null | ClientTag, (tag: null | ClientTag) => void]} */
+const ChangeTagToMetricModal = ({fetchCache, user, pushModal, popModal}) => {
+    /** @type {[null | ClientQueryTag, (tag: null | ClientQueryTag) => void]} */
     const [tag, setTag] = useState(null);
     const tags = tag === null ? [] : [tag];
     const [successMessage, setSuccessMessage] = useState("");
 
     return (
         <div style={{width: "100%", flexDirection: "column"}}>
-            <div style={{flex: 4, margin: 8}}>
+            <div style={{flex: "4 1 100%", margin: 8}}>
                 <LocalTagsSelector
+                    fetchCache={fetchCache}
                     localTagServices={user.localTagServices()}
                     multiSelect={false}
                     excludeable={false}
                     pushModal={pushModal}
-                    allowSystemTags={false}
                     onTagsSelected={(tags) => {
                         setTag(tags[0]);
                     }}
@@ -61,7 +63,7 @@ const ChangeTagToMetric = ({user, pushModal, popModal}) => {
     );
 };
 
-export default ChangeTagToMetric;
+export default ChangeTagToMetricModal;
 
 export const MODAL_PROPERTIES = {
     modalName: "change-tag-to-metric",

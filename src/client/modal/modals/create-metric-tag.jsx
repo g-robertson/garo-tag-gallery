@@ -39,7 +39,6 @@ const CreateMetricTag = ({user, modalOptions, pushModal, popModal}) => {
     const [localMetricService, setLocalMetricService] = useState(null);
     /** @type {[DBLocalMetric, (localMetric: DBLocalMetric) => void]} */
     const [localMetric, setLocalMetric] = useState(null);
-    console.log(localMetricService, localMetric);
     const [metricComparisonValue, setMetricComparisonValue] = useState(0);
 
     return (

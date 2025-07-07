@@ -2,50 +2,58 @@ import { useEffect, useState } from 'react';
 import '../global.css';
 
 /**
+ * @template T
  * @typedef {Object} MultiSelectOption
- * @property {string} value
+ * @property {T} value
  * @property {string} displayName
  */
 
 /**
+ * @template T
  * @param {{
- *  options: MultiSelectOption[]
- *  defaultOptionsSelected?: string[]
- *  onOptionsChange?: (optionsSelected: string[]) => void
+ *  options: MultiSelectOption<T>[]
+ *  defaultOptionsSelected?: T[]
+ *  onOptionsChange?: (optionsSelected: T[]) => void
  * }} param0
  * @returns
  */
 const MultiSelect = ({options, defaultOptionsSelected, onOptionsChange}) => {
-    defaultOptionsSelected ??= options.map(option => option.value);
+    defaultOptionsSelected ??= []
     onOptionsChange ??= () => {};
-    const [optionsSelected, setOptionsSelected] = useState(new Set(defaultOptionsSelected));
-    const allOptionsSelected = optionsSelected.size === options.length;
+    const [optionIndicesSelected, setOptionIndicesSelected] = useState(new Set(defaultOptionsSelected.map(value => {
+        const index = options.findIndex(option => option.value === value);
+        if (index === -1) {
+            throw `Value ${value} from defaultOptionSelected cannot be found in options array`;
+        }
+        return index;
+    })));
+    const allOptionsSelected = optionIndicesSelected.size === options.length;
 
     useEffect(() => {
-        onOptionsChange([...optionsSelected]);
-    }, [optionsSelected])
+        onOptionsChange([...optionIndicesSelected].map(index => options[index].value));
+    }, [optionIndicesSelected]);
     return (
         <div style={{flexDirection: "column"}} class="multiselect">
             <div>
                 <input type="checkbox" checked={allOptionsSelected} onClick={(e) => {
                     if (e.currentTarget.checked) {
-                        setOptionsSelected(new Set(options.map(option => option.value)));
+                        setOptionIndicesSelected(new Set(options.map((_, index) => index)));
                     } else {
-                        setOptionsSelected(new Set());
+                        setOptionIndicesSelected(new Set());
                     }
                 }}/>
                 All
             </div>
-            {options.map(option => (
+            {options.map((option, index) => (
                 <div class="multiselect-option">
-                    <input type="checkbox" checked={optionsSelected.has(option.value)} class="multiselect-checkbox" value={option.value} onChange={(e) => {
+                    <input type="checkbox" checked={optionIndicesSelected.has(index)} class="multiselect-checkbox" value={index} onChange={(e) => {
                         if (e.currentTarget.checked) {
-                            optionsSelected.add(option.value);
+                            optionIndicesSelected.add(index);
                         } else {
-                            optionsSelected.delete(option.value);
+                            optionIndicesSelected.delete(index);
                         }
 
-                        setOptionsSelected(new Set(optionsSelected));
+                        setOptionIndicesSelected(new Set(optionIndicesSelected));
                     }}/> {option.displayName}
                 </div>
             ))}

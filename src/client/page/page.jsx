@@ -7,6 +7,7 @@ import FileSearchPage, { PAGE_NAME as FILE_SEARCH_PAGE_NAME } from './pages/file
 /**
  * @type {Record<string, {
  *     component: (param0: {
+ *         fetchCache: FetchCache
  *         user: User
  *         pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *         existingState: any
@@ -34,13 +35,14 @@ const PAGES = {
 /**
  * @param {{
  *     page: PageType
+ *     fetchCache: FetchCache
  *     user: User
  *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *     updatePage: (page: PageType) => Promise<void>
  * }} param0 
  * @returns 
  */
-const Page = ({page, user, pushModal, updatePage}) => {
+const Page = ({page, fetchCache, user, pushModal, updatePage}) => {
     page.existingState ??= {};
     return (<div key={page.pageID} className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}>
         <div className="page-topbar">
@@ -52,7 +54,7 @@ const Page = ({page, user, pushModal, updatePage}) => {
         <div className="page-contents">
             {(() => {
                 if (page.pageName === FILE_SEARCH_PAGE_NAME) {
-                    return <FileSearchPage user={user} pushModal={pushModal} existingState={page.existingState} updateExistingStateProp={(key, value) => {
+                    return <FileSearchPage user={user} fetchCache={fetchCache} pushModal={pushModal} existingState={page.existingState} updateExistingStateProp={(key, value) => {
                         page.existingState[key] = value;
                         updatePage(page);
                     }} />

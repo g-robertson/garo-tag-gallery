@@ -359,29 +359,29 @@ export default class PerfTags {
     }
 
     /**
-     * @param {bigint[]} tags 
+     * @param {bigint[][]} tagGroups 
      * @param {string=} search
      */
-    async readTagsTaggableCounts(tags, search) {
+    async readTagGroupsTaggableCounts(tagGroups, search) {
         search ??= "";
         await this.#readMutex.acquire();
 
-        await this.__writeToReadInputFile(`${serializeUint64(BigInt(tags.length))}${PerfTags.#serializeSingles(tags)}${search}`);
-        await this.__writeLineToStdin("read_tags_taggable_counts");
+        const tagGroupsTagsSerialized = tagGroups.map(tags => `${serializeUint64(BigInt(tags.length))}${PerfTags.#serializeSingles(tags)}`).join('');
+        
+        await this.__writeToReadInputFile(`${serializeUint64(BigInt(tagGroups.length))}${tagGroupsTagsSerialized}${search}`);
+        await this.__writeLineToStdin("read_tag_groups_taggable_counts");
         const ok = await this.__dataOrTimeout(PerfTags.READ_OK_RESULT, 1000);
         let tagsTaggableCountsStr = await this.__readFromOutputFile();
-        /** @type {Map<bigint, number>} */
-        const tagsTaggableCounts = new Map();
+        /** @type {number[]} */
+        const tagGroupsTaggableCounts = [];
         for (let i = 0; i < tagsTaggableCountsStr.length;) {
-            const tag = tagsTaggableCountsStr.readBigUInt64BE(i);
+            const taggableGroupCount = Number(tagsTaggableCountsStr.readBigUInt64BE(i));
             i += 8;
-            const taggableCount = Number(tagsTaggableCountsStr.readBigUInt64BE(i));
-            i += 8;
-            tagsTaggableCounts.set(tag, taggableCount);
+            tagGroupsTaggableCounts.push(taggableGroupCount);
         }
 
         this.#readMutex.release();
-        return {ok, tagsTaggableCounts};
+        return {ok, tagGroupsTaggableCounts};
     }
 
     /**

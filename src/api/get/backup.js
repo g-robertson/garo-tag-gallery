@@ -80,13 +80,13 @@ export default async function get(dbs, req, res) {
         Taggable_Last_Viewed_Date: userFacingLocalFile.Taggable_Last_Viewed_Date,
         Local_Taggable_Service_ID: userFacingLocalFile.Local_Taggable_Service_ID,
         URL_Associations: userFacingLocalFile.URL_Associations,
-        Tags: userFacingLocalFile.Tags.map(tag => ([
+        Tags: userFacingLocalFile.Tag_Groups.map(tagGroup => tagGroup.tags.map(tag => [
             tag.Lookup_Name,
             tag.Display_Name,
             tag.Source_Name,
-            tag.Namespaces,
+            tagGroup.Namespaces,
             tag.Local_Tag_Service_ID
-        ])),
+        ])).flat(),
         Metrics: userFacingLocalFile.Metrics.map(metric => ({
             Local_Metric_Service_ID: metric.Local_Metric_Service_ID,
             Local_Metric_ID: metric.Local_Metric_ID,

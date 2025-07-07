@@ -48,5 +48,5 @@ export async function checkPermission(dbs, req, res) {
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
     await LocalMetrics.insert(dbs, req.body.preInsertLocalMetric, req.body.localMetricServiceID);
-    res.status(200).send("Metric service created");
+    res.status(200).send("Local metric created");
 }

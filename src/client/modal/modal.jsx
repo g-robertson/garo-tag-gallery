@@ -1,4 +1,5 @@
 import '../global.css';
+import { FetchCache } from '../js/client-util.js';
 
 /** @import {User} from "../js/user.js" */
 /** @import {JSX} from "react" */
@@ -6,6 +7,7 @@ import '../global.css';
  * @type {Record<string, {
  *     component: (param0: {
  *         modalOptions: ModalOptions,
+ *         fetchCache: FetchCache
  *         pushModal: (modalName: string, extraProperties: any) => Promise<any>,
  *         popModal: () => void
  *         user: User
@@ -17,6 +19,7 @@ import '../global.css';
  *         height?: number
  *         hasTopbar?: boolean
  *         moveWithIndex?: number
+ *         shrinkToContent?: boolean
  *     }
  * }}
  **/
@@ -28,6 +31,8 @@ const MODALS = {};
         await import('./modals/create-or-search-group.jsx'),
         await import('./modals/create-and-search-group.jsx'),
         await import('./modals/import-files-from-hydrus.jsx'),
+        await import('./modals/import-mappings-from-backup.jsx'),
+        await import('./modals/create-local-tag-service.jsx'),
         await import('./modals/update-local-tag-service.jsx'),
         await import('./modals/update-local-taggable-service.jsx'),
         await import('./modals/create-local-metric-service.jsx'),
@@ -40,7 +45,8 @@ const MODALS = {};
         await import("./modals/select-from-list-of-tags-modal.jsx"),
         await import("./modals/create-metric-tag.jsx"),
         await import("./modals/create-url-generator-service.jsx"),
-        await import('./modals/import-mappings-from-backup.jsx')
+        await import("./modals/modify-taggables.jsx"),
+        await import("./modals/dialog-box.jsx")
     ];
     
     for (const modal of modals) {
@@ -52,10 +58,10 @@ const MODALS = {};
 })();
 
 /**
- * @template {any} [T=any]
+ * @template {any} [T=Record<string, any>]
  * @typedef {Object} ModalOptions
  * @property {string} modalName
- * @property {T} extraProperties
+ * @property {T & {displayName?: string}} extraProperties
  * @property {(result: any) => void} resolve
  */
 
@@ -63,6 +69,7 @@ const MODALS = {};
  * 
  * @param {{
  *     modalOptions: ModalOptions
+ *     fetchCache: FetchCache
  *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *     popModal: () => void
  *     user: User
@@ -71,9 +78,10 @@ const MODALS = {};
  * }} param0 
  * @returns 
  */
-const Modal = ({modalOptions, pushModal, popModal, user, setUser, index}) => {
+const Modal = ({modalOptions, fetchCache, pushModal, popModal, user, setUser, index}) => {
     const {component, modalProperties} = MODALS[modalOptions.modalName];
     modalOptions.extraProperties ??= {};
+    const displayName = modalOptions.extraProperties.displayName ?? modalProperties.displayName;
     const hasTopbar = modalProperties.hasTopbar ?? true;
     const hasBorder = modalProperties.hasBorder ?? true;
     const width = modalProperties.width ?? 80;
@@ -82,17 +90,29 @@ const Modal = ({modalOptions, pushModal, popModal, user, setUser, index}) => {
     const left = ((100 - width) / 2);
     const top = ((100 - height) / 2) + (moveWithIndex * index)
 
-    return (<div className="modal" style={{zIndex: 999, border: hasBorder ? "2px solid white" : "none", maxWidth: "100%", width: `${width}vw`, height: `${height}vh`, left: `${left}vw`, top: `${top}vh`}}>
+    let modalStyle = {zIndex: 999, border: hasBorder ? "2px solid white" : "none", maxWidth: "100%"}; ;
+    if (modalProperties.shrinkToContent === true) {
+        modalStyle.top = "50%";
+        modalStyle.left = "50%";
+        modalStyle.transform = "translate(-50%, -50%)";
+    } else {
+        modalStyle.width = `${width}vw`;
+        modalStyle.height = `${height}vh`;
+        modalStyle.left = `${left}vw`;
+        modalStyle.top = `${top}vh`
+    }
+
+    return (<div className="modal" style={modalStyle}>
         {
             hasTopbar
             ?    <div className="modal-topbar">
-                     <div className="modal-title">{modalProperties.displayName}</div>
+                     <div className="modal-title">{displayName}</div>
                      <div className="modal-cancel" onClick={popModal}>X</div>
                  </div>
             :    <div style={{position: "absolute", top: 0, right: 0, zIndex: 100}} className="modal-cancel" onClick={popModal}>X</div>
         }
         <div className="modal-content">
-            {component({modalOptions, user, setUser, pushModal, popModal})}
+            {component({modalOptions, fetchCache, user, setUser, pushModal, popModal})}
         </div>
     </div>);
 };

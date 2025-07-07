@@ -51,5 +51,9 @@ export default async function get(dbs, req, res) {
         localMetricServices
     );
 
-    return res.status(200).send(bjsonStringify(userFacingTaggables));
+    return res.status(200).send(bjsonStringify(userFacingTaggables.map(userFacingTaggable => ({
+        ...userFacingTaggable,
+        Tag_Groups: undefined,
+        Tags: userFacingTaggable.Tag_Groups.map(tagGroup => tagGroup.Client_Display_Name)
+    }))));
 }

@@ -12,6 +12,7 @@ import { CREATE_LOCAL_METRIC_SERVICE_MODAL_PROPERTIES } from './modal/modals/cre
 import { UPDATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES } from './modal/modals/update-local-tag-service.jsx';
 import { UPDATE_LOCAL_TAGGABLE_SERVICE_MODAL_PROPERTIES } from './modal/modals/update-local-taggable-service.jsx';
 import { UPDATE_LOCAL_METRIC_MODAL_PROPERTIES } from './modal/modals/update-local-metric.jsx';
+import { CREATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-local-tag-service.jsx';
 
 const FILE_MENU = "file";
 const PAGES_MENU = "pages";
@@ -23,7 +24,6 @@ const PARSERS_MENU = "parsers";
 /** @import {Setters, States} from "./App.jsx" */
 
 /**
- * 
  * @param {{
  *     setters: Setters,
  *     states: States,
@@ -76,6 +76,10 @@ const Navbar = ({setters, states, pushModal}) => {
             <div className="topbar-dropdown">
                 <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(TAGS_MENU)}>Tags</div>
                 <div className="topbar-dropdown-options" style={{display: menuOpened === TAGS_MENU ? "block" : "none"}}>
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                        pushModal(CREATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES.modalName);
+                    }}>Create new tag service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
                         pushModal(UPDATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES.modalName);

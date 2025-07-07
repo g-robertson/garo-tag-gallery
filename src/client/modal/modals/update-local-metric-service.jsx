@@ -32,7 +32,7 @@ const UpdateLocalMetricService = ({user, setUser, popModal}) => {
             </form>
             <div style={{marginLeft: "8px"}}>
                 <input disabled={selectedLocalMetricService === undefined} type="button" value="Delete selected metric service" onClick={() => {
-                    const confirm = window.confirm("Are you sure you want to delete this metric service");
+                    const confirm = window.confirm("Are you sure you want to delete this metric service?\nWARNING: This will remove every Metric that exists under this metric service");
                     if (confirm) {
                         (async () => {
                             await deleteLocalMetricService(selectedLocalMetricService.Local_Metric_Service_ID);

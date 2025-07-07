@@ -973,12 +973,12 @@ const TESTS = {
             [4n,[1n]],
         ]));
 
-        const {tagsTaggableCounts} =await perfTags.readTagsTaggableCounts([1n,2n,3n,4n]);
-        if (tagsTaggableCounts.size !== 4
-         || tagsTaggableCounts.get(1n) !== 3
-         || tagsTaggableCounts.get(2n) !== 3
-         || tagsTaggableCounts.get(3n) !== 2
-         || tagsTaggableCounts.get(4n) !== 1
+        const {tagGroupsTaggableCounts} =await perfTags.readTagGroupsTaggableCounts([[1n],[2n],[3n],[4n]]);
+        if (tagGroupsTaggableCounts.length !== 4
+         || tagGroupsTaggableCounts[0] !== 3
+         || tagGroupsTaggableCounts[1] !== 3
+         || tagGroupsTaggableCounts[2] !== 2
+         || tagGroupsTaggableCounts[3] !== 1
         ) {
             throw "Wrong count of tag with tags taggable counts";
         }
@@ -992,15 +992,51 @@ const TESTS = {
             [4n,[1n]],
         ]));
 
-        const {tagsTaggableCounts} = await perfTags.readTagsTaggableCounts([1n,2n,3n,4n], PerfTags.searchUnion([PerfTags.searchTag(3n), PerfTags.searchTag(4n)]));
-        if (tagsTaggableCounts.size !== 4
-         || tagsTaggableCounts.get(1n) !== 3
-         || tagsTaggableCounts.get(2n) !== 1
-         || tagsTaggableCounts.get(3n) !== 4
-         || tagsTaggableCounts.get(4n) !== 1
+        const {tagGroupsTaggableCounts} = await perfTags.readTagGroupsTaggableCounts([[1n],[2n],[3n],[4n]], PerfTags.searchUnion([PerfTags.searchTag(3n), PerfTags.searchTag(4n)]));
+        if (tagGroupsTaggableCounts.length !== 4
+         || tagGroupsTaggableCounts[0] !== 3
+         || tagGroupsTaggableCounts[1] !== 1
+         || tagGroupsTaggableCounts[2] !== 4
+         || tagGroupsTaggableCounts[3] !== 1
         ) {
             throw "Wrong count of tag with tags taggable counts";
         }
-    }
+    },
+    "tag_groups_taggable_counts_are_correct": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n,[1n,2n,3n,4n]],
+            [2n,[3n,4n,5n]],
+            [3n,[2n,3n,7n,8n]],
+            [4n,[1n]],
+        ]));
+
+        const {tagGroupsTaggableCounts} = await perfTags.readTagGroupsTaggableCounts([[1n,2n],[2n,3n],[3n,4n]]);
+        if (tagGroupsTaggableCounts.length !== 3
+         || tagGroupsTaggableCounts[0] !== 5
+         || tagGroupsTaggableCounts[1] !== 6
+         || tagGroupsTaggableCounts[2] !== 5
+        ) {
+            throw "Wrong count of tag with tag groups taggable counts";
+        }
+    },
+    "tag_groups_taggable_counts_with_search_are_correct": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        await perfTags.insertTagPairings(new Map([
+            [1n,[1n,2n,3n,4n]],
+            [2n,[3n,4n,5n]],
+            [3n,[2n,3n,7n,8n]],
+            [4n,[1n]],
+        ]));
+
+        const {tagGroupsTaggableCounts} = await perfTags.readTagGroupsTaggableCounts([[1n,2n],[2n,3n],[3n,4n]], PerfTags.searchUnion([PerfTags.searchTag(3n), PerfTags.searchTag(4n)]));
+        if (tagGroupsTaggableCounts.length !== 3
+         || tagGroupsTaggableCounts[0] !== 3
+         || tagGroupsTaggableCounts[1] !== 4
+         || tagGroupsTaggableCounts[2] !== 5
+        ) {
+            throw "Wrong count of tag with tag groups taggable counts";
+        }
+    },
 };
 export default TESTS;

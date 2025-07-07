@@ -28,13 +28,11 @@ export async function checkPermission(dbs, req, res) {
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {
     const localTagServices = await LocalTagServices.userSelectAll(dbs, req.user, PERMISSION_BITS.READ);
-    const tags = await UserFacingLocalTags.selectManyByNamespaceID(dbs, req.body.namespaceID, localTagServices.map(localTagService => localTagService.Local_Tag_Service_ID));
-    return res.status(200).send(JSON.stringify(tags.map(tag => [
-        tag.Local_Tag_ID,
-        tag.Local_Tag_Service_ID,
-        tag.Display_Name,
-        tag.Tag_Name,
-        tag.Namespaces,
-        tag.Tag_Count
+    const tagGroups = await UserFacingLocalTags.selectManyByNamespaceID(dbs, req.body.namespaceID, localTagServices.map(localTagService => localTagService.Local_Tag_Service_ID));
+    return res.status(200).send(JSON.stringify(tagGroups.map(tagGroup => [
+        tagGroup.Lookup_Name,
+        tagGroup.Client_Display_Name,
+        tagGroup.Namespaces,
+        tagGroup.Tag_Count
     ])));
 }

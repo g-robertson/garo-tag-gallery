@@ -1,30 +1,33 @@
-import { fjsonParse } from "../../client/js/client-util.js";
+import { FetchCache, fjsonParse } from "../../client/js/client-util.js";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import { CREATE_AGGREGATE_TAG_MODAL_PROPERTIES } from "../../client/modal/modals/create-aggregate-tag.jsx";
 import { CREATE_METRIC_TAG_MODAL_PROPERTIES } from "../../client/modal/modals/create-metric-tag.jsx";
 
+/** @import {ClientSearchQuery} from "../post/search-taggables.js" */
+
 /**
- * @typedef {Object} ClientTag
- * @property {number} localTagID
- * @property {number} localTagServiceID
- * @property {string} tagName
- * @property {string} displayName
- * @property {string[]} namespaces
- * @property {number} tagCount
- * @property {{
- *     modalName: string
- * }=} modalTagInfo
+ * @typedef {(ClientSearchQuery | {
+ *     type: "modalTag"
+ *     modalTagInfo?: {
+ *         modalName: string
+ *     }
+ * }) & {
+ *     displayName: string
+ *     tagName: string,
+ *     namespaces: string[]
+ *     tagCount: number
+ * }} ClientQueryTag
  */
 
 /**
  * @param {string} displayName
  * @param {string} modalName
- * @returns {ClientTag}
+ * @returns {ClientQueryTag}
  */
-function modalSystemClientTag(displayName, modalName) {
+function modalSystemClientQueryTag(displayName, modalName) {
     return {
+        type: "modalTag",
         localTagID: -1,
-        localTagServiceID: 0,
         tagName: displayName,
         displayName: `system:${displayName}`,
         namespaces: ['system'],
@@ -35,58 +38,32 @@ function modalSystemClientTag(displayName, modalName) {
     }
 }
 
-/** @type {Map<number, ClientTag[]} */
-const CACHED = new Map([
-    [SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, [
-        modalSystemClientTag("aggregate tags", CREATE_AGGREGATE_TAG_MODAL_PROPERTIES.modalName),
-        modalSystemClientTag("metric", CREATE_METRIC_TAG_MODAL_PROPERTIES.modalName)
-    ]]
-]);
+const SYSTEM_CLIENT_TAGS = [
+    modalSystemClientQueryTag("aggregate tags", CREATE_AGGREGATE_TAG_MODAL_PROPERTIES.modalName),
+    modalSystemClientQueryTag("metric", CREATE_METRIC_TAG_MODAL_PROPERTIES.modalName)
+];
 
 /**
  * @param {number[]} localTagServiceIDs
- * @param {number[]?} taggableIDs,
+ * @param {number[]=} taggableIDs,
  */
-export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs, taggableIDs) {
-    if (taggableIDs === undefined) {
-        /** @type {number[]} */
-        const localTagServiceIDsUncached = localTagServiceIDs.filter(localTagServiceID => !CACHED.has(localTagServiceID));
-        if (localTagServiceIDsUncached.length !== 0) {
-            const response = await fetch("/api/post/tags-from-local-tag-services", {
-                body: JSON.stringify({
-                    localTagServiceIDs: localTagServiceIDsUncached
-                }),
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                method: "POST"
-            });
+function getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableIDs) {
+    return `${localTagServiceIDs.join("\x01")}\x02${taggableIDs?.join?.("\x01") ?? ""}`;
+}
 
-            /** @type {ClientTag[]} */
-            const tagsResponse = (await fjsonParse(response)).map(tag => ({
-                localTagID: tag[0],
-                localTagServiceID: tag[1],
-                displayName: tag[2],
-                tagName: tag[3],
-                namespaces: tag[4],
-                tagCount: tag[5]
-            }));
-
-            for (const localTagServiceID of localTagServiceIDsUncached) {
-                CACHED.set(localTagServiceID, []);
-            }
-            for (const tag of tagsResponse) {
-                CACHED.get(tag.localTagServiceID).push(tag);
-            }
-        }
-
-        /** @type {ClientTag[]} */
-        const clientTags = Array.prototype.concat(...localTagServiceIDs.map(localTagServiceID => CACHED.get(localTagServiceID)));
-        return clientTags;
-    } else {
+/**
+ * @param {number[]} localTagServiceIDs
+ * @param {number[]=} taggableIDs
+ * @param {FetchCache} fetchCache
+ */
+async function getTagsFromLocalTagServiceIDs_(localTagServiceIDs, taggableIDs, fetchCache) {
+    const hash = getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableIDs);
+    const tagsFromLocalTagServiceIDsCache = fetchCache.cache("tags-from-local-tag-services");
+    if (tagsFromLocalTagServiceIDsCache.getStatus(hash) === "empty") {
+        tagsFromLocalTagServiceIDsCache.setAwaiting(hash);
         const response = await fetch("/api/post/tags-from-local-tag-services", {
             body: JSON.stringify({
-                localTagServiceIDs: localTagServiceIDs.filter(localTagServiceID => localTagServiceID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID),
+                localTagServiceIDs,
                 taggableIDs
             }),
             headers: {
@@ -95,19 +72,35 @@ export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs, 
             method: "POST"
         });
 
-        /** @type {ClientTag[]} */
-        const tagsResponse = (await fjsonParse(response)).map(tag => ({
-            localTagID: tag[0],
-            localTagServiceID: tag[1],
-            displayName: tag[2],
-            tagName: tag[3],
-            namespaces: tag[4],
-            tagCount: tag[5]
-        }));
-        if (localTagServiceIDs.findIndex((localTagServiceID => localTagServiceID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)) === -1) {
-            return tagsResponse;
-        } else {
-            return CACHED.get(SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID).concat(tagsResponse);
-        }
+        tagsFromLocalTagServiceIDsCache.set(hash, (await fjsonParse(response)).map(tag => ({
+            type: "tagByLookup",
+            Lookup_Name: tag[0],
+            displayName: tag[1],
+            tagName: tag[0],
+            namespaces: tag[2],
+            tagCount: tag[3]
+        })));
+    }
+
+    /** @type {ClientQueryTag[]} */
+    const response = await tagsFromLocalTagServiceIDsCache.get(hash);
+    return response;
+}
+
+/**
+ * @param {number[]} localTagServiceIDs
+ * @param {number[]=} taggableIDs
+ * @param {FetchCache} fetchCache
+ */
+export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs, taggableIDs, fetchCache) {
+    const tagsResponse = await getTagsFromLocalTagServiceIDs_(
+        localTagServiceIDs.filter(localTagServiceID => localTagServiceID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID),
+        taggableIDs,
+        fetchCache
+    );
+    if (localTagServiceIDs.findIndex((localTagServiceID => localTagServiceID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)) === -1) {
+        return tagsResponse;
+    } else {
+        return SYSTEM_CLIENT_TAGS.concat(tagsResponse);
     }
 }

@@ -1,6 +1,6 @@
 import { fjsonParse } from "../../client/js/client-util.js";
 
-/** @import {ClientTag} from "./tags-from-local-tag-services.js" */
+/** @import {ClientTag} from "../post/update-taggables.js" */
 
 /**
  * @param {number} namespaceID
@@ -18,12 +18,10 @@ export default async function getTagsFromNamespaceID(namespaceID) {
 
     /** @type {ClientTag[]} */
     const tagsResponse = (await fjsonParse(response)).map(tag => ({
-        localTagID: tag[0],
-        localTagServiceID: tag[1],
-        displayName: tag[2],
-        tagName: tag[3],
-        namespaces: tag[4],
-        tagCount: tag[5]
+        tagName: tag[0],
+        displayName: tag[1],
+        namespaces: tag[2],
+        tagCount: tag[3]
     }));
 
     return tagsResponse;

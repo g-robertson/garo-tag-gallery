@@ -2,6 +2,7 @@
 
 #include <bit>
 #include <fstream>
+#include <iostream>
 
 void util::serializeUInt64(const uint64_t& i, std::string& str, std::size_t& location) {
     if (location + 8 > str.size()) {
@@ -76,7 +77,19 @@ void util::writeFile(const std::filesystem::path& filePath, std::string_view dat
     file.write(data.data(), data.size());
     file.close();
 
-    std::filesystem::rename(unfinishedFilePath, absoluteFilePath);
+    for (int i = 0; i < 10; ++i) {
+        bool caught = false;
+        try {
+            std::filesystem::rename(unfinishedFilePath, absoluteFilePath);
+        } catch (...) {
+            caught = true;
+        }
+        if (!caught) {
+            break;
+        } else {
+            std::cerr << "Caught filesystem exception while renaming " + unfinishedFilePath.generic_string() << " retrying attempt #" + std::to_string(i) << std::endl;
+        }
+    }
 }
 std::string util::readFile(const std::filesystem::path& filePath) {
     std::ifstream file(filePath, std::ios::in | std::ios::binary);

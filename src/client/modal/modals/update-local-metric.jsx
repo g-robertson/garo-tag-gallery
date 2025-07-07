@@ -32,7 +32,7 @@ const CreateLocalMetric = ({user, setUser, popModal}) => {
             </form>
             <div style={{marginLeft: "8px"}}>
                 <input disabled={selectedLocalMetric === undefined} type="button" value="Delete selected metric" onClick={() => {
-                    const confirm = window.confirm("Are you sure you want to delete this metric");
+                    const confirm = window.confirm("Are you sure you want to delete this metric?\nWARNING: This will remove every application of this metric that you have placed on taggables");
                     if (confirm) {
                         (async () => {
                             await deleteLocalMetric(selectedLocalMetric.Local_Metric_ID);

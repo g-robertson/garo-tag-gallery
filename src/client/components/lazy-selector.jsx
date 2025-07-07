@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import '../global.css';
-import { clamp, randomID, RealizationArray } from '../js/client-util.js';
+import { clamp, randomID, RealizationMap } from '../js/client-util.js';
 import Scrollbar from './scrollbar.jsx';
 
 /** @import {JSX} from "react" */
@@ -168,8 +168,8 @@ function LazySelector({
 
     const uniqueID = useRef(randomID(32));
     const [dimensionsAvailable, setDimensionsAvailable] = useState({width: 0, height: 0});
-    /** @type {[{ref: RealizationArray<R>}, (realizedValues: {ref: RealizationArray<R>}) => void]} */
-    const [realizedValues, setRealizedValues] = useState({ref: new RealizationArray(values.length)});
+    /** @type {[{ref: RealizationMap<number, R>}, (realizedValues: {ref: RealizationMap<R>}) => void]} */
+    const [realizedValues, setRealizedValues] = useState({ref: new RealizationMap()});
 
     const [shownStartIndex, setShownStartIndex] = useState(initialLastClickedIndex ?? 0);
     /** @type {(values: T[]) => number} */
@@ -200,9 +200,10 @@ function LazySelector({
     const lastClickedIndex = useRef(initialLastClickedIndex);
     const updateLastClickedIndex = (newLastClickedIndex, shownStartIndex) => {
         preShiftClickIndices.current = null;
+
         lastClickedIndex.current = newLastClickedIndex;
 
-        if (lastClickedIndex.current === null) {
+        if (lastClickedIndex.current === null || lastClickedIndex.current === newLastClickedIndex) {
             return;
         }
 
@@ -240,7 +241,7 @@ function LazySelector({
     /**
      * @param {Iterable<number>} forcedIndices
      * @param {Iterable<number>} allIndices
-     * @param {RealizationArray<R>} currentRealizedValues
+     * @param {RealizationMap<number, R>} currentRealizedValues
      * @param {T[]} values
      * @param {number} localValuesRealizationSync
      */
@@ -309,7 +310,7 @@ function LazySelector({
             }
         }
 
-        for (let i = shownStartIndex; i <= shownEndIndexRef.current; ++i) {
+        for (let i = shownStartIndex; i <= shownEndIndexRef.current && i < values.length; ++i) {
             forcedIndices.add(i);
             allIndices.add(i);
         }
@@ -324,10 +325,16 @@ function LazySelector({
         scrollbarSetItemPositionOut.out(shownStartIndex);
     }, [shownStartIndex]);
 
+    const dimensionsAvailableRef = useRef(dimensionsAvailable);
+    dimensionsAvailableRef.current = dimensionsAvailable;
     useEffect(() => {
         const onResize = () => {
             const parent = document.getElementById(LAZY_SELECTOR_ID).parentElement;
-            setDimensionsAvailable({width: parent.clientWidth, height: Math.max(20, parent.clientHeight)})
+            const newDimensionsAvailable = {width: parent.clientWidth, height: Math.max(20, parent.clientHeight)};
+            if (newDimensionsAvailable.width !== dimensionsAvailableRef.current.width || newDimensionsAvailable.height !== dimensionsAvailableRef.current.height) {
+                dimensionsAvailableRef.current = newDimensionsAvailable;
+                setDimensionsAvailable(dimensionsAvailableRef.current);
+            }
         };
         onResize();
         window.addEventListener("resize", onResize);
@@ -393,12 +400,17 @@ function LazySelector({
     realizedValuesRef.current = realizedValues;
     useEffect(() => {
         preShiftClickIndices.current = null;
-        setSelectedIndices(new Set());
+        if (selectedIndices.size !== 0) {
+            setSelectedIndices(new Set());
+        }
+
         updateLastClickedIndex(null);
 
         ++valuesRealizationSync.current;
-        realizedValuesRef.current = {ref: new RealizationArray(values.length)};
-        setRealizedValues(realizedValuesRef.current);
+        if (realizedValuesRef.current.ref.size() !== 0) {
+            realizedValuesRef.current = {ref: new RealizationMap()};
+            setRealizedValues(realizedValuesRef.current);
+        }
     }, [values]);
 
     useEffect(() => {
@@ -414,18 +426,6 @@ function LazySelector({
 
 
     useEffect(() => {
-        if (!multiSelect && selectedIndices.size >= 1) {
-            const selectedIndex = [...selectedIndices][0];
-            if (selectedIndices.size > 1 || selectedIndex !== lastClickedIndex.current) {
-                setSelectedIndices(new Set([lastClickedIndex.current]));
-                return;
-            }
-        }
-
-        if (selectedIndices.size === 0) {
-            return;
-        }
-
         (async () => {
             /** @type {R[]} */
             const realizedValuesSelected = [];

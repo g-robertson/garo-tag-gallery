@@ -32,7 +32,7 @@ const UpdateLocalTaggableService = ({user, setUser, popModal}) => {
             </form>
             <div style={{marginLeft: "8px"}}>
                 <input disabled={selectedLocalTaggableService === undefined} type="button" value="Delete selected taggable service" onClick={() => {
-                    const confirm = window.confirm("Are you sure you want to delete this taggable service");
+                    const confirm = window.confirm("Are you sure you want to delete this taggable service?\nWARNING: This will remove every taggable (file/collection) that exists under this taggable service");
                     if (confirm) {
                         (async () => {
                             await deleteLocalTaggableService(selectedLocalTaggableService.Local_Taggable_Service_ID);

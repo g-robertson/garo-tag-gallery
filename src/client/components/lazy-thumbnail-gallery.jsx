@@ -15,10 +15,14 @@ const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH
  * @param {{
  *  taggableIDs: number[]
  *  realizeSelectedValues: boolean
+ *  onValuesSelected?: (valuesSelected: DBUserFacingLocalFile[], indices: number[]) => void
  *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingLocalFile[], indices: number[], indexClicked: number) => void
  * }} param0
  */
-const LazyThumbnailGallery = ({taggableIDs, realizeSelectedValues, onValuesDoubleClicked}) => {
+const LazyThumbnailGallery = ({taggableIDs, realizeSelectedValues, onValuesSelected, onValuesDoubleClicked}) => {
+    onValuesSelected ??= () => {};
+    onValuesDoubleClicked ??= () => {};
+
     return <LazySelector
         values={taggableIDs}
         realizeSelectedValues={realizeSelectedValues}
@@ -61,7 +65,8 @@ const LazyThumbnailGallery = ({taggableIDs, realizeSelectedValues, onValuesDoubl
             </div>
         }}
         onValuesDoubleClicked={onValuesDoubleClicked}
-        customTitleRealizer={(realizedValue) => realizedValue.Tags.map(tag => tag.Display_Name).sort((a, b) => {
+        onValuesSelected={onValuesSelected}
+        customTitleRealizer={(realizedValue) => realizedValue.Tags.sort((a, b) => {
             if (a < b) {
                 return -1;
             } else if (a > b) {

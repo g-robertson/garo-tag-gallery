@@ -9,18 +9,18 @@ import { useRef } from 'react';
 /** 
  * @param {{
  *  user: User
+ *  fetchCache: FetchCache
  *  modalOptions: ModalOptions<{
  *      titleText: string
  *      selectionButtonText: string
  *      searchType: "intersect" | "union"
  *      initialSelectedTags?: ClientSearchQuery[]
- *      tagsFilter?:
  *  }>
  *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  popModal: () => void
  * }}
 */
-export const TagSelectorModal = ({user, modalOptions, pushModal, popModal}) => {
+export const TagSelectorModal = ({user, fetchCache, modalOptions, pushModal, popModal}) => {
     /** @type {{current: ClientSearchQuery | null}} */
     const searchObjectsRef = useRef(null);
     modalOptions.extraProperties.initialSelectedTags ??= [];
@@ -29,11 +29,11 @@ export const TagSelectorModal = ({user, modalOptions, pushModal, popModal}) => {
             {modalOptions.extraProperties.titleText}
             <div style={{width: "100%", height: "100%"}}>
                 <TagsSelector
+                    fetchCache={fetchCache}
                     user={user}
                     pushModal={pushModal}
                     searchType={modalOptions.extraProperties.searchType}
                     initialSelectedTags={modalOptions.extraProperties.initialSelectedTags}
-                    tagsFilter={modalOptions.extraProperties.tagsFilter}
                     onSearchChanged={(clientSearchQuery) => {
                         searchObjectsRef.current = clientSearchQuery;
                     }}
