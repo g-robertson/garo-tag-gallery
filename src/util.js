@@ -57,10 +57,11 @@ function getFFMPEGExecutableName() {
     return "ffmpeg";
 }
 
-export async function extractFirstFrameWithFFMPEG(inputFileName, outputFileName) {
-    const ret = spawn(getFFMPEGExecutableName(), ['-y', '-i', inputFileName, "-vf", "scale=iw*sar:ih,setsar=1", '-vframes', '1', outputFileName]);
+export async function extractFirstFrameWithFFMPEG(inputFileName, outputFileName, ffmpegExecutable) {
+    const ret = spawn(ffmpegExecutable ?? getFFMPEGExecutableName(), ['-y', '-i', inputFileName, "-vf", "scale=iw*sar:ih,setsar=1", '-vframes', '1', outputFileName]);
     return await new Promise(resolve => {
-        ret.on("error", () => {
+        ret.on("error", (e) => {
+            console.log(e);
             resolve(false);
         });
         ret.on("exit", (code) => {

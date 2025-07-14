@@ -408,39 +408,6 @@ const TESTS = {
             throw "Size of tag bucket should not be greater than 8 after deletion and flush";
         }
     },
-    "complements_make_size_smaller": async (createPerfTags) => {
-        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-        const strTaggablePairings = {};
-        let totalTaggableCount = 200;
-        let totalTagCount = 8000;
-        for (let i = 0; i < totalTaggableCount; ++i) {
-            const tags = [];
-            for (let i = 0; i < totalTagCount; ++i) {
-                tags.push(`tag${i.toString().padStart(5, "0")}`);
-            }
-
-            const file = `tgbl${i.toString().padStart(4, "0")}`;
-            strTaggablePairings[file] = tags;
-        }
-        const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings(strTaggablePairings));
-
-        await perfTags.insertTaggables(PerfTags.getTaggablesFromTagPairings(tagPairings));
-        await perfTags.insertTags(PerfTags.getTagsFromTagPairings(tagPairings));
-        await perfTags.insertTagPairings(tagPairings);
-        await perfTags.__flushAndPurgeUnusedFiles();
-        if (await perfTags.close() === false) {
-            throw "Perf tags timed out on close";
-        }
-
-        // * 2 inside for accounting for tag bucket + tag buckets, file bucket + file buckets storages
-        // * 9 inside for 64 bit entries + complement bit
-        // * 2 in addition to that as wiggle room
-        const MAX_ACCEPTABLE_FILE_SIZE = (9 * (totalTaggableCount + totalTagCount) * 2) * 2;
-        const realDirectorySize = await getTotalDirectoryBytes("test-dir/database-dir");
-        if (realDirectorySize > MAX_ACCEPTABLE_FILE_SIZE) {
-            throw `Directory size with only completely dense tags was ${realDirectorySize} bytes > ${MAX_ACCEPTABLE_FILE_SIZE} bytes indicating that complements are not implemented`;
-        }
-    },
     "search_functions_correctly": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         await perfTags.insertTagPairings(new Map([

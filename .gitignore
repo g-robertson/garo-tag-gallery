@@ -4,3 +4,4 @@ dist
 database
 test-database
 archive-commands
+test-dup

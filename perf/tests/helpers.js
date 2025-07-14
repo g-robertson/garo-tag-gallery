@@ -60,7 +60,7 @@ export function getStrPairingsFromPairings(pairings) {
 
 export async function getTotalDirectoryBytes(directory) {
     let totalBytes = 0;
-    for (const fileEntry of getAllFileEntries(directory, {recursive: true})) {
+    for (const fileEntry of await getAllFileEntries(directory, {recursive: true})) {
         totalBytes += await stat(fileEntry).size;
     }
     return totalBytes;
