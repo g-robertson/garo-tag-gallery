@@ -1,30 +1,30 @@
 import '../../global.css';
-import { User } from '../js/user.js';
 import LocalMetricServiceSelector from '../../components/local-metric-service-selector.jsx';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import getMe from '../../../api/client-get/me.js';
 import LocalMetricModifications from '../../components/local-metric-modifications.jsx';
 
 
+/** @import {Setters, States} from "../../App.jsx" */
+
 /** 
  * @param {{
- *  user: User
- *  setUser: (user: User) => void
- *  popModal: () => void
+ *  states: States
+ *  setters: Setters
  * }}
 */
-const CreateLocalMetric = ({user, setUser, popModal}) => {
+const CreateLocalMetric = ({states, setters}) => {
     return (
         <div>
             <form action="/api/post/create-local-metric" target="frame" method="POST">
-                <LocalMetricServiceSelector user={user} />
+                <LocalMetricServiceSelector states={states} />
                 <LocalMetricModifications />
                 <div style={{marginLeft: "8px"}}>
                     <input type="submit" value="Submit" />
                 </div>
                 <OnFormSubmit onFormSubmit={async () => {
-                    setUser(await getMe());
-                    popModal();
+                    setters.setUser(await getMe());
+                    setters.popModal();
                 }} />
             </form>
         </div>

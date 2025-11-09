@@ -3,7 +3,7 @@
 #include <filesystem>
 
 namespace util {
-    void serializeUInt64(const uint64_t& i, std::string& str, std::size_t& location);
+    std::size_t serializeUInt64(const uint64_t& i, std::string& str, std::size_t location);
     uint64_t deserializeUInt64(std::string_view str);
     float deserializeFloat(std::string_view str);
     void serializeChar(char c, std::string& str, std::size_t& location);

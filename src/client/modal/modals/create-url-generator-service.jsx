@@ -2,15 +2,14 @@ import '../../global.css';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import getMe from '../../../api/client-get/me.js';
 
-/** @import {User} from "../../js/user.js" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  setUser: (user: User) => void
- *  popModal: () => void
+ *   setters: Setters
  * }}
 */
-const CreateURLGeneratorService = ({setUser, popModal}) => {
+const CreateURLGeneratorService = ({setters}) => {
     return (
         <div>
             <form action="/api/post/create-url-generator-service" target="frame" method="POST">
@@ -25,8 +24,8 @@ const CreateURLGeneratorService = ({setUser, popModal}) => {
                 </div>
             </form>
             <OnFormSubmit onFormSubmit={async () => {
-                setUser(await getMe());
-                popModal();
+                setters.setUser(await getMe());
+                setters.popModal();
             }} />
         </div>
     );

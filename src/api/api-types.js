@@ -11,7 +11,11 @@ import { User } from "../client/js/user.js";
  */
 
 /**
-   * @typedef {(dbs: Databases, req: express.Request & {user: User, userAccessKey: string}, res: express.Response) => Promise<string | Record<string, any> | undefined>} APIValidationFunction
+ * @template {any} [T=any]
+ * @typedef {(dbs: Databases, req: express.Request & {user: User, userAccessKey: string}, res: express.Response) => T} APIValidationFunction
+ */
+
+/**
    * 
    * @typedef {Object} APIEndpoint
    * @property {APIFunction} default

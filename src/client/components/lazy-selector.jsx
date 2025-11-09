@@ -9,8 +9,8 @@ import Scrollbar from './scrollbar.jsx';
  * @typedef {Object} ItemProperties
  * @property {number | "100%"} width
  * @property {number | "100%"} height
- * @property {number} horizontalMargin
- * @property {number} verticalMargin
+ * @property {number=} horizontalMargin
+ * @property {number=} verticalMargin
  */
 
 /**
@@ -95,7 +95,7 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
     if (columnCountAvailable === 0) {
         return shownStartIndex;
     }
-    if (lastPossibleShownStartIndex <= 0) {
+    if (lastPossibleShownStartIndex < 0) {
         return shownStartIndex;
     }
 
@@ -116,18 +116,21 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[], indices: number[]) => void
  *  onValuesDoubleClicked?: (realizedValuesSelected: Awaited<R>[], indices: number[], indexClicked: number) => void
  *  valuesRealizer: ((values: T[]) => Promise<R[]>) | ((values: T[]) => R[])
- *  realizeSelectedValues: boolean
+ *  realizeSelectedValues?: boolean
  *  valueRealizationRange?: number
  *  valueRealizationDelay?: number
  *  realizeMinimumCount?: number
  *  customItemComponent?: (param0: {realizedValue: Awaited<R>, index: number, setRealizedValue: (realizedValue: Awaited<R>) => void, width: number, height: number}) => JSX.Element
  *  customTitleRealizer?: (realizedValue: Awaited<R>) => string,
+ *  incrementIndexOut?: {out: (increment: number) => void}
  *  itemProperties: ItemProperties
  *  scrollbarIncrement?: number
  *  initialLastClickedIndex?: number
  *  scrollbarWidth?: number
  *  elementsSelectable?: boolean
  *  multiSelect?: boolean
+ *  allowScrollInput?: boolean
+ *  allowKeyboardInput?: boolean
  * }} param0
  */
 function LazySelector({
@@ -141,12 +144,15 @@ function LazySelector({
     realizeMinimumCount,
     customItemComponent,
     customTitleRealizer,
+    incrementIndexOut,
     itemProperties,
     scrollbarIncrement,
     initialLastClickedIndex,
     scrollbarWidth,
     multiSelect,
-    elementsSelectable
+    elementsSelectable,
+    allowScrollInput,
+    allowKeyboardInput
 }) {
     onValuesDoubleClicked ??= () => {};
     onValuesSelected ??= () => {};
@@ -156,6 +162,7 @@ function LazySelector({
     realizeMinimumCount ??= 0;
     customItemComponent ??= ({realizedValue}) => (<>{realizedValue}</>);
     customTitleRealizer ??= () => "";
+    incrementIndexOut ??= {};
     itemProperties.horizontalMargin ??= 0;
     itemProperties.verticalMargin ??= 0;
     scrollbarIncrement ??= 4;
@@ -163,6 +170,8 @@ function LazySelector({
     scrollbarWidth ??= 17;
     multiSelect ??= true;
     elementsSelectable ??= true;
+    allowScrollInput ??= true;
+    allowKeyboardInput ??= true;
 
     // TODO: fix this component so it has less than 8 rerenders on load
 
@@ -180,7 +189,6 @@ function LazySelector({
     const [selectedIndices, setSelectedIndices] = useState(new Set());
 
     const isClickFocused = useRef(false);
-    
 
     // closure refs
     const fullItemDimensionsRef            = useRef(fullItemDimensions_(dimensionsAvailable, itemProperties));
@@ -195,6 +203,10 @@ function LazySelector({
     shownEndIndexRef.current               =        shownEndIndex_(shownStartIndex, currentItemsShownCountRef.current);
     const lastPossibleShownStartIndexRef   = useRef(lastPossibleShownStartIndex_(columnCountAvailableRef.current, currentItemsShownCountRef.current, values.length));
     lastPossibleShownStartIndexRef.current =        lastPossibleShownStartIndex_(columnCountAvailableRef.current, currentItemsShownCountRef.current, values.length);
+
+    incrementIndexOut.out = (increment) => {
+        setShownStartIndex(clampShownStartIndex(shownStartIndex + increment, lastPossibleShownStartIndexRef.current, columnCountAvailableRef.current));
+    }
 
     /** @type {{current: number | null}} */
     const lastClickedIndex = useRef(initialLastClickedIndex);
@@ -361,6 +373,10 @@ function LazySelector({
     }, []);
 
     useEffect(() => {
+        if (!allowKeyboardInput) {
+            return;
+        }
+
         const onKeyDown = (e) => {
             if (!isClickFocused.current && elementsSelectable) {
                 return;
@@ -408,7 +424,7 @@ function LazySelector({
 
         ++valuesRealizationSync.current;
         if (realizedValuesRef.current.ref.size() !== 0) {
-            realizedValuesRef.current = {ref: new RealizationMap()};
+            realizedValuesRef.current = {ref: new RealizationMap(realizedValuesRef.current.ref)};
             setRealizedValues(realizedValuesRef.current);
         }
     }, [values]);
@@ -459,7 +475,7 @@ function LazySelector({
                             const rowItems = [];
                             for (let j = 0; j < columnCountAvailableRef.current; ++j) {
                                 const itemIndex = (i * columnCountAvailableRef.current) + j + shownStartIndex;
-                                const realizedValue = realizedValues.ref.getOrUndefined(itemIndex);
+                                const realizedValue = realizedValues.ref.getOrPrevOrUndefined(itemIndex);
                                 
                                 if (realizedValue === undefined) {
                                     rowItems.push(<div className="lazy-selector-selectable-item" style={{
@@ -543,7 +559,7 @@ function LazySelector({
                                                         realizedValuesDoubleClicked.push(realizedValues.ref.getOrUndefined(index));
                                                     }
                                                 }
-
+                                                
                                                 onValuesDoubleClicked(realizedValuesDoubleClicked, [...selectedIndices], itemIndex);
                                              }}
                                         >
@@ -564,7 +580,9 @@ function LazySelector({
                         return rows;
                     })()}
                 </div>
-                <Scrollbar length={selectableContentsHeight}
+                {
+                    allowScrollInput
+                    ? <Scrollbar length={selectableContentsHeight}
                            itemsDisplayed={currentItemsShownCountRef.current}
                            totalItems={values.length}
                            setItemPositionOut={scrollbarSetItemPositionOut}
@@ -575,7 +593,8 @@ function LazySelector({
                            onScrollbarUpdate={(e) => {
                                setShownStartIndex(e);
                            }}
-                />
+                    /> : <></>
+                }
             </div>
         </div>
     );

@@ -17,6 +17,8 @@ import { DATABASE_DIR, dbrun, PARTIAL_ZIPS_FOLDER, TMP_FOLDER } from './src/db/d
 import { JobManager } from './src/db/job-manager.js';
 import { Mutex } from "async-mutex";
 import { readdir } from 'fs/promises';
+import { CursorManager } from './src/db/cursor-manager.js';
+import PerfHashCmp from './src/perf-tags-binding/perf-hash-cmp.js';
 /** @import {User} from "./src/client/js/user.js" */
 /** @import {APIEndpoint} from "./src/api/api-types.js" */
 
@@ -36,9 +38,9 @@ async function main() {
     }),
     sqlMutex: new Mutex(),
     sqlTransactionMutex: new Mutex(),
-    // .\perf\perftags.exe database/perf-write-input.txt database/perf-write-output.txt database/perf-read-input.txt database/perf-read-output.txt database/perf-tags
+    // .\perf\perftags\perftags.exe database/perf-write-input.txt database/perf-write-output.txt database/perf-read-input.txt database/perf-read-output.txt database/perf-tags
     perfTags: new PerfTags(
-      `perf/${PerfTags.EXE_NAME}`,
+      `perf/perftags/${PerfTags.EXE_NAME}`,
       path.join(DATABASE_DIR, "perf-write-input.txt"),
       path.join(DATABASE_DIR, "perf-write-output.txt"),
       path.join(DATABASE_DIR, "perf-read-input.txt"),
@@ -46,13 +48,22 @@ async function main() {
       path.join(DATABASE_DIR, "perf-tags"),
       "archive-commands"
     ),
+    perfHashCmp: new PerfHashCmp(
+      `perf/perf-hash-cmp/${PerfHashCmp.EXE_NAME}`,
+      path.join(DATABASE_DIR, "perfhash-write-input.txt"),
+      path.join(DATABASE_DIR, "perfhash-write-output.txt")
+    ),
     fileStorage: new FileStorage(path.join(DATABASE_DIR, "file-storage")),
-    jobManager: new JobManager()
+    jobManager: new JobManager(),
+    cursorManager: new CursorManager()
   };
 
   dbs.perfTags.__addStderrListener((data) => {
     appendFileSync(path.join(DATABASE_DIR, "perf-tags-stderr.log"), data);
   });
+  dbs.perfHashCmp.__addStderrListener((data) => {
+    appendFileSync(path.join(DATABASE_DIR, "perf-hash-cmp-stderr.log"), data);
+  })
   //await dbs.fileStorage.extractAllTo(path.join(PARTIAL_ZIPS_FOLDER, "hydrus import from laptop/export-path/hydrus export"));
   //await dbs.fileStorage.extractAllTo(path.join(PARTIAL_ZIPS_FOLDER, "hydrus import small/export-path/hydrus export 1024"));
 

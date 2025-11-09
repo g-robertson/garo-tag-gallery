@@ -79,6 +79,7 @@ int main(int argc, const char** argv) {
     };
     std::unordered_set<std::string> READ_OPS = {
         "read_taggables_tags",
+        "read_taggables_specified_tags",
         "read_tag_groups_taggable_counts",
         "search"
     };
@@ -113,6 +114,8 @@ int main(int argc, const char** argv) {
             tfm.deletePairings(input);
         } else if (op == "read_taggables_tags") {
             tfm.readTaggablesTags(input, readOutputFileWriter);
+        } else if (op == "read_taggables_specified_tags") {
+            tfm.readTaggablesSpecifiedTags(input, readOutputFileWriter);
         } else if (op == "read_tag_groups_taggable_counts") {
             tfm.readTagGroupsTaggableCountsWithSearch(input, readOutputFileWriter);
         } else if (op == "search") {

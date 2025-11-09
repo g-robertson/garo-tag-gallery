@@ -1,19 +1,23 @@
 import { useState } from 'react';
 import '../../global.css';
-import { User } from '../js/user.js';
 import PartialUploadSelector from '../../components/partial-upload-selector.jsx';
 import LocalTaggableServiceSelector from '../../components/local-taggable-service-selector.jsx';
 import LocalTagServiceSelector from '../../components/local-tag-service-selector.jsx';
+import getActiveJobs from '../../../api/client-get/active-jobs.js';
+
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  user: User
+ *  states: States
+ *  setters: Setters
  * }}
 */
-const ImportFilesFromHydrus = ({user}) => {
+const ImportFilesFromHydrus = ({states, setters}) => {
     const [finishedImportingText, setFinishedImportingText] = useState("");
 
-    const {PartialSelector, PartialSubmitButton} = PartialUploadSelector({text: "Select hydrus ZIP file (parts) you wish to import:", onSubmit: () => {
+    const {PartialSelector, PartialSubmitButton} = PartialUploadSelector({text: "Select hydrus ZIP file (parts) you wish to import:", onSubmit: async () => {
+        setters.setActiveJobs(await getActiveJobs());
         setFinishedImportingText("");
     }, onFinish: () => {
         setFinishedImportingText("Finished importing from hydrus");
@@ -25,8 +29,8 @@ const ImportFilesFromHydrus = ({user}) => {
         <div>
             <form action="/api/post/import-files-from-hydrus" target="frame" method="POST">
                 {PartialSelector}
-                <LocalTaggableServiceSelector user={user} />
-                <LocalTagServiceSelector user={user} />
+                <LocalTaggableServiceSelector states={states} />
+                <LocalTagServiceSelector states={states} />
                 {PartialSubmitButton}
             </form>
             <p style={{color: "green"}}>{finishedImportingText}</p>

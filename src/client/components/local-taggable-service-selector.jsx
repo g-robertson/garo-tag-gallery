@@ -3,17 +3,19 @@ import { User } from '../js/user.js';
 
 
 /** @import {DBPermissionedLocalTaggableService} from "../../db/taggables.js" */
+/** @import {Setters, States} from "../App.jsx" */
+
 
 /**
  * @param {{
- *  user: User
+ *  states: States
  *  onLocalTaggableServiceSelected?: (localTaggableService: DBPermissionedLocalTagService) => void
  *  defaultLocalTaggableService?: DBPermissionedLocalTagService
  * }} param0
  * @returns
  */
-const LocalTaggableServiceSelector = ({user, onLocalTaggableServiceSelected, defaultLocalTaggableService}) => {
-    defaultLocalTaggableService ??= user.localTaggableServices()[0];
+const LocalTaggableServiceSelector = ({states, onLocalTaggableServiceSelected, defaultLocalTaggableService}) => {
+    defaultLocalTaggableService ??= states.user.localTaggableServices()[0];
     onLocalTaggableServiceSelected ??= () => {};
 
     return (
@@ -23,10 +25,10 @@ const LocalTaggableServiceSelector = ({user, onLocalTaggableServiceSelected, def
                 <select style={{display: "inline-block"}} name="localTaggableServiceID" defaultValue={defaultLocalTaggableService?.Local_Taggable_Service_ID} onChange={(e) => {
                     const selectedLocalTaggableService = Number(e.currentTarget.selectedOptions[0].value);
                     onLocalTaggableServiceSelected(
-                        user.localTaggableServices().filter(localTaggableService => localTaggableService.Local_Taggable_Service_ID === selectedLocalTaggableService)[0]
+                        states.user.localTaggableServices().filter(localTaggableService => localTaggableService.Local_Taggable_Service_ID === selectedLocalTaggableService)[0]
                     );
                 }}>
-                    {user.localTaggableServices().map(localTaggableService => (
+                    {states.user.localTaggableServices().map(localTaggableService => (
                         <option value={localTaggableService.Local_Taggable_Service_ID}>{localTaggableService.Service_Name}</option>
                     ))}
                 </select>

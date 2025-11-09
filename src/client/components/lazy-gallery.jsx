@@ -7,26 +7,25 @@ import { useEffect, useRef, useState } from 'react';
 import applyMetricToTaggable from '../../api/client-get/apply-metric-to-taggable.js';
 
 /** @import {DBUserFacingLocalFile} from "../../db/taggables.js" */
-/** @import {User} from "../js/user.js" */
+/** @import {Setters, States} from "../App.jsx" */
 
 /**
  * @param {{
- *  user: User
+ *  states: States
  *  taggableIDs: number[]
- *  initialTaggableID?: number
- *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingLocalFile[]) => void
+ *  initialTaggableIndex?: number
  * }} param0
  */
-const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicked}) => {
+const LazyGallery = ({states, taggableIDs, initialTaggableIndex}) => {
     /** @type {[Map<number, number>, (metricValuesMap: Map<number, number>) => void]} */
     const [metricValuesMap, setMetricValuesMap] = useState(new Map());
     const [metricStarsHovered, setMetricStarsHovered] = useState({localMetricID: -1, starsHovered: -1});
     const galleryID = useRef(randomID(32));
-    const [visibleTaggableID, setVisibleTaggableID] = useState(-1n);
-    let initialLastClickedIndex = taggableIDs.indexOf(initialTaggableID);
-    if (initialLastClickedIndex === -1) {
-        initialLastClickedIndex = 0;
+    initialTaggableIndex ??= 0;
+    if (initialTaggableIndex === -1) {
+        initialTaggableIndex = 0;
     }
+    const [visibleIndex, setVisibleIndex] = useState(initialTaggableIndex);
 
     const VIDEO_ID = `video-${galleryID}`;
 
@@ -35,7 +34,7 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
         if (vid !== null) {
             vid.load();
         }
-    }, [visibleTaggableID]);
+    }, [visibleIndex]);
 
     return <LazySelector
         values={taggableIDs}
@@ -61,17 +60,20 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
             }
             return values.map(taggableID => taggablesResponseMap.get(taggableID));
         }}
-        customItemComponent={({realizedValue, setRealizedValue}) => {
-            if (visibleTaggableID !== realizedValue.Taggable_ID) {
-                setVisibleTaggableID(realizedValue.Taggable_ID);
+        customItemComponent={({realizedValue, index, setRealizedValue}) => {
+            if (visibleIndex !== index) {
+                setVisibleIndex(index);
                 setMetricValuesMap(new Map(realizedValue.Metrics.map(metric => [metric.Local_Metric_ID, metric])));
             }
             const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];
             const src = `images-database/${realizedValue.File_Hash.slice(0, 2)}/${realizedValue.File_Hash.slice(2, 4)}/${realizedValue.File_Hash}${realizedValue.File_Extension}`;
 
             return <div style={{width: "100%", height: "100%", justifyContent: "center"}}>
-                <div style={{position: "absolute", top: "3vh", right: "0vh", flexDirection: "column"}}>
-                    {user.localMetricServices().map(localMetricService => localMetricService.Local_Metrics).flat().map(localMetric => (<div>
+                <div style={{position: "absolute", bottom: "4px", left: "4px"}}>
+                    {visibleIndex + 1} / {taggableIDs.length}
+                </div>
+                <div style={{position: "absolute", top: "3vh", right: "0", flexDirection: "column"}}>
+                    {states.user.localMetricServices().map(localMetricService => localMetricService.Local_Metrics).flat().map(localMetric => (<div>
                         <div style={{flexDirection: "column", justifyItems: "center"}}>{localMetric.Local_Metric_Name}</div> {
                             localMetric.Local_Metric_Type === METRIC_TYPES.STARS
                           ? (() => {
@@ -130,7 +132,6 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
                 }
             </div>
         }}
-        onValuesDoubleClicked={onValuesDoubleClicked}
         customTitleRealizer={() => ""}
         valueRealizationDelay={50}
         valueRealizationRange={5}
@@ -140,8 +141,7 @@ const LazyGallery = ({user, taggableIDs, initialTaggableID, onValuesDoubleClicke
         }}
         scrollbarIncrement={1}
         scrollbarWidth={0}
-        preloadRealizedItems={true}
-        initialLastClickedIndex={initialLastClickedIndex}
+        initialLastClickedIndex={initialTaggableIndex}
         elementsSelectable={false}
     />
 };

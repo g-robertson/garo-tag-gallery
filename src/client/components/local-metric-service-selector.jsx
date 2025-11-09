@@ -1,19 +1,19 @@
 import { useEffect } from 'react';
 import '../global.css';
-import { User } from '../js/user.js';
 
 /** @import {DBPermissionedLocalMetricService} from "../../db/metrics.js" */
+/** @import {Setters, States} from "../App.jsx" */
 
 /**
  * @param {{
- *  user: User
+ *  states: States
  *  onMetricServiceSelected?: (localMetricService: DBPermissionedLocalMetricService) => void
  *  defaultLocalMetricService?: DBPermissionedLocalMetricService
  * }} param0
- * @returns s
+ * @returns
  */
-const LocalMetricServiceSelector = ({user, onMetricServiceSelected, defaultLocalMetricService}) => {
-    defaultLocalMetricService ??= user.localMetricServices()[0];
+const LocalMetricServiceSelector = ({states, onMetricServiceSelected, defaultLocalMetricService}) => {
+    defaultLocalMetricService ??= states.user.localMetricServices()[0];
     onMetricServiceSelected ??= () => {};
 
     useEffect(() => {
@@ -26,10 +26,10 @@ const LocalMetricServiceSelector = ({user, onMetricServiceSelected, defaultLocal
                 <select style={{display: "inline-block"}} name="localMetricServiceID" defaultValue={defaultLocalMetricService?.Local_Metric_Service_ID} onChange={(e) => {
                     const selectedLocalMetricServiceID = Number(e.currentTarget.selectedOptions[0].value);
                     onMetricServiceSelected(
-                        user.localMetricServices().filter(localMetricService => localMetricService.Local_Metric_Service_ID === selectedLocalMetricServiceID)[0]
+                        states.user.localMetricServices().filter(localMetricService => localMetricService.Local_Metric_Service_ID === selectedLocalMetricServiceID)[0]
                     );
                 }}>
-                    {user.localMetricServices().map(localMetricService => (
+                    {states.user.localMetricServices().map(localMetricService => (
                         <option value={localMetricService.Local_Metric_Service_ID}>{localMetricService.Service_Name}</option>
                     ))}
                 </select>

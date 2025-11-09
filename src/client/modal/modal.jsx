@@ -1,15 +1,14 @@
 import '../global.css';
 import { FetchCache } from '../js/client-util.js';
 
+/** @import {Setters, States} from "../App.jsx" */
 /** @import {User} from "../js/user.js" */
 /** @import {JSX} from "react" */
 /** 
  * @type {Record<string, {
  *     component: (param0: {
- *         modalOptions: ModalOptions,
- *         fetchCache: FetchCache
- *         pushModal: (modalName: string, extraProperties: any) => Promise<any>,
- *         popModal: () => void
+ *         states: States
+ *         setters: Setters
  *         user: User
  *     }) => JSX.Element
  *     modalProperties: {
@@ -28,6 +27,7 @@ const MODALS = {};
 (async () => {
     const modals =  [
         await import("./modals/gallery.jsx"),
+        await import("./modals/dedupe-gallery.jsx"),
         await import('./modals/create-or-search-group.jsx'),
         await import('./modals/create-and-search-group.jsx'),
         await import('./modals/import-files-from-hydrus.jsx'),
@@ -68,17 +68,14 @@ const MODALS = {};
 /**
  * 
  * @param {{
+ *     states: States
+ *     setters: Setters
  *     modalOptions: ModalOptions
- *     fetchCache: FetchCache
- *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *     popModal: () => void
- *     user: User
- *     setUser: (user: User) => void
- *     index: number
+ *     index: number,
  * }} param0 
  * @returns 
  */
-const Modal = ({modalOptions, fetchCache, pushModal, popModal, user, setUser, index}) => {
+const Modal = ({states, setters, modalOptions, index}) => {
     const {component, modalProperties} = MODALS[modalOptions.modalName];
     modalOptions.extraProperties ??= {};
     const displayName = modalOptions.extraProperties.displayName ?? modalProperties.displayName;
@@ -90,7 +87,7 @@ const Modal = ({modalOptions, fetchCache, pushModal, popModal, user, setUser, in
     const left = ((100 - width) / 2);
     const top = ((100 - height) / 2) + (moveWithIndex * index)
 
-    let modalStyle = {zIndex: 999, border: hasBorder ? "2px solid white" : "none", maxWidth: "100%"}; ;
+    let modalStyle = {zIndex: 999, position: "absolute", border: hasBorder ? "2px solid white" : "none", maxWidth: "100%"}; ;
     if (modalProperties.shrinkToContent === true) {
         modalStyle.top = "50%";
         modalStyle.left = "50%";
@@ -107,12 +104,12 @@ const Modal = ({modalOptions, fetchCache, pushModal, popModal, user, setUser, in
             hasTopbar
             ?    <div className="modal-topbar">
                      <div className="modal-title">{displayName}</div>
-                     <div className="modal-cancel" onClick={popModal}>X</div>
+                     <div className="modal-cancel" onClick={setters.popModal}>X</div>
                  </div>
-            :    <div style={{position: "absolute", top: 0, right: 0, zIndex: 100}} className="modal-cancel" onClick={popModal}>X</div>
+            :    <div style={{position: "absolute", top: 0, right: 0, zIndex: 100}} className="modal-cancel" onClick={setters.popModal}>X</div>
         }
         <div className="modal-content">
-            {component({modalOptions, fetchCache, user, setUser, pushModal, popModal})}
+            {component({states, setters, modalOptions})}
         </div>
     </div>);
 };

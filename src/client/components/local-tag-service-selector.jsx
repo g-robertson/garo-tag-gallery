@@ -3,17 +3,19 @@ import { User } from '../js/user.js';
 
 
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
+/** @import {Setters, States} from "../App.jsx" */
+
 
 /**
  * @param {{
- *  user: User
+ *  states: States
  *  onLocalTagServiceSelected?: (localTagService: DBPermissionedLocalTagService) => void
  *  defaultLocalTagService?: DBPermissionedLocalTagService
  * }} param0
  * @returns
  */
-const LocalTagServiceSelector = ({user, onLocalTagServiceSelected, defaultLocalTagService}) => {
-    defaultLocalTagService ??= user.localTagServices()[0];
+const LocalTagServiceSelector = ({states, onLocalTagServiceSelected, defaultLocalTagService}) => {
+    defaultLocalTagService ??= states.user.localTagServices()[0];
     onLocalTagServiceSelected ??= () => {};
 
     return (
@@ -23,10 +25,10 @@ const LocalTagServiceSelector = ({user, onLocalTagServiceSelected, defaultLocalT
                 <select style={{display: "inline-block"}} name="localTagServiceID" defaultValue={defaultLocalTagService?.Local_Tag_Service_ID} onChange={(e) => {
                     const selectedLocalTagService = Number(e.currentTarget.selectedOptions[0].value);
                     onLocalTagServiceSelected(
-                        user.localTagServices().filter(localTagService => localTagService.Local_Tag_Service_ID === selectedLocalTagService)[0]
+                        states.user.localTagServices().filter(localTagService => localTagService.Local_Tag_Service_ID === selectedLocalTagService)[0]
                     );
                 }}>
-                    {user.localTagServices().map(localTagService => (
+                    {states.user.localTagServices().map(localTagService => (
                         <option value={localTagService.Local_Tag_Service_ID}>{localTagService.Service_Name}</option>
                     ))}
                 </select>

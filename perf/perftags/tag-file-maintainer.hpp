@@ -70,6 +70,7 @@ class TagFileMaintainer {
         void deletePairings(std::string_view input);
         void readTagGroupsTaggableCountsWithSearch(std::string_view input, void (*writer)(const std::string&));
         void readTaggablesTags(std::string_view input, void (*writer)(const std::string&));
+        void readTaggablesSpecifiedTags(std::string_view input, void (*writer)(const std::string&));
         void search(std::string_view input, void (*writer)(const std::string&));
         void flushFiles();
         void purgeUnusedFiles() const;

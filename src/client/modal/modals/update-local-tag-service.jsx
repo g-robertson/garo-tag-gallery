@@ -6,23 +6,22 @@ import LocalTagServiceSelector from '../../components/local-tag-service-selector
 import LocalTagServiceModifications from '../../components/local-tag-service-modifications.jsx';
 import deleteLocalTagService from '../../../api/client-get/delete-local-tag-service.js';
 
-/** @import {User} from "../../js/user.js" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  user: User
- *  setUser: (user: User) => void
- *  popModal: () => void
+ *  states: States
+ *  setters: Setters
  * }}
 */
-const UpdateLocalTagService = ({user, setUser, popModal}) => {
-    const defaultLocalTagService = user.localTagServices()[0];
+const UpdateLocalTagService = ({states, setters}) => {
+    const defaultLocalTagService = states.user.localTagServices()[0];
     const [selectedLocalTagService, setSelectedLocalTagService] = useState(defaultLocalTagService);
 
     return (
         <div style={{flexDirection: "column"}}>
             <form action="/api/post/update-local-tag-service" target="frame" method="POST">
-                <LocalTagServiceSelector user={user} defaultLocalTagService={defaultLocalTagService} onLocalTagServiceSelected={localTagService => {
+                <LocalTagServiceSelector states={states} defaultLocalTagService={defaultLocalTagService} onLocalTagServiceSelected={localTagService => {
                     setSelectedLocalTagService(localTagService);
                 }} />
                 <LocalTagServiceModifications selectedLocalTagService={selectedLocalTagService} />
@@ -36,15 +35,15 @@ const UpdateLocalTagService = ({user, setUser, popModal}) => {
                     if (confirm) {
                         (async () => {
                             await deleteLocalTagService(selectedLocalTagService.Local_Tag_Service_ID);
-                            setUser(await getMe());
-                            popModal();
+                            setters.setUser(await getMe());
+                            setters.popModal();
                         })();
                     }
                 }} />
             </div>
             <OnFormSubmit onFormSubmit={async () => {
-                setUser(await getMe());
-                popModal();
+                setters.setUser(await getMe());
+                setters.popModal();
             }} />
         </div>
     );

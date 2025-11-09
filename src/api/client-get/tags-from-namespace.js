@@ -1,4 +1,4 @@
-import { fjsonParse } from "../../client/js/client-util.js";
+import { fbjsonParse } from "../../client/js/client-util.js";
 
 /** @import {ClientTag} from "../post/update-taggables.js" */
 
@@ -17,7 +17,7 @@ export default async function getTagsFromNamespaceID(namespaceID) {
     });
 
     /** @type {ClientTag[]} */
-    const tagsResponse = (await fjsonParse(response)).map(tag => ({
+    const tagsResponse = (await fbjsonParse(response)).map(tag => ({
         tagName: tag[0],
         displayName: tag[1],
         namespaces: tag[2],

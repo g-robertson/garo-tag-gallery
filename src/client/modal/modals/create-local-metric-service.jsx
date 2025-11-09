@@ -3,15 +3,14 @@ import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import getMe from '../../../api/client-get/me.js';
 import LocalMetricServiceModifications from '../../components/local-metric-service-modifications.jsx';
 
-/** @import {User} from "../../js/user.js" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  setUser: (user: User) => void
- *  popModal: () => void
+ *  setters: Setters
  * }}
 */
-const CreateLocalMetricService = ({setUser, popModal}) => {
+const CreateLocalMetricService = ({setters}) => {
     return (
         <div>
             <form action="/api/post/create-local-metric-service" target="frame" method="POST">
@@ -21,8 +20,8 @@ const CreateLocalMetricService = ({setUser, popModal}) => {
                 </div>
             </form>
             <OnFormSubmit onFormSubmit={async () => {
-                setUser(await getMe());
-                popModal();
+                setters.setUser(await getMe());
+                setters.popModal();
             }} />
         </div>
     );

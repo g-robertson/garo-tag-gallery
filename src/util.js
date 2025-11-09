@@ -57,8 +57,62 @@ function getFFMPEGExecutableName() {
     return "ffmpeg";
 }
 
-export async function extractFirstFrameWithFFMPEG(inputFileName, outputFileName, ffmpegExecutable) {
-    const ret = spawn(ffmpegExecutable ?? getFFMPEGExecutableName(), ['-y', '-i', inputFileName, "-vf", "scale=iw*sar:ih,setsar=1", '-vframes', '1', outputFileName]);
+function getFFPROBEExecutableName() {
+    if (process.platform === "win32") {
+        return ".\\extern\\ffprobe.exe";
+    }
+    return "ffprobe";
+}
+
+/**
+ * @param {string} inputFileName 
+ * @param {number} seconds 
+ * @param {string} outputFileName
+ * @param {{width: number, height: number}} dimensions
+ * @param {string=} ffmpegExecutable 
+ */
+export async function extractNthSecondWithFFMPEG(inputFileName, seconds, outputFileName, dimensions, ffmpegExecutable) {
+    let scale = "scale=iw*sar:ih,setsar=1";
+    if (dimensions !== undefined) {
+        scale = `scale=${dimensions.width}:${dimensions.height}`;
+    }
+
+    let ret;
+    if (seconds === 0) {
+        ret = spawn(ffmpegExecutable ?? getFFMPEGExecutableName(), ['-y', '-i', inputFileName, "-vf", scale, '-vframes', '1', outputFileName]);
+    } else {
+        const threeSecondPrior = seconds - 3;
+        if (threeSecondPrior > 0) {
+            ret = spawn(ffmpegExecutable ?? getFFMPEGExecutableName(), [
+                '-y',
+                "-ss",
+                threeSecondPrior.toFixed(6),
+                '-i',
+                inputFileName,
+                "-ss",
+                "3",
+                "-vf",
+                scale,
+                '-vframes',
+                '1',
+                outputFileName
+            ]);
+
+        } else {
+            ret = spawn(ffmpegExecutable ?? getFFMPEGExecutableName(), [
+                '-y',
+                '-i',
+                inputFileName,
+                "-ss",
+                seconds.toFixed(6),
+                "-vf",
+                scale,
+                '-vframes',
+                '1',
+                outputFileName
+            ]);
+        }
+    }
     return await new Promise(resolve => {
         ret.on("error", (e) => {
             console.log(e);
@@ -69,6 +123,56 @@ export async function extractFirstFrameWithFFMPEG(inputFileName, outputFileName,
                 resolve(false);
             }
             resolve(true);
+        })
+    });
+}
+
+/**
+ * @param {string} inputFileName 
+ * @param {string} ffprobeExecutable
+ * @returns {Promise<{
+ *   frames: number
+ *   duration: number
+ *   width: number
+ *   height: number
+ * }>}
+ */
+export async function extractMetadataWithFFPROBE(inputFileName, ffprobeExecutable) {
+    const ret = spawn(ffprobeExecutable ?? getFFPROBEExecutableName(), [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-count_packets",
+        "-show_entries",
+        "format=duration:stream=nb_read_packets,width,height",
+        "-of",
+        "json=c=1",
+        inputFileName
+    ]);
+    let metadata = "";
+    ret.stdout.on("data", (chunk) => {
+        metadata += chunk.toString();
+    });
+
+    return await new Promise(resolve => {
+        ret.on("error", (e) => {
+            console.log(e);
+            resolve(undefined);
+        });
+
+        ret.on("exit", (code) => {
+            if (code !== 0) {
+                resolve(undefined);
+            }
+
+            const parsedMetadata = JSON.parse(metadata);
+            resolve({
+                duration: Number(parsedMetadata.format.duration),
+                frames: Number(parsedMetadata.streams[0].nb_read_packets),
+                width: parsedMetadata.streams[0].width,
+                height: parsedMetadata.streams[0].height,
+            });
         })
     });
 }

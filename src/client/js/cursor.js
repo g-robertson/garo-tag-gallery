@@ -1,0 +1,1 @@
+export const NO_FILE_CURSOR_FOUND = "No file cursor found for user";

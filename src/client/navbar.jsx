@@ -3,7 +3,7 @@ import './global.css';
 import { IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES } from './modal/modals/import-files-from-hydrus.jsx';
 import { CREATE_LOCAL_METRIC_MODAL_PROPERTIES } from './modal/modals/create-local-metric.jsx';
 import { CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES } from './modal/modals/change-tag-to-metric.jsx';
-import { PAGE_NAME as FILE_SEARCH_PAGE_NAME, PAGE_DEFAULT_DISPLAY_NAME as FILE_SEARCH_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
+import { FILE_SEARCH_PAGE_NAME, FILE_SEARCH_PAGE_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
 import { randomID } from './js/client-util.js';
 import { CREATE_URL_GENERATOR_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-url-generator-service.jsx';
 import { IMPORT_MAPPINGS_FROM_BACKUP_MODAL_PROPERTIES } from './modal/modals/import-mappings-from-backup.jsx';
@@ -13,6 +13,7 @@ import { UPDATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES } from './modal/modals/update
 import { UPDATE_LOCAL_TAGGABLE_SERVICE_MODAL_PROPERTIES } from './modal/modals/update-local-taggable-service.jsx';
 import { UPDATE_LOCAL_METRIC_MODAL_PROPERTIES } from './modal/modals/update-local-metric.jsx';
 import { CREATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES } from './modal/modals/create-local-tag-service.jsx';
+import { DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME, DUPLICATES_PROCESSING_PAGE_NAME } from './page/pages/duplicates-page.jsx';
 
 const FILE_MENU = "file";
 const PAGES_MENU = "pages";
@@ -27,11 +28,10 @@ const PARSERS_MENU = "parsers";
  * @param {{
  *     setters: Setters,
  *     states: States,
- *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
  * }} param0 
  * @returns 
  */
-const Navbar = ({setters, states, pushModal}) => {
+const Navbar = ({setters, states}) => {
     /** @type [string | null, (menuOpened: string | null) => void] */
     const [menuOpened, setMenuOpened] = useState(null);
 
@@ -46,11 +46,11 @@ const Navbar = ({setters, states, pushModal}) => {
                 <div className="topbar-dropdown-options" style={{display: menuOpened === FILE_MENU ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(IMPORT_FILES_FROM_HYDRUS_MODAL_PROPERTIES.modalName);
                     }}>Import files from Hydrus</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(IMPORT_MAPPINGS_FROM_BACKUP_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(IMPORT_MAPPINGS_FROM_BACKUP_MODAL_PROPERTIES.modalName);
                     }}>Import mappings from backup</div>
                     <a href="/api/get/backup" download="garo-backup.json"><div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
@@ -64,13 +64,25 @@ const Navbar = ({setters, states, pushModal}) => {
                         const newActivePageIndex = states.pages.length;
                         setters.setPages([...states.pages, {
                             pageName: FILE_SEARCH_PAGE_NAME,
-                            pageDisplayName: FILE_SEARCH_DEFAULT_DISPLAY_NAME,
+                            pageDisplayName: FILE_SEARCH_PAGE_DEFAULT_DISPLAY_NAME,
                             pageID: randomID(32)
                         }]);
                         setters.setActivePageIndex(newActivePageIndex);
 
                         setMenuOpened(null);
                     }}>New file search page</div>
+                    {/* Further implementation needed
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        const newActivePageIndex = states.pages.length;
+                        setters.setPages([...states.pages, {
+                            pageName: DUPLICATES_PROCESSING_PAGE_NAME,
+                            pageDisplayName: DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME,
+                            pageID: randomID(32)
+                        }]);
+                        setters.setActivePageIndex(newActivePageIndex);
+
+                        setMenuOpened(null);
+                    }}>New duplicates processing page</div>*/}
                 </div>
             </div>
             <div className="topbar-dropdown">
@@ -78,11 +90,11 @@ const Navbar = ({setters, states, pushModal}) => {
                 <div className="topbar-dropdown-options" style={{display: menuOpened === TAGS_MENU ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(CREATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(CREATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES.modalName);
                     }}>Create new tag service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(UPDATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(UPDATE_LOCAL_TAG_SERVICE_MODAL_PROPERTIES.modalName);
                     }}>Update/delete existing tag service</div>
                 </div>
             </div>
@@ -91,7 +103,7 @@ const Navbar = ({setters, states, pushModal}) => {
                 <div className="topbar-dropdown-options" style={{display: menuOpened === TAGGABLES_MENU ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(UPDATE_LOCAL_TAGGABLE_SERVICE_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(UPDATE_LOCAL_TAGGABLE_SERVICE_MODAL_PROPERTIES.modalName);
                     }}>Update/delete existing taggable service</div>
                 </div>
             </div>
@@ -100,23 +112,23 @@ const Navbar = ({setters, states, pushModal}) => {
                 <div className="topbar-dropdown-options" style={{display: menuOpened === METRICS_MENU ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(CREATE_LOCAL_METRIC_SERVICE_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(CREATE_LOCAL_METRIC_SERVICE_MODAL_PROPERTIES.modalName);
                     }}>Create new metric service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(UPDATE_LOCAL_METRIC_SERVICE_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(UPDATE_LOCAL_METRIC_SERVICE_MODAL_PROPERTIES.modalName);
                     }}>Update/delete existing metric service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(CREATE_LOCAL_METRIC_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(CREATE_LOCAL_METRIC_MODAL_PROPERTIES.modalName);
                     }}>Create new metric</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(UPDATE_LOCAL_METRIC_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(UPDATE_LOCAL_METRIC_MODAL_PROPERTIES.modalName);
                     }}>Update/delete existing metric</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES.modalName);
                     }}>Change tag to metric</div>
                 </div>
             </div>
@@ -125,7 +137,7 @@ const Navbar = ({setters, states, pushModal}) => {
                 <div className="topbar-dropdown-options" style={{display: menuOpened === PARSERS_MENU ? "block" : "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        pushModal(CREATE_URL_GENERATOR_SERVICE_MODAL_PROPERTIES.modalName);
+                        setters.pushModal(CREATE_URL_GENERATOR_SERVICE_MODAL_PROPERTIES.modalName);
                     }}>Create new URL generator service</div>
                     
                 </div>

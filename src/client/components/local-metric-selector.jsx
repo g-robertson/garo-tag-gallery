@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react';
 import '../global.css';
-import { User } from '../js/user.js';
 import LocalMetricServiceSelector from './local-metric-service-selector.jsx';
 
 /** @import {DBLocalMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js" */
+/** @import {Setters, States} from "../App.jsx" */
 
 /**
  * @param {{
- *  user: User
+ *  states: States
  *  onLocalMetricSelected: (localMetric: DBLocalMetric) => void
  *  onLocalMetricServiceSelected: (localMetricService: DBPermissionedLocalMetricService) => void
  *  defaultLocalMetricService?: DBPermissionedLocalMetricService
  *  defaultLocalMetric?: DBLocalMetric
  * }} param0
- * @returns s
+ * @returns
  */
-const LocalMetricSelector = ({user, onLocalMetricSelected, onLocalMetricServiceSelected, defaultLocalMetricService, defaultLocalMetric}) => {
+const LocalMetricSelector = ({states, onLocalMetricSelected, onLocalMetricServiceSelected, defaultLocalMetricService, defaultLocalMetric}) => {
     onLocalMetricServiceSelected ??= () => {};
     onLocalMetricSelected ??= () => {};
     defaultLocalMetricService ??= user.localMetricServices()[0];
@@ -31,7 +31,7 @@ const LocalMetricSelector = ({user, onLocalMetricSelected, onLocalMetricServiceS
 
     return (
         <>
-            <LocalMetricServiceSelector user={user} defaultLocalMetricService={defaultLocalMetricService} onMetricServiceSelected={(localMetricService) => {
+            <LocalMetricServiceSelector states={states} defaultLocalMetricService={defaultLocalMetricService} onMetricServiceSelected={(localMetricService) => {
                 setLocalMetricService(localMetricService);
             }}/>
             <div style={{marginLeft: "8px"}}>

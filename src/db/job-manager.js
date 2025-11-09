@@ -5,9 +5,23 @@
  * @property {number=} remainingSubtasks
  */
 
-import { mapNullCoalesce } from "../client/js/client-util.js";
+/**
+ * @typedef {Object} ClientJob
+ * @property {string} jobID
+ * @property {string} jobName
+ * @property {string} jobType
+ * @property {string} taskName
+ * @property {number} finishedSubtaskCount
+ * @property {number} totalEstimatedSubtasks
+ * @property {boolean} done
+ */
+
+import { mapNullCoalesce, randomID } from "../client/js/client-util.js";
 
 export class Job {
+    #jobID;
+    #jobName;
+    #jobType;
     #generator;
     #durationBetweenTasks;
     #totalEstimatedSubtasks;
@@ -19,6 +33,8 @@ export class Job {
 
     /**
      * @param {{
+     *     jobName: string
+     *     jobType?: string
      *     durationBetweenTasks?: number
      *     totalEstimatedSubtasks?: number
      * }} param0
@@ -26,15 +42,29 @@ export class Job {
 
      */
     constructor({
+        jobName,
+        jobType,
         durationBetweenTasks,
         totalEstimatedSubtasks,
     }, generator) {
+        jobType ??= "Untyped";
         durationBetweenTasks ??= 100;
         totalEstimatedSubtasks ??= Job.UNKNOWN_SUBTASK_ESTIMATE;
 
         this.#generator = generator();
+        this.#jobID = randomID(32);
+        this.#jobName = jobName;
+        this.#jobType = jobType;
         this.#durationBetweenTasks = durationBetweenTasks;
         this.#totalEstimatedSubtasks = totalEstimatedSubtasks;
+    }
+
+    jobID() {
+        return this.#jobID;
+    }
+
+    jobType() {
+        return this.#jobType;
     }
 
     async execute() {
@@ -42,7 +72,7 @@ export class Job {
         do {
             let {value, done} = (await this.#generator.next());
             this.#finishedSubtaskCount += upcomingSubtasks;
-            if (done) {
+            if (done || this.#done) {
                 break;
             }
 
@@ -54,7 +84,6 @@ export class Job {
             }
             if (value.upcomingSubtasks !== undefined) {
                 upcomingSubtasks = value.upcomingSubtasks;
-                console.log(upcomingSubtasks, this.#finishedSubtaskCount, this.#totalEstimatedSubtasks);
                 if (this.#durationBetweenTasks !== 0) {
                     await new Promise(resolve => {
                         setTimeout(resolve, this.#durationBetweenTasks);
@@ -72,6 +101,10 @@ export class Job {
         }
     }
 
+    cancel() {
+        this.#done = true;
+    }
+
     /**
      * @param {(job: Job) => void} onFinish 
      */
@@ -80,31 +113,62 @@ export class Job {
     }
 
     static UNKNOWN_SUBTASK_ESTIMATE = Infinity;
+
+    toJSON() {
+        return {
+            jobID: this.#jobID,
+            jobName: this.#jobName,
+            jobType: this.#jobType,
+            taskName: this.#currentTaskName,
+            finishedSubtaskCount: this.#finishedSubtaskCount,
+            totalEstimatedSubtasks: this.#totalEstimatedSubtasks,
+            done: this.#done
+        };
+    }
 }
 
+/** @template T */
 export class JobManager {
-    /** @type {Map<any, Set<Job>>} */
+    /** @type {Map<T, Map<string, Job>>} */
     #runnersJobs = new Map();
 
     /**
-     * @param {any} runner 
+     * @param {T} runner 
      * @param {Job} job 
      */
     addJobToRunner(runner, job) {
-        const runnerJobs = mapNullCoalesce(this.#runnersJobs, runner, new Set());
+        const runnerJobs = mapNullCoalesce(this.#runnersJobs, runner, new Map());
 
         job.addOnFinishCallback(job => {
-            runnerJobs.delete(job);
+            runnerJobs.delete(job.jobID());
         });
 
-        runnerJobs.add(job);
+        runnerJobs.set(job.jobID(), job);
         job.execute();
     }
 
     /**
-     * @param {any} runner 
+     * @param {T} runner
+     * @param {string} jobID
+     */
+    cancelJobOnRunner(runner, jobID) {
+        const runnerJobs = this.#runnersJobs.get(runner);
+        if (runnerJobs === undefined) {
+            return;
+        }
+
+        const job = runnerJobs.get(jobID);
+        job.cancel();
+    }
+
+    /**
+     * @param {T} runner 
      */
     getJobsForRunner(runner) {
-        return [...this.#runnersJobs.get(runner)] ?? [];
+        const runnerJobs = this.#runnersJobs.get(runner);
+        if (runnerJobs === undefined) {
+            return [];
+        }
+        return [...runnerJobs.values()];
     }
 }

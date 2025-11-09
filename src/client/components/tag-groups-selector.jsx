@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 /** @import {DBNamespace} from "../../db/tags.js" */
 /** @import {DBLocalMetric} from "../../db/metrics.js" */
 /** @import {ClientTagGroup} from "../../api/post/search-taggables.js" */
+/** @import {Setters, States} from "../App.jsx" */
 
 /**
  * @typedef {{
@@ -19,12 +20,12 @@ import { useEffect, useState } from "react";
 
 /**
  * @param {{
- *  user: User
+ *  states: States
  *  multiSelect?: boolean
  *  onTagGroupsSelected?: (tagGroups: DisplayClientTagGroup[]) => void
  * }} param0
  */
-const TagGroupsSelector = ({user, multiSelect, onTagGroupsSelected}) => {
+const TagGroupsSelector = ({states, multiSelect, onTagGroupsSelected}) => {
     multiSelect ??= true;
     onTagGroupsSelected ??= () => {};
     const NAMESPACES_SELECTED = 0;
@@ -35,7 +36,7 @@ const TagGroupsSelector = ({user, multiSelect, onTagGroupsSelected}) => {
     /** @type {DisplayClientTagGroup[]} */
     let tagGroups = [];
     if (tagGroupOptionsSelected.has(METRIC_RATINGS_SELECTED)) {
-        tagGroups = tagGroups.concat(user.localMetricServices().map(localMetricService => localMetricService.Local_Metrics).flat().map(localMetric => ({
+        tagGroups = tagGroups.concat(states.user.localMetricServices().map(localMetricService => localMetricService.Local_Metrics).flat().map(localMetric => ({
             type: "applied-metrics",
             displayName: `aggregate metric:${localMetric.Local_Metric_Name}`,
             Local_Metric_ID: localMetric.Local_Metric_ID,

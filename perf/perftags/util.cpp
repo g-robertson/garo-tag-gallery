@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 
-void util::serializeUInt64(const uint64_t& i, std::string& str, std::size_t& location) {
+std::size_t util::serializeUInt64(const uint64_t& i, std::string& str, std::size_t location) {
     if (location + 8 > str.size()) {
         str.resize(location + 8);
     }
@@ -18,7 +18,7 @@ void util::serializeUInt64(const uint64_t& i, std::string& str, std::size_t& loc
     str[location + 6] = std::bit_cast<char>(static_cast<unsigned char>((i >>  8ULL) & 0xFFULL));
     str[location + 7] = std::bit_cast<char>(static_cast<unsigned char>((i         ) & 0xFFULL));
 
-    location += 8;
+    return location + 8;
 }
 
 const uint8_t DESERIALIZE_FLOAT_INDEX_0 = (std::endian::native == std::endian::little) ? 0 : 3;

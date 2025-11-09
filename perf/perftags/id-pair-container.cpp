@@ -24,13 +24,13 @@ std::string IdPairDiffContainer::serialize() const {
         }
 
         // {first}
-        util::serializeUInt64(pair.first, pairingsStr, location);
+        location = util::serializeUInt64(pair.first, pairingsStr, location);
         // {physical size}
-        util::serializeUInt64(pair.second.size(), pairingsStr, location);
+        location = util::serializeUInt64(pair.second.size(), pairingsStr, location);
 
         for (auto second : pair.second) {
             // {second}
-            util::serializeUInt64(second, pairingsStr, location);
+            location = util::serializeUInt64(second, pairingsStr, location);
         }
     }
 
@@ -421,18 +421,18 @@ std::string IdPairContainer::serialize() const {
         }
 
         // {first}
-        util::serializeUInt64(pair.first, pairingsStr, location);
+        location = util::serializeUInt64(pair.first, pairingsStr, location);
         // {complement}
         util::serializeChar(pair.second.complementIndicator(), pairingsStr, location);
         if (pair.second.complementIndicator() == IdPairSecond::IS_COMPLEMENT) {
             ++complementsSerialized;
         }
         // {physical size}
-        util::serializeUInt64(pair.second.physicalSize(), pairingsStr, location);
+        location = util::serializeUInt64(pair.second.physicalSize(), pairingsStr, location);
 
         for (auto physicalSecond : pair.second.physicalContents()) {
             // {physical second}
-            util::serializeUInt64(physicalSecond, pairingsStr, location);
+            location = util::serializeUInt64(physicalSecond, pairingsStr, location);
         }
     }
 

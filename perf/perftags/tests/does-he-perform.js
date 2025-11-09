@@ -8,62 +8,66 @@ import PerfTags from "../../src/perf-tags-binding/perf-tags.js"
  * @type {Record<string, TestFunction>}
  */
 const TESTS = {
-    "read_file_tags": async (createPerfTags) => {
+    "read_taggables_tags": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-        const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
+        const tagPairings = PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n,4n]]]));
         await perfTags.insertTagPairings(tagPairings);
         const {ok, taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
-        const strTaggablePairings = getStrPairingsFromPairings(taggablePairings);
-        if (strTaggablePairings['tgbl0001'].length !== 4) {
-            throw "Taggable pairings tgbl0001 does not have 4 tags";
+        if (taggablePairings.get(1n).length !== 4) {
+            throw "Taggable pairings 1 does not have 4 tags";
         }
-        if (strTaggablePairings['tgbl0001'].indexOf("tag00001") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00002") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00003") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00004") === -1) {
-            throw "Taggable pairings tgbl0001 lacks one of the placed tags";
+        if (taggablePairings.get(1n).indexOf(1n) === -1 ||
+            taggablePairings.get(1n).indexOf(2n) === -1 ||
+            taggablePairings.get(1n).indexOf(3n) === -1 ||
+            taggablePairings.get(1n).indexOf(4n) === -1) {
+            throw "Taggable pairings 1 lacks one of the placed tags";
         }
     },
-    "read_file_tags_after_exit": async (createPerfTags) => {
+    "read_taggables_tags_after_exit": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-        const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
+        const tagPairings = PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n,4n]]]));
         await perfTags.insertTagPairings(tagPairings);
         await perfTags.close();
         perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
-        const strTaggablePairings = getStrPairingsFromPairings(taggablePairings);
-        if (strTaggablePairings['tgbl0001'] === undefined) {
-            throw "Taggable pairings does not have tgbl0001";
+        if (taggablePairings.get(1n).length !== 4) {
+            throw "Taggable pairings 1 does not have 4 tags";
         }
-        if (strTaggablePairings['tgbl0001'].length !== 4) {
-            throw "Taggable pairings tgbl0001 does not have 4 tags";
-        }
-        if (strTaggablePairings['tgbl0001'].indexOf("tag00001") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00002") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00003") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00004") === -1) {
-            throw "Taggable pairings tgbl0001 lacks one of the placed tags";
+        if (taggablePairings.get(1n).indexOf(1n) === -1 ||
+            taggablePairings.get(1n).indexOf(2n) === -1 ||
+            taggablePairings.get(1n).indexOf(3n) === -1 ||
+            taggablePairings.get(1n).indexOf(4n) === -1) {
+            throw "Taggable pairings 1 lacks one of the placed tags";
         }
     },
-    "read_file_tags_after_kill": async (createPerfTags) => {
+    "read_taggables_tags_after_kill": async (createPerfTags) => {
         let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-        const tagPairings = getPairingsFromStrPairings(strTaggablePairingsToStrTagPairings({'tgbl0001': ['tag00001','tag00002','tag00003','tag00004']}));
+        const tagPairings = PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n,4n]]]));
         await perfTags.insertTagPairings(tagPairings);
         perfTags.__kill();
         perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
         const {taggablePairings} = await perfTags.readTaggablesTags(PerfTags.getTaggablesFromTagPairings(tagPairings));
-        const strTaggablePairings = getStrPairingsFromPairings(taggablePairings);
-        if (strTaggablePairings['tgbl0001'] === undefined) {
-            throw "Taggable pairings does not have tgbl0001";
+        if (taggablePairings.get(1n).length !== 4) {
+            throw "Taggable pairings 1 does not have 4 tags";
         }
-        if (strTaggablePairings['tgbl0001'].length !== 4) {
-            throw "Taggable pairings tgbl0001 does not have 4 tags";
+        if (taggablePairings.get(1n).indexOf(1n) === -1 ||
+            taggablePairings.get(1n).indexOf(2n) === -1 ||
+            taggablePairings.get(1n).indexOf(3n) === -1 ||
+            taggablePairings.get(1n).indexOf(4n) === -1) {
+            throw "Taggable pairings 1 lacks one of the placed tags";
         }
-        if (strTaggablePairings['tgbl0001'].indexOf("tag00001") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00002") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00003") === -1 ||
-            strTaggablePairings['tgbl0001'].indexOf("tag00004") === -1) {
-            throw "Taggable pairings tgbl0001 lacks one of the placed tags";
+    },
+    "read_taggables_specific_tags": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const tagPairings = PerfTags.getTagPairingsFromTaggablePairings(new Map([[1n, [1n,2n,3n,4n]]]));
+        await perfTags.insertTagPairings(tagPairings);
+        const {ok, taggablePairings} = await perfTags.readTaggablesSpecifiedTags(PerfTags.getTaggablesFromTagPairings(tagPairings), [1n,3n]);
+        if (taggablePairings.get(1n).length !== 2) {
+            throw "Taggable pairings 1 does not have 2 tags";
+        }
+        if (taggablePairings.get(1n).indexOf(1n) === -1 ||
+            taggablePairings.get(1n).indexOf(3n) === -1) {
+            throw "Taggable pairings 1 lacks one of the placed tags";
         }
     },
     "insert_tags_between_toggle_tag_pairings_should_not_cause_problem": async (createPerfTags) => {

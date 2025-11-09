@@ -1,4 +1,4 @@
-import { fjsonParse } from "../../client/js/client-util.js";
+import { fbjsonParse } from "../../client/js/client-util.js";
 
 /**
  * 
@@ -7,5 +7,5 @@ import { fjsonParse } from "../../client/js/client-util.js";
  */
 export default async function getPartialUploadSelectionFragments(partialUploadFolder) {
     const partialUploadSelectionFragments = await fetch(`/api/get/partial-upload-selection-fragments?partialUploadFolder=${encodeURIComponent(partialUploadFolder)}`);
-    return await fjsonParse(partialUploadSelectionFragments);
+    return await fbjsonParse(partialUploadSelectionFragments);
 }

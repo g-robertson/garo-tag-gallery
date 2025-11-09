@@ -7,6 +7,7 @@ import { FetchCache } from "../js/client-util.js";
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
 /** @import {ClientQueryTag} from "../../api/client-get/tags-from-local-tag-services.js" */
 /** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
+/** @import {Setters, States} from "../App.jsx */
 
 /**
  * @param {ClientQueryTag[]} clientTags 
@@ -39,32 +40,32 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags, pushModal) {
 /**
  * @template {any} [T=ClientQueryTag]
  * @param {{
- *  fetchCache: FetchCache
+ *  states: States
+ *  setters: Setters
  *  localTagServices: DBPermissionedLocalTagService[]
- *  taggableIDs?: number[]
+ *  taggableCursor?: string
  *  tagsToRemove?: Set<string>
  *  tagsToAdd?: Map<string, ClientQueryTag>
  *  defaultLocalTagServiceIDsSelected?: number[]
  *  multiSelect?: boolean
  *  excludeable?: boolean
  *  tagSelectionTitle?: string
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
  *  valueMappingFunction?: (tags: ClientQueryTag[], pushModal: (modalName: string, extraProperties: any) => Promise<any>) => Promise<T[]>
  *  onTagsSelected?: (tags: T[], isExcludeOn: boolean, localTagServiceIDsSelected: number[]) => void
  *  onLocalTagServiceIDsChanged?: (localTagServiceIDsSelected: number[]) => void
  * }} param0
  */
 const LocalTagsSelector = ({
-    fetchCache,
+    states,
+    setters,
+    taggableCursor,
     localTagServices,
-    taggableIDs,
     tagsToRemove,
     tagsToAdd,
     defaultLocalTagServiceIDsSelected,
     multiSelect,
     excludeable,
     tagSelectionTitle,
-    pushModal,
     valueMappingFunction,
     onTagsSelected,
     onLocalTagServiceIDsChanged
@@ -95,9 +96,9 @@ const LocalTagsSelector = ({
 
     useEffect(() => {
         (async () => {
-            setTagsPreFilter(await getTagsFromLocalTagServiceIDs(localTagServiceIDsSelected, taggableIDs, fetchCache));
+            setTagsPreFilter(await getTagsFromLocalTagServiceIDs(localTagServiceIDsSelected, taggableCursor, states.fetchCache));
         })();
-    }, [localTagServiceIDsSelected, taggableIDs, fetchCache]);
+    }, [localTagServiceIDsSelected, taggableCursor, states.fetchCache]);
 
     useEffect(() => {
         onLocalTagServiceIDsChanged(localTagServiceIDsSelected);
@@ -212,7 +213,7 @@ const LocalTagsSelector = ({
                         })
                     }
                     onValuesDoubleClicked={async (valuesSelected) => {
-                        const mappedValues = await valueMappingFunction(valuesSelected, pushModal);
+                        const mappedValues = await valueMappingFunction(valuesSelected, setters.pushModal);
                         onTagsSelected(mappedValues, isExcludeOn, localTagServiceIDsSelected);
                     }}
                     customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== Infinity ? ` (${realizedValue.tagCount})` : ""}</>}

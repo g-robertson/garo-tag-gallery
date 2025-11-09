@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import '../../global.css';
-import { User } from '../js/user.js';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
+import getActiveJobs from '../../../api/client-get/active-jobs.js';
+
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  user: User
+ *  states: States
+ *  setters: Setters
  * }}
 */
-const ImportMappingsFromBackup = ({user}) => {
+const ImportMappingsFromBackup = ({states, setters}) => {
     const [finishedImportingText, setFinishedImportingText] = useState("");
 
     return (
@@ -17,8 +20,9 @@ const ImportMappingsFromBackup = ({user}) => {
                 <input type="file" name="backup-file" />
                 <input type="submit" value="Import from backup" />
             </form>
-            <OnFormSubmit onFormSubmit={() => {
+            <OnFormSubmit onFormSubmit={async () => {
                 setFinishedImportingText("Finished importing from backup");
+                setters.setActiveJobs(await getActiveJobs());
             }} />
             <p style={{color: "green"}}>{finishedImportingText}</p>
         </div>

@@ -1,4 +1,4 @@
-import { FetchCache, fjsonParse } from "../../client/js/client-util.js";
+import { FetchCache, fbjsonParse } from "../../client/js/client-util.js";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import { CREATE_AGGREGATE_TAG_MODAL_PROPERTIES } from "../../client/modal/modals/create-aggregate-tag.jsx";
 import { CREATE_METRIC_TAG_MODAL_PROPERTIES } from "../../client/modal/modals/create-metric-tag.jsx";
@@ -47,24 +47,24 @@ const SYSTEM_CLIENT_TAGS = [
  * @param {number[]} localTagServiceIDs
  * @param {number[]=} taggableIDs,
  */
-function getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableIDs) {
-    return `${localTagServiceIDs.join("\x01")}\x02${taggableIDs?.join?.("\x01") ?? ""}`;
+function getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableCursor) {
+    return `${localTagServiceIDs.join("\x01")}\x02${taggableCursor ?? ""}`;
 }
 
 /**
  * @param {number[]} localTagServiceIDs
- * @param {number[]=} taggableIDs
+ * @param {number[]=} taggableCursor
  * @param {FetchCache} fetchCache
  */
-async function getTagsFromLocalTagServiceIDs_(localTagServiceIDs, taggableIDs, fetchCache) {
-    const hash = getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableIDs);
+async function getTagsFromLocalTagServiceIDs_(localTagServiceIDs, taggableCursor, fetchCache) {
+    const hash = getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableCursor);
     const tagsFromLocalTagServiceIDsCache = fetchCache.cache("tags-from-local-tag-services");
     if (tagsFromLocalTagServiceIDsCache.getStatus(hash) === "empty") {
         tagsFromLocalTagServiceIDsCache.setAwaiting(hash);
         const response = await fetch("/api/post/tags-from-local-tag-services", {
             body: JSON.stringify({
                 localTagServiceIDs,
-                taggableIDs
+                taggableCursor
             }),
             headers: {
               "Content-Type": "application/json",
@@ -72,7 +72,7 @@ async function getTagsFromLocalTagServiceIDs_(localTagServiceIDs, taggableIDs, f
             method: "POST"
         });
 
-        tagsFromLocalTagServiceIDsCache.set(hash, (await fjsonParse(response)).map(tag => ({
+        tagsFromLocalTagServiceIDsCache.set(hash, (await fbjsonParse(response)).map(tag => ({
             type: "tagByLookup",
             Lookup_Name: tag[0],
             displayName: tag[1],
@@ -89,13 +89,13 @@ async function getTagsFromLocalTagServiceIDs_(localTagServiceIDs, taggableIDs, f
 
 /**
  * @param {number[]} localTagServiceIDs
- * @param {number[]=} taggableIDs
+ * @param {string=} taggableCursor
  * @param {FetchCache} fetchCache
  */
-export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs, taggableIDs, fetchCache) {
+export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs, taggableCursor, fetchCache) {
     const tagsResponse = await getTagsFromLocalTagServiceIDs_(
         localTagServiceIDs.filter(localTagServiceID => localTagServiceID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID),
-        taggableIDs,
+        taggableCursor,
         fetchCache
     );
     if (localTagServiceIDs.findIndex((localTagServiceID => localTagServiceID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)) === -1) {

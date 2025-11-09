@@ -1,34 +1,32 @@
 import './global.css';
 
-/** @import {PageType} from "./page/page.jsx" */
+/** @import {Setters, States} from "./App.jsx" */
 
 /**
  * 
  * @param {{
- *     pages: PageType[]
- *     setPages: (pages: PageType[]) => void
- *     activePageIndex: number,
- *     setActivePageIndex: (activePageIndex: number) => void
+ *     states: States,
+ *     setters: Setters,
  * }} param0 
  * @returns 
  */
-const PageNavbar = ({pages, setPages, activePageIndex, setActivePageIndex}) => {
+const PageNavbar = ({states, setters}) => {
     return (
         <div className="page-navbar-scroller">
             <nav className="page-navbar">
-                {pages.map((page, index) => (<div className={`page-navbar-topbar-dropdown${activePageIndex === index ? " selected" : ""}`}>
+                {states.pages.map((page, index) => (<div className={`page-navbar-topbar-dropdown${states.activePageIndex === index ? " selected" : ""}`}>
                     <div className="page-navbar-topbar-dropdown-title" style={{height: "100%", alignItems: "center"}} onClick={() => {
-                        setActivePageIndex(index);
+                        setters.setActivePageIndex(index);
                     }}>
                         <div style={{marginLeft: 8}}>{page.pageDisplayName}</div>
                         
                         <div style={{marginLeft: 16, fontSize: "18px"}} class="page-cancel" onClick={(e) => {
-                            if (index <= activePageIndex) {
-                                --activePageIndex;
+                            if (index <= states.activePageIndex) {
+                                --states.activePageIndex;
                             }
-                            pages.splice(index, 1)
-                            setPages([...pages]);
-                            setActivePageIndex(activePageIndex);
+                            states.pages.splice(index, 1)
+                            setters.setPages([...states.pages]);
+                            setters.setActivePageIndex(states.activePageIndex);
                             e.stopPropagation();
                         }}>X</div>
                     </div>

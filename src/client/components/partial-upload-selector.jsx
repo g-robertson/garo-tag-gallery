@@ -18,6 +18,14 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
     const uniqueID = useRef(randomID(32));
     const [partialUploadSelections, setPartialUploadSelections] = useState(new Set([NOT_A_PARTIAL_UPLOAD]));
     const [activePartialUploadSelection, setActivePartialUploadSelection] = useState(NOT_A_PARTIAL_UPLOAD);
+    const trueActivePartialUploadSelection = useRef(activePartialUploadSelection);
+    useEffect(() => {
+        if (activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
+            trueActivePartialUploadSelection.current = `____NOT_PARTIAL____${randomID(16).toString("hex")}`
+        } else {
+            trueActivePartialUploadSelection.current = activePartialUploadSelection;
+        }
+    }, [activePartialUploadSelection]);
     const [activePartialUploadSelectionFragments, setActivePartialUploadSelectionFragments] = useState([]);
     const [remainingPartialPiecesFinished, setRemainingPartialPiecesFinished] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -45,7 +53,8 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
             <div style={{marginLeft: "8px", flexDirection: "column"}}>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Partial upload location: </span>
-                    <select style={{display: "inline-block"}} name="partialUploadSelection" onChange={(e) => {
+                    <input type="text" name="partialUploadSelection" value={trueActivePartialUploadSelection.current} style={{display: "none"}} />
+                    <select style={{display: "inline-block"}} name="partialUploadSelectionFake" onChange={(e) => {
                         setActivePartialUploadSelection(e.target.options[e.target.selectedIndex].value);
                     }}>
                         {[...partialUploadSelections].map(partialUploadSelection => (
@@ -74,13 +83,14 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Are all remaining pieces in this upload:</span>
+                    <input name="remainingPartialPiecesFinished" type="checkbox" checked={remainingPartialPiecesFinished} style={{display: "none"}} />
                     <input
                         style={{display: "inline-block", marginLeft: "4px"}}
-                        name="remainingPartialPiecesFinished"
+                        name="remainingPartialPiecesFinishedFake"
                         disabled={activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD}
                         checked={remainingPartialPiecesFinished}
                         type="checkbox"
-                        onChange={(e) => {
+                        onChange={() => {
                         setRemainingPartialPiecesFinished(!remainingPartialPiecesFinished);
                     }} />
                 </div>
@@ -95,17 +105,12 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
 
                     setUploading(true);
                     onSubmit();
-                    let trueActivePartialUploadSelection = activePartialUploadSelection
-                    if (trueActivePartialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
-                      trueActivePartialUploadSelection = `____NOT_PARTIAL____${randomID(16).toString("hex")}`;
-                    }
                     
                     const filesSelected = document.getElementById(`partialFiles-${uniqueID.current}`).files;
                     for (const file of filesSelected) {
                         const formData = new FormData();
-                        formData.append("partialUploadSelection", trueActivePartialUploadSelection);
+                        formData.append("partialUploadSelection", trueActivePartialUploadSelection.current);
                         formData.append("file", file, file.name);
-                        console.log(formData);
                         const res = await fetch("/api/post/partial-file", {
                             body: formData,
                             method: "POST"

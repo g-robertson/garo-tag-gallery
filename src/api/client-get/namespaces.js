@@ -1,4 +1,4 @@
-import { fjsonParse } from "../../client/js/client-util.js";
+import { fbjsonParse } from "../../client/js/client-util.js";
 
 
 /** @type {DBNamespace[]} */
@@ -14,7 +14,7 @@ export default async function getNamespaces() {
             method: "GET"
         });
 
-        CACHED = await fjsonParse(response);
+        CACHED = await fbjsonParse(response);
     }
 
     return CACHED;

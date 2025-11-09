@@ -7,6 +7,7 @@ import { FetchCache, mapNullCoalesce, mapUnion, setIntersect } from '../../js/cl
 import { updateTaggables } from '../../../api/client-get/update-taggables.js';
 
 /** @import {ModalOptions} from "../modal.jsx" */
+/** @import {Setters, States} from "../../App.jsx" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 const UNKNOWN_OP_TAGS = -1;
@@ -15,16 +16,14 @@ const REMOVE_TAGS = 1;
 
 /** 
  * @param {{
- *  fetchCache: FetchCache
- *  user: User
+ *  states: States
+ *  setters: Setters
  *  modalOptions: ModalOptions<{
  *      taggableIDs: number[]
  *  }>
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *  popModal: () => void
  * }}
 */
-export const ModifyTaggablesModal = ({fetchCache, user, modalOptions, pushModal, popModal}) => {
+export const ModifyTaggablesModal = ({states, setters, modalOptions}) => {
     const taggableIDs = modalOptions.extraProperties.taggableIDs;
     /** @type {[Map<number, Set<string>>, (tagsToRemove: Map<number, Set<string>>) => void]} */
     const [tagsToRemove, setTagsToRemove] = useState(new Map());
@@ -42,9 +41,9 @@ export const ModifyTaggablesModal = ({fetchCache, user, modalOptions, pushModal,
                 <div style={{flex: 1}}></div>
                 <div style={{flex: 1}}>
                     <LocalTagsSelector
-                        fetchCache={fetchCache}
-                        localTagServices={user.localTagServices()}
-                        pushModal={pushModal}
+                        states={states}
+                        setters={setters}
+                        localTagServices={states.user.localTagServices()}
                         taggableIDs={taggableIDs}
                         tagsToRemove={tagsToRemoveForLocalTagServiceIDs}
                         tagsToAdd={tagsToAddForLocalTagServiceIDs}
@@ -68,7 +67,7 @@ export const ModifyTaggablesModal = ({fetchCache, user, modalOptions, pushModal,
                             } else if (definitelyRemove) {
                                 operationToPerform = REMOVE_TAGS;
                             } else {
-                                const addOrRemove = await pushModal(DIALOG_BOX_MODAL_PROPERTIES.modalName, {
+                                const addOrRemove = await setters.pushModal(DIALOG_BOX_MODAL_PROPERTIES.modalName, {
                                     displayName: "Add or remove tags",
                                     promptText: "This set of taggables already has some of the tag(s) you selected, do you wish to add or remove these tags?",
                                     optionButtons: [{
@@ -118,9 +117,9 @@ export const ModifyTaggablesModal = ({fetchCache, user, modalOptions, pushModal,
                         taggableIDs,
                         [...tagsToAdd].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags.values()]]),
                         [...tagsToRemove].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags]]),
-                        fetchCache
+                        states.fetchCache
                     );
-                    popModal();
+                    setters.popModal();
                 }}/>
             </div>
         </div>

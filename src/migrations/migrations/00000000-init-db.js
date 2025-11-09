@@ -304,10 +304,39 @@ export const MIGRATION = {
                 File_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 File_Hash BLOB NOT NULL,
                 Perceptual_Hash BLOB,
+                Perceptual_Hash_Version INTEGER,
                 Exact_Bitmap_Hash BLOB,
                 Prethumbnail_Hash BLOB,
                 Thumbnail_Hash BLOB,
                 File_Extension TEXT
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE File_Comparisons_Made(
+                File_Comparisons_Made_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                File_Comparisons_Made_PK_Hash TEXT NOT NULL,
+                File_ID_1 INTEGER NOT NULL,
+                File_ID_2 INTEGER NOT NULL,
+                Comparison_Is_Checked INTEGER NOT NULL DEFAULT 0,
+                Perceptual_Hash_Distance INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Duplicate_Files(
+                File_ID_1 INTEGER NOT NULL,
+                File_ID_2 INTEGER NOT NULL,
+                Better_File_ID INTEGER
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Alternate_File_Groups(
+                Alternate_File_Group_ID INTEGER PRIMARY KEY AUTOINCREMENT
+            ); 
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Alternate_File_Groups_Files(
+                Alternate_File_Group_ID INTEGER NOT NULL,
+                File_ID INTEGER NOT NULL
             );
         `),
         ...insertsystemtag(IS_FILE_TAG),

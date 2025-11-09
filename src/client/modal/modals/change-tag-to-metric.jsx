@@ -4,20 +4,17 @@ import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
 import { useState } from 'react';
-import { FetchCache } from '../../js/client-util.js';
 
-/** @import {User} from "../../js/user.js" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  fetchCache: FetchCache
- *  user: User
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *  popModal: () => void
+ *  states: States
+ *  setters: Setters
  * }}
 */
-const ChangeTagToMetricModal = ({fetchCache, user, pushModal, popModal}) => {
+const ChangeTagToMetricModal = ({states, setters}) => {
     /** @type {[null | ClientQueryTag, (tag: null | ClientQueryTag) => void]} */
     const [tag, setTag] = useState(null);
     const tags = tag === null ? [] : [tag];
@@ -27,11 +24,11 @@ const ChangeTagToMetricModal = ({fetchCache, user, pushModal, popModal}) => {
         <div style={{width: "100%", flexDirection: "column"}}>
             <div style={{flex: "4 1 100%", margin: 8}}>
                 <LocalTagsSelector
-                    fetchCache={fetchCache}
-                    localTagServices={user.localTagServices()}
+                    states={states}
+                    setters={setters}
+                    localTagServices={states.user.localTagServices()}
                     multiSelect={false}
                     excludeable={false}
-                    pushModal={pushModal}
                     onTagsSelected={(tags) => {
                         setTag(tags[0]);
                     }}
@@ -41,7 +38,7 @@ const ChangeTagToMetricModal = ({fetchCache, user, pushModal, popModal}) => {
                 Select a tag from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjects={tags} elementsSelectable={false} scrollbarWidth={0} /></div>
             </div>
             <form style={{flex: 5}} action="/api/post/change-tag-to-metric" target="frame" method="POST">
-                <LocalMetricSelector user={user} />
+                <LocalMetricSelector states={states} />
                 <input name="localTagID" style={{display: "none"}} value={tag !== null ? tag.localTagID : ""} />
                 <div style={{marginLeft: "8px"}}>
                     Select what metric value you wish for this tag to be applied as: <input id="metricValue" name="metricValue" type="text" />

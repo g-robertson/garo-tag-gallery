@@ -1,35 +1,12 @@
 /**
  * @param {Response} response 
  */
-export async function fjsonParse(response) {
-    const text = await response.text();
-    try {
-        return JSON.parse(text);
-    } catch (err) {
-        console.error(`${err}: JSON Text was "${text}" for response from "${response.url}"`);
-    }
-}
-
-/**
- * @param {Response} response 
- */
 export async function fbjsonParse(response) {
     const text = await response.text();
     try {
         return bjsonParse(text);
     } catch (err) {
         console.error(`${err}: JSON Text was "${text}" for response from "${response.url}"`);
-    }
-}
-
-/**
- * @param {string} json 
- */
-export function tjsonParse(json) {
-    try {
-        return JSON.parse(json);
-    } catch (err) {
-        return;
     }
 }
 
@@ -48,8 +25,35 @@ export function randomID(size) {
     return id;
 }
 
+export function walkObject(object, replaceCallback) {
+    let replacedObject = replaceCallback(object);
+    if (replacedObject instanceof Array) {
+        replacedObject = replacedObject.map(item => walkObject(item, replaceCallback));
+    } else if (typeof replacedObject === "object" && replacedObject !== null) {
+        const newReplacedObject = {};
+        for (const key in replacedObject) {
+            newReplacedObject[key] = walkObject(replacedObject[key], replaceCallback);
+        }
+        replacedObject = newReplacedObject;
+    }
 
-const BIG_INT_IDENTIFIER = "BigInt_fuihi873ohr87hnfuidwnfufh3e2oi8fwefa";
+    return replacedObject;
+}
+
+/**
+ * @param {any[]} obj 
+ */
+export function* abjsonStringify(obj) {
+    yield "[";
+    if (obj.length !== 0) {
+        yield bjsonStringify(obj[0]);
+        for (const elem of obj.slice(1)) {
+            yield `,"DELIMITER__fuihi873ohr87hnfuidwnfufh3e2oi8fwefa__",`;
+            yield bjsonStringify(elem);
+        }
+    }
+    yield "]";
+}
 
 /**
  * @param {string} json 
@@ -76,19 +80,23 @@ export function abjsonParse(json) {
 }
 
 /**
- * @param {any[]} obj 
+ * @param {any} obj 
+ * @returns {string} 
  */
-export function* abjsonStringify(obj) {
-    yield "[";
-    if (obj.length !== 0) {
-        yield bjsonStringify(obj[0]);
-        for (const elem of obj.slice(1)) {
-            yield `,"DELIMITER__fuihi873ohr87hnfuidwnfufh3e2oi8fwefa__",`;
-            yield bjsonStringify(elem);
+export function clientjsonStringify(obj) {
+    obj = walkObject(obj, (value) => {
+        if (typeof value === "bigint") {
+            return Number(value);
+        } else if (value instanceof Buffer) {
+            return value.toString("hex");
+        } else {
+            return value;
         }
-    }
-    yield "]";
+    })
+    return JSON.stringify(obj);
 }
+
+const BIG_INT_IDENTIFIER = "BigInt_fuihi873ohr87hnfuidwnfufh3e2oi8fwefa";
 
 /**
  * @param {any} obj 
@@ -147,6 +155,29 @@ export function replaceObject(objDest, objSrc) {
     for (const key in objSrc) {
         objDest[key] = objSrc[key];
     }
+}
+
+/**
+ * @param {bigint} num 
+ */
+export function serializeUint32(num) {
+    let serialized = "";
+    serialized += String.fromCharCode(Number((num >> 24) & 0xFF));
+    serialized += String.fromCharCode(Number((num >> 16) & 0xFF));
+    serialized += String.fromCharCode(Number((num >>  8) & 0xFF));
+    serialized += String.fromCharCode(Number((num >>  0) & 0xFF));
+    return serialized;
+}
+/**
+ * @param {string} str 
+ */
+export function deserializeUint32(str) {
+    let num = 0;
+    num += str.charCodeAt(4) << 24;
+    num += str.charCodeAt(5) << 16;
+    num += str.charCodeAt(6) << 8;
+    num += str.charCodeAt(7);
+    return num;
 }
 
 /**
@@ -214,13 +245,25 @@ export function mapNullCoalesce(map, key, value) {
  * @template K, V
  */
 export class RealizationMap {
-    /** @type {Map<K, T>} */
+    /** @type {RealizationMap<K, V>} */
+    #prev = undefined;
+    /** @type {Map<K, V>} */
     #values = new Map();
     /** @type {Map<string, "filled" | "awaiting">} */
     #valueStatuses = new Map();
     /** @type {Map<K, (() => void)[]>} */
     #valueOnFillCallbacks = new Map();
     
+    /**
+     * @param {RealizationMap<K, V>} prev 
+     */
+    constructor(prev) {
+        this.#prev = prev;
+        if (this.#prev !== undefined) {
+            this.#prev._removePrev();
+        }
+    }
+
     /**
      * @param {K} key 
      */
@@ -280,12 +323,29 @@ export class RealizationMap {
     /**
      * @param {K} key 
      */
+    getOrPrevOrUndefined(key) {
+        if (this.#valueStatuses.get(key) === "filled") {
+            return this.#values.get(key);
+        } else if (this.#prev !== undefined) {
+            return this.#prev.getOrUndefined(key);
+        } else {
+            return undefined;
+        }
+    }
+
+    /**
+     * @param {K} key 
+     */
     getStatus(key) {
         return this.#valueStatuses.get(key) ?? "empty";
     }
 
     size() {
         return this.#valueStatuses.size;
+    }
+
+    _removePrev() {
+        this.#prev = undefined;
     }
 }
 
@@ -331,28 +391,227 @@ export function mapUnion(maps) {
     return union;
 }
 
-const ENDPOINTS = Object.freeze({
+/**
+ * @template K, V
+ */
+class DoublyLinkedMap {
+    /** @type {Map<K, V>} */
+    #map = new Map();
+    /** @type {Map<V, Set<K>>} */
+    #inverseMap = new Map();
+
+    constructor() {}
+
+    set(key, value) {
+        mapNullCoalesce(this.#inverseMap, this.#map.get(key), new Set()).delete(key);
+        this.#map.set(key, value);
+        mapNullCoalesce(this.#inverseMap, value, new Set()).add(key);
+    }
+
+    delete(key) {
+        mapNullCoalesce(this.#inverseMap, this.#map.get(key), new Set()).delete(key);
+        this.#map.delete(key);
+    }
+
+    get(key) {
+        return this.#map.get(key);
+    }
+
+    getValue(value) {
+        return this.#inverseMap.get(value);
+    }
+}
+
+/**
+ * @template T, G
+ * @param {T[]} groupableItems 
+ * @param {(groupableItem: T) => G[]} groupingCallback 
+ */
+export function mergeGroups(groupableItems, groupingCallback) {
+    let currentGroupNum = {current: 0};
+    /** @type {Map<G, {group: number, mergedGroups: Set<number>}} */
+    const groupMap = new Map();
+    /** @type {Map<G, T[]} */
+    const groupingMemberMap = new Map();
+    for (const groupableItem of groupableItems) {
+        const groupingMembers = groupingCallback(groupableItem);
+        mergeGroupsIntoGroupMap(groupMap, groupingMembers, currentGroupNum);
+        for (const groupingMember of groupingMembers) {
+            mapNullCoalesce(groupingMemberMap, groupingMember, []).push(groupableItem);
+        }
+    }
+
+    const mergedGroups = getMergedGroups(groupMap);
+    return mergedGroups.map(mergedGroup => ({
+        group: mergedGroup.map(groupingMember => ({
+            groupingMember,
+            constituents: groupingMemberMap.get(groupingMember)
+        })),
+        constituents: [...new Set(mergedGroup.flatMap(groupingMember => groupingMemberMap.get(groupingMember)))]
+    }));
+}
+
+/**
+ * @template T
+ * @param {Map<T, {group: number, mergedGroups: Set<number>}>} groupMap 
+ * @param {T[]} groupedIDs 
+ * @param {{current: number}} currentGroupNum
+ */
+export function mergeGroupsIntoGroupMap(groupMap, groupedIDs, currentGroupNum) {
+    for (const id of groupedIDs) {
+        const existingGroup = groupMap.get(id);
+        if (existingGroup !== undefined) {
+            for (const idInner of groupedIDs) {
+                const innerGroup = groupMap.get(idInner);
+                if (innerGroup !== undefined) {
+                    existingGroup.mergedGroups.add(innerGroup.group);
+                } else {
+                    groupMap.set(idInner, existingGroup);
+                }
+            }
+            return;
+        }
+    }
+    
+    const newGroup = ++currentGroupNum.current;
+    const newGroupObj = {group: newGroup, mergedGroups: new Set([newGroup])}
+    for (const id of groupedIDs) {
+        groupMap.set(id, newGroupObj);
+    }
+}
+
+/**
+ * @template T
+ * @param {Map<T, {group: number, mergedGroups: Set<number>}>} groupMap
+ * @param {T} groupID
+ * @param {T[]} existingGroupIDs 
+ * @param {{current: number}} currentGroupNum
+ */
+export function mergeExistingGroupsIntoGroupMap(groupMap, groupID, existingGroupIDs, currentGroupNum) {
+    for (const existingGroupID of existingGroupIDs) {
+        const existingGroup = groupMap.get(existingGroupID);
+        if (existingGroup !== undefined) {
+            groupMap.set(groupID, existingGroup);
+            for (const existingGroupIDInner of existingGroupIDs) {
+                const existingGroupInner = groupMap.get(existingGroupIDInner);
+                if (existingGroupInner !== undefined) {
+                    existingGroup.mergedGroups.add(existingGroupInner.group);
+                }
+            }
+            return;
+        }
+    }
+    
+    const newGroup = ++currentGroupNum.current;
+    groupMap.set(groupID, {group: newGroup, mergedGroups: new Set([newGroup])});
+}
+
+/**
+ * @template T
+ * @param {Map<T, {group: number, mergedGroups: Set<number>}>} groupMap
+ */
+export function getMergedGroups(groupMap) {
+    let currentMergedGroup = 1;
+    /** @type {Set<number>} */
+    const checkedGroups = new Set();
+    /** @type {Map<number, number>} */
+    const groupToMergedGroupMap = new Map();
+    /** @type {Map<number, T[]>} */
+    const mergedGroupMap = new Map();
+    for (const [k, v] of groupMap) {
+        if (!checkedGroups.has(v.group)) {
+            let mergedGroup = groupToMergedGroupMap.get(v.group);
+            for (const group of v.mergedGroups) {
+                if (mergedGroup !== undefined) {
+                    break;
+                }
+
+                mergedGroup = groupToMergedGroupMap.get(group);
+            }
+
+            if (mergedGroup === undefined) {
+                mergedGroup = currentMergedGroup;
+                mergedGroupMap.set(mergedGroup, []);
+                ++currentMergedGroup;
+            }
+
+            for (const group of v.mergedGroups) {
+                groupToMergedGroupMap.set(group, mergedGroup);
+            }
+
+            checkedGroups.add(v.group);
+        }
+        
+        mergedGroupMap.get(groupToMergedGroupMap.get(v.group)).push(k);
+    }
+
+    return [...mergedGroupMap.values()];
+}
+
+/**
+ * @template K, V, [V2=V]
+ * @param {Map<K, V>} map
+ * @param {(value: V) => V2} valueMappingFunction
+ */
+export function invertMap(map, valueMappingFunction) {
+    valueMappingFunction ??= (value) => value;
+    /** @type {Map<V2, K[]>} */
+    const invertedMap = new Map();
+
+    for (const [k, v] of map) {
+        mapNullCoalesce(invertedMap, valueMappingFunction(v), []).push(k);
+    }
+
+    return invertedMap;
+}
+
+const TAG_ENDPOINTS = Object.freeze({
     "tags-from-local-tag-services": 0,
-    "search-taggables": 0
+    "search-taggables": 0,
+});
+
+const FILE_ENDPOINTS = Object.freeze({
+    "select-file-comparisons": 0,
+    "select-files": 0
 });
 
 export class FetchCache {
-    /** @type {Map<keyof ENDPOINTS, RealizationMap<string, any>>} */
+    /** @type {Map<keyof TAG_ENDPOINTS | keyof FILE_ENDPOINTS, RealizationMap<string, any>>} */
     #cache;
     rerender = () => {};
 
-    constructor() {
-        this.#generateTagsCache();
+    /**
+     * @param {FetchCache} fetchCache 
+     */
+    constructor(fetchCache) {
+        this.#generateCache(fetchCache);
     }
 
-    #generateTagsCache() {
-        this.#cache = new Map(Object.keys(ENDPOINTS).map(endpoint => [
-            endpoint,
-            new RealizationMap()
-        ]));
+    /**
+     * @param {FetchCache} fetchCache 
+     */
+    #generateCache(fetchCache) {
+        this.#cache = new Map();
+
+        let getNewRealizationMap = (endpoint) => {
+            return fetchCache.cache(endpoint);
+        }
+        if (fetchCache === undefined) {
+            getNewRealizationMap = () => new RealizationMap();
+        }
+
+        for (const endpoint of [...Object.keys(TAG_ENDPOINTS), ...Object.keys(FILE_ENDPOINTS)]) {
+            if (!this.#cache.has(endpoint)) {
+                this.#cache.set(endpoint, getNewRealizationMap(endpoint));
+            }
+        }
     }
 
     regenerateTagsCache() {
+        for (const endpoint of TAG_ENDPOINTS) {
+            this.#cache.delete(endpoint);
+        }
+        this.#generateCache();
         this.rerender();
     }
 
@@ -363,3 +622,6 @@ export class FetchCache {
         return this.#cache.get(cache);
     }
 }
+
+export const T_SECOND = 1000;
+export const T_MINUTE = T_SECOND * 60;

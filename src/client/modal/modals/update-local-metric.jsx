@@ -6,23 +6,22 @@ import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import { useState } from 'react';
 import deleteLocalMetric from '../../../api/client-get/delete-local-metric.js';
 
-/** @import {User} from "../../js/user.js" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  user: User
- *  setUser: (user: User) => void
- *  popModal: () => void
+ *  states: States
+ *  setters: Setters
  * }}
 */
-const CreateLocalMetric = ({user, setUser, popModal}) => {
-    const defaultLocalMetricService = user.localMetricServices()[0];
+const CreateLocalMetric = ({states, setters}) => {
+    const defaultLocalMetricService = states.user.localMetricServices()[0];
     const defaultLocalMetric = defaultLocalMetricService?.Local_Metrics?.[0];
     const [selectedLocalMetric, setSelectedLocalMetric] = useState(defaultLocalMetric);
     return (
         <div style={{flexDirection: "column"}}>
             <form action="/api/post/update-local-metric" target="frame" method="POST">
-                <LocalMetricSelector user={user} defaultLocalMetricService={defaultLocalMetricService} defaultLocalMetric={defaultLocalMetric} onLocalMetricSelected={(localMetric) => {
+                <LocalMetricSelector states={states} defaultLocalMetricService={defaultLocalMetricService} defaultLocalMetric={defaultLocalMetric} onLocalMetricSelected={(localMetric) => {
                     setSelectedLocalMetric(localMetric);
                 }}/>
                 <LocalMetricModifications selectedLocalMetric={selectedLocalMetric} />
@@ -36,15 +35,15 @@ const CreateLocalMetric = ({user, setUser, popModal}) => {
                     if (confirm) {
                         (async () => {
                             await deleteLocalMetric(selectedLocalMetric.Local_Metric_ID);
-                            setUser(await getMe());
-                            popModal();
+                            setters.setUser(await getMe());
+                            setters.popModal();
                         })();
                     }
                 }} />
             </div>
             <OnFormSubmit onFormSubmit={async () => {
-                setUser(await getMe());
-                popModal();
+                setters.setUser(await getMe());
+                setters.popModal();
             }} />
         </div>
     );

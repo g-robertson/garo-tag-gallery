@@ -1,30 +1,28 @@
 import { useEffect, useState } from 'react';
 import '../global.css';
-import { PERMISSION_BITS, User } from '../js/user.js';
+import { PERMISSION_BITS } from '../js/user.js';
 
 import { CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES } from '../modal/modals/create-or-search-group.jsx';
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
 import LocalTagsSelector, { MAP_TO_CLIENT_SEARCH_QUERY } from './local-tags-selector.jsx';
 import { clientSearchQueryToDisplayName, isConflictingClientSearchQuery, SYSTEM_LOCAL_TAG_SERVICE } from '../js/tags.js';
-import { FetchCache } from '../js/client-util.js';
-
 /** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
+/** @import {States, Setters} from "../App.jsx" */
 
 /**
  * @param {{
- *  fetchCache: FetchCache
- *  user: User
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
+ *  states: States
+ *  setters: Setters
  *  initialSelectedTags?: ClientSearchQuery[]
- *  taggableIDs?: number[]
+ *  taggableCursor?: string
  *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery, localTagServiceIDs: number[]) => void
  *  searchType?: "intersect" | "union"
  *  existingState?: any
- *  updateExistingStateProp: (key: string, value: any) => void
+ *  updateExistingStateProp?: (key: string, value: any) => void
  * }} param0
  */
-const TagsSelector = ({fetchCache, user, pushModal, initialSelectedTags, taggableIDs, onSearchChanged, searchType, existingState, updateExistingStateProp}) => {
+const TagsSelector = ({states, setters, initialSelectedTags, taggableCursor, onSearchChanged, searchType, existingState, updateExistingStateProp}) => {
     existingState ??= {};
     updateExistingStateProp ??= () => {};
     onSearchChanged ??= () => {};
@@ -35,7 +33,7 @@ const TagsSelector = ({fetchCache, user, pushModal, initialSelectedTags, taggabl
     useEffect(() => {updateExistingStateProp("clientSearchQuery", clientSearchQuery);}, [clientSearchQuery]);
 
     const localTagServicesAvailable = [SYSTEM_LOCAL_TAG_SERVICE].concat(
-        user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)
+        states.user.localTagServices().filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)
     );
 
     /** @type {number[]} */
@@ -72,7 +70,7 @@ const TagsSelector = ({fetchCache, user, pushModal, initialSelectedTags, taggabl
                             } else {
 
                             }
-                            const orGroupSearchQuery = await pushModal(CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {initialSelectedTags});
+                            const orGroupSearchQuery = await setters.pushModal(CREATE_OR_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {initialSelectedTags});
                             if (orGroupSearchQuery === null || orGroupSearchQuery === undefined) {
                                 return;
                             }
@@ -91,12 +89,13 @@ const TagsSelector = ({fetchCache, user, pushModal, initialSelectedTags, taggabl
             </div>
             <div style={{flex: "3 1 100%", height: "80%"}}>
                 <LocalTagsSelector 
-                    fetchCache={fetchCache}
+                    states={states}
+                    setters={setters}
+                    taggableCursor={taggableCursor}
                     localTagServices={localTagServicesAvailable}
                     onLocalTagServiceIDsChanged={localTagServiceIDs => {
                         setLocalTagServiceIDsSelected(localTagServiceIDs);
                     }}
-                    taggableIDs={taggableIDs}
                     defaultLocalTagServiceIDsSelected={defaultLocalTagServiceIDsSelected}
                     onTagsSelected={(clientQueriesToAdd, isExcludeOn) => {
                         for (let clientSearchQueryToAdd of clientQueriesToAdd) {
@@ -129,7 +128,6 @@ const TagsSelector = ({fetchCache, user, pushModal, initialSelectedTags, taggabl
                         setClientSearchQuery([...clientSearchQuery]);
                     }}
                     valueMappingFunction={MAP_TO_CLIENT_SEARCH_QUERY}
-                    pushModal={pushModal}
                 />
             </div>
         </div>

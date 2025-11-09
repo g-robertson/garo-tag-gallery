@@ -3,15 +3,14 @@ import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import getMe from '../../../api/client-get/me.js';
 import LocalTagServiceModifications from '../../components/local-tag-service-modifications.jsx';
 
-/** @import {User} from "../../js/user.js" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  setUser: (user: User) => void
- *  popModal: () => void
+ *     setters: Setters
  * }}
 */
-const CreateLocalTagService = ({setUser, popModal}) => {
+const CreateLocalTagService = ({setters}) => {
     return (
         <div>
             <form action="/api/post/create-local-tag-service" target="frame" method="POST">
@@ -21,8 +20,8 @@ const CreateLocalTagService = ({setUser, popModal}) => {
                 </div>
             </form>
             <OnFormSubmit onFormSubmit={async () => {
-                setUser(await getMe());
-                popModal();
+                setters.setUser(await getMe());
+                setters.popModal();
             }} />
         </div>
     );

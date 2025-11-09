@@ -91,6 +91,10 @@ export async function validateImportable(dbs, importable) {
  * @param {Importable[]} importables 
  */
 export async function importChunks(dbs, importables) {
+    if (importables.length === 0) {
+        return;
+    }
+
     for (let i = 0; i < importables.length; ++i) {
         importables[i] = await validateImportable(dbs, importables[i]);
     }
@@ -218,8 +222,8 @@ export async function importChunks(dbs, importables) {
  * @param {number} localTaggableServiceID
  */
 export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePaths, localTagServiceID, localTaggableServiceID) {
-    return new Job({durationBetweenTasks: 250}, async function*() {
-        yield {upcomingSubtasks: 1};
+    return new Job({durationBetweenTasks: 250, jobName: "Importing files from Hydrus"}, async function*() {
+        yield {upcomingSubtasks: 1, upcomingTaskName: "Extracting ZIP file"};
 
         let leadFilePath;
         if (partialFilePaths.length === 1) {
@@ -240,7 +244,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
         const extractPath = path.join(partialUploadFolder, "export-path");
         await extractWith7Z(leadFilePath, extractPath);
     
-        yield {upcomingSubtasks: 1};
+        yield {upcomingSubtasks: 1, upcomingTaskName: "Reading extracted ZIP file"};
         const allFileEntries = await getAllFileEntries(extractPath, {recursive: true});
         const EXTENSIONS = ["tags", "notes", "urls", "arctime", "modtime", "imptime", "deltime", "pimtime", "lavtime"].map(extension => ({
             name: extension,
@@ -360,7 +364,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
             importables.push(importable);
 
             if (importables.length >= CHUNK_SIZE) {
-                yield {upcomingSubtasks: entriesHandled};
+                yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Importing ${importables.length} files`};
                 entriesHandled = 0;
                 await importChunks(dbs, importables);
                 importables = [];
@@ -368,11 +372,9 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
         }
 
         if (entriesHandled > 0) {
-            yield {upcomingSubtasks: entriesHandled};
+            yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Importing ${importables.length} files`};
             entriesHandled = 0;
-            if (importables.length > 0) {
-                await importChunks(dbs, importables);
-            }
+            await importChunks(dbs, importables);
         }
 
         console.log("Finished importing from hydrus");
@@ -385,7 +387,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
  * @param {number} userID
  */
 export function importMappingsFromBackupJob(dbs, backupMappings, userID) {
-    return new Job({durationBetweenTasks: 250}, async function*() {
+    return new Job({durationBetweenTasks: 250, jobName: "Importing mappings from backup"}, async function*() {
         yield {remainingSubtasks: backupMappings.length};
 
         /** @type {Importable[]} */
@@ -402,18 +404,22 @@ export function importMappingsFromBackupJob(dbs, backupMappings, userID) {
 
         for (const backupItem of backupMappings) {
             if (backupItem.Type === IMPORTABLE_TYPES.LOCAL_TAGGABLE_SERVICE) {
+                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local taggable service: ${backupItem.Service_Name}`};
                 const localTaggableServiceID = await LocalTaggableServices.userInsert(dbs, userID, backupItem.Service_Name);
                 taggableServiceIDToTaggableService.set(
                     backupItem.Local_Taggable_Service_ID,
                     await LocalTaggableServices.tagMap(dbs, await LocalTaggableServices.selectByID(dbs, localTaggableServiceID))
                 );
             } else if (backupItem.Type === IMPORTABLE_TYPES.LOCAL_TAG_SERVICE) {
+                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local tag service: ${backupItem.Service_Name}`};
                 const localTagServiceID = await LocalTagServices.userInsert(dbs, userID, backupItem.Service_Name);
                 tagServiceIDToTagService.set(backupItem.Local_Tag_Service_ID, await LocalTagServices.selectByID(dbs, localTagServiceID));
             } else if (backupItem.Type === IMPORTABLE_TYPES.LOCAL_METRIC_SERVICE) {
+                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local metric service: ${backupItem.Service_Name}`};
                 const localMetricServiceID = await LocalMetricServices.userInsert(dbs, userID, backupItem.Service_Name);
                 metricServiceIDToMetricService.set(backupItem.Local_Metric_Service_ID, await LocalMetricServices.selectByID(dbs, localMetricServiceID));
             } else if (backupItem.Type === IMPORTABLE_TYPES.LOCAL_METRIC) {
+                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local metric: ${backupItem.Local_Metric_Name}`};
                 const localMetricID = await LocalMetrics.insert(dbs, {
                     Local_Metric_Name: backupItem.Local_Metric_Name,
                     Local_Metric_Lower_Bound: backupItem.Local_Metric_Lower_Bound,
@@ -432,7 +438,7 @@ export function importMappingsFromBackupJob(dbs, backupMappings, userID) {
                 importable.Taggable_Deleted_Date = backupItem.Taggable_Deleted_Date;
                 importable.Taggable_Last_Modified_Date = backupItem.Taggable_Last_Modified_Date;
                 importable.Taggable_Last_Viewed_Date = backupItem.Taggable_Last_Viewed_Date;
-                importable.Local_Taggable_Service_Tag_ID = taggableServiceIDToTaggableService.get(backupItem.Local_Taggable_Service_ID).In_Local_Taggable_Service_Tag_ID;
+                importable.Local_Taggable_Service_Tag_ID = taggableServiceIDToTaggableService.get(backupItem.Local_Taggable_Service_ID).In_Local_Taggable_Service_Tag.Tag_ID;
                 importable.URL_Associations = backupItem.URL_Associations;
                 importable.Tags = []
                 for (const tag of backupItem.Tags) {
@@ -457,14 +463,14 @@ export function importMappingsFromBackupJob(dbs, backupMappings, userID) {
             }
 
             if (importables.length >= 100) {
-                yield {upcomingSubtasks: importables.length};
+                yield {upcomingSubtasks: importables.length, upcomingTaskName: `Importing ${importables.length} local files`};
                 await importChunks(dbs, importables);
                 importables = [];
             }
         }
 
         if (importables.length > 0) {
-            yield {upcomingSubtasks: importables.length};
+            yield {upcomingSubtasks: importables.length, upcomingTaskName: `Importing ${importables.length} local files`};
             await importChunks(dbs, importables);
             importables = [];
         }

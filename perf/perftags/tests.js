@@ -14,8 +14,7 @@ const TESTS = {
 };
 
 const DISABLED_TEST_CASES = [
-    ...Object.keys(DOES_NOT_CRASH_TESTS),
-    ...Object.keys(DOES_HE_PERFORM_TESTS)
+    ...Object.keys(LOAD_TESTS),
 ];
 
 async function main() {

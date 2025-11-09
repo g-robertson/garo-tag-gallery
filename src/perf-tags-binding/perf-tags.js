@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import path from 'path';
-import { mapNullCoalesce, serializeUint64 } from '../client/js/client-util.js';
+import { mapNullCoalesce, serializeUint64, T_MINUTE } from '../client/js/client-util.js';
 import { Mutex } from 'async-mutex';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { serializeFloat } from '../util.js';
@@ -9,7 +9,7 @@ import { serializeFloat } from '../util.js';
 /** @import {Databases} from "../db/db-util.js" */
 /** @import {ClientComparator} from "../api/post/search-taggables.js" */
 
-const THIRTY_MINUTES = 30 * 60 * 1000;
+const THIRTY_MINUTES = 30 * T_MINUTE;
 
 export default class PerfTags {
     #closed = false;
@@ -392,6 +392,38 @@ export default class PerfTags {
 
         await this.__writeToReadInputFile(PerfTags.#serializeSingles(taggables));
         await this.__writeLineToStdin("read_taggables_tags");
+        const ok = await this.__dataOrTimeout(PerfTags.READ_OK_RESULT, THIRTY_MINUTES);
+        let taggablesTagsStr = await this.__readFromOutputFile();
+        /** @type {Map<bigint, bigint[]>} */
+        const taggablePairings = new Map();
+        for (let i = 0; i < taggablesTagsStr.length;) {
+            const taggable = taggablesTagsStr.readBigUInt64BE(i);
+            i += 8;
+            const tagCount = taggablesTagsStr.readBigUInt64BE(i);
+            i += 8;
+            const tags = [];
+            for (let j = 0; j < tagCount; ++j) {
+                const tag = taggablesTagsStr.readBigUInt64BE(i);
+                i += 8;
+
+                tags.push(tag);
+            }
+            taggablePairings.set(taggable, tags);
+        }
+
+        this.#readMutex.release();
+        return {ok, taggablePairings};
+    }
+
+    /**
+     * @param {bigint[]} taggables
+     * @param {bigint[]} tags
+     */
+    async readTaggablesSpecifiedTags(taggables, tags) {
+        await this.#readMutex.acquire();
+
+        await this.__writeToReadInputFile(`${serializeUint64(BigInt(tags.length))}${PerfTags.#serializeSingles(tags)}${serializeUint64(BigInt(taggables.length))}${PerfTags.#serializeSingles(taggables)}`);
+        await this.__writeLineToStdin("read_taggables_specified_tags");
         const ok = await this.__dataOrTimeout(PerfTags.READ_OK_RESULT, THIRTY_MINUTES);
         let taggablesTagsStr = await this.__readFromOutputFile();
         /** @type {Map<bigint, bigint[]>} */

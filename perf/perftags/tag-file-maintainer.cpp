@@ -16,7 +16,7 @@ namespace {
         filesStr.resize(8 * contents.size());
         std::size_t location = 0;
         for (auto file : contents) {
-            util::serializeUInt64(file, filesStr, location);
+            location = util::serializeUInt64(file, filesStr, location);
         }
 
         return filesStr;
@@ -356,9 +356,9 @@ void TagFileMaintainer::readTagGroupsTaggableCountsWithSearch(std::string_view i
     }
 
     std::string output;
-    std::size_t outputIndex = 0;
+    std::size_t location = 0;
     for (const auto& tagGroupTaggableCount : tagGroupsTaggableCounts) {
-        util::serializeUInt64(tagGroupTaggableCount, output, outputIndex);
+        location = util::serializeUInt64(tagGroupTaggableCount, output, location);
     }
 
     writer(output);
@@ -377,18 +377,70 @@ void TagFileMaintainer::readTaggablesTags(std::string_view input, void (*writer)
         auto& taggableBucket = getTaggableBucket(taggable);
         const auto* taggableTags = taggableBucket.firstContents(taggable);
         if (taggableTags != nullptr) {
-            util::serializeUInt64(taggable, output, location);
-            util::serializeUInt64(taggableTags->size(), output, location);
+            location = util::serializeUInt64(taggable, output, location);
+            location = util::serializeUInt64(taggableTags->size(), output, location);
             
             auto serializeTag = [&output, &location](uint64_t tag) {
-                util::serializeUInt64(tag, output, location);
+                location = util::serializeUInt64(tag, output, location);
             };
             taggableTags->forEach(serializeTag);
         } else {
-            util::serializeUInt64(taggable, output, location);
-            util::serializeUInt64(0, output, location);
+            location = util::serializeUInt64(taggable, output, location);
+            location = util::serializeUInt64(0, output, location);
         }
     }
+
+    writer(output);
+}
+
+// format is {tags count}{tags}{taggables count}{taggables}
+void TagFileMaintainer::readTaggablesSpecifiedTags(std::string_view input, void (*writer)(const std::string&)) {
+    std::string output;
+    std::size_t location = 0;
+    
+    if (input.size() % 8 != 0) {
+        throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
+    }
+    uint64_t tagCount = util::deserializeUInt64(input);
+    input = input.substr(8);
+    std::unordered_set<uint64_t> tagsSpecified;
+    tagsSpecified.reserve(tagCount);
+    for (std::size_t i = 0; i < tagCount; ++i) {
+        uint64_t tag = util::deserializeUInt64(input);
+        input = input.substr(8);
+        tagsSpecified.insert(tag);
+    }
+
+    uint64_t taggableCount = util::deserializeUInt64(input);
+    std::vector<uint64_t> tagsToWrite;
+    for (std::size_t i = 0; i < taggableCount; ++i) {
+        uint64_t taggable = util::deserializeUInt64(input);
+        input = input.substr(8);
+        auto& taggableBucket = getTaggableBucket(taggable);
+        const auto* taggableTags = taggableBucket.firstContents(taggable);
+        if (taggableTags != nullptr) {
+            location = util::serializeUInt64(taggable, output, location);
+            
+            std::size_t tagsWritten = 0;
+            std::size_t tagsCountLocation = location;
+            const uint64_t PLACEHOLDER_COUNT = 0xFFFFFFFFFFFFFFFFULL;
+            location = util::serializeUInt64(PLACEHOLDER_COUNT, output, location);
+
+            auto serializeTag = [&output, &location, &tagsSpecified, &tagsWritten](uint64_t tag) {
+                if (tagsSpecified.contains(tag)) {
+                    location = util::serializeUInt64(tag, output, location);
+                    ++tagsWritten;
+                }
+            };
+            taggableTags->forEach(serializeTag);
+
+            util::serializeUInt64(tagsWritten, output, tagsCountLocation);
+        } else {
+            location = util::serializeUInt64(taggable, output, location);
+            location = util::serializeUInt64(0, output, location);
+        }
+    }
+    
 
     writer(output);
 }

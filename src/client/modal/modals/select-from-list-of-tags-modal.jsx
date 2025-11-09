@@ -1,19 +1,17 @@
 import { useState } from 'react';
 import DualListboxLazyTextObjectSelector from '../../components/dual-listbox-lazy-text-object-selector.jsx';
 import '../../global.css';
-import { User } from '../js/user.js';
 
+/** @import {Setters, States} from "../../App.jsx" */
 /** @import {ModalOptions} from "../modal.jsx" */
 
 /** 
  * @param {{
- *  user: User
+ *  setters: Setters
  *  modalOptions: ModalOptions
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *  popModal: () => void
  * }}
 */
-const SelectFromListOfTags = ({user, modalOptions, pushModal, popModal}) => {
+const SelectFromListOfTags = ({setters, modalOptions}) => {
     const [selectedTags, setSelectedTags] = useState([]);
 
     return (
@@ -31,7 +29,7 @@ const SelectFromListOfTags = ({user, modalOptions, pushModal, popModal}) => {
             </div>
             <input style={{margin: 8}} type="button" value="Select tags" onClick={() => {
                 modalOptions.resolve(selectedTags);
-                popModal();
+                setters.popModal();
             }} />
         </div>
     );

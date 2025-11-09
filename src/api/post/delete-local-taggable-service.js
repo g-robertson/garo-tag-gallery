@@ -1,11 +1,16 @@
 /**
- * @import {APIFunction} from "../api-types.js"
+ * @import {APIFunction, APIValidationFunction} from "../api-types.js"
  */
 
 import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { LocalTaggableServices } from "../../db/taggables.js";
 
+/**
+ * @param {Parameters<APIValidationFunction>[0]} dbs 
+ * @param {Parameters<APIValidationFunction>[1]} req 
+ * @param {Parameters<APIValidationFunction>[2]} res 
+ */
 export async function validate(dbs, req, res) {
     const localTaggableServiceID = z.number().nonnegative().safeParse(req?.body?.localTaggableServiceID, {path: "localTaggableServiceID"});
     if (!localTaggableServiceID.success) return localTaggableServiceID.error.message;

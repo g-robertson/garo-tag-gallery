@@ -9,20 +9,19 @@ import { CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES } from './create-and-search-gr
 import NumericInput from '../../components/numeric-input.jsx';
 import { clientSearchQueryToDisplayName } from '../../js/tags.js';
 
-/** @import {User} from "../../js/user.js" */
 /** @import {ModalOptions} from "../modal.jsx" */
 /** @import {ClientAggregateTag, ClientAggregateTagCondition, ClientComparator, ClientSearchTag} from "../../../api/post/search-taggables.js" */
 /** @import {DisplayClientTagGroup} from "../../components/tag-groups-selector.jsx" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  user: User
+ *  states: States
+ *  setters: Setters
  *  modalOptions: ModalOptions
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *  popModal: () => void
  * } param0}
 */
-const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
+const CreateAggregateTag = ({states, setters, modalOptions}) => {
     /** @type {[DisplayClientTagGroup[], (tagGroups: DisplayClientTagGroup[]) => void]} */
     const [tagGroups, setTagGroups] = useState([]); 
     /** @type {[ClientAggregateTagCondition[], (conditions: ClientAggregateTagCondition[]) => void]} */
@@ -42,7 +41,7 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
             An aggregate tag selects from a union of all of the tags in a certain selected group that meets a specified condition
             <div style={{flex: 4}}>
                 <TagGroupsSelector
-                    user={user}
+                    states={states}
                     multiSelect={false}
                     onTagGroupsSelected={(tagGroups) => {
                         setTagGroups(tagGroups)
@@ -79,7 +78,7 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                                             type: "appliedLocalMetric",
                                             Local_Metric_ID: localMetric.Local_Metric_ID,
                                             Applied_Value: i,
-                                            displayName: createAppliedMetricDisplayName(localMetric.Local_Metric_Name, user.name(), i)
+                                            displayName: createAppliedMetricDisplayName(localMetric.Local_Metric_Name, states.user.name(), i)
                                         });
                                     }
                                 }
@@ -94,7 +93,7 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                                 }
                             }
                             
-                            const notInTagList = await pushModal(SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES.modalName, {
+                            const notInTagList = await setters.pushModal(SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES.modalName, {
                                 tags
                             });
                             if (notInTagList === null || notInTagList === undefined) {
@@ -125,7 +124,7 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                                 />
                             </div></div>
                             <input disabled={tagGroups.length === 0} style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify query" onClick={async () => {
-                                const searchQuery = await pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
+                                const searchQuery = await setters.pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
                                     selectionButtonText: `Select query that ${countComparator}${countValue} taggables must match`
                                 });
 
@@ -162,7 +161,7 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                                 />
                             </div></div>
                             <input disabled={tagGroups.length === 0} style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify query" onClick={async () => {
-                                const searchQuery = await pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
+                                const searchQuery = await setters.pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
                                     selectionButtonText: `Select query that ${percentageComparator}${percentageValue}% of taggables must match`
                                 });
                                 if (searchQuery === undefined || searchQuery.value.length === 0) {
@@ -198,10 +197,10 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
                                 />
                             </div></div>
                             <input disabled={tagGroups.length === 0} style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify queries" onClick={async () => {
-                                const searchQuery = await pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
+                                const searchQuery = await setters.pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
                                     selectionButtonText: "Select query that will filter taggables"
                                 });
-                                const secondSearchQuery = await pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
+                                const secondSearchQuery = await setters.pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
                                     selectionButtonText: `Select query that ${percentageOfSecondQueryComparator}${percentageOfSecondQueryValue}% of filtered taggables must match`
                                 });
                                 if (searchQuery === undefined || searchQuery.value.length === 0 || secondSearchQuery === undefined || secondSearchQuery.value.length === 0) {
@@ -233,7 +232,7 @@ const CreateAggregateTag = ({user, modalOptions, pushModal, popModal}) => {
 
                         delete aggregateTag.tagGroup['extraInfo'];
                         modalOptions.resolve(aggregateTag);
-                        popModal();
+                        setters.popModal();
                     }}/>
                 </div>
             </div>

@@ -5,6 +5,8 @@ import { FileStorage } from "./file-storage.js";
 import { JobManager } from "./job-manager.js";
 import { Mutex } from "async-mutex";
 import path from "path";
+import { CursorManager } from "./cursor-manager.js";
+import PerfHashCmp from "../perf-tags-binding/perf-hash-cmp.js";
 
 export const DATABASE_DIR = "database";
 export const PARTIAL_ZIPS_FOLDER = path.join(DATABASE_DIR, "_partial-zips");
@@ -17,9 +19,11 @@ export const TMP_FOLDER = path.join(DATABASE_DIR, "_tmp");
  * @property {Mutex} sqlMutex
  * @property {Mutex} sqlTransactionMutex
  * @property {PerfTags} perfTags
+ * @property {PerfHashCmp} perfHashCmp
  * @property {Mutex} perfTagsMutex
  * @property {FileStorage} fileStorage
- * @property {JobManager} jobManager
+ * @property {JobManager<number>} jobManager
+ * @property {CursorManager} cursorManager
  */
 
 /**

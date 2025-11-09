@@ -3,21 +3,19 @@ import { User } from '../js/user.js';
 import { TagSelectorModal } from './tag-selector-modal.jsx';
 
 /** @import {ModalOptions} from "../modal.jsx" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  user: User
- *  fetchCache: FetchCache
+ *  states: States
+ *  setters: Setters
  *  modalOptions: ModalOptions
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *  popModal: () => void
  * }}
 */
-const CreateOrSearchGroup = ({user, fetchCache, modalOptions, pushModal, popModal}) => {
+const CreateOrSearchGroup = ({states, setters, modalOptions}) => {
     return (
         <TagSelectorModal
-            fetchCache={fetchCache}
-            user={user}
+            states={states}
             modalOptions={{
                 ...modalOptions,
                 extraProperties: {
@@ -27,8 +25,7 @@ const CreateOrSearchGroup = ({user, fetchCache, modalOptions, pushModal, popModa
                     selectionButtonText: modalOptions.extraProperties.selectionButtonText ?? "Select OR Group"
                 }
             }}
-            pushModal={pushModal}
-            popModal={popModal}
+            setters={setters}
         />
     );
 };

@@ -1,6 +1,7 @@
 import '../../global.css';
 
 /** @import {ModalOptions} from "../modal.jsx" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /**
  * @template T
@@ -12,14 +13,14 @@ import '../../global.css';
 /** 
  * @template T
  * @param {{
+ *  setters: Setters
  *  modalOptions: ModalOptions<{
  *      promptText: string
  *      optionButtons: OptionButton<T>[]
  *  }>
- *  popModal: () => void
- * }}
+ * }} param0
 */
-const DialogBox = ({modalOptions, popModal}) => {
+const DialogBox = ({setters, modalOptions}) => {
     return (
         <div style={{flexDirection: "column", margin: 4}}>
             <div>
@@ -30,7 +31,7 @@ const DialogBox = ({modalOptions, popModal}) => {
                     {modalOptions.extraProperties.optionButtons.map(optionButton => (
                         <input type="button" value={optionButton.text} onClick={() => {
                             modalOptions.resolve(optionButton.value);
-                            popModal();
+                            setters.popModal();
                         }} />
                     ))}
                 </div>

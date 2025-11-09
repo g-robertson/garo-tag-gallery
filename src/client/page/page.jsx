@@ -1,25 +1,10 @@
+import setUserPages from '../../api/client-get/set-user-pages.js';
 import '../global.css';
-import { randomID } from '../js/client-util.js';
+import DuplicatesProcessingPage, { DUPLICATES_PROCESSING_PAGE_NAME } from './pages/duplicates-page.jsx';
 
 /** @import {JSX} from "react" */
 
-import FileSearchPage, { PAGE_NAME as FILE_SEARCH_PAGE_NAME } from './pages/file-search-page.jsx';
-/**
- * @type {Record<string, {
- *     component: (param0: {
- *         fetchCache: FetchCache
- *         user: User
- *         pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *         existingState: any
- *         updateExistingStateProp: (key: string, value: any)
- *     }) => JSX.Element, pageDisplayName: string
- * }}
- **/
-const PAGES = {
-    [FILE_SEARCH_PAGE_NAME]: {
-        component: FileSearchPage
-    }
-}
+import FileSearchPage, { FILE_SEARCH_PAGE_NAME } from './pages/file-search-page.jsx';
 
 /**
  * @typedef {Object} PageType
@@ -30,19 +15,26 @@ const PAGES = {
  * @property {Record<string, any>} extraProperties
 */
 
-/** @import {User} from "../js/user.js" */
+/** @import {Setters, States} from "../App.jsx" */
 
 /**
  * @param {{
- *     page: PageType
- *     fetchCache: FetchCache
- *     user: User
- *     pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *     updatePage: (page: PageType) => Promise<void>
+ *     states: States
+ *     setters: Setters
  * }} param0 
  * @returns 
  */
-const Page = ({page, fetchCache, user, pushModal, updatePage}) => {
+const Page = ({states, setters}) => {
+    const page = states.pages[states.activePageIndex];
+    if (page === undefined) {
+        return <></>
+    }
+
+    const updatePage = async (page) => {
+        // no rerender necessary here, just need to push to index to update db
+        states.pages[states.activePageIndex] = page;
+        await setUserPages(states.pages);
+    }
     page.existingState ??= {};
     return (<div key={page.pageID} className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}>
         <div className="page-topbar">
@@ -54,7 +46,12 @@ const Page = ({page, fetchCache, user, pushModal, updatePage}) => {
         <div className="page-contents">
             {(() => {
                 if (page.pageName === FILE_SEARCH_PAGE_NAME) {
-                    return <FileSearchPage user={user} fetchCache={fetchCache} pushModal={pushModal} existingState={page.existingState} updateExistingStateProp={(key, value) => {
+                    return <FileSearchPage states={states} setters={setters} existingState={page.existingState} updateExistingStateProp={(key, value) => {
+                        page.existingState[key] = value;
+                        updatePage(page);
+                    }} />
+                } else if (page.pageName === DUPLICATES_PROCESSING_PAGE_NAME) {
+                    return <DuplicatesProcessingPage states={states} setters={setters} existingState={page.existingState} updateExistingStateProp={(key, value) => {
                         page.existingState[key] = value;
                         updatePage(page);
                     }} />

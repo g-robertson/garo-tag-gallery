@@ -3,8 +3,8 @@ import { useState } from 'react';
 import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import NumericInput from '../../components/numeric-input.jsx';
 
-/** @import {User} from "../../js/user.js" */
 /** @import {ModalOptions} from "../modal.jsx" */
+/** @import {Setters, States} from "../../App.jsx" */
 /** @import {ClientComparator, ClientSearchTagHasMetricID, ClientSearchTagInLocalMetricServiceID, ClientSearchTagLocalMetricComparison} from "../../../api/post/search-taggables.js" */
 /** @import {DBLocalMetric, DBPermissionedLocalMetricService} from "../../../db/metrics.js" */
 
@@ -28,13 +28,12 @@ function createLocalMetricComparison(localMetric, comparator, metricComparisonVa
 
 /** 
  * @param {{
- *  user: User
+ *  states: States
  *  modalOptions: ModalOptions
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *  popModal: () => void
+ *  setters: Setters
  * } param0}
 */
-const CreateMetricTag = ({user, modalOptions, pushModal, popModal}) => {
+const CreateMetricTag = ({states, setters, modalOptions}) => {
     /** @type {[DBPermissionedLocalMetricService, (localMetricService: DBPermissionedLocalMetricService) => void]} */
     const [localMetricService, setLocalMetricService] = useState(null);
     /** @type {[DBLocalMetric, (localMetric: DBLocalMetric) => void]} */
@@ -43,7 +42,7 @@ const CreateMetricTag = ({user, modalOptions, pushModal, popModal}) => {
 
     return (
         <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
-            <LocalMetricSelector user={user} onLocalMetricServiceSelected={(localMetricService => {
+            <LocalMetricSelector states={states} onLocalMetricServiceSelected={(localMetricService => {
                 setLocalMetricService(localMetricService);
                 setLocalMetric(localMetricService.Local_Metrics[0] ?? null);
             })} onLocalMetricSelected={(localMetric => {
@@ -58,7 +57,7 @@ const CreateMetricTag = ({user, modalOptions, pushModal, popModal}) => {
                         displayName: `system:has metric in metric service:${localMetricService.Service_Name}`
                     }
                     modalOptions.resolve(localMetricServiceIDTag);
-                    popModal();
+                    setters.popModal();
                 }}/>
                 <input value="Has Metric" type="button" onClick={() => {
                     /** @type {ClientSearchTagHasMetricID} */
@@ -68,25 +67,25 @@ const CreateMetricTag = ({user, modalOptions, pushModal, popModal}) => {
                         displayName: `system:has metric from:${localMetric.Local_Metric_Name}`
                     }
                     modalOptions.resolve(localMetricIDTag);
-                    popModal();
+                    setters.popModal();
                 }}/>
             </div>
             <div>
                 <input type="button" value="Metric is <" onClick={() => {
                     modalOptions.resolve(createLocalMetricComparison(localMetric, "<", metricComparisonValue));
-                    popModal();
+                    setters.popModal();
                 }} />
                 <input type="button" value="Metric is <=" onClick={() => {
                     modalOptions.resolve(createLocalMetricComparison(localMetric, "<=", metricComparisonValue));
-                    popModal();
+                    setters.popModal();
                 }} />
                 <input type="button" value="Metric is >" onClick={() => {
                     modalOptions.resolve(createLocalMetricComparison(localMetric, ">", metricComparisonValue));
-                    popModal();
+                    setters.popModal();
                 }} />
                 <input type="button" value="Metric is >=" onClick={() => {
                     modalOptions.resolve(createLocalMetricComparison(localMetric, ">=", metricComparisonValue));
-                    popModal();
+                    setters.popModal();
                 }} />
                 <NumericInput onChange={(num) => {
                     setMetricComparisonValue(num);

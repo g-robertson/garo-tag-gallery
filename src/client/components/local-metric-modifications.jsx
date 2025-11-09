@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { METRIC_TYPES } from "../js/metrics.js";
 import { clamp } from "../js/client-util.js";
+import HoverInfo from "./hover-info.jsx";
 
 /** @import {DBLocalMetric} from "../../db/metrics.js" */
 
@@ -76,13 +77,13 @@ const LocalMetricModifications = ({selectedLocalMetric}) => {
     return (
         <div style={{marginLeft: "8px", flexDirection: "column"}}>
             <div style={{margin: "2px 0 2px 0"}}>
-                <span style={{marginRight: 2}}>Choose a name for your metric: </span>
+                <div style={{marginRight: 2}}>Choose a name for your metric: </div>
                 <input name="metricName" type="text" value={metricName} onChange={(e) => {
                     setMetricName(e.currentTarget.value); 
                 }} />
             </div>
             <div style={{margin: "2px 0 2px 0"}}>
-                <span style={{marginRight: 2}}>Choose a lower bound number for your rating service: </span>
+                <div style={{marginRight: 2}}>Choose a lower bound number for your rating service: </div>
                 <input name="lowerBound" type="text" value={lowerBound} onChange={(e) => {
                     setLowerBound(e.currentTarget.value);
                 }}  onBlur={(e) => {
@@ -90,7 +91,7 @@ const LocalMetricModifications = ({selectedLocalMetric}) => {
                 }} />
             </div>
             <div style={{margin: "2px 0 2px 0"}}>
-                <span>Choose an upper bound number for your rating service: </span>
+                <div style={{marginRight: 2}}>Choose an upper bound number for your rating service: </div>
                 <input name="upperBound" type="text" value={upperBound} onChange={(e) => {
                     setUpperBound(e.currentTarget.value);
                 }} onBlur={(e) => {
@@ -98,7 +99,7 @@ const LocalMetricModifications = ({selectedLocalMetric}) => {
                 }} />
             </div>
             <div style={{margin: "2px 0 2px 0"}}>
-                <span style={{marginRight: 2}}>Choose a <span title="how many fractional digits are stored">precision<sub><sub>?</sub></sub></span> for your rating service: </span>
+                <div style={{marginRight: 2}}>Choose a <HoverInfo hoverText="How many fractional digits are stored">precision</HoverInfo> for your rating service: </div>
                 <input disabled={metricType !== METRIC_TYPES.NUMERIC} type="text" value={precision} onChange={(e) => {
                     setPrecision(e.currentTarget.value);
                 }}  onBlur={(e) => {
@@ -108,7 +109,7 @@ const LocalMetricModifications = ({selectedLocalMetric}) => {
             </div>
 
             <div style={{margin: "2px 0 2px 0"}}>
-                <span style={{marginRight: 2}}>Select what type of rating service you would like this to be: </span>
+                <div style={{marginRight: 2}}>Select what type of rating service you would like this to be: </div>
                 <select name="metricType" value={metricType} onChange={(e) => {
                     let metricType = clampServiceType(Number(e.currentTarget.value));
                     if (metricType === METRIC_TYPES.INCDEC) {

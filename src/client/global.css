@@ -110,7 +110,6 @@ div {
 
 .modal {
     flex-direction: column;
-    position: absolute;
     border: 2px solid var(--foreground);
 }
 
@@ -133,6 +132,16 @@ div {
 }
 .modal-content {
     flex-grow: 100;
+}
+
+.modal-minimize {
+    margin: 2px 4px 2px 0px;
+    padding: 2px 6px;
+    color: #aaa;
+    float: right;
+    text-align: right;
+    cursor: pointer;
+    font-weight: 1000;
 }
 .modal-cancel {
     margin: 4px 4px 2px -6px;

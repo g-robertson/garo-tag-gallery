@@ -7,7 +7,7 @@ namespace {
         filesStr.resize(8 * contents.size());
         std::size_t location = 0;
         for (auto file : contents) {
-            util::serializeUInt64(file, filesStr, location);
+            location = util::serializeUInt64(file, filesStr, location);
         }
 
         return filesStr;

@@ -1,24 +1,20 @@
 import '../../global.css';
-import { User } from '../js/user.js';
 import LazyGallery from '../../components/lazy-gallery.jsx';
 
 /** @import {ModalOptions} from "../modal.jsx" */
+/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  user: User
+ *  states: States
  *  modalOptions: ModalOptions
- *  pushModal: (modalName: string, extraProperties: any) => Promise<any>
- *  popModal: () => void
  * }}
 */
-const GalleryModal = ({user, modalOptions, pushModal, popModal}) => {
+const GalleryModal = ({states, modalOptions}) => {
     const taggableIDs = modalOptions.extraProperties.taggableIDs;
-    let initialTaggableID = modalOptions?.extraProperties?.initialTaggableID;
-    initialTaggableID ??= taggableIDs[0];
     return (
         <div style={{width: "100%", height: "100%"}}>
-            <LazyGallery user={user} taggableIDs={taggableIDs} initialTaggableID={initialTaggableID} />
+            <LazyGallery states={states} taggableIDs={taggableIDs} initialTaggableIndex={modalOptions?.extraProperties?.initialTaggableIndex} />
         </div>
     );
 };

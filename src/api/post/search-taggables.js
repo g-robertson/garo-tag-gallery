@@ -1,17 +1,18 @@
 /**
  * @import {APIFunction} from "../api-types.js"
- * @import {DBTaggable} from "../../db/taggables.js"
+ * @import {DBTaggable, DedupedDBJoinedLocalFile} from "../../db/taggables.js"
  * @import {DBAppliedMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js"
  */
 
-import { bjsonStringify, replaceObject } from "../../client/js/client-util.js";
+import { bjsonStringify, clientjsonStringify, mapNullCoalesce, randomID, replaceObject } from "../../client/js/client-util.js";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { Taggables } from "../../db/taggables.js";
+import { Files, LocalFiles, Taggables } from "../../db/taggables.js";
 import { LocalTags, LocalTagServices, TagsNamespaces } from "../../db/tags.js";
 import z from "zod";
 import PerfTags from "../../perf-tags-binding/perf-tags.js";
 import { IN_TRASH_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import { AppliedMetrics, LocalMetrics, LocalMetricServices } from "../../db/metrics.js";
+import { Cursor, getCursorAsFileWantedFields, getCursorAsTaggableWantedFields, Z_WANTED_FILE_FIELD, Z_WANTED_TAGGABLE_FIELD } from "../../db/cursor-manager.js";
 
 const Z_CLIENT_COMPARATOR = z.literal("<").or(z.literal("<=")).or(z.literal(">")).or(z.literal(">="));
 /** @typedef {z.infer<typeof Z_CLIENT_COMPARATOR>} ClientComparator */
@@ -53,7 +54,7 @@ const Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON = z.object({
     Local_Metric_ID: z.number(),
     metricComparisonValue: z.number().finite()
 });
-/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON} ClientSearchTagLocalMetricComparison */
+/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON>} ClientSearchTagLocalMetricComparison */
 
 const Z_CLIENT_SEARCH_TAG = Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID
     .or(Z_CLIENT_SEARCH_TAG_BY_LOOKUP)
@@ -130,6 +131,16 @@ const Z_SEARCH_QUERY = z.object({
  *     value: ClientSearchQuery
  * } | ClientSearchTag | ClientAggregateTag} ClientSearchQuery
  **/
+
+
+const Z_WANTED_FIELD = Z_WANTED_TAGGABLE_FIELD
+.or(Z_WANTED_FILE_FIELD);
+/** @typedef {z.infer<typeof Z_WANTED_FIELD>} SearchWantedField */
+
+const Z_WANTED_CURSOR = z.literal("Taggable")
+.or(z.literal("File"));
+/** @typedef {z.infer<typeof Z_WANTED_CURSOR>} WantedCursor */
+
 
 /**
  * @typedef {{
@@ -499,7 +510,13 @@ export async function validate(dbs, req, res) {
     if (!tryClientSearchQuery.success) return tryClientSearchQuery.error.message;
     /** @type {ClientSearchQuery} */
     const clientSearchQuery = tryClientSearchQuery.data;
+
+    const wantedCursor = Z_WANTED_CURSOR.safeParse(req?.body?.wantedCursor, {path: ["wantedCursor"]});
+    if (!wantedCursor.success) return wantedCursor.error.message;
     
+    const wantedFields = Z_WANTED_FIELD.or(z.array(Z_WANTED_FIELD)).safeParse(req?.body?.wantedFields, {path: ["wantedFields"]});
+    if (!wantedFields.success) return wantedFields.error.message;
+
     const localTagServiceIDs = z.array(z.number().nonnegative().int()
         .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
     ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
@@ -554,6 +571,8 @@ export async function validate(dbs, req, res) {
 
     return {
         clientSearchQuery,
+        wantedCursor: wantedCursor.data,
+        wantedFields: wantedFields.data,
         localTagServiceIDs: localTagServiceIDs.data,
         allLocalTagIDs: [...allLocalTagIDs],
         allTagLookups: [...allTagLookups],
@@ -583,6 +602,8 @@ export async function checkPermission(dbs, req, res) {
     return localTagServices.length === localTagServiceIDsToCheck.length;
 }
 
+/** @typedef {Cursor<"Taggable", DBTaggable[]>} DBTaggableCursor */
+/** @typedef {Cursor<"File", DedupedDBJoinedLocalFile[]>} DBFileCursor */
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {
@@ -635,5 +656,32 @@ export default async function get(dbs, req, res) {
         );
     }
 
-    return res.status(200).send(bjsonStringify(taggables.map(taggable => Number(taggable.Taggable_ID))));
+    if (req.body.wantedCursor === "Taggable") {
+        const cursor = new Cursor({cursorType: "Taggable", cursorValue: taggables})
+        dbs.cursorManager.addCursorToUser(req.user.id(), cursor);
+
+        if (req.body.wantedFields === "Taggable_ID") {
+            return res.status(200).send(clientjsonStringify({
+                cursor: cursor.id(),
+                result: getCursorAsTaggableWantedFields(cursor, req.body.wantedFields)
+            }));
+        } else {
+            return res.status(400).send(`No implementation currently exists for non "Taggable_ID" wantedFields on "Taggable" wantedCursor queries`);
+        }
+    } else if (req.body.wantedCursor === "File") {
+        /** @type {DBFileCursor} */
+        const cursor = new Cursor({cursorType: "File", cursorValue: LocalFiles.dedupeLocalFilesTaggables(
+            await LocalFiles.selectManyByTaggableIDs(dbs, taggables.map(taggable => taggable.Taggable_ID))
+        )});
+        dbs.cursorManager.addCursorToUser(req.user.id(), cursor);
+
+        return res.status(200).send(clientjsonStringify({
+            cursor: cursor.id(),
+            result: getCursorAsFileWantedFields(cursor, req.body.wantedFields)
+        }));
+    } else {
+        return res.status(400).send(`No implementation currently exists for non "Taggable" | "File" wantedCursor queries`);
+    }
+
+    return res.status(400).send("Something unexpected happened and the query was not processed");
 }
