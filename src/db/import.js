@@ -230,7 +230,8 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
             leadFilePath = partialFilePaths[0];
         } else {
             for (const filePath of partialFilePaths) {
-                if (filePath.endsWith(".zip") || filePath.endsWith(".zip.001")) {
+                if (filePath.toLowerCase().endsWith(".zip")
+                 || filePath.toLowerCase().endsWith(".zip.001")) {
                     leadFilePath = filePath;
                     break;
                 }
