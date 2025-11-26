@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { ExistingState } from "../page/pages.js";
 
 /**
  * 
@@ -9,11 +9,11 @@ import { useState } from "react";
  */
 export const OnFormSubmit = ({onFormSubmit}) => {
     onFormSubmit ??= () => {};
-    const [firstLoad, setFirstLoad] = useState(true);
+    const firstLoad = ExistingState.stateRef(true);
 
     return <iframe id="frame" name="frame" style={{display: "none"}} onLoad={(e) => {
-        if (firstLoad) {
-            setFirstLoad(false);
+        if (firstLoad.get()) {
+            firstLoad.update(false);
         } else {
             if (e.currentTarget.contentWindow.performance.getEntriesByType("navigation")[0].responseStatus === 200) {
                 onFormSubmit();

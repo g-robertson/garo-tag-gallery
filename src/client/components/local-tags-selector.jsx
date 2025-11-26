@@ -1,13 +1,16 @@
 import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
-import { FetchCache } from "../js/client-util.js";
+import { User } from "../js/user.js";
+import { Modals } from "../modal/modals.js";
+import {ExistingState} from "../page/pages.js";
 
+/** @import {ExistingStateRef, ExistingStateConstRef} from "../page/pages.js" */
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
 /** @import {ClientQueryTag} from "../../api/client-get/tags-from-local-tag-services.js" */
 /** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
-/** @import {Setters, States} from "../App.jsx */
+/** @import {MultiSelectOption} from "./multi-select.jsx" */
 
 /**
  * @param {ClientQueryTag[]} clientTags 
@@ -17,15 +20,14 @@ export async function MAP_TO_CLIENT_TAGS(clientTags) {
 }
 /**
  * @param {ClientQueryTag[]} clientTags 
- * @param {(modalName: string, extraProperties: any) => Promise<any>} pushModal
  */
-export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags, pushModal) {
+export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags) {
     /** @type {ClientSearchQuery[]} */
     const mapped = [];
     for (let i = clientTags.length - 1; i >= 0; --i) {
         const tag = clientTags[i];
         if (tag.type === "modalTag") {
-            const modalTags = await pushModal(tag.modalTagInfo.modalName);
+            const modalTags = await Modals.Global().pushModal(tag.modalTagInfo.modal);
             if (modalTags !== undefined && modalTags !== null) {
                 mapped.push(modalTags);
             }
@@ -40,90 +42,136 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags, pushModal) {
 /**
  * @template {any} [T=ClientQueryTag]
  * @param {{
- *  states: States
- *  setters: Setters
- *  localTagServices: DBPermissionedLocalTagService[]
- *  taggableCursor?: string
+ *  existingState?: ExistingState<{
+ *    multiSelectOptions: MultiSelectOption<number>[]
+ *    selectedLocalTagServiceIDs: number[]
+ *    isExcludeOn: boolean
+ *    tagFilterValue: string
+ *    tagsPreFilter: ClientQueryTag[]
+ *    tags: ClientQueryTag[]
+ *  }>
+ *  localTagServicesConstRef?: ExistingStateConstRef<DBPermissionedLocalTagService[]>
+ *  selectedLocalTagServiceIDsRef?: ExistingStateRef<Set<number>>
+ *  taggableCursorConstRef: ExistingStateConstRef<string>
+ *  taggableIDsConstRef?: ExistingStateConstRef<number[]>
  *  tagsToRemove?: Set<string>
  *  tagsToAdd?: Map<string, ClientQueryTag>
- *  defaultLocalTagServiceIDsSelected?: number[]
  *  multiSelect?: boolean
  *  excludeable?: boolean
  *  tagSelectionTitle?: string
- *  valueMappingFunction?: (tags: ClientQueryTag[], pushModal: (modalName: string, extraProperties: any) => Promise<any>) => Promise<T[]>
- *  onTagsSelected?: (tags: T[], isExcludeOn: boolean, localTagServiceIDsSelected: number[]) => void
- *  onLocalTagServiceIDsChanged?: (localTagServiceIDsSelected: number[]) => void
+ *  valueMappingFunction?: (tags: ClientQueryTag[]) => Promise<T[]>
+ *  onTagsSelected?: (tags: T[], isExcludeOn: boolean, selectedLocalTagServiceIDs: number[]) => void
  * }} param0
  */
 const LocalTagsSelector = ({
-    states,
-    setters,
-    taggableCursor,
-    localTagServices,
+    existingState,
+    localTagServicesConstRef,
+    selectedLocalTagServiceIDsRef,
+    taggableIDsConstRef,
+    taggableCursorConstRef,
     tagsToRemove,
     tagsToAdd,
-    defaultLocalTagServiceIDsSelected,
     multiSelect,
     excludeable,
     tagSelectionTitle,
     valueMappingFunction,
     onTagsSelected,
-    onLocalTagServiceIDsChanged
 }) => {
+    localTagServicesConstRef ??= User.Global().localTagServicesAvailableRef();
+    existingState ??= new ExistingState();
+    // If no provided reference to selection, then create one in this component's state, and save it
+    if (selectedLocalTagServiceIDsRef === undefined) {
+        existingState.initAssign("selectedLocalTagServiceIDs", new Set(localTagServicesConstRef.get().map(localTagService => localTagService.Local_Tag_Service_ID)), {isSaved: true});
+        selectedLocalTagServiceIDsRef = existingState.getRef("selectedLocalTagServiceIDs");
+    }
+    existingState.initAssign("isExcludeOn", false, {isSaved: true});
+    existingState.initAssign("tagFilterValue", "");
+    existingState.initAssign("tagsPreFilter", []);
+    existingState.initAssign("tags", []);
+    taggableCursorConstRef ??= ExistingState.stateRef(undefined);
+    taggableIDsConstRef ??= ExistingState.stateRef(undefined);
     tagsToRemove ??= new Set();
-    tagsToAdd ??= new Set();
+    tagsToAdd ??= new Map();
     multiSelect ??= true;
     excludeable ??= true;
     tagSelectionTitle ??= "Select tags";
     valueMappingFunction ??= MAP_TO_CLIENT_TAGS;
     onTagsSelected ??= () => {};
-    onLocalTagServiceIDsChanged ??= () => {};
-    defaultLocalTagServiceIDsSelected ??= localTagServices.map(localTagService => localTagService.Local_Tag_Service_ID);
 
-    /** @type {[ClientQueryTag[], (tags: ClientQueryTag[]) => void]} */
-    const [tagsPreFilter, setTagsPreFilter] = useState([]);
-    /** @type {[string, (tagFilterValue: string) => void]} */
-    const [tagFilterValue, setTagFilterValue] = useState("");
-    /** @type {[boolean, (isExcludeOn: boolean) => void]} */
-    const [isExcludeOn, setIsExcludeOn] = useState(false);
-    /** @type {[number[], (localTagServiceIDsSelected: number[]) => void]} */
-    const [localTagServiceIDsSelected, setLocalTagServiceIDsSelected] = useState(defaultLocalTagServiceIDsSelected);
+    const onAdd = () => {
+        // Updates tags available in tag services
+        const onTagsPreFilterCriteriasChanged = async () => {
+            existingState.update("tagsPreFilter", await getTagsFromLocalTagServiceIDs([...selectedLocalTagServiceIDsRef.get()], taggableCursorConstRef.get(), taggableIDsConstRef.get()));
+        };
+        onTagsPreFilterCriteriasChanged();
 
-    let tags = tagsPreFilter.filter(tag => !tagsToRemove.has(tag.tagName) && !tagsToAdd.has(tag.tagName) && tag.tagCount !== 0);
-    tags.push(...tagsToAdd.values());
+        // Updates tags allowed to be selected when tag criteria changes (tagsPreFilter, tagFilterValue)
+        const onTagCriteriaChanged = () => {
+            let tags = existingState.get("tagsPreFilter").filter(tag => !tagsToRemove.has(tag.tagName) && !tagsToAdd.has(tag.tagName) && tag.tagCount !== 0);
+            tags.push(...tagsToAdd.values());
+            tags = tags.sort((a, b) => b.tagCount - a.tagCount);
 
-    tags = tags.sort((a, b) => b.tagCount - a.tagCount)
+            const tagFilterValue = existingState.get("tagFilterValue");
+            tags = tags.filter(tag => {
+                const colonSplitTagFilter = tagFilterValue.split(':');
+                let tagNameMatchedPartsFrom = colonSplitTagFilter.length;
+                for (let i = 0; i < colonSplitTagFilter.length; ++i) {
+                    if (tag.tagName.startsWith(colonSplitTagFilter.slice(i).join(':'))) {
+                        tagNameMatchedPartsFrom = i;
+                        break;
+                    }
+                }
 
-    useEffect(() => {
-        (async () => {
-            setTagsPreFilter(await getTagsFromLocalTagServiceIDs(localTagServiceIDsSelected, taggableCursor, states.fetchCache));
-        })();
-    }, [localTagServiceIDsSelected, taggableCursor, states.fetchCache]);
+                const namespaceParts = colonSplitTagFilter.slice(0, Math.min(colonSplitTagFilter.length - 1, tagNameMatchedPartsFrom));
+                for (const namespacePart of namespaceParts) {
+                    if (tag.namespaces.indexOf(namespacePart) === -1) {
+                        return false;
+                    }
+                }
+                if (tagNameMatchedPartsFrom === colonSplitTagFilter.length) {
+                    let namespacePartialMatch = false;
+                    for (const namespace of tag.namespaces) {
+                        if (namespace.startsWith(colonSplitTagFilter[colonSplitTagFilter.length - 1])) {
+                            namespacePartialMatch = true;
+                        }
+                    }
+                    if (!namespacePartialMatch) {
+                        return false;
+                    }
+                }
 
-    useEffect(() => {
-        onLocalTagServiceIDsChanged(localTagServiceIDsSelected);
-    }, [localTagServiceIDsSelected]);
+                return true;
+            });
+
+            console.log("tags criteria changed", existingState.get("tags"), tags);
+
+            existingState.update("tags", tags);
+        };
+        onTagCriteriaChanged();
+
+        let cleanup = () => {};
+        cleanup = selectedLocalTagServiceIDsRef.addOnUpdateCallback(onTagsPreFilterCriteriasChanged, cleanup);
+        cleanup = taggableCursorConstRef.addOnUpdateCallback(onTagsPreFilterCriteriasChanged, cleanup);
+        cleanup = existingState.addOnUpdateCallbackForKey("tagsPreFilter", onTagCriteriaChanged, cleanup);
+        cleanup = existingState.addOnUpdateCallbackForKey("tagFilterValue", onTagCriteriaChanged, cleanup);
+        return cleanup;
+    };
 
     // TODO: Separate out top half of this from the LazyTextObjectSelector
     return (
-        <div style={{flexDirection: "column", width: "100%"}}>
+        <div class="local-tags-selector" style={{flexDirection: "column", width: "100%"}} onAdd={onAdd}>
             <div>Tag services to view/add from:</div>
-            <div style={{flex: 1, overflowY: "auto"}}>
+            <div className="tag-service-selector" style={{flex: 1, overflowY: "auto"}}>
                 <MultiSelect
-                    options={localTagServices.map((localTagService, i) => ({
+                    optionsConstRef={localTagServicesConstRef.getTransformRef(localTagServices => localTagServices.map(localTagService => ({
                         value: localTagService.Local_Tag_Service_ID,
                         displayName: localTagService.Service_Name
-                    }))}
-                    defaultOptionsSelected={defaultLocalTagServiceIDsSelected}
-                    onOptionsChange={async (optionsSelected) => {
-                        setLocalTagServiceIDsSelected(optionsSelected.map(option => Number(option)));
-                    }}
+                    })))}
+                    selectedOptionsRef={selectedLocalTagServiceIDsRef}
                 />
             </div>
             {tagSelectionTitle}:
-            <div><input type="text" value={tagFilterValue} onChange={(e) => {
-                setTagFilterValue(e.currentTarget.value);
-            }} onKeyDown={(e) => {
+            <div><input class="tag-filter-input" type="text" onInput={(e) => {
                 if (e.key === "Enter") {
                     let displayName = e.currentTarget.value;
                     if (displayName === "") {
@@ -147,7 +195,8 @@ const LocalTagsSelector = ({
                         tagName = displayName.slice(lastColonIndex + 1);
                     }
 
-                    const foundSameTag = tags.find(tag => tag.tagName === displayName);
+                    const isExcludeOn = existingState.get("isExcludeOn");
+                    const foundSameTag = existingState.get("tags").find(tag => tag.tagName === displayName);
                     if (foundSameTag !== undefined) {
                         onTagsSelected([foundSameTag], Boolean(isExcludeOn ^ excludeFromTag));
                     } else {
@@ -161,65 +210,33 @@ const LocalTagsSelector = ({
                             Lookup_Name: tagName
                         };
 
-                        onTagsSelected([enteredClientTag], Boolean(isExcludeOn ^ excludeFromTag), localTagServiceIDsSelected);
+                        onTagsSelected([enteredClientTag], Boolean(isExcludeOn ^ excludeFromTag), selectedLocalTagServiceIDsRef.get());
                     }
 
-                    setTagFilterValue("");
+                    existingState.update("tagFilterValue", "");
+                    e.currentTarget.value = "";
+                } else {
+                    existingState.update("tagFilterValue", e.currentTarget.value);
                 }
             }}/></div>
             {excludeable
-                ? <div>Exclude: <input type="checkbox" checked={isExcludeOn} onChange={() => {
-                    setIsExcludeOn(!isExcludeOn);
+                ? <div>Exclude: <input class="exclude-checkbox" type="checkbox" onChange={(e) => {
+                    existingState.update("isExcludeOn", e.currentTarget.checked);
                 }}/></div>
                 : <></>
             }
             
             <div style={{flex: 5}}>
-                <LazyTextObjectSelector
-                    textObjects={
-                        tags.filter(tag => {
-                            if (tag.tagCount === 0) {
-                                return false;
-                            }
-                            
-                            const colonSplitTagFilter = tagFilterValue.split(':');
-                            let tagNameMatchedPartsFrom = colonSplitTagFilter.length;
-                            for (let i = 0; i < colonSplitTagFilter.length; ++i) {
-                                if (tag.tagName.startsWith(colonSplitTagFilter.slice(i).join(':'))) {
-                                    tagNameMatchedPartsFrom = i;
-                                    break;
-                                }
-                            }
-
-                            const namespaceParts = colonSplitTagFilter.slice(0, Math.min(colonSplitTagFilter.length - 1, tagNameMatchedPartsFrom));
-                            for (const namespacePart of namespaceParts) {
-                                if (tag.namespaces.indexOf(namespacePart) === -1) {
-                                    return false;
-                                }
-                            }
-                            if (tagNameMatchedPartsFrom === colonSplitTagFilter.length) {
-                                let namespacePartialMatch = false;
-                                for (const namespace of tag.namespaces) {
-                                    if (namespace.startsWith(colonSplitTagFilter[colonSplitTagFilter.length - 1])) {
-                                        namespacePartialMatch = true;
-                                    }
-                                }
-                                if (!namespacePartialMatch) {
-                                    return false;
-                                }
-                            }
-
-                            return true;
-                        })
-                    }
+                {<LazyTextObjectSelector
+                    textObjectsConstRef={existingState.getConstRef("tags")}
                     onValuesDoubleClicked={async (valuesSelected) => {
-                        const mappedValues = await valueMappingFunction(valuesSelected, setters.pushModal);
-                        onTagsSelected(mappedValues, isExcludeOn, localTagServiceIDsSelected);
+                        const mappedValues = await valueMappingFunction(valuesSelected);
+                        onTagsSelected(mappedValues, existingState.get("isExcludeOn"), selectedLocalTagServiceIDsRef.get());
                     }}
                     customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== Infinity ? ` (${realizedValue.tagCount})` : ""}</>}
                     customTitleRealizer={(realizedValue) => realizedValue.displayName}
                     multiSelect={multiSelect}
-                />
+                />}
             </div>
         </div>
     );

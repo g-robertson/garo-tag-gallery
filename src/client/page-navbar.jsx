@@ -1,32 +1,27 @@
+import { useEffect, useState } from 'react';
 import './global.css';
+import { Pages } from './page/pages.js';
 
-/** @import {Setters, States} from "./App.jsx" */
+const PageNavbar = () => {
+    const [, rerenderStateFn] = useState({});
+    const rerenderComponent = () => {rerenderStateFn({});};
+    useEffect(() => {
+        let cleanup = () => {};
+        cleanup = Pages.Global().addOnUpdateCallback(rerenderComponent, cleanup);
+        return cleanup;
+    }, []);
 
-/**
- * 
- * @param {{
- *     states: States,
- *     setters: Setters,
- * }} param0 
- * @returns 
- */
-const PageNavbar = ({states, setters}) => {
     return (
         <div className="page-navbar-scroller">
             <nav className="page-navbar">
-                {states.pages.map((page, index) => (<div className={`page-navbar-topbar-dropdown${states.activePageIndex === index ? " selected" : ""}`}>
+                {Pages.Global().pages.map((page, index) => (<div className={`page-navbar-topbar-dropdown${Pages.Global().currentPage === page  ? " selected" : ""}`}>
                     <div className="page-navbar-topbar-dropdown-title" style={{height: "100%", alignItems: "center"}} onClick={() => {
-                        setters.setActivePageIndex(index);
+                        Pages.Global().setCurrentPage(page);
                     }}>
                         <div style={{marginLeft: 8}}>{page.pageDisplayName}</div>
                         
-                        <div style={{marginLeft: 16, fontSize: "18px"}} class="page-cancel" onClick={(e) => {
-                            if (index <= states.activePageIndex) {
-                                --states.activePageIndex;
-                            }
-                            states.pages.splice(index, 1)
-                            setters.setPages([...states.pages]);
-                            setters.setActivePageIndex(states.activePageIndex);
+                        <div style={{marginLeft: 16, fontSize: "18px"}} className="page-cancel" onClick={(e) => {
+                            Pages.Global().removePageAt(index);
                             e.stopPropagation();
                         }}>X</div>
                     </div>

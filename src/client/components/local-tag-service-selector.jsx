@@ -1,34 +1,28 @@
 import '../global.css';
 import { User } from '../js/user.js';
-
+import { ExistingState } from '../page/pages.js';
 
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
-/** @import {Setters, States} from "../App.jsx" */
-
+/** @import {ExistingStateRef} from '../page/pages.js' */
 
 /**
  * @param {{
- *  states: States
- *  onLocalTagServiceSelected?: (localTagService: DBPermissionedLocalTagService) => void
- *  defaultLocalTagService?: DBPermissionedLocalTagService
+ *  selectedLocalTagServiceRef: ExistingStateRef<DBPermissionedLocalTagService>
  * }} param0
  * @returns
  */
-const LocalTagServiceSelector = ({states, onLocalTagServiceSelected, defaultLocalTagService}) => {
-    defaultLocalTagService ??= states.user.localTagServices()[0];
-    onLocalTagServiceSelected ??= () => {};
+const LocalTagServiceSelector = ({selectedLocalTagServiceRef}) => {
+    selectedLocalTagServiceRef ??= ExistingState.stateRef(User.Global().localTagServices()[0]);
 
     return (
         <div style={{marginLeft: "8px"}}>
             <div style={{margin: "2px 0 2px 0"}}>
                 <span>Select which local tag service you wish to use: </span>
-                <select style={{display: "inline-block"}} name="localTagServiceID" defaultValue={defaultLocalTagService?.Local_Tag_Service_ID} onChange={(e) => {
-                    const selectedLocalTagService = Number(e.currentTarget.selectedOptions[0].value);
-                    onLocalTagServiceSelected(
-                        states.user.localTagServices().filter(localTagService => localTagService.Local_Tag_Service_ID === selectedLocalTagService)[0]
-                    );
+                <select style={{display: "inline-block"}} name="localTagServiceID" defaultValue={selectedLocalTagServiceRef.get()?.Local_Tag_Service_ID} onChange={(e) => {
+                    const selectedLocalTagServiceRefID = Number(e.currentTarget.selectedOptions[0].value);
+                    selectedLocalTagServiceRef.update(User.Global().localTagServices().find(localTagService => localTagService.Local_Tag_Service_ID === selectedLocalTagServiceRefID));
                 }}>
-                    {states.user.localTagServices().map(localTagService => (
+                    {User.Global().localTagServices().map(localTagService => (
                         <option value={localTagService.Local_Tag_Service_ID}>{localTagService.Service_Name}</option>
                     ))}
                 </select>

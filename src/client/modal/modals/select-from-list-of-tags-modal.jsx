@@ -1,44 +1,40 @@
-import { useState } from 'react';
 import DualListboxLazyTextObjectSelector from '../../components/dual-listbox-lazy-text-object-selector.jsx';
 import '../../global.css';
+import { Modals } from '../../modal/modals.js';
+import { ExistingState } from '../../page/pages.js';
 
-/** @import {Setters, States} from "../../App.jsx" */
-/** @import {ModalOptions} from "../modal.jsx" */
+/** @import {ExtraProperties} from "../modals.js" */
+/** @import {Modal} from "../modals.js" */
 
 /** 
  * @param {{
- *  setters: Setters
- *  modalOptions: ModalOptions
+ *  extraProperties: ExtraProperties<{
+ *      tags: any[]
+ *  }>
+ *  modalResolve: (value: any) => void
  * }}
 */
-const SelectFromListOfTags = ({setters, modalOptions}) => {
-    const [selectedTags, setSelectedTags] = useState([]);
+export default function SelectFromListOfTags({ extraProperties, modalResolve }) {
+    const selectedTagsRef = ExistingState.stateRef(new Set());
 
-    return (
-        <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
-            Select from list of tags:
-            <div style={{width: "100%", height: "100%"}}>
-                <DualListboxLazyTextObjectSelector
-                    items={modalOptions.extraProperties.tags}
-                    customItemSelectorComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
-                    customItemSelectedComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
-                    onSelectionChanged={(items) => {
-                        setSelectedTags(items);
-                    }}
-                />
+    return {
+        component: (
+            <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
+                Select from list of tags:
+                <div style={{width: "100%", height: "100%"}}>
+                    <DualListboxLazyTextObjectSelector
+                        items={extraProperties.tags}
+                        selectedItemsRef={selectedTagsRef}
+                        customItemSelectorComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
+                        customItemSelectedComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
+                    />
+                </div>
+                <input style={{margin: 8}} type="button" value="Select tags" onClick={() => {
+                    modalResolve([...selectedTagsRef.get()]);
+                    Modals.Global().popModal();
+                }} />
             </div>
-            <input style={{margin: 8}} type="button" value="Select tags" onClick={() => {
-                modalOptions.resolve(selectedTags);
-                setters.popModal();
-            }} />
-        </div>
-    );
+        ),
+        displayName: "Select list of tags"
+    };
 };
-
-export default SelectFromListOfTags;
-
-export const MODAL_PROPERTIES = {
-    modalName: "select-list-of-tags",
-    displayName: "Select list of tags"
-};
-export const SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES = MODAL_PROPERTIES;

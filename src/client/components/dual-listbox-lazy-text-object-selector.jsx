@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
+import { ExistingState } from '../page/pages.js';
 import '../global.css';
 
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
+
+
+/** @import {ExistingStateRef} from '../page/pages.js' */
 
 /**
  * @template T
  * @param {{
  *  items: T[]
+ *  selectedItemsRef: ExistingStateRef<Set<T>>
  *  initialSelectedItemIndices?: number[]
  *  onSelectionChanged?: (selectedItems: T) => void
  *  customItemSelectedComponent: (param0: {realizedValue: T, index: number}) => JSX.Element
@@ -17,8 +21,7 @@ import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
  */
 const DualListboxLazyTextObjectSelector = ({
     items,
-    initialSelectedItemIndices,
-    onSelectionChanged,
+    selectedItemsRef,
     customItemSelectedComponent,
     itemSelectorHeaderComponent,
     customItemSelectorComponent,
@@ -26,50 +29,44 @@ const DualListboxLazyTextObjectSelector = ({
 }) => {
     itemSelectorHeaderComponent ??= <></>;
     customTitleRealizer ??= () => "";
-    onSelectionChanged ??= () => {};
-
-    /** @type {[Set<number>, (selectedItemIndices: Set<number>) => void]} */
-    const [selectedItemIndices, setSelectedItems] = useState(new Set(initialSelectedItemIndices ?? []));
-
-    useEffect(() => {
-        onSelectionChanged([...selectedItemIndices].map(index => items[index]));
-    }, [selectedItemIndices]);
 
     return (
         <div style={{width: "100%", flexDirection: "column", margin: 4}}>
             Selected items:
             <div style={{flex: 1}}>
-                <LazyTextObjectSelector
-                    textObjects={[...selectedItemIndices]}
-                    onValuesDoubleClicked={((indices) => {
-                        for (const index of indices) {
-                            selectedItemIndices.delete(index);
+                {<LazyTextObjectSelector
+                    textObjectsConstRef={selectedItemsRef}
+                    onValuesDoubleClicked={((items) => {
+                        const selectedItems = selectedItemsRef.get();
+                        for (const item of items) {
+                            selectedItems.delete(item);
                         }
-                        setSelectedItems(new Set(selectedItemIndices));
+                        selectedItemsRef.forceUpdate();
                     })}
                     multiSelect={true}
                     customItemComponent={({realizedValue, index}) => customItemSelectedComponent({realizedValue: items[realizedValue], index})}
                     customTitleRealizer={customTitleRealizer}
-                />
+                />}
             </div>
             {itemSelectorHeaderComponent}
             <div style={{marginTop: 8, flex: 3}}>
-                <LazyTextObjectSelector
-                    textObjects={items}
-                    onValuesDoubleClicked={(_, indices) => {
-                        for (const index of indices) {
-                            if (selectedItemIndices.has(index)) {
-                                selectedItemIndices.delete(index);
+                {<LazyTextObjectSelector
+                    textObjectsConstRef={ExistingState.stateRef(items)}
+                    onValuesDoubleClicked={(items) => {
+                        const selectedItems = selectedItemsRef.get();
+                        for (const item of items) {
+                            if (selectedItems.has(item)) {
+                                selectedItems.delete(item);
                             } else {
-                                selectedItemIndices.add(index);
+                                selectedItems.add(item);
                             }
                         }
-                        setSelectedItems(new Set(selectedItemIndices));
+                        selectedItemsRef.forceUpdate();
                     }}
                     multiSelect={true}
                     customItemComponent={customItemSelectorComponent}
                     customTitleRealizer={customTitleRealizer}
-                />
+                />}
             </div>
         </div>
     );

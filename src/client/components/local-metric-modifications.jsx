@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { METRIC_TYPES } from "../js/metrics.js";
-import { clamp } from "../js/client-util.js";
+import { clamp, ReferenceableReact } from "../js/client-util.js";
 import HoverInfo from "./hover-info.jsx";
+import { ExistingState } from "../page/pages.js";
 
 /** @import {DBLocalMetric} from "../../db/metrics.js" */
-
+/** @import {ExistingStateConstRef} from "../page/pages.js" */
 
 function clampServiceType(metricType) {
     if (isNaN(metricType)) {
@@ -56,78 +57,100 @@ function clampPrecision(metricType, precision) {
 
 /**
  * @param {{
- *     selectedLocalMetric?: DBLocalMetric
+ *     selectedLocalMetricConstRef?: ExistingStateConstRef<DBLocalMetric>
  * }} param0 
  * @returns 
  */
-const LocalMetricModifications = ({selectedLocalMetric}) => {
-    const [metricName, setMetricName] = useState(selectedLocalMetric?.Local_Metric_Name ?? "My metric")
-    const [lowerBound, setLowerBound] = useState(selectedLocalMetric?.Local_Metric_Lower_Bound ?? 0);
-    const [upperBound, setUpperBound] = useState(selectedLocalMetric?.Local_Metric_Upper_Bound ?? 10);
-    const [precision, setPrecision] = useState(selectedLocalMetric?.Local_Metric_Precision ?? 0);
-    const [metricType, setMetricType] = useState(selectedLocalMetric?.Local_Metric_Type ?? 0);
-    useEffect(() => {
-        setMetricName(selectedLocalMetric?.Local_Metric_Name ?? "My metric");
-        setLowerBound(selectedLocalMetric?.Local_Metric_Lower_Bound ?? 0);
-        setUpperBound(selectedLocalMetric?.Local_Metric_Upper_Bound ?? 10);
-        setPrecision(selectedLocalMetric?.Local_Metric_Precision ?? 0);
-        setMetricType(selectedLocalMetric?.Local_Metric_Type ?? 0);
-    }, [selectedLocalMetric]);
+const LocalMetricModifications = ({selectedLocalMetricConstRef}) => {
+    selectedLocalMetricConstRef ??= ExistingState.stateRef(undefined);
+    const LocalMetricName = ReferenceableReact();
+    const LocalMetricLowerBound = ReferenceableReact();
+    const LocalMetricUpperBound = ReferenceableReact();
+    const LocalMetricPrecisionFaker = ReferenceableReact();
+    const LocalMetricPrecisionReal = ReferenceableReact();
+    const LocalMetricMetricType = ReferenceableReact();
+
+
+    const precisionRef = ExistingState.stateRef(selectedLocalMetricConstRef.get()?.Local_Metric_Precision ?? 0);
+    const metricTypeRef = ExistingState.stateRef(selectedLocalMetricConstRef.get()?.Local_Metric_Type ?? METRIC_TYPES.NUMERIC);
+
+    const onAdd = () => {
+        const onSelectedLocalMetricChanged = () => {
+            metricTypeRef.update(selectedLocalMetricConstRef.get()?.Local_Metric_Type ?? METRIC_TYPES.NUMERIC);
+            LocalMetricName.dom.value = selectedLocalMetricConstRef.get()?.Local_Metric_Name ?? "My metric";
+            LocalMetricLowerBound.dom.value = selectedLocalMetricConstRef.get()?.Local_Metric_Lower_Bound ?? 0;
+            LocalMetricUpperBound.dom.value = selectedLocalMetricConstRef.get()?.Local_Metric_Upper_Bound ?? 10;
+            precisionRef.update(selectedLocalMetricConstRef.get()?.Local_Metric_Precision ?? 0);
+        };
+        onSelectedLocalMetricChanged();
+        
+        const onPrecisionChanged = () => {
+            const precision = precisionRef.get();
+            LocalMetricPrecisionFaker.dom.value = precision;
+            LocalMetricPrecisionReal.dom.value = precision;
+        };
+        onPrecisionChanged();
+
+        const onMetricTypeChanged = () => {
+            const metricType = metricTypeRef.get();
+            if (metricType === METRIC_TYPES.INCDEC) {
+                LocalMetricLowerBound.dom.value = 0;
+                LocalMetricUpperBound.dom.value = Infinity;
+                precisionRef.update(0);
+            } else if (metricType === METRIC_TYPES.STARS) {
+                LocalMetricLowerBound.dom.value = 0;
+                LocalMetricUpperBound.dom.value = clamp(Number(LocalMetricUpperBound.dom.value), 1, 20);
+                precisionRef.update(0);
+            }
+
+            LocalMetricPrecisionFaker.dom.disabled = metricType !== METRIC_TYPES.NUMERIC;
+
+            LocalMetricMetricType.dom.value = metricType;
+        };
+        onMetricTypeChanged();
+
+        let cleanup = () => {};
+        cleanup = selectedLocalMetricConstRef.addOnUpdateCallback(onSelectedLocalMetricChanged, cleanup);
+        cleanup = precisionRef.addOnUpdateCallback(onPrecisionChanged, cleanup);
+        cleanup = metricTypeRef.addOnUpdateCallback(onMetricTypeChanged, cleanup);
+        return cleanup;
+    };
     
     return (
-        <div style={{marginLeft: "8px", flexDirection: "column"}}>
+        <div style={{marginLeft: "8px", flexDirection: "column"}} onAdd={onAdd}>
             <div style={{margin: "2px 0 2px 0"}}>
                 <div style={{marginRight: 2}}>Choose a name for your metric: </div>
-                <input name="metricName" type="text" value={metricName} onChange={(e) => {
-                    setMetricName(e.currentTarget.value); 
-                }} />
+                {LocalMetricName.react(<input name="metricName" type="text" />)}
             </div>
             <div style={{margin: "2px 0 2px 0"}}>
                 <div style={{marginRight: 2}}>Choose a lower bound number for your rating service: </div>
-                <input name="lowerBound" type="text" value={lowerBound} onChange={(e) => {
-                    setLowerBound(e.currentTarget.value);
-                }}  onBlur={(e) => {
-                    setLowerBound(clampLowerBound(metricType, Number(e.currentTarget.value)));
-                }} />
+                {LocalMetricLowerBound.react(<input name="lowerBound" type="text" onChange={(e) => {
+                    e.currentTarget.value = clampLowerBound(metricTypeRef.get(), Number(e.currentTarget.value));
+                }} />)}
             </div>
             <div style={{margin: "2px 0 2px 0"}}>
                 <div style={{marginRight: 2}}>Choose an upper bound number for your rating service: </div>
-                <input name="upperBound" type="text" value={upperBound} onChange={(e) => {
-                    setUpperBound(e.currentTarget.value);
-                }} onBlur={(e) => {
-                    setUpperBound(clampUpperBound(metricType, Number(e.currentTarget.value)));
-                }} />
+                {LocalMetricUpperBound.react(<input name="upperBound" type="text" onChange={(e) => {
+                    e.currentTarget.value = clampUpperBound(metricTypeRef.get(), Number(e.currentTarget.value));
+                }} />)}
             </div>
             <div style={{margin: "2px 0 2px 0"}}>
                 <div style={{marginRight: 2}}>Choose a <HoverInfo hoverText="How many fractional digits are stored">precision</HoverInfo> for your rating service: </div>
-                <input disabled={metricType !== METRIC_TYPES.NUMERIC} type="text" value={precision} onChange={(e) => {
-                    setPrecision(e.currentTarget.value);
-                }}  onBlur={(e) => {
-                    setPrecision(clampPrecision(metricType, Number(e.currentTarget.value)));
-                }} />
-                <input style={{display: "none"}} name="precision" type="text" value={precision} />
+                {LocalMetricPrecisionFaker.react(<input className="fake-precision-input" type="text" onChange={(e) => {
+                    precisionRef.update(clampPrecision(metricTypeRef.get(), Number(e.currentTarget.value)));
+                }} />)}
+                {LocalMetricPrecisionReal.react(<input style={{display: "none"}} name="precision" type="text" />)}
             </div>
 
             <div style={{margin: "2px 0 2px 0"}}>
                 <div style={{marginRight: 2}}>Select what type of rating service you would like this to be: </div>
-                <select name="metricType" value={metricType} onChange={(e) => {
-                    let metricType = clampServiceType(Number(e.currentTarget.value));
-                    if (metricType === METRIC_TYPES.INCDEC) {
-                        setLowerBound(0);
-                        setUpperBound(Infinity);
-                        setPrecision(0);
-                    } else if (metricType === METRIC_TYPES.STARS) {
-                        setLowerBound(0);
-                        setUpperBound(clamp(upperBound, 1, 20));
-                        setPrecision(0);
-                    }
-
-                    setMetricType(metricType);
+                {LocalMetricMetricType.react(<select name="metricType" onChange={(e) => {
+                    metricTypeRef.update(clampServiceType(Number(e.currentTarget.value)));
                 }}>
                     <option value={METRIC_TYPES.NUMERIC}>Numeric</option>
                     <option value={METRIC_TYPES.INCDEC}>Inc/Dec</option>
                     <option value={METRIC_TYPES.STARS}>Stars</option>
-                </select>
+                </select>)}
             </div>
         </div>
     );

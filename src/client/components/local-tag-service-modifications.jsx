@@ -1,27 +1,35 @@
-import { useEffect, useState } from "react";
+import { ReferenceableReact } from "../js/client-util.js";
+import { ExistingState } from "../page/pages.js";
 
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
+/** @import {ExistingStateConstRef} from "../page/pages.js" */
 
 /**
  * @param {{
- *     selectedLocalTagService?: DBPermissionedLocalTagService
+ *     selectedLocalTagServiceConstRef?: ExistingStateConstRef<DBPermissionedLocalTagService>
  * }} param0 
  * @returns 
  */
-const LocalTagServiceModifications = ({selectedLocalTagService}) => {
-    const [localTagServiceName, setLocalTagServiceName] = useState(selectedLocalTagService?.Service_Name ?? "My tag service");
+const LocalTagServiceModifications = ({selectedLocalTagServiceConstRef}) => {
+    const LocalTagServiceName = ReferenceableReact();
+    selectedLocalTagServiceConstRef ??= ExistingState.stateRef(undefined);
+    
+    const onAdd = () => {
+        const onSelectionChanged = () => {
+            LocalTagServiceName.dom.value = selectedLocalTagServiceConstRef.get()?.Service_Name ?? "My tag service";
+        };
+        onSelectionChanged();
 
-    useEffect(() => {
-        setLocalTagServiceName(selectedLocalTagService?.Service_Name ?? "My tag service");
-    }, [selectedLocalTagService]);
+        let cleanup = () => {};
+        cleanup = selectedLocalTagServiceConstRef.addOnUpdateCallback(onSelectionChanged, cleanup);
+        return cleanup;
+    }
     
     return (
-        <div style={{marginLeft: "8px"}}>
+        <div style={{marginLeft: "8px"}} onAdd={onAdd} >
             <div style={{margin: "2px 0 2px 0"}}>
                 <span>Choose a name for your local tag service: </span>
-                <input id="localTagServiceName" name="serviceName" value={localTagServiceName} type="text" onChange={e => {
-                    setLocalTagServiceName(e.currentTarget.value);
-                }} />
+                {LocalTagServiceName.react(<input name="serviceName" type="text" />)}
             </div>
         </div>
     );

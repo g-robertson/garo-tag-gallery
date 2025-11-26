@@ -1,11 +1,12 @@
-/** @import {PageType} from "../../client/page/page.jsx" */
+import { bjsonStringify } from "../../client/js/client-util.js";
+import { Pages } from "../../client/page/pages.js";
 
 /**
- * @param {PageType[]} pages
+ * @param {Pages} pages
  */
 export default async function setUserPages(pages) {
     await fetch("/api/post/set-user-pages", {
-        body: JSON.stringify({
+        body: bjsonStringify({
             pages
         }),
         headers: {

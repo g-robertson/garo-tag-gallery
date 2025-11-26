@@ -1,99 +1,111 @@
-import { useEffect, useRef, useState } from 'react';
 import TagsSelector from '../../components/tags-selector.jsx';
 import '../../global.css';
-import { FetchCache } from '../../js/client-util.js';
 import LazyThumbnailGallery from '../../components/lazy-thumbnail-gallery.jsx';
 
-import { GALLERY_MODAL_PROPERTIES } from '../../modal/modals/gallery.jsx';
-import { MODIFY_TAGGABLES_MODAL_PROPERTIES } from '../../modal/modals/modify-taggables.jsx';
+import GalleryModal from '../../modal/modals/gallery.jsx';
+import ModifyTaggablesModal from '../../modal/modals/modify-taggables.jsx';
 import { searchTaggables } from '../../../api/client-get/search-taggables.js';
 import { trashTaggables } from '../../../api/client-get/trash-taggables.js';
-
-/** @import {SearchObject} from "../../components/tags-selector.jsx" */
-/** @import {Setters, States} from "../../App.jsx" */
+import { ExistingState, Page } from '../../page/pages.js';
+import { Modals } from '../../modal/modals.js';
+import { ReferenceableReact } from '../../js/client-util.js';
 
 /** 
  * @param {{
- *  states: States
- *  setters: Setters
- *  existingState: any
- *  updateExistingStateProp: (key: string, value: any) => void
+ *  page: Page
  * }}
 */
-const FileSearchPage = ({states, setters, existingState, updateExistingStateProp}) => {
-    existingState ??= {};
-    existingState.tagsSelector ??= {};
-    updateExistingStateProp ??= () => {};
+const FileSearchPageElement = ({page}) => {
+    /**
+     * @type {ExistingState<{
+     *   taggableCursor: string | undefined,
+     *   taggableIDs: number[],
+     *   selectedTaggableIDs: number[]
+     * }}
+     */
+    const existingState = page.existingState;
+    const ModifySelectedTaggablesButton = ReferenceableReact();
+    const TrashSelectedTaggablesButton = ReferenceableReact();
+    existingState.initAssign("taggableCursor", undefined);
+    existingState.initAssign("taggableIDs", []);
+    existingState.initAssign("selectedTaggableIDs", []);
 
-    const [taggableIDs, setTaggableIDs] = useState([]);
-    const [taggableCursor, setTaggableCursor] = useState();
-    const [selectedTaggableIDs, setSelectedTaggableIDs] = useState([]); 
+    const onAdd = () => {
+        const onSelectedTaggables = () => {
+            const selectedTaggableIDs = existingState.get("selectedTaggableIDs");
+            ModifySelectedTaggablesButton.dom.disabled = selectedTaggableIDs.length === 0;
+            TrashSelectedTaggablesButton.dom.disabled = selectedTaggableIDs.length === 0;
+        };
+        onSelectedTaggables();
 
-    const previousSearch = useRef(null);
+        let cleanup = () => {};
+        cleanup = existingState.addOnUpdateCallbackForKey("selectedTaggableIDs", onSelectedTaggables, cleanup);
+        return cleanup;
+    };
 
+    const tagsSelectorState = existingState.getInnerState("tagsSelector");
+
+    const previousSearch = ExistingState.stateRef(null);
     const makeSearch = async () => {
-        const result = await searchTaggables(previousSearch.current.clientSearchQuery, "Taggable", "Taggable_ID", previousSearch.current.localTagServiceIDs, states.fetchCache);
-        setTaggableCursor(result.cursor);
-        setTaggableIDs(result.result);
-    }
+        const result = await searchTaggables(previousSearch.get().clientSearchQuery, "Taggable", "Taggable_ID", previousSearch.get().localTagServiceIDs);
+        existingState.update("taggableCursor", result.cursor);
+        existingState.update("taggableIDs", result.result);
+    };
 
-    useEffect(() => {
-        if (previousSearch.current !== null) {
-            makeSearch();
-        }
-    }, [states.fetchCache])
 
     return (
-        <div style={{width: "100%", height: "100%"}}>
+        <div style={{width: "100%", height: "100%"}} onAdd={onAdd}>
             <div style={{flex: 1, height: "100%"}}>
-                <TagsSelector
-                    states={states}
-                    setters={setters}
-                    taggableCursor={taggableCursor}
+                {<TagsSelector
+                    taggableCursorConstRef={existingState.getConstRef("taggableCursor")}
                     onSearchChanged={async (clientSearchQuery, localTagServiceIDs) => {
-                        previousSearch.current = {
+                        previousSearch.update({
                             clientSearchQuery,
                             localTagServiceIDs
-                        };
+                        });
                         makeSearch();
                     }}
-
-                    existingState={existingState.tagsSelector}
-                    updateExistingStateProp={(key, value) => {
-                        existingState.tagsSelector[key] = value;
-                        updateExistingStateProp("tagsSelector", existingState.tagsSelector);
-                    }}
-                />
+                    existingState={tagsSelectorState}
+                />}
             </div>
             <div style={{width: "auto", flex: 3, flexDirection: "column", height: "100%"}}>
                 <div>
-                    <input type="button" disabled={selectedTaggableIDs.length === 0} value="Modify selected taggables" onClick={async () => {
-                        await setters.pushModal(MODIFY_TAGGABLES_MODAL_PROPERTIES.modalName, {taggableIDs: selectedTaggableIDs});
-                    }} />
-                    <input type="button" disabled={selectedTaggableIDs.length === 0} value="Trash selected taggables" onClick={() => {
+                    {ModifySelectedTaggablesButton.react(<input type="button" value="Modify selected taggables" onClick={async () => {
+                        await Modals.Global().pushModal(ModifyTaggablesModal, {
+                            taggableCursorConstRef: existingState.getConstRef("taggableCursor"),
+                            taggableIDsConstRef: existingState.getConstRef("selectedTaggableIDs")
+                        });
+                    }} />)}
+                    {TrashSelectedTaggablesButton.react(<input type="button" value="Trash selected taggables" onClick={() => {
                         const confirm = window.confirm("Are you sure you want to trash these taggables, they will be sent to trash can where they can either be restored or deleted permanently.");
                         if (!confirm) {
                             return;
                         }
 
-                        trashTaggables(selectedTaggableIDs, states.fetchCache);
-                    }} />
+                        trashTaggables(existingState.get("selectedTaggableIDs"));
+                    }} />)}
                 </div>
                 <div style={{flex: 1}}>
-                    <LazyThumbnailGallery 
-                        taggableIDs={taggableIDs ?? []}
+                    <LazyThumbnailGallery
+                        taggableIDsConstRef={existingState.getConstRef("taggableIDs")}
                         onValuesSelected={(_, indices) => {
-                            setSelectedTaggableIDs(indices.map(index => taggableIDs[index]));
+                            const taggableIDs = existingState.get("taggableIDs");
+                            existingState.update("selectedTaggableIDs", indices.map(index => taggableIDs[index]));
                         }}
                         onValuesDoubleClicked={(_, indices, indexClicked) => {
+                            const taggableIDs = existingState.get("taggableIDs");
                             if (indices.length > 1) {
-                                setters.pushModal(GALLERY_MODAL_PROPERTIES.modalName, {
-                                    taggableIDs: indices.map(index => taggableIDs[index]),
-                                    initialTaggableIndex: 0
+                                const indicesSet = new Set(indices);
+                                const taggableIDsToShow = taggableIDs.filter((_, index) => indicesSet.has(index));
+                                const initialTaggableIndex = taggableIDsToShow.findIndex(taggable => taggable === taggableIDs[indexClicked]);
+
+                                Modals.Global().pushModal(GalleryModal, {
+                                    taggableIDs: taggableIDsToShow,
+                                    initialTaggableIndex
                                 });
                             } else if (indices.length === 1) {
-                                setters.pushModal(GALLERY_MODAL_PROPERTIES.modalName, {
-                                    taggableIDs,
+                                Modals.Global().pushModal(GalleryModal, {
+                                    taggableIDs: taggableIDs,
                                     initialTaggableIndex: indexClicked
                                 });
                             }
@@ -105,7 +117,7 @@ const FileSearchPage = ({states, setters, existingState, updateExistingStateProp
     );
 };
 
-export default FileSearchPage;
+export default FileSearchPageElement;
 
 export const PAGE_NAME = "file-search-page";
 export const FILE_SEARCH_PAGE_NAME = PAGE_NAME;

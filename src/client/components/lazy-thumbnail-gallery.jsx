@@ -9,21 +9,22 @@ const THUMB_ORIGINAL_HEIGHT = 200;
 const THUMB_WIDTH = 150;
 const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH);
 
+/** @import {ExistingStateConstRef} from "../page/pages.js" */
 /** @import {DBUserFacingLocalFile} from "../../db/taggables.js" */
 
 /**
  * @param {{
- *  taggableIDs: number[]
+ *  taggableIDsConstRef: ExistingStateConstRef<number[]>
  *  onValuesSelected?: (valuesSelected: DBUserFacingLocalFile[], indices: number[]) => void
  *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingLocalFile[], indices: number[], indexClicked: number) => void
  * }} param0
  */
-const LazyThumbnailGallery = ({taggableIDs, onValuesSelected, onValuesDoubleClicked}) => {
+const LazyThumbnailGallery = ({taggableIDsConstRef, onValuesSelected, onValuesDoubleClicked}) => {
     onValuesSelected ??= () => {};
     onValuesDoubleClicked ??= () => {};
 
     return <LazySelector
-        values={taggableIDs}
+        valuesConstRef={taggableIDsConstRef}
         realizeSelectedValues={false}
         valuesRealizer={async (values) => {
             const response = await fetch("/api/post/select-user-facing-taggables", {
@@ -50,7 +51,7 @@ const LazyThumbnailGallery = ({taggableIDs, onValuesSelected, onValuesDoubleClic
         customItemComponent={({realizedValue}) => {
             const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];
 
-            return <div className="lazy-selector-selectable-item-portion" style={{width: "100%", height: "100%", justifyContent: "center"}}>
+            return <div className="thumbnail-gallery-item lazy-selector-selectable-item-portion" style={{width: "100%", height: "100%", justifyContent: "center"}}>
                 {VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_Extension) !== -1
                  ? <img className="lazy-selector-selectable-item-portion"
                          src="assets/video.png"

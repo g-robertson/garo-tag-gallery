@@ -1,40 +1,33 @@
 import '../../global.css';
 import LocalMetricServiceSelector from '../../components/local-metric-service-selector.jsx';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
-import getMe from '../../../api/client-get/me.js';
 import LocalMetricModifications from '../../components/local-metric-modifications.jsx';
+import { User } from '../../js/user.js';
+import { Modals } from '../../modal/modals.js';
 
-
-/** @import {Setters, States} from "../../App.jsx" */
+/** @import {ExtraProperties} from "../modals.js" */
 
 /** 
  * @param {{
- *  states: States
- *  setters: Setters
+ *  extraProperties: ExtraProperties<any>
+ *  modalResolve: (value: any) => void
  * }}
 */
-const CreateLocalMetric = ({states, setters}) => {
-    return (
-        <div>
+export default function CreateLocalMetric({ extraProperties, modalResolve }) {
+    return {
+        component: <div>
             <form action="/api/post/create-local-metric" target="frame" method="POST">
-                <LocalMetricServiceSelector states={states} />
+                <LocalMetricServiceSelector />
                 <LocalMetricModifications />
                 <div style={{marginLeft: "8px"}}>
                     <input type="submit" value="Submit" />
                 </div>
                 <OnFormSubmit onFormSubmit={async () => {
-                    setters.setUser(await getMe());
-                    setters.popModal();
+                    User.refreshGlobal();
+                    Modals.Global().popModal();
                 }} />
             </form>
-        </div>
-    );
+        </div>,
+        displayName: "Create Local Metric"
+    };
 };
-
-export default CreateLocalMetric;
-
-export const MODAL_PROPERTIES = {
-    modalName: "create-local-metric",
-    displayName: "Create Local Metric"
-};
-export const CREATE_LOCAL_METRIC_MODAL_PROPERTIES = MODAL_PROPERTIES;

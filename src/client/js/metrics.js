@@ -1,8 +1,8 @@
-export const METRIC_TYPES = {
+export const METRIC_TYPES = /** @type {const} */ ({
     NUMERIC: 0,
     INCDEC: 1,
     STARS: 2
-};
+});
 
 /** @import {PreInsertAppliedMetric} from "../../db/metrics.js" */
 

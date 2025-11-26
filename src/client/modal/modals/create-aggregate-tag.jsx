@@ -1,70 +1,92 @@
 import '../../global.css';
 import TagGroupsSelector from '../../components/tag-groups-selector.jsx';
-import { useState } from 'react';
 import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
-import { SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES } from "./select-from-list-of-tags-modal.jsx"
+import SelectFromListOfTags from "./select-from-list-of-tags-modal.jsx"
 import { createAppliedMetricDisplayName } from '../../js/metrics.js';
 import getTagsFromNamespaceID from '../../../api/client-get/tags-from-namespace.js';
-import { CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES } from './create-and-search-group.jsx';
+import CreateAndSearchGroup from './create-and-search-group.jsx';
 import NumericInput from '../../components/numeric-input.jsx';
 import { clientSearchQueryToDisplayName } from '../../js/tags.js';
+import { User } from '../../js/user.js';
+import { Modals } from '../../modal/modals.js';
+import { ExistingState } from '../../page/pages.js';
+import { ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {ModalOptions} from "../modal.jsx" */
+/** @import {ExistingStateRef} from "../../page/pages.js" */
+/** @import {ExtraProperties} from "../modals.js" */
 /** @import {ClientAggregateTag, ClientAggregateTagCondition, ClientComparator, ClientSearchTag} from "../../../api/post/search-taggables.js" */
 /** @import {DisplayClientTagGroup} from "../../components/tag-groups-selector.jsx" */
-/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  states: States
- *  setters: Setters
- *  modalOptions: ModalOptions
+ *  extraProperties: ExtraProperties
+ *  modalResolve: (value: any) => void
  * } param0}
 */
-const CreateAggregateTag = ({states, setters, modalOptions}) => {
-    /** @type {[DisplayClientTagGroup[], (tagGroups: DisplayClientTagGroup[]) => void]} */
-    const [tagGroups, setTagGroups] = useState([]); 
-    /** @type {[ClientAggregateTagCondition[], (conditions: ClientAggregateTagCondition[]) => void]} */
-    const [conditions, setConditions] = useState([]);
+export default function CreateAggregateTag({extraProperties, modalResolve}) {
+    const SpecifyTagGroupTags = ReferenceableReact();
+    const TagOccurrencesCountSpecifyQuery = ReferenceableReact();
+    const TagOccurrencesPercentageSpecifyQuery = ReferenceableReact();
+    const TagOccurrencesPercentageSpecifyQueries = ReferenceableReact();
+    const CreateAggregateTagButton = ReferenceableReact();
 
-    /** @type {[ClientComparator, (countComparator: ClientComparator) => void]} */
-    const [countComparator, setCountComparator] = useState("<");
-    const [countValue, setCountValue] = useState(0);
-    /** @type {[ClientComparator, (percentageComparator: ClientComparator) => void]} */
-    const [percentageComparator, setPercentageComparator] = useState("<");
-    const [percentageValue, setPercentageValue] = useState(0);
-    /** @type {[ClientComparator, (percentageOfSecondQueryComparator: ClientComparator) => void]} */
-    const [percentageOfSecondQueryComparator, setPercentageOfSecondQueryComparator] = useState("<");
-    const [percentageOfSecondQueryValue, setPercentageOfSecondQueryValue] = useState(0);
-    return (
-        <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
+    /** @type {ExistingStateRef<DisplayClientTagGroup | undefined} */
+    const tagGroupRef = ExistingState.stateRef(undefined);
+    /** @type {ExistingStateRef<ClientAggregateTagCondition[]} */
+    const conditionsRef = ExistingState.stateRef([]);
+
+    /** @type {ExistingStateRef<ClientComparator>} */
+    const countComparatorRef = ExistingState.stateRef("<");
+    const countValueRef = ExistingState.stateRef(0);
+    /** @type {ExistingStateRef<ClientComparator>} */
+    const percentageComparatorRef = ExistingState.stateRef("<");
+    const percentageValueRef = ExistingState.stateRef(0);
+    /** @type {ExistingStateRef<ClientComparator>} */
+    const percentageOfSecondQueryComparatorRef = ExistingState.stateRef("<");
+    const percentageOfSecondQueryValueRef = ExistingState.stateRef(0);
+
+    const onAdd = () => {
+        const onTagGroupChanged = () => {
+            SpecifyTagGroupTags.dom.disabled = tagGroupRef.get() === undefined;
+            TagOccurrencesCountSpecifyQuery.dom.disabled = tagGroupRef.get() === undefined;
+            TagOccurrencesPercentageSpecifyQuery.dom.disabled = tagGroupRef.get() === undefined;
+            TagOccurrencesPercentageSpecifyQueries.dom.disabled = tagGroupRef.get() === undefined;
+            CreateAggregateTagButton.dom.disabled = tagGroupRef.get() === undefined;
+        };
+        onTagGroupChanged();
+
+        let cleanup = () => {};
+        cleanup = tagGroupRef.addOnUpdateCallback(onTagGroupChanged, cleanup);
+        return cleanup;
+    }
+
+    return {
+        component: <div style={{width: "100%", height: "100%", flexDirection: "column"}} onAdd={onAdd}>
             An aggregate tag selects from a union of all of the tags in a certain selected group that meets a specified condition
             <div style={{flex: 4}}>
                 <TagGroupsSelector
-                    states={states}
                     multiSelect={false}
                     onTagGroupsSelected={(tagGroups) => {
-                        setTagGroups(tagGroups)
+                        tagGroupRef.update(tagGroups[0]);
                     }} />
             </div>
             <div style={{marginLeft: 8, marginTop: 4}}>
-                Select a tag group from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjects={tagGroups} elementsSelectable={false} scrollbarWidth={0} /></div>
+                Select a tag group from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjectsConstRef={tagGroupRef.getTransformRef(tagGroup => [tagGroup])} elementsSelectable={false} scrollbarWidth={0} /></div>
             </div>
             <div style={{marginLeft: 8, flexDirection: "column"}}>
                 <div style={{marginTop: 4}}>Where the tags within the group must follow any selected conditions below</div>
                 <div style={{marginTop: 4}}>Conditions selected:</div>
                 <div style={{height: 100, marginTop: 4}}>
-                    <LazyTextObjectSelector textObjects={conditions} multiSelect={false} onValuesDoubleClicked={(_, indicesSelected) => {
-                        conditions.splice(indicesSelected[0], 1);
-
-                        setConditions([...conditions]);
+                    <LazyTextObjectSelector textObjectsConstRef={conditionsRef} multiSelect={false} onValuesDoubleClicked={(_, indicesSelected) => {
+                        conditionsRef.get().splice(indicesSelected[0], 1);
+                        conditionsRef.forceUpdate();
                     }} />
                 </div>
                 <div style={{marginTop: 8, flexDirection: "column"}}>
                     <div>
                         Apply condition: Tag must not be within specified list of tags
-                        <input disabled={tagGroups.length === 0} style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify tags" onClick={async () => {
-                            const tagGroup = tagGroups[0];
+                        {SpecifyTagGroupTags.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify tags" onClick={async () => {
+                            const tagGroup = tagGroupRef.get();
                             /** @type {ClientSearchTag[]} */
                             let tags = [];
                             if (tagGroup.type === "applied-metrics") {
@@ -78,7 +100,7 @@ const CreateAggregateTag = ({states, setters, modalOptions}) => {
                                             type: "appliedLocalMetric",
                                             Local_Metric_ID: localMetric.Local_Metric_ID,
                                             Applied_Value: i,
-                                            displayName: createAppliedMetricDisplayName(localMetric.Local_Metric_Name, states.user.name(), i)
+                                            displayName: createAppliedMetricDisplayName(localMetric.Local_Metric_Name, User.Global().name(), i)
                                         });
                                     }
                                 }
@@ -93,157 +115,139 @@ const CreateAggregateTag = ({states, setters, modalOptions}) => {
                                 }
                             }
                             
-                            const notInTagList = await setters.pushModal(SELECT_FROM_LIST_OF_TAGS_MODAL_PROPERTIES.modalName, {
+                            const notInTagList = await Modals.Global().pushModal(SelectFromListOfTags, {
                                 tags
                             });
                             if (notInTagList === null || notInTagList === undefined) {
                                 return;
                             }
 
-                            conditions.push({
+                            conditionsRef.get().push({
                                 type: "is-not-in-tag-list",
                                 list: notInTagList,
                                 displayName: `is not in tags:${notInTagList.map(tag => tag.displayName).join(' OR ')}`
                             });
-                            setConditions([...conditions]);
-                        }}/>
+                            conditionsRef.forceUpdate();
+                        }}/>)}
                     </div>
                     <div style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [count] taggables that match a specified query (can be empty)</div>
                         <div style={{marginTop: 8}}>
-                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => setCountComparator("<")} defaultChecked={true} />&lt;</div>
-                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => setCountComparator("<=")} />&lt;=</div>
-                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => setCountComparator(">")} />&gt;</div>
-                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => setCountComparator(">=")} />&gt;=</div>
+                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
+                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update("<=")} />&lt;=</div>
+                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update(">")} />&gt;</div>
+                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update(">=")} />&gt;=</div>
                             <div style={{marginLeft: 8}}>Count: <div style={{marginTop: -2, marginLeft: 4}}>
-                                <NumericInput
-                                    defaultValue={0}
-                                    onChange={(num) => {
-                                        setCountValue(num);
-                                    }}
-                                />
+                                <NumericInput selectedNumberRef={countValueRef} />
                             </div></div>
-                            <input disabled={tagGroups.length === 0} style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify query" onClick={async () => {
-                                const searchQuery = await setters.pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
-                                    selectionButtonText: `Select query that ${countComparator}${countValue} taggables must match`
+                            {TagOccurrencesCountSpecifyQuery.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify query" onClick={async () => {
+                                const searchQuery = await Modals.Global().pushModal(CreateAndSearchGroup, {
+                                    selectionButtonText: `Select query that ${countComparatorRef.get()}${countValueRef.get()} taggables must match`
                                 });
 
                                 if (searchQuery === undefined) {
                                     return;
                                 }
 
-                                conditions.push({
+                                conditionsRef.get().push({
                                     type: "tag-occurrences-compared-to-n-within-expression",
-                                    comparator: countComparator,
-                                    occurrences: countValue,
+                                    comparator: countComparatorRef.get(),
+                                    occurrences: countValueRef.get(),
                                     expression: searchQuery,
-                                    displayName: `must have ${countComparator}${countValue} taggables${searchQuery.value.length !== 0 ? ` match the query (${clientSearchQueryToDisplayName(searchQuery)})`: ""}`
+                                    displayName: `must have ${countComparatorRef.get()}${countValueRef.get()} taggables${searchQuery.value.length !== 0 ? ` match the query (${clientSearchQueryToDisplayName(searchQuery)})`: ""}`
                                 });
-                                setConditions([...conditions]);
-                            }} />
+                                conditionsRef.forceUpdate();
+                            }} />)}
                         </div>
                     </div>
                     <div style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [percentage] taggables match a specified query</div>
                         <div style={{marginTop: 8}}>
-                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => setPercentageComparator("<")} defaultChecked={true} />&lt;</div>
-                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => setPercentageComparator("<=")} />&lt;=</div>
-                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => setPercentageComparator(">")} />&gt;</div>
-                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => setPercentageComparator(">=")} />&gt;=</div>
+                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
+                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update("<=")} />&lt;=</div>
+                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update(">")} />&gt;</div>
+                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update(">=")} />&gt;=</div>
                             <div style={{marginLeft: 8}}>Percentage (0-100%): <div style={{marginTop: -2, marginLeft: 4}}>
                                 <NumericInput
-                                    defaultValue={0}
-                                    onChange={(num) => {
-                                        setPercentageValue(num);
-                                    }}
+                                    selectedNumberRef={percentageValueRef.get()}
                                     minValue={0}
                                     maxValue={100}
                                 />
                             </div></div>
-                            <input disabled={tagGroups.length === 0} style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify query" onClick={async () => {
-                                const searchQuery = await setters.pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
-                                    selectionButtonText: `Select query that ${percentageComparator}${percentageValue}% of taggables must match`
+                            {TagOccurrencesPercentageSpecifyQuery.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify query" onClick={async () => {
+                                const searchQuery = await Modals.Global().pushModal(CreateAndSearchGroup, {
+                                    selectionButtonText: `Select query that ${percentageComparatorRef.get()}${percentageValueRef.get()}% of taggables must match`
                                 });
                                 if (searchQuery === undefined || searchQuery.value.length === 0) {
                                     return;
                                 }
 
-                                conditions.push({
+                                conditionsRef.get().push({
                                     type: "tag-occurrences-compared-to-n-percent-within-expression",
-                                    comparator: percentageComparator,
-                                    percentage: percentageValue / 100,
+                                    comparator: percentageComparatorRef.get(),
+                                    percentage: percentageValueRef.get() / 100,
                                     expression: searchQuery,
-                                    displayName: `must have ${percentageComparator}${percentageValue}% of taggables match the query (${clientSearchQueryToDisplayName(searchQuery)})`
+                                    displayName: `must have ${percentageComparatorRef.get()}${percentageValueRef.get()}% of taggables match the query (${clientSearchQueryToDisplayName(searchQuery)})`
                                 });
-                                setConditions([...conditions]);
-                            }} />
+                                conditionsRef.forceUpdate();
+                            }} />)}
                         </div>
                     </div>
                     <div style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [percentage] of taggables that match a specified query match a second specified query</div>
                         <div style={{marginTop: 8}}>
-                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => setPercentageOfSecondQueryComparator("<")} defaultChecked={true} />&lt;</div>
-                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => setPercentageOfSecondQueryComparator("<=")} />&lt;=</div>
-                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => setPercentageOfSecondQueryComparator(">")} />&gt;</div>
-                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => setPercentageOfSecondQueryComparator(">=")} />&gt;=</div>
+                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
+                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update("<=")} />&lt;=</div>
+                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update(">")} />&gt;</div>
+                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update(">=")} />&gt;=</div>
                             <div style={{marginLeft: 8}}>Percentage (0-100%): <div style={{marginTop: -2, marginLeft: 4}}>
                                 <NumericInput
-                                    defaultValue={0}
-                                    onChange={(num) => {
-                                        setPercentageOfSecondQueryValue(num);
-                                    }}
+                                    selectedNumberRef={percentageOfSecondQueryValueRef.get()}
                                     minValue={0}
                                     maxValue={100}
                                 />
                             </div></div>
-                            <input disabled={tagGroups.length === 0} style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify queries" onClick={async () => {
-                                const searchQuery = await setters.pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
+                            {TagOccurrencesPercentageSpecifyQueries.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify queries" onClick={async () => {
+                                const searchQuery = await Modals.Global().pushModal(CreateAndSearchGroup, {
                                     selectionButtonText: "Select query that will filter taggables"
                                 });
-                                const secondSearchQuery = await setters.pushModal(CREATE_AND_SEARCH_GROUP_MODAL_PROPERTIES.modalName, {
-                                    selectionButtonText: `Select query that ${percentageOfSecondQueryComparator}${percentageOfSecondQueryValue}% of filtered taggables must match`
+                                const secondSearchQuery = await Modals.Global().pushModal(CreateAndSearchGroup, {
+                                    selectionButtonText: `Select query that ${percentageOfSecondQueryComparatorRef.get()}${percentageOfSecondQueryValueRef.get()}% of filtered taggables must match`
                                 });
                                 if (searchQuery === undefined || searchQuery.value.length === 0 || secondSearchQuery === undefined || secondSearchQuery.value.length === 0) {
                                     return;
                                 }
 
-                                conditions.push({
+                                conditionsRef.get().push({
                                     type: "filtered-tag-occurrences-compared-to-n-percent-within-expression",
-                                    comparator: percentageOfSecondQueryComparator,
-                                    percentage: percentageOfSecondQueryValue / 100,
+                                    comparator: percentageOfSecondQueryComparatorRef.get(),
+                                    percentage: percentageOfSecondQueryValueRef.get() / 100,
                                     filteringExpression: searchQuery,
                                     expression: secondSearchQuery,
-                                    displayName: `must have ${percentageOfSecondQueryComparator}${percentageOfSecondQueryValue}% of taggables that match the query (${clientSearchQueryToDisplayName(searchQuery)}) also match the query (${clientSearchQueryToDisplayName(secondSearchQuery)})`
+                                    displayName: `must have ${percentageOfSecondQueryComparatorRef.get()}${percentageOfSecondQueryValueRef.get()}% of taggables that match the query (${clientSearchQueryToDisplayName(searchQuery)}) also match the query (${clientSearchQueryToDisplayName(secondSearchQuery)})`
                                 });
-                                setConditions([...conditions]);
-                            }} />
+                                conditionsRef.forceUpdate();
+                            }} />)}
                         </div>
                     </div>
                 </div>
                 <div style={{marginTop: 4, marginBottom: 4}}>
-                    <input disabled={tagGroups.length === 0} type="button" value="Create Aggregate Tag" onClick={() => {
+                    {CreateAggregateTagButton.react(<input type="button" value="Create Aggregate Tag" onClick={() => {
                         /** @type {ClientAggregateTag} */
                         const aggregateTag = {
                             type: "aggregateTag",
-                            tagGroup: tagGroups[0],
-                            conditions,
-                            displayName: `system:aggregate tag with group:${tagGroups[0].displayName}${conditions.length !== 0 ? " WHERE " : ""}${conditions.map(condition => condition.displayName).join(" AND ")}`
+                            tagGroup: tagGroupRef.get(),
+                            conditions: conditionsRef.get(),
+                            displayName: `system:aggregate tag with group:${tagGroupRef.get().displayName}${conditionsRef.get().length !== 0 ? " WHERE " : ""}${conditionsRef.get().map(condition => condition.displayName).join(" AND ")}`
                         }
 
                         delete aggregateTag.tagGroup['extraInfo'];
-                        modalOptions.resolve(aggregateTag);
-                        setters.popModal();
-                    }}/>
+                        modalResolve(aggregateTag);
+                        Modals.Global().popModal();
+                    }}/>)}
                 </div>
             </div>
-        </div>
-    );
+        </div>,
+        displayName: "Create Aggregate Tag"
+    };
 };
-
-export default CreateAggregateTag;
-
-export const MODAL_PROPERTIES = {
-    modalName: "create-aggregate-tag",
-    displayName: "Create Aggregate Tag"
-};
-export const CREATE_AGGREGATE_TAG_MODAL_PROPERTIES = MODAL_PROPERTIES;

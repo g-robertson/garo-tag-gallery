@@ -1,4 +1,5 @@
-import { FetchCache, fbjsonParse } from "../../client/js/client-util.js";
+import { fbjsonParse } from "../../client/js/client-util.js";
+import { FetchCache } from "../../client/js/fetch-cache.js";
 
 /** @import {DBFile} from "../../db/taggables.js" */
 
@@ -11,14 +12,13 @@ function selectFilesHash(fileIDs) {
 
 /**
  * @param {number[]} fileIDs
- * @param {FetchCache} fetchCache
  * @param {boolean=} forceNoCache
  */
-export default async function selectFiles(fileIDs, fetchCache, forceNoCache) {
+export default async function selectFiles(fileIDs, forceNoCache) {
     forceNoCache ??= false;
 
     const hash = selectFilesHash(fileIDs);
-    const selectFilesCache = fetchCache.cache("select-files");
+    const selectFilesCache = FetchCache.Global().cache("select-files");
     if (selectFilesCache.getStatus(hash) === "empty" || forceNoCache) {
         selectFilesCache.setAwaiting(hash);
         const response = await fetch("/api/post/select-files", {

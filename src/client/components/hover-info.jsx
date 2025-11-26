@@ -1,3 +1,4 @@
+// STATELESS
 /** @import {JSX} from "react" */
 
 /**

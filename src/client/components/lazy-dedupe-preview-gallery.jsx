@@ -12,20 +12,18 @@ const DISTANCE_HEIGHT = 0;
 
 /** @import {DBJoinedLocalFile} from "../../db/taggables.js" */
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
-/** @import {Setters, States} from "../../App.jsx" */
 
 /**
  * @param {{
- *  states: States
  *  fileComparisonPairs: DBFileComparison[]
  *  onValuesDoubleClicked?: (valuesSelected: any, indices: number[], indexClicked: number) => void
  * }} param0
  */
-const LazyDedupePreviewGallery = ({states, fileComparisonPairs, onValuesDoubleClicked}) => {
+const LazyDedupePreviewGallery = ({fileComparisonPairs, onValuesDoubleClicked}) => {
     onValuesDoubleClicked ??= () => {};
 
     return <LazySelector
-        values={fileComparisonPairs}
+        valuesConstRef={fileComparisonPairs}
         realizeSelectedValues={false}
         valuesRealizer={async (values) => {
             /** @type {Set<number>} */
@@ -34,7 +32,7 @@ const LazyDedupePreviewGallery = ({states, fileComparisonPairs, onValuesDoubleCl
                 filesSet.add(value.File_ID_1);
                 filesSet.add(value.File_ID_2);
             }
-            const fileMap = new Map((await selectFiles([...filesSet], states.fetchCache)).map(file => [
+            const fileMap = new Map((await selectFiles([...filesSet])).map(file => [
                 file.File_ID,
                 file
             ]));

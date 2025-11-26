@@ -1,4 +1,5 @@
-import { FetchCache, fbjsonParse } from "../../client/js/client-util.js";
+import { fbjsonParse } from "../../client/js/client-util.js";
+import { FetchCache } from "../../client/js/fetch-cache.js";
 
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
 
@@ -14,14 +15,13 @@ function selectFileComparisonsHash(fileCursor, maxPerceptualHashDistance) {
 /**
  * @param {string=} fileCursor
  * @param {number} maxPerceptualHashDistance
- * @param {FetchCache} fetchCache
  * @param {boolean=} forceNoCache
  */
-export default async function selectFileComparisons(fileCursor, maxPerceptualHashDistance, fetchCache, forceNoCache) {
+export default async function selectFileComparisons(fileCursor, maxPerceptualHashDistance, forceNoCache) {
     forceNoCache ??= false;
 
     const hash = selectFileComparisonsHash(fileCursor, maxPerceptualHashDistance);
-    const selectFileComparisonsCache = fetchCache.cache("select-file-comparisons");
+    const selectFileComparisonsCache = FetchCache.Global().cache("select-file-comparisons");
     if (selectFileComparisonsCache.getStatus(hash) === "empty" || forceNoCache) {
         selectFileComparisonsCache.setAwaiting(hash);
         const response = await fetch("/api/post/select-file-comparisons", {

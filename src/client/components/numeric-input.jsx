@@ -1,27 +1,20 @@
-import { useState } from "react";
+/** @import {ExistingStateRef} from "../page/pages.js" */
 
 /**
- * 
  * @param {{
- *     defaultValue?: number
- *     onChange?: (num: number) => void
+ *     selectedNumberRef: ExistingStateRef<number>
  *     minValue?: number
  *     maxValue?: number
+ *     className?: string
  * }} param0 
  * @returns 
  */
-function NumericInput({defaultValue, onChange, minValue, maxValue}) {
+function NumericInput({selectedNumberRef, minValue, maxValue, className}) {
     minValue ??= -Infinity;
     maxValue ??= Infinity;
-    defaultValue ??= 0;
-    onChange ??= () => {};
-    const [numericValue, setNumericValue] = useState(defaultValue);
-    const [textValue, setTextValue] = useState(defaultValue.toString());
 
-    return <input type="text" value={textValue} onChange={e => {
-        setTextValue(e.currentTarget.value);
-    }} onBlur={e => {
-        let newNumericValue = Number(textValue);
+    return <input className={className} type="text" defaultValue={selectedNumberRef.get().toString()} onBlur={e => {
+        let newNumericValue = Number(e.currentTarget.value);
         if (Number.isFinite(newNumericValue)) {
             if (newNumericValue < minValue) {
                 newNumericValue = minValue;
@@ -29,11 +22,10 @@ function NumericInput({defaultValue, onChange, minValue, maxValue}) {
                 newNumericValue = maxValue;
             }
             
-            setNumericValue(newNumericValue);
-            onChange(newNumericValue);
-            setTextValue(newNumericValue.toString())
+            selectedNumberRef.update(newNumericValue);
+            e.currentTarget.value = newNumericValue.toString();
         } else {
-            setTextValue(numericValue.toString())
+            e.currentTarget.value = selectedNumberRef.get().toString();
         }
     }} />
 }

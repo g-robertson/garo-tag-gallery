@@ -1,27 +1,33 @@
-import { useEffect, useState } from "react";
+import { ReferenceableReact } from "../js/client-util.js";
 
 /** @import {DBPermissionedLocalTaggableService} from "../../db/taggables.js" */
+/** @import {ExistingStateConstRef} from "../page/pages.js" */
 
 /**
  * @param {{
- *     selectedLocalTaggableService?: DBPermissionedLocalTaggableService
+ *     selectedLocalTaggableServiceConstRef?: ExistingStateConstRef<DBPermissionedLocalTaggableService>
  * }} param0 
  * @returns 
  */
-const LocalTaggableServiceModifications = ({selectedLocalTaggableService}) => {
-    const [localTaggableServiceName, setLocalTaggableServiceName] = useState(selectedLocalTaggableService?.Service_Name ?? "My taggable service");
+const LocalTaggableServiceModifications = ({selectedLocalTaggableServiceConstRef}) => {
+    const LocalTaggableServiceName = ReferenceableReact();
+    
+    const onAdd = () => {
+        const onSelectionChanged = () => {
+            LocalTaggableServiceName.dom.value = selectedLocalTaggableServiceConstRef.get()?.Service_Name ?? "My taggable service";
+        };
+        onSelectionChanged();
 
-    useEffect(() => {
-        setLocalTaggableServiceName(selectedLocalTaggableService?.Service_Name ?? "My taggable service");
-    }, [selectedLocalTaggableService]);
+        let cleanup = () => {};
+        cleanup = selectedLocalTaggableServiceConstRef.addOnUpdateCallback(onSelectionChanged, cleanup);
+        return cleanup;
+    };
     
     return (
-        <div style={{marginLeft: "8px"}}>
+        <div style={{marginLeft: "8px"}} onAdd={onAdd}>
             <div style={{margin: "2px 0 2px 0"}}>
                 <span>Choose a name for your local taggable service: </span>
-                <input id="localTaggableServiceName" name="serviceName" value={localTaggableServiceName} type="text" onChange={e => {
-                    setLocalTaggableServiceName(e.currentTarget.value);
-                }} />
+                {LocalTaggableServiceName.react(<input name="serviceName" type="text" />)}
             </div>
         </div>
     );

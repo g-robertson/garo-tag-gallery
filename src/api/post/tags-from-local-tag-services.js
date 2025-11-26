@@ -8,6 +8,7 @@ import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { UserFacingLocalTags, LocalTagServices } from "../../db/tags.js";
 import PerfTags from "../../perf-tags-binding/perf-tags.js";
 import { getCursorAsTaggableIDs } from "../../db/cursor-manager.js";
+import { bjsonStringify } from "../../client/js/client-util.js";
 
 /**
  * @param {Parameters<APIValidationFunction>[0]} dbs 
@@ -20,11 +21,24 @@ export async function validate(dbs, req, res) {
     ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
     if (!localTagServiceIDs.success) return localTagServiceIDs.error.message;
     
-    const taggableCursorID = z.string().or(z.undefined()).safeParse(req?.body?.taggableCursor, {path: ["taggableCursor"]});
-    if (!taggableCursorID.success) return taggableCursorID.error.message;
+    const taggableCursor = z.string().or(z.undefined()).safeParse(req?.body?.taggableCursor, {path: ["taggableCursor"]});
+    if (!taggableCursor.success) return taggableCursor.error.message;
 
-    /** @type {bigint[]} */
-    const taggableIDs = getCursorAsTaggableIDs(dbs.cursorManager.getCursorForUser(req.user.id(), taggableCursorID.data));
+    const taggableIDsRequested = z.array(z.number()).or(z.undefined()).safeParse(req?.body?.taggableIDs, {path: ["taggableIDs"]});
+    if (!taggableIDsRequested.success) return taggableIDsRequested.error.message;
+
+    let taggableIDs = getCursorAsTaggableIDs(dbs.cursorManager.getCursorForUser(req.user.id(), taggableCursor.data));
+    if (taggableIDsRequested.data !== undefined) {
+        const permittedTaggableIDs = new Set(taggableIDs);
+        taggableIDs = taggableIDsRequested.data.map(BigInt);
+        
+        for (const taggableID of taggableIDs) {
+            if (!permittedTaggableIDs.has(taggableID)) {
+                return `The taggable with id=${taggableID} was not found in the cursor provided`;
+            }
+        }
+    }
+     
 
     return {
         localTagServiceIDs: localTagServiceIDs.data,

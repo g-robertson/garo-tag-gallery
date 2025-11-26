@@ -8,7 +8,7 @@ import path from "path";
 import { CursorManager } from "./cursor-manager.js";
 import PerfHashCmp from "../perf-tags-binding/perf-hash-cmp.js";
 
-export const DATABASE_DIR = "database";
+export const DATABASE_DIR = process.env.DATABASE_DIR;
 export const PARTIAL_ZIPS_FOLDER = path.join(DATABASE_DIR, "_partial-zips");
 export const TMP_FOLDER = path.join(DATABASE_DIR, "_tmp");
 

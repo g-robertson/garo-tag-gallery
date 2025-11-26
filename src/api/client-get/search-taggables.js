@@ -1,6 +1,7 @@
 /** @import {ClientSearchQuery, WantedCursor, SearchWantedField} from "../post/search-taggables.js" */
 
-import { FetchCache, fbjsonParse } from "../../client/js/client-util.js";
+import { fbjsonParse } from "../../client/js/client-util.js";
+import { FetchCache } from "../../client/js/fetch-cache.js";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 
 /**
@@ -17,19 +18,18 @@ function searchTaggablesHash(clientSearchQuery, wantedCursor, wantedFields, loca
  * @param {ClientSearchQuery} clientSearchQuery
  * @param {WantedCursor} wantedCursor
  * @param {SearchWantedField | SearchWantedField[]} wantedFields
- * @param {number[]} localTagServiceIDs 
- * @param {FetchCache} fetchCache
+ * @param {number[]} localTagServiceIDs
  * @param {boolean=} forceNoCache
  * @returns {Promise<{
  *   cursor: string
  *   result: any
  * }>}
  */
-export async function searchTaggables(clientSearchQuery, wantedCursor, wantedFields, localTagServiceIDs, fetchCache, forceNoCache) {
+export async function searchTaggables(clientSearchQuery, wantedCursor, wantedFields, localTagServiceIDs, forceNoCache) {
     forceNoCache ??= false;
 
     const hash = searchTaggablesHash(clientSearchQuery, wantedCursor, wantedFields, localTagServiceIDs);
-    const searchTaggablesCache = fetchCache.cache("search-taggables");
+    const searchTaggablesCache = FetchCache.Global().cache("search-taggables");
     if (searchTaggablesCache.getStatus(hash) === "empty" || forceNoCache) {
         searchTaggablesCache.setAwaiting(hash);
         const response = await fetch("/api/post/search-taggables", {

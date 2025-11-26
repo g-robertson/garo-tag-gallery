@@ -1,38 +1,35 @@
 import { preload } from 'react-dom';
 import '../global.css';
-import { mergeGroups, randomID } from '../js/client-util.js';
+import { randomID } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 import { useEffect, useRef, useState } from 'react';
 import selectFiles from '../../api/client-get/select-files.js';
+import { ExistingState } from "../page/pages.js";
 
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
-/** @import {Setters, States} from "../App.jsx" */
 
 /**
  * @param {{
- *  states: States
  *  fileComparisons: DBFileComparison[]
  *  initialFileComparisonIndex?: number
- *  existingState: any
- *  updateExistingStateProp: (key: string, value: any) => void
- *  clearExistingStateProps: () => void
+ *  existingState: ExistingState
  * }} param0
  */
-const LazyDedupeGallery = ({states, fileComparisons, initialFileComparisonIndex, existingState, updateExistingStateProp, clearExistingStateProps}) => {
+const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, existingState}) => {
     const galleryID = useRef(randomID(32));
-    initialFileComparisonIndex ??= existingState.visibleIndex ?? 0;
+    initialFileComparisonIndex ??= existingState.get("visibleIndex") ?? 0;
     if (initialFileComparisonIndex === -1) {
         initialFileComparisonIndex = 0;
     }
     const [visibleIndex, setVisibleIndex] = useState(initialFileComparisonIndex);
 
-    fileComparisons ??= existingState.fileComparisons;
-    updateExistingStateProp("fileComparisons", fileComparisons);
+    fileComparisons ??= existingState.get("fileComparisons");
+    existingState.update("fileComparisons", fileComparisons);
 
     const fileComparisonsEvaluated = useRef(existingState?.fileComparisonsEvaluated ?? {});
     const updateFileComparisonsEvaluated = (newFileComparisonsEvaluated) => {
         fileComparisonsEvaluated.current = newFileComparisonsEvaluated;
-        updateExistingStateProp("fileComparisonsEvaluated", fileComparisonsEvaluated.current);
+        existingState.update("fileComparisonsEvaluated", fileComparisonsEvaluated.current);
     }
 
     /** @type {{out: (increment: number) => void}} */
@@ -43,7 +40,7 @@ const LazyDedupeGallery = ({states, fileComparisons, initialFileComparisonIndex,
     const VIDEO_ID = `video-${galleryID}`;
 
     useEffect(() => {
-        updateExistingStateProp("visibleIndex", visibleIndex);
+        existingState.update("visibleIndex", visibleIndex);
 
         let vid = document.getElementById(VIDEO_ID);
         if (vid !== null) {
@@ -79,7 +76,7 @@ const LazyDedupeGallery = ({states, fileComparisons, initialFileComparisonIndex,
     }, [activeFile]);
 
     return <LazySelector
-        values={fileComparisons}
+        valuesConstRef={fileComparisons}
         realizeSelectedValues={false}
         valuesRealizer={async (values) => {
             /** @type {Set<number>} */
@@ -88,7 +85,7 @@ const LazyDedupeGallery = ({states, fileComparisons, initialFileComparisonIndex,
                 filesSet.add(value.File_ID_1);
                 filesSet.add(value.File_ID_2);
             }
-            const fileMap = new Map((await selectFiles([...filesSet], states.fetchCache)).map(file => [
+            const fileMap = new Map((await selectFiles([...filesSet])).map(file => [
                 file.File_ID,
                 file
             ]));

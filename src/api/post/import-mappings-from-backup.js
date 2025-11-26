@@ -9,8 +9,8 @@ import { abjsonParse } from "../../client/js/client-util.js";
 import { importMappingsFromBackupJob } from "../../db/import.js";
 
 export async function validate(dbs, req, res) {
-    if (req?.files?.length > 1) {
-        return "More than one file is not allowed to be uploaded at a time";
+    if (req?.files?.length !== 1) {
+        return "Only one file is allowed to be uploaded at a time";
     }
     /** @type {Express.Multer.File} */
     const file = req.files[0];

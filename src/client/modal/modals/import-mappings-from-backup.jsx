@@ -1,38 +1,31 @@
-import { useState } from 'react';
 import '../../global.css';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
-import getActiveJobs from '../../../api/client-get/active-jobs.js';
+import { Jobs } from '../../jobs.js';
+import { ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {Setters, States} from "../../App.jsx" */
+/** @import {ExtraProperties} from "../modals.js" */
 
 /** 
  * @param {{
- *  states: States
- *  setters: Setters
+ *  extraProperties: ExtraProperties<any>
+ *  modalResolve: (value: any) => void
  * }}
 */
-const ImportMappingsFromBackup = ({states, setters}) => {
-    const [finishedImportingText, setFinishedImportingText] = useState("");
+export default function ImportMappingsFromBackup({ extraProperties, modalResolve }) {
+    const FinishedImporting = ReferenceableReact();
 
-    return (
-        <div>
+    return {
+        component: <div>
             <form enctype="multipart/form-data" action="/api/post/import-mappings-from-backup" target="frame" method="POST">
                 <input type="file" name="backup-file" />
                 <input type="submit" value="Import from backup" />
             </form>
             <OnFormSubmit onFormSubmit={async () => {
-                setFinishedImportingText("Finished importing from backup");
-                setters.setActiveJobs(await getActiveJobs());
+                FinishedImporting.dom.textContent = "Started importing from backup";
+                await Jobs.refreshGlobal();
             }} />
-            <p style={{color: "green"}}>{finishedImportingText}</p>
-        </div>
-    );
+            {FinishedImporting.react(<p style={{color: "green"}}></p>)}
+        </div>,
+        displayName: "Import Mappings From Backup"
+    };
 };
-
-export default ImportMappingsFromBackup;
-
-export const MODAL_PROPERTIES = {
-    modalName: "import-mappings-from-backup",
-    displayName: "Import Mappings From Backup"
-};
-export const IMPORT_MAPPINGS_FROM_BACKUP_MODAL_PROPERTIES = MODAL_PROPERTIES;

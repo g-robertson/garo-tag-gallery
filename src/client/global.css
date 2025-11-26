@@ -108,7 +108,7 @@ div {
     color: var(--hover-accent-foreground);
 }
 
-.modal {
+.modal, .job {
     flex-direction: column;
     border: 2px solid var(--foreground);
 }
@@ -121,7 +121,7 @@ div {
     background-color: var(--accent-background-layered);
     border-bottom: 1px solid var(--foreground);
 }
-.modal, .modal-content, .modal-content {
+.modal, .modal-content, .job {
     background-color: var(--background-layered);
 }
 .modal-title {
@@ -257,6 +257,12 @@ div {
 
 .scroll-cursor:hover {
     background-color: var(--hover-accent-foreground-alt);
+}
+
+.gallery-content {
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
 }
 
 .metric-star {

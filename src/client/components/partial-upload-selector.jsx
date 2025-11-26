@@ -1,8 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
 import '../global.css';
 import getPartialUploadSelections, { NOT_A_PARTIAL_UPLOAD } from '../../api/client-get/partial-upload-selections.js';
 import getPartialUploadSelectionFragments from '../../api/client-get/partial-upload-selection-fragments.js';
-import { randomID } from '../js/client-util.js';
+import { randomID, ReferenceableReact } from '../js/client-util.js';
+import { ExistingState } from '../page/pages.js';
+
+function sanitizePartialUploadSelection(activePartialUploadSelection) {
+    if (activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
+        return `____NOT_PARTIAL____${randomID(16).toString("hex")}`;
+    }
+    return activePartialUploadSelection;
+}
 
 /**
  * 
@@ -15,101 +22,123 @@ import { randomID } from '../js/client-util.js';
  * @returns 
  */
 const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
-    const uniqueID = useRef(randomID(32));
-    const [partialUploadSelections, setPartialUploadSelections] = useState(new Set([NOT_A_PARTIAL_UPLOAD]));
-    const [activePartialUploadSelection, setActivePartialUploadSelection] = useState(NOT_A_PARTIAL_UPLOAD);
-    const trueActivePartialUploadSelection = useRef(activePartialUploadSelection);
-    useEffect(() => {
-        if (activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
-            trueActivePartialUploadSelection.current = `____NOT_PARTIAL____${randomID(16).toString("hex")}`
-        } else {
-            trueActivePartialUploadSelection.current = activePartialUploadSelection;
-        }
-    }, [activePartialUploadSelection]);
-    const [activePartialUploadSelectionFragments, setActivePartialUploadSelectionFragments] = useState([]);
-    const [remainingPartialPiecesFinished, setRemainingPartialPiecesFinished] = useState(true);
-    const [uploading, setUploading] = useState(false);
+    const RemainingPartialPiecesFinishedReal = ReferenceableReact();
+    const RemainingPartialPiecesFinishedFaker = ReferenceableReact();
+    const ActivePartialUploadSelectionFragments = ReferenceableReact();
+    const PartialUploadSelectionFaker = ReferenceableReact();
+    const PartialUploadSelectionReal = ReferenceableReact();
+    const NewPartialUploadLocation = ReferenceableReact();
+    const SubmitButton = ReferenceableReact();
+    const FilesSelected = ReferenceableReact();
+
+    const partialUploadSelectionsRef = ExistingState.stateRef(new Set([NOT_A_PARTIAL_UPLOAD]));
+    const activePartialUploadSelectionRef = ExistingState.stateRef(NOT_A_PARTIAL_UPLOAD);
+    const activePartialUploadSelectionFragmentsRef = ExistingState.stateRef([]);
+    const remainingPartialPiecesFinishedRef = ExistingState.stateRef(true);
+    const uploading = ExistingState.stateRef(false);
     
-    useEffect(() => {
-        (async () => {
-            const partialUploadSelections_ = await getPartialUploadSelections()
-            setPartialUploadSelections(new Set(partialUploadSelections_));
-            setActivePartialUploadSelection(partialUploadSelections_[0]);
-        })();
-    }, []);
+    const onAdd = () => {
+        const onPartialUploadSelectionsChanged = () => {
+            const partialUploadSelections = [...partialUploadSelectionsRef.get()];
+            PartialUploadSelectionFaker.dom.replaceChildren(...(partialUploadSelections.map(partialUploadSelection => (
+                <option dom value={partialUploadSelection}>{partialUploadSelection}</option>
+            ))));
+        };
+        onPartialUploadSelectionsChanged();
 
-    useEffect(() => {
-        (async () => {
-            setActivePartialUploadSelectionFragments(await getPartialUploadSelectionFragments(activePartialUploadSelection));
-        })();
+        const onActivePartialUploadSelectionChanged = () => {
+            const activePartialUploadSelection = activePartialUploadSelectionRef.get();
+            getPartialUploadSelectionFragments(activePartialUploadSelection).then(activePartialUploadSelectionFragments => {
+                activePartialUploadSelectionFragmentsRef.update(activePartialUploadSelectionFragments);
+            });
 
-        if (activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
-            setRemainingPartialPiecesFinished(true);
+            RemainingPartialPiecesFinishedFaker.dom.disabled = activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD;
+            if (activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
+                remainingPartialPiecesFinishedRef.update(true);
+            }
+
+            PartialUploadSelectionReal.dom.value = sanitizePartialUploadSelection(activePartialUploadSelection);
         }
-    }, [activePartialUploadSelection]);
+        onActivePartialUploadSelectionChanged();
+
+        let cleanup = () => {};
+        cleanup = partialUploadSelectionsRef.addOnUpdateCallback(onPartialUploadSelectionsChanged, cleanup);
+        cleanup = activePartialUploadSelectionRef.addOnUpdateCallback(onActivePartialUploadSelectionChanged, cleanup);
+        cleanup = activePartialUploadSelectionFragmentsRef.addOnUpdateCallback(activePartialUploadSelectionFragments => {
+            ActivePartialUploadSelectionFragments.dom.replaceChildren(...(activePartialUploadSelectionFragments.map(activePartialUploadSelectionFragment => 
+                <option dom value={activePartialUploadSelectionFragment}>{activePartialUploadSelectionFragment}</option>
+            )));
+        }, cleanup);
+        cleanup = remainingPartialPiecesFinishedRef.addOnUpdateCallback(remainingPartialPiecesFinished => {
+            RemainingPartialPiecesFinishedFaker.dom.checked = remainingPartialPiecesFinished;
+            RemainingPartialPiecesFinishedReal.dom.checked = remainingPartialPiecesFinished;
+        }, cleanup);
+
+        
+        (async () => {
+            const existingPartialUploadSelections = await getPartialUploadSelections()
+            partialUploadSelectionsRef.update(new Set(existingPartialUploadSelections));
+            activePartialUploadSelectionRef.update(existingPartialUploadSelections[0]);
+        })();
+
+        return cleanup;
+    };
 
     return {
         PartialSelector: (
-            <div style={{marginLeft: "8px", flexDirection: "column"}}>
+            <div onAdd={onAdd} style={{marginLeft: "8px", flexDirection: "column"}}>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Partial upload location: </span>
-                    <input type="text" name="partialUploadSelection" value={trueActivePartialUploadSelection.current} style={{display: "none"}} />
-                    <select style={{display: "inline-block"}} name="partialUploadSelectionFake" onChange={(e) => {
-                        setActivePartialUploadSelection(e.target.options[e.target.selectedIndex].value);
-                    }}>
-                        {[...partialUploadSelections].map(partialUploadSelection => (
-                            <option value={partialUploadSelection} selected={(partialUploadSelection === activePartialUploadSelection)}>{partialUploadSelection}</option>
-                        ))}
-                    </select>
+                    {PartialUploadSelectionReal.react(<input type="text" name="partialUploadSelection" style={{display: "none"}} />)}
+                    {PartialUploadSelectionFaker.react(
+                        <select style={{display: "inline-block"}} name="partialUploadSelectionFake" onChange={(e) => {
+                            activePartialUploadSelectionRef.update(e.target.options[e.target.selectedIndex].value)
+                        }}></select>
+                    )}
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Create a new partial upload location to upload to: </span>
-                    <input style={{display: "inline-block"}} id="newPartialUploadLocation" type="text" placeholder="New Partial Upload Location" />
+                    {NewPartialUploadLocation.react(<input style={{display: "inline-block"}} type="text" placeholder="New Partial Upload Location" />)}
                     <input style={{display: "inline-block", marginLeft: "4px"}} type="button" value="Create" onClick={() => {
-                        setPartialUploadSelections(new Set(partialUploadSelections, document.getElementById("newPartialUploadLocation").value));
+                        partialUploadSelectionsRef.update(new Set([...partialUploadSelectionsRef.get(), NewPartialUploadLocation.dom.value]));
                     }} />
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Parts already on server: </span>
-                    <select style={{display: "inline-block"}}>
-                        {[...activePartialUploadSelectionFragments].map(activePartialUploadSelectionFragment => (
-                            <option>{activePartialUploadSelectionFragment}</option>
-                        ))}
-                    </select>
+                    {ActivePartialUploadSelectionFragments.react(<select style={{display: "inline-block"}}></select>)}
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>{text}</span>
-                    <input style={{display: "inline-block", marginLeft: "4px"}}  id={`partialFiles-${uniqueID.current}`} name="partialFiles" type="file" multiple />
+                    {FilesSelected.react(<input style={{display: "inline-block", marginLeft: "4px"}} name="partialFiles" type="file" multiple />)}
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Are all remaining pieces in this upload:</span>
-                    <input name="remainingPartialPiecesFinished" type="checkbox" checked={remainingPartialPiecesFinished} style={{display: "none"}} />
-                    <input
+                    {RemainingPartialPiecesFinishedReal.react(<input name="remainingPartialPiecesFinished" type="checkbox" style={{display: "none"}} />)}
+                    {RemainingPartialPiecesFinishedFaker.react(<input
                         style={{display: "inline-block", marginLeft: "4px"}}
                         name="remainingPartialPiecesFinishedFake"
-                        disabled={activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD}
-                        checked={remainingPartialPiecesFinished}
                         type="checkbox"
-                        onChange={() => {
-                        setRemainingPartialPiecesFinished(!remainingPartialPiecesFinished);
-                    }} />
+                        onChange={(e) => {
+                            remainingPartialPiecesFinishedRef.update(e.currentTarget.checked);
+                        }}
+                    />)}
                 </div>
             </div>
         ),
         PartialSubmitButton: (
             <div style={{marginLeft: "8px"}}>
                 <input type="button" value="Submit" onClick={async () => {
-                    if (uploading) {
+                    if (uploading.get()) {
                         return;
                     }
 
-                    setUploading(true);
+                    uploading.update(true);
                     onSubmit();
                     
-                    const filesSelected = document.getElementById(`partialFiles-${uniqueID.current}`).files;
+                    const filesSelected = FilesSelected.dom.files;
                     for (const file of filesSelected) {
                         const formData = new FormData();
-                        formData.append("partialUploadSelection", trueActivePartialUploadSelection.current);
+                        formData.append("partialUploadSelection", PartialUploadSelectionReal.dom.value);
                         formData.append("file", file, file.name);
                         const res = await fetch("/api/post/partial-file", {
                             body: formData,
@@ -119,12 +148,13 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                     }
 
                     /** @type {HTMLFormElement} */
-                    let outerForm = document.getElementById(`submit-${uniqueID.current}`);
+                    let outerForm = SubmitButton.dom;
                     while (outerForm !== null && outerForm.tagName !== "FORM") {
                         outerForm = outerForm.parentElement;
                     }
 
                     const outerFormData = new FormData(outerForm);
+                    outerFormData.delete("partialFiles");
                     const outerFormRes = await fetch(outerForm.action, {
                         body: outerFormData,
                         method: outerForm.method
@@ -136,9 +166,9 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                     } else {
                         onError(response);
                     }
-                    setUploading(false);
+                    uploading.update(false);
                 }}/>
-                <input type="submit" id={`submit-${uniqueID.current}`} style={{display: "none"}} />
+                {SubmitButton.react(<input type="submit" style={{display: "none"}} />)}
             </div>
         )
     };

@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
 import '../global.css';
-import { clamp, randomID, RealizationMap } from '../js/client-util.js';
+import { clamp, concatCallback, RealizationMap, ReferenceableReact } from '../js/client-util.js';
+import { ExistingState } from '../page/pages.js';
 import Scrollbar from './scrollbar.jsx';
+
+/** @import {ExistingStateRef, ExistingStateConstRef} from "../page/pages.js" */
 
 /** @import {JSX} from "react" */
 
@@ -18,73 +20,6 @@ import Scrollbar from './scrollbar.jsx';
  * @typedef {Object} SelectValue
  * @property {T} value
  */
-
-/**
- * @param {{width: number, height: number}} dimensionsAvailable  
- * @param {ItemProperties} itemProperties
- */
-function fullItemDimensions_(dimensionsAvailable, itemProperties) {
-    let width = dimensionsAvailable.width;
-    if (typeof itemProperties.width === "number") {
-        width = itemProperties.width + (2 * itemProperties.horizontalMargin);
-    }
-    let height = dimensionsAvailable.height;
-    if (typeof itemProperties.height === "number") {
-        height = itemProperties.height + (2 * itemProperties.horizontalMargin);
-    }
-    return {width, height};
-}
-
-/**
- * @param {{width: number, height: number}} dimensionsAvailable
- * @param {number} fullItemWidth
- */
-function columnCountAvailable_(dimensionsAvailable, fullItemWidth) {
-    if (fullItemWidth === 0) {
-        return 0;
-    }
-    return Math.floor(dimensionsAvailable.width / fullItemWidth);
-}
-
-/**
- * @param {{width: number, height: number}} dimensionsAvailable
- * @param {number} fullItemHeight
- */
-function rowCountAvailable_(dimensionsAvailable, fullItemHeight) {
-    if (fullItemHeight === 0) {
-        return 0;
-    }
-    return Math.floor(dimensionsAvailable.height / fullItemHeight);
-}
-
-/**
- * @param {number} rowCountAvailable 
- * @param {number} columnCountAvailable
- */
-function currentItemsShownCount_(rowCountAvailable, columnCountAvailable) {
-    return rowCountAvailable * columnCountAvailable;
-}
-
-/**
- * @param {number} columnCountAvailable
- * @param {number} currentItemsShownCount
- * @param {number} valuesLength
- */
-function lastPossibleShownStartIndex_(columnCountAvailable, currentItemsShownCount, valuesLength) {
-    if (columnCountAvailable === 0) {
-        return 0;
-    }
-
-    return Math.max((columnCountAvailable * Math.ceil(valuesLength / columnCountAvailable)) - currentItemsShownCount, 0);
-}
-
-/**
- * @param {number} shownStartIndex
- * @param {number} currentItemsShownCount
- */
-function shownEndIndex_(shownStartIndex, currentItemsShownCount) {
-    return shownStartIndex + currentItemsShownCount - 1;
-}
 
 /**
  * @param {number} shownStartIndex 
@@ -112,7 +47,7 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  * @template T
  * @template R
  * @param {{
- *  values: T[]
+ *  valuesConstRef: ExistingStateConstRef<T[]>
  *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[], indices: number[]) => void
  *  onValuesDoubleClicked?: (realizedValuesSelected: Awaited<R>[], indices: number[], indexClicked: number) => void
  *  valuesRealizer: ((values: T[]) => Promise<R[]>) | ((values: T[]) => R[])
@@ -134,7 +69,7 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  * }} param0
  */
 function LazySelector({
-    values,
+    valuesConstRef,
     onValuesSelected,
     onValuesDoubleClicked,
     valuesRealizer,
@@ -173,425 +108,490 @@ function LazySelector({
     allowScrollInput ??= true;
     allowKeyboardInput ??= true;
 
-    // TODO: fix this component so it has less than 8 rerenders on load
+    const RootElement = ReferenceableReact();
+    const SelectableContents = ReferenceableReact();
+    /** @type {ExistingStateRef<Map<number, ReturnType<ReferenceableReact>} */
+    const rowItemElementsRef = ExistingState.stateRef(new Map());
 
-    const uniqueID = useRef(randomID(32));
-    const [dimensionsAvailable, setDimensionsAvailable] = useState({width: 0, height: 0});
-    /** @type {[{ref: RealizationMap<number, R>}, (realizedValues: {ref: RealizationMap<R>}) => void]} */
-    const [realizedValues, setRealizedValues] = useState({ref: new RealizationMap()});
+    const widthAvailableRef = ExistingState.stateRef(0);
+    const heightAvailableRef = ExistingState.stateRef(0);
+    /** @type {ExistingStateRef<RealizationMap<number, R>>} */
+    const realizedValuesRef = ExistingState.stateRef(new RealizationMap());
+    const shownStartIndexRef = ExistingState.stateRef(initialLastClickedIndex ?? 0);
 
-    const [shownStartIndex, setShownStartIndex] = useState(initialLastClickedIndex ?? 0);
-    /** @type {(values: T[]) => number} */
+    /** @type {ExistingStateRef<Set<number> | null>} */
+    const preShiftClickIndices = ExistingState.stateRef(null);
+    /** @type {ExistingStateRef<Set<number>>} */
+    const selectedIndicesRef = ExistingState.stateRef(new Set());
 
-    /** @type {{current: Set<number> | null}} */
-    const preShiftClickIndices = useRef(null);
-    /** @type {[Set<number>, (selectedIndices: Set<number>) => void]} */
-    const [selectedIndices, setSelectedIndices] = useState(new Set());
+    const isClickFocusedRef = ExistingState.stateRef(false);
 
-    const isClickFocused = useRef(false);
+    const fullItemWidthRef = widthAvailableRef.getTransformRef(widthAvailable => {
+        if (typeof itemProperties.width === "number") {
+            return itemProperties.width + (2 * itemProperties.horizontalMargin);
+        }
+        return widthAvailable;
+    });
+    const fullItemHeightRef = heightAvailableRef.getTransformRef(heightAvailable => {
+        if (typeof itemProperties.height === "number") {
+            return itemProperties.height + (2 * itemProperties.horizontalMargin);
+        }
+        return heightAvailable;
+    });
+    const columnCountAvailableRef = ExistingState.tupleTransformRef([widthAvailableRef, fullItemWidthRef], () => {
+        if (fullItemWidthRef.get() === 0) {
+            return 0;
+        }
+        return Math.floor(widthAvailableRef.get() / fullItemWidthRef.get());
+    });
+    const rowCountAvailableRef = ExistingState.tupleTransformRef([heightAvailableRef, fullItemHeightRef], () => {
+        if (fullItemHeightRef.get() === 0) {
+            return 0;
+        }
+        return Math.floor(heightAvailableRef.get() / fullItemHeightRef.get());
+    });
+    const rootElementWidthRef = ExistingState.tupleTransformRef([columnCountAvailableRef, fullItemWidthRef, widthAvailableRef], () => {
+        if (typeof itemProperties.width === "number") {
+            return columnCountAvailableRef.get() * fullItemWidthRef.get();
+        }
+        return widthAvailableRef.get();
+    }) 
+    const rootElementHeightRef = ExistingState.tupleTransformRef([rowCountAvailableRef, fullItemHeightRef, heightAvailableRef], () => {
+        if (typeof itemProperties.height === "number") {
+            return rowCountAvailableRef.get() * fullItemHeightRef.get();
+        }
+        return heightAvailableRef.get();
+    }) 
+    const currentItemsShownCountRef = ExistingState.tupleTransformRef([rowCountAvailableRef, columnCountAvailableRef], () => {
+        return rowCountAvailableRef.get() * columnCountAvailableRef.get();
+    });
+    const shownEndIndexRef = ExistingState.tupleTransformRef([shownStartIndexRef, currentItemsShownCountRef], () => {
+        return shownStartIndexRef.get() + currentItemsShownCountRef.get() - 1;
+    });
+    const lastPossibleShownStartIndexRef = ExistingState.tupleTransformRef([columnCountAvailableRef, currentItemsShownCountRef, valuesConstRef], () => {
+        if (columnCountAvailableRef.get() === 0) {
+            return 0;
+        }
 
-    // closure refs
-    const fullItemDimensionsRef            = useRef(fullItemDimensions_(dimensionsAvailable, itemProperties));
-    fullItemDimensionsRef.current          =        fullItemDimensions_(dimensionsAvailable, itemProperties);
-    const columnCountAvailableRef          = useRef(columnCountAvailable_(dimensionsAvailable, fullItemDimensionsRef.current.width));
-    columnCountAvailableRef.current        =        columnCountAvailable_(dimensionsAvailable, fullItemDimensionsRef.current.width);
-    const rowCountAvailableRef             = useRef(rowCountAvailable_(dimensionsAvailable, fullItemDimensionsRef.current.height));
-    rowCountAvailableRef.current           =        rowCountAvailable_(dimensionsAvailable, fullItemDimensionsRef.current.height);
-    const currentItemsShownCountRef        = useRef(currentItemsShownCount_(rowCountAvailableRef.current, columnCountAvailableRef.current));
-    currentItemsShownCountRef.current      =        currentItemsShownCount_(rowCountAvailableRef.current, columnCountAvailableRef.current);
-    const shownEndIndexRef                 = useRef(shownEndIndex_(shownStartIndex, currentItemsShownCountRef.current));
-    shownEndIndexRef.current               =        shownEndIndex_(shownStartIndex, currentItemsShownCountRef.current);
-    const lastPossibleShownStartIndexRef   = useRef(lastPossibleShownStartIndex_(columnCountAvailableRef.current, currentItemsShownCountRef.current, values.length));
-    lastPossibleShownStartIndexRef.current =        lastPossibleShownStartIndex_(columnCountAvailableRef.current, currentItemsShownCountRef.current, values.length);
-
+        return Math.max((columnCountAvailableRef.get() * Math.ceil(valuesLength / columnCountAvailableRef.get())) - currentItemsShownCountRef.get(), 0);
+    });
     incrementIndexOut.out = (increment) => {
-        setShownStartIndex(clampShownStartIndex(shownStartIndex + increment, lastPossibleShownStartIndexRef.current, columnCountAvailableRef.current));
+        shownStartIndexRef.update(clampShownStartIndex(shownStartIndexRef.get() + increment, lastPossibleShownStartIndexRef.get(), columnCountAvailableRef.get()));
     }
 
-    /** @type {{current: number | null}} */
-    const lastClickedIndex = useRef(initialLastClickedIndex);
-    const updateLastClickedIndex = (newLastClickedIndex, shownStartIndex) => {
-        preShiftClickIndices.current = null;
+    /** @type {ExistingStateRef<number | null>} */
+    const lastClickedIndexRef = ExistingState.stateRef(initialLastClickedIndex);
 
-        lastClickedIndex.current = newLastClickedIndex;
-
-        if (lastClickedIndex.current === null || lastClickedIndex.current === newLastClickedIndex) {
-            return;
-        }
-
-        if (lastClickedIndex.current < shownStartIndex) {
-            setShownStartIndex(clampShownStartIndex(
-                Math.floor(lastClickedIndex.current / columnCountAvailableRef.current) * columnCountAvailableRef.current,
-                lastPossibleShownStartIndexRef.current,
-                columnCountAvailableRef.current
-            ));
-        }
-        if (lastClickedIndex.current > shownEndIndexRef.current) {
-            setShownStartIndex(clampShownStartIndex(
-                Math.ceil((lastClickedIndex.current - currentItemsShownCountRef.current) / columnCountAvailableRef.current) * columnCountAvailableRef.current,
-                lastPossibleShownStartIndexRef.current,
-                columnCountAvailableRef.current
-            ));
-        }
+    const clampedStartIndex = clampShownStartIndex(shownStartIndexRef.get(), lastPossibleShownStartIndexRef.get(), columnCountAvailableRef.get());
+    if (shownStartIndexRef.get() !== clampedStartIndex) {
+        shownStartIndexRef.update(clampedStartIndex);
     }
 
-    let selectableContentsWidth = dimensionsAvailable.width;
-    if (typeof itemProperties.width === "number") {
-        selectableContentsWidth = columnCountAvailableRef.current * fullItemDimensionsRef.current.width;
-    }
-    let selectableContentsHeight = dimensionsAvailable.height;
-    if (typeof itemProperties.height === "number") {
-        selectableContentsHeight = rowCountAvailableRef.current * fullItemDimensionsRef.current.height;
-    }
-
-
-    const clampedStartIndex = clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndexRef.current, columnCountAvailableRef.current);
-    if (shownStartIndex !== clampedStartIndex) {
-        setShownStartIndex(clampedStartIndex);
-    }
-
+    const valuesRealizationSync = ExistingState.stateRef(0);
     /**
      * @param {Iterable<number>} forcedIndices
      * @param {Iterable<number>} allIndices
-     * @param {RealizationMap<number, R>} currentRealizedValues
-     * @param {T[]} values
-     * @param {number} localValuesRealizationSync
+     * @param {RealizationMap<number, R>} realizedValues
      */
-    const setToRealize = async (forcedIndices, allIndices, currentRealizedValues, values, localValuesRealizationSync) => {
+    const setToRealize = async (forcedIndices, allIndices, realizedValues) => {
+        const localValuesRealizationSync = valuesRealizationSync.get();
+        const values = valuesConstRef.get();
         /** @type {{index: number, value: T}[]} */
         const absentValues = [];
 
         let mustDo = false;
         for (const index of forcedIndices) {
-            if (currentRealizedValues.getStatus(index) === "empty") {
+            if (realizedValues.getStatus(index) === "empty") {
                 mustDo = true;
                 break;
             }
         }
 
         for (const index of allIndices) {
-            if (currentRealizedValues.getStatus(index) === "empty") {
+            if (realizedValues.getStatus(index) === "empty") {
                 absentValues.push({
                     index,
                     value: values[index]
                 });
             }
         }
-        if (absentValues.length < realizeMinimumCount && !mustDo) {
+        if (absentValues.length <= realizeMinimumCount && !mustDo) {
+            if (realizedValuesRef.get() !== realizedValues) {
+                realizedValuesRef.update(realizedValues);
+            }
             return;
         }
 
         const valuesPromise = valuesRealizer(absentValues.map(absentValue => absentValue.value));
         if (valuesPromise instanceof Promise) {
             for (const absentValue of absentValues) {
-                currentRealizedValues.setAwaiting(absentValue.index);
+                realizedValues.setAwaiting(absentValue.index);
             }
 
             const valuesAwaited = await valuesPromise;
 
-            if (localValuesRealizationSync === valuesRealizationSync.current) {
+            if (localValuesRealizationSync === valuesRealizationSync.get()) {
                 for (let i = 0; i < absentValues.length; ++i) {
-                    currentRealizedValues.set(absentValues[i].index, valuesAwaited[i]);
+                    realizedValues.set(absentValues[i].index, valuesAwaited[i]);
                 }
             }
         } else {
             for (let i = 0; i < absentValues.length; ++i) {
-                currentRealizedValues.set(absentValues[i].index, valuesPromise[i]);
+                realizedValues.set(absentValues[i].index, valuesPromise[i]);
             }
         }
 
-
-        if (localValuesRealizationSync === valuesRealizationSync.current) {
-            setRealizedValues({ref: currentRealizedValues});
+        if (localValuesRealizationSync === valuesRealizationSync.get()) {
+            realizedValuesRef.update(realizedValues);
         }
     }
 
-    const valuesRealizationSync = useRef(0);
-    const realizeItems = async (selectedIndices, realizedValues, values, shownStartIndex) => {
+    /**
+     *  @param {RealizationMap<number, R>} realizedValues
+     */
+    const realizeItems = async (realizedValues) => {
         /** @type {Set<number>} */
         const allIndices = new Set();
-        const realizationRangeFrom = Math.max(0, shownStartIndex - valueRealizationRange * currentItemsShownCountRef.current);
-        const realizationRangeTo = Math.min(values.length - 1, shownEndIndexRef.current + valueRealizationRange * currentItemsShownCountRef.current);
+        const realizationRangeFrom = Math.max(0, shownStartIndexRef.get() - valueRealizationRange * currentItemsShownCountRef.get());
+        const realizationRangeTo = Math.min(valuesConstRef.get().length - 1, shownEndIndexRef.get() + valueRealizationRange * currentItemsShownCountRef.get());
         
         const forcedIndices = new Set();
 
         if (realizeSelectedValues) {
-            for (const index of selectedIndices) {
+            for (const index of selectedIndicesRef.get()) {
                 forcedIndices.add(index);
                 allIndices.add(index);
             }
         }
 
-        for (let i = shownStartIndex; i <= shownEndIndexRef.current && i < values.length; ++i) {
+        for (let i = shownStartIndexRef.get(); i <= shownEndIndexRef.get() && i < valuesConstRef.get().length; ++i) {
             forcedIndices.add(i);
             allIndices.add(i);
         }
         for (let i = realizationRangeFrom; i <= realizationRangeTo; ++i) {
             allIndices.add(i);
         }
-        await setToRealize(forcedIndices, allIndices, realizedValues, values, valuesRealizationSync.current);
+        await setToRealize(forcedIndices, allIndices, realizedValues);
     };
 
-    const scrollbarSetItemPositionOut = {out: () => {}};
-    useEffect(() => {
-        scrollbarSetItemPositionOut.out(shownStartIndex);
-    }, [shownStartIndex]);
+    const onAdd = () => {
+        let cleanup = () => {};
+        
+        let timeoutHandle = undefined;
+        /**
+         *  @param {RealizationMap<number, R>=} realizedValues
+         */
+        const onRealizationUpdateNeeded = (realizedValues) => {
+            realizedValues ??= realizedValuesRef.get();
 
-    const dimensionsAvailableRef = useRef(dimensionsAvailable);
-    dimensionsAvailableRef.current = dimensionsAvailable;
-    useEffect(() => {
-        const onResize = () => {
-            const parent = document.getElementById(LAZY_SELECTOR_ID).parentElement;
-            const newDimensionsAvailable = {width: parent.clientWidth, height: Math.max(20, parent.clientHeight)};
-            if (newDimensionsAvailable.width !== dimensionsAvailableRef.current.width || newDimensionsAvailable.height !== dimensionsAvailableRef.current.height) {
-                dimensionsAvailableRef.current = newDimensionsAvailable;
-                setDimensionsAvailable(dimensionsAvailableRef.current);
-            }
-        };
-        onResize();
-        window.addEventListener("resize", onResize);
-
-        const onClickFocusOutListener = (e) => {
-            let parent = e.target;
-            do {
-                if (parent.id === LAZY_SELECTOR_ID) {
-                    return;
-                }
-                parent = parent.parentElement;
-            } while (parent !== null && parent !== undefined);
-            isClickFocused.current = false;
-        }
-        window.addEventListener("click", onClickFocusOutListener);
-        document.getElementById(LAZY_SELECTOR_ID).addEventListener("click", () => {
-            isClickFocused.current = true;
-        });
-
-        return () => {
-            window.removeEventListener("resize", onResize);
-            window.removeEventListener("click", onClickFocusOutListener);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!allowKeyboardInput) {
-            return;
-        }
-
-        const onKeyDown = (e) => {
-            if (!isClickFocused.current && elementsSelectable) {
-                return;
-            }
-
-            let change = 0;
-            if (e.key === "ArrowDown") {
-                change = columnCountAvailableRef.current;
-            } else if (e.key === "ArrowUp") {
-                change = -columnCountAvailableRef.current;
-            } else if (rowCountAvailableRef.current !== 1 || !elementsSelectable) {
-                if (e.key === "ArrowRight") {
-                    change = 1;
-                } else if (e.key === "ArrowLeft") {
-                    change = -1;
-                } else {
-                    return;
-                }
+            clearTimeout(timeoutHandle);
+            if (valueRealizationDelay === 0) {
+                realizeItems(realizedValues);
             } else {
-                return;
-            }
-
-            const newIndex = clamp(lastClickedIndex.current + change, 0, values.length - 1);
-            if (newIndex !== lastClickedIndex.current) {
-                updateLastClickedIndex(newIndex, shownStartIndex);
-                setSelectedIndices(new Set([newIndex]));
+                timeoutHandle = setTimeout(() => realizeItems(realizedValues), valueRealizationDelay);
             }
         }
-        window.addEventListener("keydown", onKeyDown);
+        
+        cleanup = selectedIndicesRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup);
+        cleanup = widthAvailableRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup, {requireChangeForUpdate: true});
+        cleanup = heightAvailableRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup, {requireChangeForUpdate: true});
+        cleanup = shownStartIndexRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup, {requireChangeForUpdate: true});
 
-        return () => {
-            window.removeEventListener("keydown", onKeyDown);
+        const onValuesChange = () => {
+            preShiftClickIndices.update(null);
+            selectedIndicesRef.update(new Set());
+            lastClickedIndexRef.update(null);
+            valuesRealizationSync.update(valuesRealizationSync.get() + 1);
+
+            onRealizationUpdateNeeded(new RealizationMap());
+        };
+        onValuesChange();
+        cleanup = valuesConstRef.addOnUpdateCallback(onValuesChange, cleanup);
+        
+        const onRowItemsSelectedChanged = () => {
+            for (const rowItemElement of rowItemElementsRef.get().values()) {
+                if (rowItemElement.dom) {
+                    rowItemElement.dom.classList.remove("selected");
+                }
+            }
+
+            for (const index of selectedIndicesRef.get()) {
+                const rowItemElement = rowItemElementsRef.get().get(index)?.dom;
+                if (rowItemElement) {
+                    rowItemElement.classList.add("selected");
+                }
+            }
         }
-    }, [values, shownStartIndex]);
-
-    const realizedValuesRef = useRef(realizedValues);
-    realizedValuesRef.current = realizedValues;
-    useEffect(() => {
-        preShiftClickIndices.current = null;
-        if (selectedIndices.size !== 0) {
-            setSelectedIndices(new Set());
-        }
-
-        updateLastClickedIndex(null);
-
-        ++valuesRealizationSync.current;
-        if (realizedValuesRef.current.ref.size() !== 0) {
-            realizedValuesRef.current = {ref: new RealizationMap(realizedValuesRef.current.ref)};
-            setRealizedValues(realizedValuesRef.current);
-        }
-    }, [values]);
-
-    useEffect(() => {
-        if (valueRealizationDelay === 0) {
-            realizeItems(selectedIndices, realizedValuesRef.current.ref, values, shownStartIndex);
-        } else {
-            const timeoutHandle = setTimeout(() => realizeItems(selectedIndices, realizedValuesRef.current.ref, values, shownStartIndex), valueRealizationDelay);
-            return () => {
-                clearTimeout(timeoutHandle);
-            };
-        }
-    }, [selectedIndices, shownStartIndex, values, dimensionsAvailable]);
-
-
-    useEffect(() => {
-        (async () => {
+        const onSelectedIndicesChanged = async () => {
+            const realizedValues = realizedValuesRef.get();
             /** @type {R[]} */
             const realizedValuesSelected = [];
+
             if (realizeSelectedValues) {
-                for (const index of selectedIndices) {
-                    realizedValuesSelected.push(await realizedValues.ref.get(index));
+                for (const index of selectedIndicesRef.get()) {
+                    realizedValuesSelected.push(await realizedValues.get(index));
                 }
             } else {
-                for (const index of selectedIndices) {
-                    realizedValuesSelected.push(realizedValues.ref.getOrUndefined(index));
+                for (const index of selectedIndicesRef.get()) {
+                    realizedValuesSelected.push(realizedValues.getOrUndefined(index));
                 }
             }
 
-            onValuesSelected(realizedValuesSelected, [...selectedIndices]);
-        })();
-    }, [selectedIndices]);
+            onValuesSelected(realizedValuesSelected, [...selectedIndicesRef.get()]);
+        };
+        cleanup = selectedIndicesRef.addOnUpdateCallback(onSelectedIndicesChanged, cleanup);
+        cleanup = selectedIndicesRef.addOnUpdateCallback(onRowItemsSelectedChanged, cleanup);
+        cleanup = rowItemElementsRef.addOnUpdateCallback(onRowItemsSelectedChanged, cleanup);
+        
+        const onLastClickedIndexChanged = (newLastClickedIndex) => {
+            preShiftClickIndices.update(null);
 
-    const LAZY_SELECTOR_ID = `lazy-selector-${uniqueID.current}`;
-    const SELECTABLE_CONTENTS_ID = `lazy-selector-selectable-contents-${uniqueID.current}`
-    const SCROLLABLE_ELEMENTS = [SELECTABLE_CONTENTS_ID];
+            if (lastClickedIndexRef.get() === null || lastClickedIndexRef.get() === newLastClickedIndex) {
+                return;
+            }
 
-    return (
-        <div style={{position: "absolute", width: selectableContentsWidth, height: selectableContentsHeight}} id={LAZY_SELECTOR_ID} class="lazy-select">
-            <div style={{width: "100%", height: "100%"}}>
-                <div id={SELECTABLE_CONTENTS_ID} className="lazy-selector-selectable-contents" style={{width: `calc(100% - ${scrollbarWidth}px)`, height: "100%", float: "left", flexDirection: "column"}}>
-                    {(() => {
-                        /** @type {JSX.Element[]} */
-                        const rows = [];
-                        for (let i = 0; i < rowCountAvailableRef.current; ++i) {
-                            /** @type {JSX.Element[]} */
-                            const rowItems = [];
-                            for (let j = 0; j < columnCountAvailableRef.current; ++j) {
-                                const itemIndex = (i * columnCountAvailableRef.current) + j + shownStartIndex;
-                                const realizedValue = realizedValues.ref.getOrPrevOrUndefined(itemIndex);
-                                
-                                if (realizedValue === undefined) {
-                                    rowItems.push(<div className="lazy-selector-selectable-item" style={{
+            if (lastClickedIndexRef.get() < shownStartIndexRef.get()) {
+                shownStartIndexRef.update(clampShownStartIndex(
+                    Math.floor(lastClickedIndexRef.get() / columnCountAvailableRef.get()) * columnCountAvailableRef.get(),
+                    lastPossibleShownStartIndexRef.get(),
+                    columnCountAvailableRef.get()
+                ));
+            }
+            if (lastClickedIndexRef.get() > shownEndIndexRef.get()) {
+                shownStartIndexRef.update(clampShownStartIndex(
+                    Math.ceil((lastClickedIndexRef.get() - currentItemsShownCountRef.get()) / columnCountAvailableRef.get()) * columnCountAvailableRef.get(),
+                    lastPossibleShownStartIndexRef.get(),
+                    columnCountAvailableRef.get()
+                ));
+            }
+        };
+        cleanup = lastClickedIndexRef.addOnUpdateCallback(onLastClickedIndexChanged, cleanup);
+
+        const onActiveRealizedValuesChanged = (db) => {
+            console.log("on active realized values changed", valuesConstRef.get(), db);
+            const realizedValues = realizedValuesRef.get();
+            const rowItemElements = new Map();
+
+            /** @type {JSX.Element[]} */
+            const rows = [];
+            for (let i = 0; i < rowCountAvailableRef.get(); ++i) {
+                /** @type {JSX.Element[]} */
+                const rowItems = [];
+                for (let j = 0; j < columnCountAvailableRef.get(); ++j) {
+                    const itemIndex = (i * columnCountAvailableRef.get()) + j + shownStartIndexRef.get();
+                    const realizedValue = realizedValues.getOrUndefined(itemIndex);
+                    const rowItemElement = ReferenceableReact();
+
+                    if (realizedValue === undefined) {
+                        rowItems.push(<div className="lazy-selector-selectable-item" style={{
+                            width: itemProperties.width,
+                            height: itemProperties.height,
+                            marginTop: itemProperties.verticalMargin,
+                            marginBottom: itemProperties.verticalMargin,
+                            marginLeft: itemProperties.horizontalMargin,
+                            marginRight: itemProperties.horizontalMargin
+                        }}></div>);
+                    } else {
+                        rowItems.push(
+                            rowItemElement.react(<div className={`lazy-selector-selectable-item${elementsSelectable ? " selectable" : ""}`}
+                                    title={customTitleRealizer(realizedValue)}
+                                    style={{
                                         width: itemProperties.width,
+                                        lineHeight: `${itemProperties.height}px`,
                                         height: itemProperties.height,
                                         marginTop: itemProperties.verticalMargin,
                                         marginBottom: itemProperties.verticalMargin,
                                         marginLeft: itemProperties.horizontalMargin,
                                         marginRight: itemProperties.horizontalMargin
-                                    }}></div>);
-                                } else {
-                                    rowItems.push(
-                                        <div className={`lazy-selector-selectable-item${elementsSelectable ? " selectable" : ""}${selectedIndices.has(itemIndex) ? " selected" : ""}`}
-                                             title={customTitleRealizer(realizedValue)}
-                                             style={{
-                                                width: itemProperties.width,
-                                                lineHeight: `${itemProperties.height}px`,
-                                                height: itemProperties.height,
-                                                marginTop: itemProperties.verticalMargin,
-                                                marginBottom: itemProperties.verticalMargin,
-                                                marginLeft: itemProperties.horizontalMargin,
-                                                marginRight: itemProperties.horizontalMargin
-                                            }}
-                                             onClick={e => {
-                                                if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
-                                                    return;
-                                                }
-                                                let newSelectedIndices;
+                                    }}
+                                    onClick={e => {
+                                        if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
+                                            return;
+                                        }
+                                        const selectedIndices = selectedIndicesRef.get();
+                                        let newSelectedIndices;
 
-                                                if (!multiSelect) {
-                                                    updateLastClickedIndex(itemIndex, shownStartIndex);
-                                                    setSelectedIndices(new Set([itemIndex]));
-                                                } else if (e.ctrlKey) {
-                                                    updateLastClickedIndex(itemIndex, shownStartIndex);
-                                                    newSelectedIndices = selectedIndices;
-                                                    if (selectedIndices.has(itemIndex)) {
-                                                        newSelectedIndices.delete(itemIndex);
-                                                    } else {
-                                                        newSelectedIndices.add(itemIndex);
-                                                    }
-                                                } else if (e.shiftKey) {
-                                                    if (preShiftClickIndices.current === null) {
-                                                        newSelectedIndices = selectedIndices;
-                                                        preShiftClickIndices.current = new Set(selectedIndices);
-                                                    } else {
-                                                        newSelectedIndices = new Set(preShiftClickIndices.current);
-                                                    }
-                                                    let from = lastClickedIndex.current;
-                                                    let to = itemIndex;
-                                                    if (from > to) {
-                                                        const tmp = from;
-                                                        from = to;
-                                                        to = tmp;
-                                                    }
+                                        if (!multiSelect) {
+                                            lastClickedIndexRef.update(itemIndex);
+                                            selectedIndices.clear();
+                                            selectedIndices.add(itemIndex);
+                                            selectedIndicesRef.forceUpdate();
+                                        } else if (e.ctrlKey) {
+                                            lastClickedIndexRef.update(itemIndex);
+                                            newSelectedIndices = selectedIndices;
+                                            if (newSelectedIndices.has(itemIndex)) {
+                                                newSelectedIndices.delete(itemIndex);
+                                            } else {
+                                                newSelectedIndices.add(itemIndex);
+                                            }
+                                        } else if (e.shiftKey) {
+                                            // Maintains prior state from before shift click
+                                            if (preShiftClickIndices.get() === null) {
+                                                preShiftClickIndices.update(new Set(selectedIndices));
+                                                newSelectedIndices = selectedIndices;
+                                            } else {
+                                                newSelectedIndices = new Set(preShiftClickIndices.get());
+                                            }
 
-                                                    for (; from <= to; ++from) {
-                                                        newSelectedIndices.add(from);
-                                                    }
-                                                } else if (!selectedIndices.has(itemIndex)) {
-                                                    updateLastClickedIndex(itemIndex, shownStartIndex);
-                                                    newSelectedIndices = new Set([itemIndex]);
-                                                }
+                                            let from = lastClickedIndexRef.get();
+                                            let to = itemIndex;
+                                            if (from > to) {
+                                                const tmp = from;
+                                                from = to;
+                                                to = tmp;
+                                            }
 
-                                                if (newSelectedIndices !== undefined) {
-                                                    setSelectedIndices(new Set(newSelectedIndices));
-                                                }
-                                             }}
-                                             onDoubleClick={async (e) => {
-                                                if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
-                                                    return;
-                                                }
+                                            for (; from <= to; ++from) {
+                                                newSelectedIndices.add(from);
+                                            }
+                                        } else if (!selectedIndices.has(itemIndex)) {
+                                            lastClickedIndexRef.update(itemIndex);
+                                            newSelectedIndices = new Set([itemIndex]);
+                                        }
 
-                                                /** @type {R[]} */
-                                                const realizedValuesDoubleClicked = [];
-                                                if (realizeSelectedValues) {
-                                                    for (const index of selectedIndices) {
-                                                        realizedValuesDoubleClicked.push(await realizedValues.ref.get(index));
-                                                    }
-                                                } else {
-                                                    for (const index of selectedIndices) {
-                                                        realizedValuesDoubleClicked.push(realizedValues.ref.getOrUndefined(index));
-                                                    }
-                                                }
-                                                
-                                                onValuesDoubleClicked(realizedValuesDoubleClicked, [...selectedIndices], itemIndex);
-                                             }}
-                                        >
-                                            {customItemComponent({realizedValue, index: itemIndex, setRealizedValue: (realizedValue) => {
-                                                realizedValues.ref.set(itemIndex, realizedValue);
-                                                setRealizedValues({ref: realizedValues.ref});
-                                            }})}
-                                        </div>
-                                    );
-                                }
-                            }
+                                        if (newSelectedIndices !== undefined) {
+                                            selectedIndicesRef.update(newSelectedIndices);
+                                        }
+                                    }}
+                                    onDoubleClick={async (e) => {
+                                        if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
+                                            return;
+                                        }
 
-                            rows.push(<div style={{width: "100%", height: fullItemDimensionsRef.current.height}}>
-                                {rowItems}
-                            </div>);
-                        }
+                                        /** @type {R[]} */
+                                        const realizedValuesDoubleClicked = [];
+                                        if (realizeSelectedValues) {
+                                            for (const index of selectedIndicesRef.get()) {
+                                                realizedValuesDoubleClicked.push(await realizedValues.get(index));
+                                            }
+                                        } else {
+                                            for (const index of selectedIndicesRef.get()) {
+                                                realizedValuesDoubleClicked.push(realizedValues.getOrUndefined(index));
+                                            }
+                                        }
 
-                        return rows;
-                    })()}
-                </div>
+                                        onValuesDoubleClicked(realizedValuesDoubleClicked, [...selectedIndicesRef.get()], itemIndex);
+                                    }}
+                            >
+                                {customItemComponent({realizedValue, index: itemIndex, setRealizedValue: (realizedValue) => {
+                                    realizedValues.set(itemIndex, realizedValue);
+                                    realizedValuesRef.update(realizedValues);
+                                }})}
+                            </div>)
+                        );
+
+                        rowItemElements.set(itemIndex, rowItemElement);
+                    }
+                }
+                rowItemElementsRef.update(rowItemElements);
+
+
+                rows.push(<div style={{width: "100%", height: fullItemHeightRef.get()}}>
+                    {rowItems}
+                </div>);
+            }
+
+            SelectableContents.dom.replaceChildren(...(<dom>
+                {rows}
+            </dom>));
+        };
+        cleanup = realizedValuesRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged("rv"), cleanup);
+        cleanup = columnCountAvailableRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged("cc"), cleanup, {requireChangeForUpdate: true});
+        cleanup = shownStartIndexRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged("ssi"), cleanup, {requireChangeForUpdate: true});
+
+        const onRootElementWidthChanged = () => {
+            RootElement.dom.style.width = `${rootElementWidthRef.get()}px`;
+        }
+        cleanup = rootElementWidthRef.addOnUpdateCallback(onRootElementWidthChanged, cleanup, {requireChangeForUpdate: true});
+
+        const onRootElementHeightChanged = () => {
+            RootElement.dom.style.height = `${rootElementHeightRef.get()}px`;
+        }
+        cleanup = rootElementHeightRef.addOnUpdateCallback(onRootElementHeightChanged, cleanup, {requireChangeForUpdate: true});
+
+        const onResize = () => {
+            const parent = RootElement.dom.parentElement;
+            widthAvailableRef.update(parent.clientWidth);
+            heightAvailableRef.update(Math.max(20, parent.clientHeight));
+        };
+        onResize();
+        window.addEventListener("resize", onResize);
+        cleanup = concatCallback(cleanup, () => window.removeEventListener("resize", onResize));
+
+        const onClickFocusOutListener = (e) => {
+            let parent = e.target;
+            do {
+                if (parent === RootElement) {
+                    return;
+                }
+                parent = parent.parentElement;
+            } while (parent !== null && parent !== undefined);
+            isClickFocusedRef.update(false);
+        }
+        RootElement.dom.addEventListener("click", () => {
+            isClickFocusedRef.update(true);
+        });
+        window.addEventListener("click", onClickFocusOutListener);
+        cleanup = concatCallback(cleanup, () => window.removeEventListener("click", onClickFocusOutListener));
+
+        if (allowKeyboardInput) {
+            const onKeyDown = (e) => {
+                if (!isClickFocusedRef.get() && elementsSelectable) {
+                    return;
+                }
+
+                let change = 0;
+                if (e.key === "ArrowDown") {
+                    change = columnCountAvailableRef.get();
+                } else if (e.key === "ArrowUp") {
+                    change = -columnCountAvailableRef.get();
+                } else if (rowCountAvailableRef.get() !== 1 || !elementsSelectable) {
+                    if (e.key === "ArrowRight") {
+                        change = 1;
+                    } else if (e.key === "ArrowLeft") {
+                        change = -1;
+                    } else {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+
+                const newIndex = clamp(lastClickedIndexRef.get() + change, 0, valuesConstRef.get().length - 1);
+                if (newIndex !== lastClickedIndexRef.get()) {
+                    lastClickedIndexRef.update(newIndex);
+                    selectedIndicesRef.get().clear();
+                    selectedIndicesRef.add(newIndex);
+                    selectedIndicesRef.forceUpdate();
+                }
+            };
+            window.addEventListener("keydown", onKeyDown);
+            cleanup = concatCallback(cleanup, () => window.removeEventListener("keydown", onKeyDown));
+        }
+        return cleanup;
+    };
+
+    const SCROLLABLE_ELEMENTS = [SelectableContents];
+
+    return RootElement.react(
+        <div style={{position: "absolute"}} className="lazy-select" onAdd={onAdd}>
+            <div style={{width: "100%", height: "100%"}}>
+                {SelectableContents.react(
+                    <div className="lazy-selector-selectable-contents" style={{width: `calc(100% - ${scrollbarWidth}px)`, height: "100%", float: "left", flexDirection: "column"}}>
+                    </div>
+                )}
                 {
                     allowScrollInput
-                    ? <Scrollbar length={selectableContentsHeight}
-                           itemsDisplayed={currentItemsShownCountRef.current}
-                           totalItems={values.length}
-                           setItemPositionOut={scrollbarSetItemPositionOut}
+                    ? <Scrollbar lengthConstRef={rootElementHeightRef}
+                           itemsDisplayedConstRef={currentItemsShownCountRef}
+                           totalItemsConstRef={valuesConstRef.getTransformRef(values => values.length)}
+                           itemPositionRef={shownStartIndexRef}
                            alternativeScrollingElements={SCROLLABLE_ELEMENTS}
-                           scrollbarInterval={columnCountAvailableRef.current}
-                           scrollbarIncrement={columnCountAvailableRef.current * scrollbarIncrement}
+                           scrollbarIntervalConstRef={columnCountAvailableRef}
+                           scrollbarIncrementConstRef={columnCountAvailableRef.getTransformRef(columnCountAvailable => columnCountAvailable * scrollbarIncrement)}
                            scrollbarWidth={scrollbarWidth}
                            onScrollbarUpdate={(e) => {
-                               setShownStartIndex(e);
+                               shownStartIndexRef.update(e);
                            }}
                     /> : <></>
                 }

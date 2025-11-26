@@ -1,39 +1,35 @@
 import LazyDedupeGallery from '../../components/lazy-dedupe-gallery.jsx';
 import '../../global.css';
 
-/** @import {ModalOptions} from "../modal.jsx" */
-/** @import {Setters, States} from "../../App.jsx" */
+/** @import {ExtraProperties} from "../modals.js" */
+/** @import {Modal} from "../modals.js" */
 
 /** 
  * @param {{
- *  states: States
- *  modalOptions: ModalOptions
+ *  extraProperties: ExtraProperties<{
+ *      fileComparisons: any[]
+ *      initialFileComparisonIndex?: number
+ *      existingState?: any
+ *  }>
+ *  modalResolve: (value: any) => void
  * }}
 */
-const DedupeGalleryModal = ({states, modalOptions}) => {
-    return (
-        <div style={{width: "100%", height: "100%"}}>
-            <LazyDedupeGallery
-                states={states}
-                fileComparisons={modalOptions.extraProperties.fileComparisons}
-                initialFileComparisonIndex={modalOptions?.extraProperties?.initialFileComparisonIndex}
-                existingState={modalOptions.extraProperties.existingState}
-                updateExistingStateProp={modalOptions.extraProperties.updateExistingStateProp}
-                clearExistingStateProps={modalOptions.extraProperties.clearExistingStateProps}
-            />
-        </div>
-    );
+export default function DedupeGalleryModal({ extraProperties, modalResolve }) {
+    return {
+        component: (
+            <div style={{width: "100%", height: "100%"}}>
+                <LazyDedupeGallery
+                    fileComparisons={extraProperties.fileComparisons}
+                    initialFileComparisonIndex={extraProperties?.initialFileComparisonIndex}
+                    existingState={extraProperties.existingState}
+                />
+            </div>
+        ),
+        displayName: "Dedupe Gallery",
+        width: 100,
+        height: 100,
+        hasTopbar: false,
+        hasBorder: false,
+        moveWithIndex: 0
+    };
 };
-
-export default DedupeGalleryModal;
-
-export const MODAL_PROPERTIES = {
-    modalName: "dedupe-gallery",
-    displayName: "Dedupe Gallery",
-    width: 100,
-    height: 100,
-    hasTopbar: false,
-    hasBorder: false,
-    moveWithIndex: 0
-};
-export const DEDUPE_GALLERY_MODAL_PROPERTIES = MODAL_PROPERTIES;

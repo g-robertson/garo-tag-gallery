@@ -8,16 +8,17 @@ import HoverInfo from '../../components/hover-info.jsx';
 import { ALT_LIKELY_PERCEPTUAL_HASH_DISTANCE, COMPARE_FILES_FOR_DUPLICATE_JOB_TYPE, CURRENT_PERCEPTUAL_HASH_VERSION, DUP_LIKELY_PERCEPTUAL_HASH_DISTANCE, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE, REASONABLE_PERCEPTUAL_HASH_DISTANCE, USER_PERCEPTUAL_HASH_MULTIPLIER } from '../../js/duplicates.js';
 import selectFileComparisons from '../../../api/client-get/select-file-comparisons.js';
 import compareFilesForDuplicates from '../../../api/client-get/compare-files-for-duplicates.js';
-import getActiveJobs from '../../../api/client-get/active-jobs.js';
 import reselectFiles from '../../../api/client-get/reselect-files.js';
 import LazyDedupePreviewGallery from '../../components/lazy-dedupe-preview-gallery.jsx';
-import { DEDUPE_GALLERY_MODAL_PROPERTIES } from '../../modal/modals/dedupe-gallery.jsx';
-import { DIALOG_BOX_MODAL_PROPERTIES } from '../../modal/modals/dialog-box.jsx';
+import DedupeGalleryModal from '../../modal/modals/dedupe-gallery.jsx';
+import DialogBox from '../../modal/modals/dialog-box.jsx';
 import { mergeGroups } from '../../js/client-util.js';
+import { ExistingState } from '../page/pages.js';
+import { Modals } from '../../modal/modals.js';
+import { Jobs } from '../../jobs.js';
 
 /** @import {DBFileComparison} from "../../../db/duplicates.js" */
 /** @import {SearchObject} from "../../components/tags-selector.jsx" */
-/** @import {Setters, States} from "../../App.jsx" */
 
 /**
  * @typedef {Object} ClientFile
@@ -46,22 +47,17 @@ function mapToFiles(searchResult) {
 
 /** 
  * @param {{
- *  states: States
- *  setters: Setters
- *  existingState: any
- *  updateExistingStateProp: (key: string, value: any) => void
+ *  existingState: ExistingState
  * }}
 */
-const DuplicatesProcessingPage = ({states, setters, existingState, updateExistingStateProp}) => {
-    existingState ??= {};
-    existingState.tagsSelector ??= {};
-    existingState.dedupeGallery ??= {};
-    updateExistingStateProp ??= () => {};
+const DuplicatesProcessingPage = ({existingState}) => {
+    const tagsSelectorState = existingState.getInnerState("tagsSelector");
+    const dedupeGalleryState = existingState.getInnerState("dedupeGallery");
 
     const defaultMaxSearchDistance = existingState?.maxSearchDistance ?? (REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER);
     /** @type {[number, (maxSearchDistance: number) => void]} */
     const [maxSearchDistance, setMaxSearchDistance] = useState(defaultMaxSearchDistance);
-    useEffect(() => {updateExistingStateProp("maxSearchDistance", maxSearchDistance);}, [maxSearchDistance]);
+    useEffect(() => {existingState.update("maxSearchDistance", maxSearchDistance);}, [maxSearchDistance]);
     const [fileCursor, setFileCursor] = useState();
     /** @type {[ClientFile[], (files: ClientFile[]) => void]} */
     const [files, setFiles] = useState([]);
@@ -105,11 +101,11 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
     const refreshFileComparisons = useRef(() => {});
     refreshFileComparisons.current = async () => {
         reselectFiles(fileCursor, ["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"]).then(files => setFiles(mapToFiles(files)));
-        selectFileComparisons(fileCursor, maxSearchDistance, states.fetchCache, true).then(fileComparisons => setPotentialDuplicateFileComparisons(fileComparisons));
+        selectFileComparisons(fileCursor, maxSearchDistance, true).then(fileComparisons => setPotentialDuplicateFileComparisons(fileComparisons));
     }
     useEffect(() => {
         let dedupingJobExists = false;
-        for (const job of states.activeJobs) {
+        for (const job of Jobs.Global().jobs) {
             if (job.jobType === COMPARE_FILES_FOR_DUPLICATE_JOB_TYPE) {
                 dedupingJobExists = true;
             }
@@ -123,7 +119,7 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
                 refreshFileComparisons.current();
             }, 1000);
         }
-    }, [states.activeJobs, fileCursor]);
+    }, [Jobs.Global().jobs, fileCursor]);
 
     useEffect(() => {
         if (fileCursor === undefined) {
@@ -141,7 +137,6 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
             "File",
             ["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"],
             previousSearch.current.localTagServiceIDs,
-            states.fetchCache,
             forceNoCache
         );
         setFileCursor(result.cursor);
@@ -150,21 +145,14 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
         return result.cursor;
     }
 
-    useEffect(() => {
-        if (previousSearch.current !== null) {
-            makeSearch();
-        }
-    }, [states.fetchCache])
-
-    existingState.dedupeGallery ??= {};
     const openNewDedupeGallery = useRef(async (fileComparisons, initialFileComparisonIndex) => {});
     openNewDedupeGallery.current = async (fileComparisons, initialFileComparisonIndex) => {
-        if (existingState.dedupeGallery.fileComparisonsEvaluated !== undefined) {
+        if (dedupeGalleryState.state.fileComparisonsEvaluated !== undefined) {
             const REOPEN_BUTTON = 0;
             const COMMIT_BUTTON = 1;
             const DISCARD_BUTTON = 2;
 
-            const optionSelected = await setters.pushModal(DIALOG_BOX_MODAL_PROPERTIES.modalName, {
+            const optionSelected = await Modals.Global().pushModal(DialogBox, {
                 promptText: "You have an active dedupe gallery that is uncommitted. What do you wish to do with this gallery?",
                 optionButtons: [
                     {
@@ -182,42 +170,24 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
                 ]
             });
             if (optionSelected === REOPEN_BUTTON) {
-                setters.pushModal(DEDUPE_GALLERY_MODAL_PROPERTIES.modalName, {
-                    existingState: existingState.dedupeGallery,
-                    clearExistingStateProps: () => {
-                        existingState.dedupeGallery = {};
-                        updateExistingStateProp("dedupeGallery", existingState.dedupeGallery);
-                    },
-                    updateExistingStateProp: (key, value) => {
-                        existingState.dedupeGallery[key] = value;
-                        updateExistingStateProp("dedupeGallery", existingState.dedupeGallery);
-                    }
+                Modals.Global().pushModal(DedupeGalleryModal, {
+                    existingState: dedupeGalleryState
                 });
                 return;
             }
             if (optionSelected === COMMIT_BUTTON) {
 
-                //existingState.dedupeGallery = {};
-                //updateExistingStateProp("dedupeGallery", existingState.dedupeGallery);
+                // dedupeGalleryState.clear();
             } else if (optionSelected === DISCARD_BUTTON) {
-                existingState.dedupeGallery = {};
-                updateExistingStateProp("dedupeGallery", existingState.dedupeGallery);
+                dedupeGalleryState.clear();
             } else {
                 return;
             }
         }
-        setters.pushModal(DEDUPE_GALLERY_MODAL_PROPERTIES.modalName, {
+        Modals.Global().pushModal(DedupeGalleryModal, {
             fileComparisons,
             initialFileComparisonIndex,
-            existingState: existingState.dedupeGallery,
-            clearExistingStateProps: () => {
-                existingState.dedupeGallery = {};
-                updateExistingStateProp("dedupeGallery", existingState.dedupeGallery);
-            },
-            updateExistingStateProp: (key, value) => {
-                existingState.dedupeGallery[key] = value;
-                updateExistingStateProp("dedupeGallery", existingState.dedupeGallery);
-            }
+            existingState: dedupeGalleryState
         });
     };
 
@@ -227,8 +197,6 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
                 <div style={{marginRight: 16}}>Limit the files you will process duplicates of:</div>
                 <div style={{height: "97%"}}>
                     <TagsSelector
-                        states={states}
-                        setters={setters}
                         taggableCursor={fileCursor}
                         onSearchChanged={async (clientSearchQuery, localTagServiceIDs) => {
                             previousSearch.current = {
@@ -238,11 +206,7 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
                             makeSearch();
                         }}
 
-                        existingState={existingState.tagsSelector}
-                        updateExistingStateProp={(key, value) => {
-                            existingState.tagsSelector[key] = value;
-                            updateExistingStateProp("tagsSelector", existingState.tagsSelector);
-                        }}
+                        existingState={tagsSelectorState}
                     />
                 </div>
             </div>
@@ -259,7 +223,7 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
                                                 + " will almost always be just false positives\n"
                                                 + `Maximum value allowed for input is ${MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} as higher values would just cause lower performance for no more similar images`
                     }>search distance</HoverInfo> of pairs:
-                    <div style={{marginLeft: 4}}><NumericInput minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} defaultValue={defaultMaxSearchDistance} onChange={(num) => {
+                    <div style={{marginLeft: 4}}><NumericInput  minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} defaultValue={defaultMaxSearchDistance} onChange={(num) => {
                         setMaxSearchDistance(num);
                     }} /></div></div>
                 <div style={{marginTop: 4}}>Taggables included in query: {taggableIDs.length}</div>
@@ -273,7 +237,7 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
                         }
 
                         if (createdJob) {
-                            setters.setActiveJobs(await getActiveJobs());
+                            await Jobs.refreshGlobal();
                         }
                     }} />
                 </div>
@@ -290,7 +254,6 @@ const DuplicatesProcessingPage = ({states, setters, existingState, updateExistin
                 <div style={{marginTop: 4}}>Preview of file pairs to dedupe:</div>
                 <div style={{flex: 1}}>
                     <LazyDedupePreviewGallery
-                        states={states}
                         fileComparisonPairs={potentialDuplicateFileComparisonsPendingGroups.flatMap(group => group.constituents.sort((a, b) => a.Perceptual_Hash_Distance - b.Perceptual_Hash_Distance))}
                         onValuesDoubleClicked={(_, indices, indexClicked) => {
                             if (indices.length > 1) {

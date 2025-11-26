@@ -1,3 +1,5 @@
+/** @import {JSX} from "react" */
+
 /**
  * @param {Response} response 
  */
@@ -97,6 +99,8 @@ export function clientjsonStringify(obj) {
 }
 
 const BIG_INT_IDENTIFIER = "BigInt_fuihi873ohr87hnfuidwnfufh3e2oi8fwefa";
+const SET_IDENTIFIER = "Set_fsdhkjafhsdkfjah";
+const MAP_IDENTIFIER = "Map_fdjhuifhuiewhf";
 
 /**
  * @param {any} obj 
@@ -107,6 +111,14 @@ export function bjsonStringify(obj) {
         if (typeof value === "bigint") {
             return {
                 [BIG_INT_IDENTIFIER]: value.toString()
+            }
+        } else if (value instanceof Set) {
+            return {
+                [SET_IDENTIFIER]: [...value]
+            }
+        } else if (value instanceof Map) {
+            return {
+                [MAP_IDENTIFIER]: [...value]
             }
         } else {
             return value;
@@ -124,6 +136,10 @@ export function bjsonParse(json) {
             return null;
         } else if (typeof value === "object" && value[BIG_INT_IDENTIFIER] !== undefined) {
             return BigInt(value[BIG_INT_IDENTIFIER]);
+        } else if (typeof value === "object" && value[SET_IDENTIFIER] !== undefined) {
+            return new Set(value[SET_IDENTIFIER]);
+        } else if (typeof value === "object" && value[MAP_IDENTIFIER] !== undefined) {
+            return new Map(value[MAP_IDENTIFIER]);
         } else {
             return value;
         }
@@ -315,19 +331,6 @@ export class RealizationMap {
     getOrUndefined(key) {
         if (this.#valueStatuses.get(key) === "filled") {
             return this.#values.get(key);
-        } else {
-            return undefined;
-        }
-    }
-
-    /**
-     * @param {K} key 
-     */
-    getOrPrevOrUndefined(key) {
-        if (this.#valueStatuses.get(key) === "filled") {
-            return this.#values.get(key);
-        } else if (this.#prev !== undefined) {
-            return this.#prev.getOrUndefined(key);
         } else {
             return undefined;
         }
@@ -565,63 +568,29 @@ export function invertMap(map, valueMappingFunction) {
     return invertedMap;
 }
 
-const TAG_ENDPOINTS = Object.freeze({
-    "tags-from-local-tag-services": 0,
-    "search-taggables": 0,
-});
+export const T_SECOND = 1000;
+export const T_MINUTE = T_SECOND * 60;
 
-const FILE_ENDPOINTS = Object.freeze({
-    "select-file-comparisons": 0,
-    "select-files": 0
-});
-
-export class FetchCache {
-    /** @type {Map<keyof TAG_ENDPOINTS | keyof FILE_ENDPOINTS, RealizationMap<string, any>>} */
-    #cache;
-    rerender = () => {};
-
-    /**
-     * @param {FetchCache} fetchCache 
-     */
-    constructor(fetchCache) {
-        this.#generateCache(fetchCache);
-    }
-
-    /**
-     * @param {FetchCache} fetchCache 
-     */
-    #generateCache(fetchCache) {
-        this.#cache = new Map();
-
-        let getNewRealizationMap = (endpoint) => {
-            return fetchCache.cache(endpoint);
-        }
-        if (fetchCache === undefined) {
-            getNewRealizationMap = () => new RealizationMap();
-        }
-
-        for (const endpoint of [...Object.keys(TAG_ENDPOINTS), ...Object.keys(FILE_ENDPOINTS)]) {
-            if (!this.#cache.has(endpoint)) {
-                this.#cache.set(endpoint, getNewRealizationMap(endpoint));
-            }
-        }
-    }
-
-    regenerateTagsCache() {
-        for (const endpoint of TAG_ENDPOINTS) {
-            this.#cache.delete(endpoint);
-        }
-        this.#generateCache();
-        this.rerender();
-    }
-
-    /**
-     * @param {keyof ENDPOINTS} cache 
-     */
-    cache(cache) {
-        return this.#cache.get(cache);
+export function concatCallback(callback, callback2) {
+    return () => {
+        callback();
+        callback2();
     }
 }
 
-export const T_SECOND = 1000;
-export const T_MINUTE = T_SECOND * 60;
+export function ReferenceableReact() {
+    let reactRef = undefined;
+
+    return {
+        get dom() {
+            return document.querySelector(`[data-react-ref=${reactRef}]`);
+        },
+        /**
+         * @param {import("react").JSX.Element} jsx 
+         */
+        react(jsx) {
+            reactRef = jsx.props['data-react-ref'];
+            return jsx;
+        }
+    }
+}

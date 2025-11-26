@@ -7,10 +7,13 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "dev": "node server.js",
-    "build": "npx rsbuild build && node build.js"
+    "e2eServer": "npx @dotenvx/dotenvx run -f build/.env.test -- node server.js",
+    "e2e": "npx @dotenvx/dotenvx run -f build/.env.test -- node e2etest/test.js",
+    "dev": "npx @dotenvx/dotenvx run -f build/.env.dev -- node server.js",
+    "build": "node build/pre-build.js && npx rsbuild --config rsbuild.config.mjs build && node build/post-build.js"
   },
   "dependencies": {
+    "@dotenvx/dotenvx": "^1.51.1",
     "@tensorflow/tfjs-node": "^4.22.0",
     "@types/express": "^5.0.2",
     "async-mutex": "^0.5.0",
@@ -21,6 +24,7 @@
     "node-stream-zip": "^1.15.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "selenium-webdriver": "^4.38.0",
     "serve-static": "^2.2.0",
     "sharp": "^0.34.2",
     "sqlite3": "^5.1.7",

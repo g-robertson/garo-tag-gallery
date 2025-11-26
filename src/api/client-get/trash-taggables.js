@@ -1,12 +1,11 @@
 /** @import {ClientTag} from "../post/update-taggables.js" */
 
-import { FetchCache } from "../../client/js/client-util.js";
+import { FetchCache } from "../../client/js/fetch-cache.js";
 
 /**
  * @param {number[]} taggableIDs
- * @param {FetchCache} fetchCache
  */
-export async function trashTaggables(taggableIDs, fetchCache) {
+export async function trashTaggables(taggableIDs) {
     await fetch("/api/post/trash-taggables", {
         body: JSON.stringify({
             taggableIDs
@@ -16,5 +15,5 @@ export async function trashTaggables(taggableIDs, fetchCache) {
         },
         method: "POST"
     });
-    fetchCache.regenerateTagsCache();
+    FetchCache.Global().regenerateTagsCache();
 }

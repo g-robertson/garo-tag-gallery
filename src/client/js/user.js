@@ -1,5 +1,9 @@
 /** @import {DBJoinedUser} from "../../db/user.js" */
 
+import getMe from "../../api/client-get/me.js";
+import { Pages, Page, ExistingState } from "../page/pages.js";
+import { SYSTEM_LOCAL_TAG_SERVICE } from "./tags.js";
+
 export const PERMISSIONS = Object.freeze({
     NONE: "NONE",
     USER_MANAGEMENT: "USER_MANAGEMENT",
@@ -45,13 +49,16 @@ export const METHOD_TO_PERMISSION_BIT = Object.freeze({
 /** @typedef {"GET" | "POST" | "PUT" | "DELETE"} HTTPMethod */
 
 export class User {
+    /** @type {ExistingState<{
+        localTagServices: DBJoinedUser['Local_Tag_Services']
+        localMetricServices: DBJoinedUser['Local_Metric_Services']
+    }>} */
+    #existingState = new ExistingState();
     #id;
     #name;
     #isAdmin = false;
     #createdDate;
     #localTaggableServices;
-    #localTagServices;
-    #localMetricServices;
     #localURLGeneratorServices;
 
     #pages;
@@ -84,14 +91,12 @@ export class User {
         this.#name = json.User_Name ?? "";
         this.#createdDate = json.User_Created_Date ?? 0;
         this.#isAdmin = json.Is_Administrator ?? false;
-
-        this.#localTagServices = json.Local_Tag_Services ?? [];
+        this.#existingState.update("localTagServices", json.Local_Tag_Services ?? []);
         this.#localTaggableServices = json.Local_Taggable_Services ?? [];
-        this.#localMetricServices = json.Local_Metric_Services ?? [];
+        this.#existingState.update("localMetricServices", json.Local_Metric_Services ?? []);
         this.#localURLGeneratorServices = json.Local_URL_Generator_Services ?? [];
 
-        this.#pages = json.JSON_Pages ?? [];
-
+        this.#pages = json.JSON_Pages;
         this.#userManagementPermission = json.User_Management_Permission ?? 0;
         this.#localFileServicesPermission = json.Local_Taggable_Services_Permission ?? 0;
         this.#globalFileServicesPermission = json.Global_Taggable_Services_Permission ?? 0;
@@ -109,6 +114,29 @@ export class User {
         this.#globalParserServicesPermission = json.Global_Parser_Services_Permission ?? 0;
         this.#settingsPermission = json.Settings_Permission ?? 0;
         this.#advancedSettingsPermission = json.Advanced_Settings_Permission ?? 0;
+    }
+
+    static EmptyUser() {
+        return new User({});
+    }
+    static #Gl_User = User.EmptyUser();
+
+    static Global() {
+        return this.#Gl_User;
+    }
+
+    /**
+     * @param {User} newUser 
+     */
+    static makeGlobal(newUser) {
+        const oldGlobal = User.#Gl_User;
+        User.#Gl_User = newUser;
+        User.#Gl_User.#existingState.consumeCallbacks(oldGlobal.#existingState);
+    }
+
+    static async refreshGlobal() {
+        const user = await getMe();
+        User.makeGlobal(user);
     }
 
     id() {
@@ -134,15 +162,44 @@ export class User {
         this.#sudo = value;
     }
 
+    /**
+     * @param {() => void} callback 
+     * @param {(() => void) | null} cleanupFunction
+     */
+    addOnLocalTagServicesUpdatedCallback(callback, cleanupFunction) {
+        return this.#existingState.addOnUpdateCallbackForKey("localTagServices", callback, cleanupFunction);
+    }
+
     localTagServices() {
-        return this.#localTagServices;
+        return this.#existingState.get("localTagServices");
+    }
+
+    localTagServicesRef() {
+        return this.#existingState.getConstRef("localTagServices");
     }
 
     /**
-     * @param {ReturnType<typeof this.localTagServices>} localTagServices 
+     * @param {DBJoinedUser['Local_Tag_Services']} localTagServices 
+     */
+    static #transformLocalTagServicesAvailable(localTagServices) {
+        return [SYSTEM_LOCAL_TAG_SERVICE].concat(
+            localTagServices.filter(localTagService => (localTagService.Permission_Extent & PERMISSION_BITS.READ) === PERMISSION_BITS.READ)
+        );
+    }
+
+    localTagServicesAvailable() {
+        return User.#transformLocalTagServicesAvailable(this.localTagServices());
+    }
+
+    localTagServicesAvailableRef() {
+        return this.#existingState.getTransformRef("localTagServices", User.#transformLocalTagServicesAvailable);
+    }
+
+    /**
+     * @param {DBJoinedUser['Local_Tag_Services']} localTagServices 
      */
     setLocalTagServices(localTagServices) {
-        this.#localTagServices = localTagServices;
+        this.#existingState.update("localTagServices", localTagServices);
     }
 
     localTaggableServices() {
@@ -157,14 +214,18 @@ export class User {
     }
 
     localMetricServices() {
-        return this.#localMetricServices;
+        return this.#existingState.get("localMetricServices");
+    }
+
+    localMetricServicesRef() {
+        return this.#existingState.getConstRef("localMetricServices");
     }
 
     /**
      * @param {ReturnType<typeof this.localMetricServices>} localMetricServices 
      */
     setLocalMetricServices(localMetricServices) {
-        this.#localMetricServices = localMetricServices;
+        this.#existingState.update("localMetricServices", localMetricServices);
     }
 
     localURLGeneratorServices() {
@@ -272,9 +333,9 @@ export class User {
             User_Created_Date: this.#createdDate,
             Is_Administrator: this.#isAdmin,
 
-            Local_Tag_Services: this.#localTagServices,
+            Local_Tag_Services: this.#existingState.get("localTagServices"),
             Local_Taggable_Services: this.#localTaggableServices,
-            Local_Metric_Services: this.#localMetricServices,
+            Local_Metric_Services: this.#existingState.get("localMetricServices"),
             Local_URL_Generator_Services: this.#localURLGeneratorServices,
 
             JSON_Pages: this.#pages,
@@ -297,6 +358,4 @@ export class User {
             Advanced_Settings_Permission: this.#advancedSettingsPermission,
         };
     }
-
-    static EMPTY_USER = new User({});
 }

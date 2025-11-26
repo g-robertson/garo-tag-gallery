@@ -208,12 +208,12 @@ async function main() {
     if (req.body.remainingPartialPiecesFinished === "on") {
       const partialUploadFolder = req.body.partialUploadSelection;
       if (partialUploadFolder === undefined) {
-          return res.redirect("/400");
+          return res.status(400).send("Partial upload folder was not provided for a partial file upload");
       }
 
       const partialUploadRootedPath = rootedPath(PARTIAL_ZIPS_FOLDER, path.join(PARTIAL_ZIPS_FOLDER, partialUploadFolder));
       if (!partialUploadRootedPath.isRooted) {
-          return res.redirect("/400");
+          return res.status(400).send("Partial upload folder was not rooted in partial zips folder");
       }
 
       const partialUploadPath = partialUploadRootedPath.safePath;
@@ -222,12 +222,12 @@ async function main() {
       try {
         filePaths = await readdir(partialUploadPath);
       } catch (e) {
-        return res.redirect("/400");
+        return res.status(400).send(`No directory found with partialUploadPath '${partialUploadPath}' provided`);
       }
       req.partialFilePaths = filePaths.map(partialUploadFileName => {
         const partialUploadFilePath = rootedPath(PARTIAL_ZIPS_FOLDER, path.join(partialUploadPath, partialUploadFileName));
         if (!partialUploadFilePath.isRooted) {
-            return res.redirect("/400");
+            return res.status(400).send("Partial upload file path was not rooted in partial zips folder");
         }
 
         return partialUploadFilePath.safePath;
@@ -259,7 +259,7 @@ async function main() {
           (methodPath.startsWith("/put/") && req.method !== "PUT") ||
           (methodPath.startsWith("/delete/") && req.method !== "DELETE")
       ) {
-        return res.redirect("/400");
+        return res.status(400).send("Invalid method path was provided");
       }
 
       let canPerformAction = false;
@@ -311,9 +311,8 @@ async function main() {
 
   app.use(serveStatic("dist", {index: ["index.htm", "index.html"], extensions: ['html', 'htm']}));
 
-  const port = 3000;
-  app.listen(port, () => {
-    console.log(`Example app listening on port ${port}`);
+  app.listen(process.env.PORT, () => {
+    console.log(`Example app listening on port ${process.env.PORT}`);
   });
 }
 

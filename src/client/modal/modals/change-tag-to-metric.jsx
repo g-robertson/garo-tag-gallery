@@ -3,45 +3,70 @@ import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
-import { useState } from 'react';
+import { User } from '../../js/user.js';
+import { ExistingState } from '../../page/pages.js';
+import { ReferenceableReact } from '../../js/client-util.js';
 
+/** @import {ExtraProperties} from "../modals.js" */
+/** @import {ExistingStateRef} from "../../page/pages.js" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
-/** @import {Setters, States} from "../../App.jsx" */
 
 /** 
  * @param {{
- *  states: States
- *  setters: Setters
+ *  extraProperties: ExtraProperties<any>
+ *  modalResolve: (value: any) => void
  * }}
 */
-const ChangeTagToMetricModal = ({states, setters}) => {
-    /** @type {[null | ClientQueryTag, (tag: null | ClientQueryTag) => void]} */
-    const [tag, setTag] = useState(null);
-    const tags = tag === null ? [] : [tag];
-    const [successMessage, setSuccessMessage] = useState("");
+export default function ChangeTagToMetricModal({ extraProperties, modalResolve }) {
+    const SuccessMessage = ReferenceableReact();
+    const MetricValue = ReferenceableReact();
+    const LocalTagID = ReferenceableReact();
 
-    return (
-        <div style={{width: "100%", flexDirection: "column"}}>
+    const localTagServicesConstRef = User.Global().localTagServicesRef();
+    const selectedLocalTagServiceIDsRef = ExistingState.stateRef(new Set(localTagServicesConstRef.get().map(localTagService => localTagService.Local_Tag_Service_ID)));
+    /** @type {ExistingStateRef<ClientQueryTag>} */
+    const tagRef = ExistingState.stateRef(null);
+
+    const onAdd = () => {
+        const onTagSelected = () => {
+            const tag = tagRef.get();
+            console.log(tag);
+            throw "Bugged implementation, expecting LocalTagID but only have tagByLookup accessible";
+            if (tag !== null) {
+                LocalTagID.dom.value = tag;
+            }
+        }
+
+        let cleanup = () => {};
+        cleanup = tagRef.addOnUpdateCallback(onTagSelected, cleanup);
+        return cleanup;
+    }
+
+    return {
+        component: <div style={{width: "100%", flexDirection: "column"}} onAdd={onAdd}>
             <div style={{flex: "4 1 100%", margin: 8}}>
                 <LocalTagsSelector
-                    states={states}
-                    setters={setters}
-                    localTagServices={states.user.localTagServices()}
+                    localTagServicesConstRef={localTagServicesConstRef}
+                    selectedLocalTagServiceIDsRef={selectedLocalTagServiceIDsRef}
                     multiSelect={false}
                     excludeable={false}
                     onTagsSelected={(tags) => {
-                        setTag(tags[0]);
+                        tagRef.update(tags[0]);
                     }}
                 />
             </div>
             <div style={{marginLeft: 8}}>
-                Select a tag from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjects={tags} elementsSelectable={false} scrollbarWidth={0} /></div>
+                Select a tag from above:
+                <div style={{height: 20, flexGrow: 100}}>
+                    <LazyTextObjectSelector textObjectsConstRef={tagRef.getTransformRef(tag => (tag !== null ? [tag] : []))} elementsSelectable={false} scrollbarWidth={0} />
+                </div>
             </div>
             <form style={{flex: 5}} action="/api/post/change-tag-to-metric" target="frame" method="POST">
-                <LocalMetricSelector states={states} />
-                <input name="localTagID" style={{display: "none"}} value={tag !== null ? tag.localTagID : ""} />
+                <LocalMetricSelector />
+                {LocalTagID.react(<input name="localTagID" style={{display: "none"}} />)}
                 <div style={{marginLeft: "8px"}}>
-                    Select what metric value you wish for this tag to be applied as: <input id="metricValue" name="metricValue" type="text" />
+                    Select what metric value you wish for this tag to be applied as:
+                    {MetricValue.react(<input name="metricValue" type="text" />)}
                 </div>
                 <div style={{marginLeft: "8px"}}>
                     Remove existing tag?: <input name="removeExistingTag" type="checkbox" />
@@ -50,20 +75,11 @@ const ChangeTagToMetricModal = ({states, setters}) => {
                     <input type="submit" value="Submit" />
                 </div>
                 <OnFormSubmit onFormSubmit={() => {
-                    setSuccessMessage(`Successfully set tag ${tag.displayName} to metric value ${document.getElementById("metricValue").value}`);
+                    SuccessMessage.dom.textContent = `Successfully set tag ${tag.displayName} to metric value ${MetricValue.dom.value}`;
                 }}/>
-                <div style={{color: "green"}}>
-                    {successMessage}
-                </div>
+                {SuccessMessage.react(<div style={{color: "green"}}></div>)}
             </form>
-        </div>
-    );
+        </div>,
+        displayName: "Change Tag to Metric"
+    };
 };
-
-export default ChangeTagToMetricModal;
-
-export const MODAL_PROPERTIES = {
-    modalName: "change-tag-to-metric",
-    displayName: "Change Tag to Metric"
-};
-export const CHANGE_TAG_TO_METRIC_MODAL_PROPERTIES = MODAL_PROPERTIES;

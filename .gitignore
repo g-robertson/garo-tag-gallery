@@ -1,7 +1,6 @@
 node_modules
 .vscode
 dist
-database
-test-database
+databases
 archive-commands
 test-dup

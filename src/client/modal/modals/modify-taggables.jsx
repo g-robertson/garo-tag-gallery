@@ -1,13 +1,13 @@
 import '../../global.css';
-import { User } from '../js/user.js';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import { useState } from 'react';
-import { DIALOG_BOX_MODAL_PROPERTIES } from './dialog-box.jsx';
-import { FetchCache, mapNullCoalesce, mapUnion, setIntersect } from '../../js/client-util.js';
+import DialogBox from './dialog-box.jsx';
+import { mapNullCoalesce, mapUnion, setIntersect } from '../../js/client-util.js';
 import { updateTaggables } from '../../../api/client-get/update-taggables.js';
+import { Modals } from '../modals.js';
 
-/** @import {ModalOptions} from "../modal.jsx" */
-/** @import {Setters, States} from "../../App.jsx" */
+/** @import {ExistingStateConstRef} from "../../page/pages.js" */
+/** @import {ExtraProperties} from "../modals.js" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 const UNKNOWN_OP_TAGS = -1;
@@ -16,15 +16,15 @@ const REMOVE_TAGS = 1;
 
 /** 
  * @param {{
- *  states: States
- *  setters: Setters
- *  modalOptions: ModalOptions<{
- *      taggableIDs: number[]
+ *  extraProperties: ExtraProperties<{
+ *      taggableCursorConstRef: ExistingStateConstRef<string>
+ *      taggableIDsConstRef: ExistingStateConstRef<number[]>
  *  }>
+ *  modalResolve: (value: any) => void
  * }}
 */
-export const ModifyTaggablesModal = ({states, setters, modalOptions}) => {
-    const taggableIDs = modalOptions.extraProperties.taggableIDs;
+export default function ModifyTaggablesModal({ extraProperties, modalResolve }) {
+    const taggableIDsConstRef = extraProperties.taggableIDsConstRef;
     /** @type {[Map<number, Set<string>>, (tagsToRemove: Map<number, Set<string>>) => void]} */
     const [tagsToRemove, setTagsToRemove] = useState(new Map());
     /** @type {[Map<number, Map<string, ClientQueryTag>>, (tagsToAdd: Map<number, Map<string, ClientQueryTag>>) => void]} */
@@ -35,101 +35,93 @@ export const ModifyTaggablesModal = ({states, setters, modalOptions}) => {
     const tagsToRemoveForLocalTagServiceIDs = setIntersect(localTagServiceIDs.map(localTagServiceID => tagsToRemove.get(localTagServiceID) ?? new Set()));
     const tagsToAddForLocalTagServiceIDs = mapUnion(localTagServiceIDs.map(localTagServiceID => tagsToAdd.get(localTagServiceID) ?? new Map()));
 
-    return (
-        <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
-            <div style={{width: "100%", height: "100%"}}>
-                <div style={{flex: 1}}></div>
-                <div style={{flex: 1}}>
-                    <LocalTagsSelector
-                        states={states}
-                        setters={setters}
-                        localTagServices={states.user.localTagServices()}
-                        taggableIDs={taggableIDs}
-                        tagsToRemove={tagsToRemoveForLocalTagServiceIDs}
-                        tagsToAdd={tagsToAddForLocalTagServiceIDs}
-                        excludeable={false}
-                        tagSelectionTitle="Add/remove tags"
-                        onTagsSelected={async (tags, isExcludeOn) => {
-                            let definitelyAdd = true;
-                            let definitelyRemove = true;
-                            for (const tag of tags) {
-                                if (tag.tagCount !== Infinity) {
-                                    definitelyAdd = false;
-                                }
-                                if (tag.tagCount !== taggableIDs.length && !isExcludeOn) {
-                                    definitelyRemove = false;
-                                }
-                            }
-
-                            let operationToPerform = UNKNOWN_OP_TAGS;
-                            if (definitelyAdd) {
-                                operationToPerform = ADD_TAGS;
-                            } else if (definitelyRemove) {
-                                operationToPerform = REMOVE_TAGS;
-                            } else {
-                                const addOrRemove = await setters.pushModal(DIALOG_BOX_MODAL_PROPERTIES.modalName, {
-                                    displayName: "Add or remove tags",
-                                    promptText: "This set of taggables already has some of the tag(s) you selected, do you wish to add or remove these tags?",
-                                    optionButtons: [{
-                                        text: "Add tags",
-                                        value: ADD_TAGS
-                                    }, {
-                                        text: "Remove tags",
-                                        value: REMOVE_TAGS
-                                    }]
-                                });
-                                if (addOrRemove === undefined) {
-                                    return;
-                                }
-
-                                operationToPerform = addOrRemove;
-                            }
-                            
-                            for (const localTagServiceID of localTagServiceIDs) {
-                                const setToAdd = mapNullCoalesce(tagsToAdd, localTagServiceID, new Map());
-                                const setToRemove = mapNullCoalesce(tagsToRemove, localTagServiceID, new Set());
+    return {
+        component: (
+            <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
+                <div style={{width: "100%", height: "100%"}}>
+                    <div style={{flex: 1}}></div>
+                    <div style={{flex: 1}}>
+                        <LocalTagsSelector
+                            taggableCursorConstRef={extraProperties.taggableCursorConstRef}
+                            taggableIDsConstRef={taggableIDsConstRef}
+                            tagsToRemove={tagsToRemoveForLocalTagServiceIDs}
+                            tagsToAdd={tagsToAddForLocalTagServiceIDs}
+                            excludeable={false}
+                            tagSelectionTitle="Add/remove tags"
+                            onTagsSelected={async (tags, isExcludeOn) => {
+                                let definitelyAdd = true;
+                                let definitelyRemove = true;
                                 for (const tag of tags) {
-                                    if (operationToPerform === ADD_TAGS) {
-                                        setToAdd.set(tag.tagName, {
-                                            ...tag,
-                                            tagCount: taggableIDs.length
-                                        });
-                                        setToRemove.delete(tag.tagName);
-                                    } else if (operationToPerform === REMOVE_TAGS) {
-                                        setToAdd.delete(tag.tagName);
-                                        setToRemove.add(tag.tagName);
+                                    if (tag.tagCount !== Infinity) {
+                                        definitelyAdd = false;
+                                    }
+                                    if (tag.tagCount !== taggableIDsRef.get().length && !isExcludeOn) {
+                                        definitelyRemove = false;
                                     }
                                 }
-                            }
 
-                            setTagsToAdd(new Map(tagsToAdd));
-                            setTagsToRemove(new Map(tagsToRemove));
-                        }}
-                        onLocalTagServiceIDsChanged={(localTagServiceIDs) => {
-                            setLocalTagServiceIDs(localTagServiceIDs);
-                        }}
-                    />
+                                let operationToPerform = UNKNOWN_OP_TAGS;
+                                if (definitelyAdd) {
+                                    operationToPerform = ADD_TAGS;
+                                } else if (definitelyRemove) {
+                                    operationToPerform = REMOVE_TAGS;
+                                } else {
+                                    const addOrRemove = await Modals.Global().pushModal(DialogBox, {
+                                        displayName: "Add or remove tags",
+                                        promptText: "This set of taggables already has some of the tag(s) you selected, do you wish to add or remove these tags?",
+                                        optionButtons: [{
+                                            text: "Add tags",
+                                            value: ADD_TAGS
+                                        }, {
+                                            text: "Remove tags",
+                                            value: REMOVE_TAGS
+                                        }]
+                                    });
+                                    if (addOrRemove === undefined) {
+                                        return;
+                                    }
+
+                                    operationToPerform = addOrRemove;
+                                }
+
+                                for (const localTagServiceID of localTagServiceIDs) {
+                                    const setToAdd = mapNullCoalesce(tagsToAdd, localTagServiceID, new Map());
+                                    const setToRemove = mapNullCoalesce(tagsToRemove, localTagServiceID, new Set());
+                                    for (const tag of tags) {
+                                        if (operationToPerform === ADD_TAGS) {
+                                            setToAdd.set(tag.tagName, {
+                                                ...tag,
+                                                tagCount: taggableIDsRef.get().length
+                                            });
+                                            setToRemove.delete(tag.tagName);
+                                        } else if (operationToPerform === REMOVE_TAGS) {
+                                            setToAdd.delete(tag.tagName);
+                                            setToRemove.add(tag.tagName);
+                                        }
+                                    }
+                                }
+
+                                setTagsToAdd(new Map(tagsToAdd));
+                                setTagsToRemove(new Map(tagsToRemove));
+                            }}
+                            onLocalTagServiceIDsChanged={(localTagServiceIDs) => {
+                                setLocalTagServiceIDs(localTagServiceIDs);
+                            }}
+                        />
+                    </div>
+                </div>
+                <div>
+                    <input type="button" value="Save changes" onClick={async () => {
+                        await updateTaggables(
+                            taggableIDsConstRef.get(),
+                            [...tagsToAdd].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags.values()]]),
+                            [...tagsToRemove].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags]])
+                        );
+                        Modals.Global().popModal();
+                    }}/>
                 </div>
             </div>
-            <div>
-                <input type="button" value="Save changes" onClick={async () => {
-                    await updateTaggables(
-                        taggableIDs,
-                        [...tagsToAdd].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags.values()]]),
-                        [...tagsToRemove].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags]]),
-                        states.fetchCache
-                    );
-                    setters.popModal();
-                }}/>
-            </div>
-        </div>
-    );
+        ),
+        displayName: "Modify Taggables"
+    };
 };
-
-export default ModifyTaggablesModal;
-
-export const MODAL_PROPERTIES = {
-    modalName: "modify-taggables-modal",
-    displayName: "Modify Taggables"
-};
-export const MODIFY_TAGGABLES_MODAL_PROPERTIES = MODAL_PROPERTIES;

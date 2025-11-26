@@ -1,55 +1,54 @@
-import { useEffect, useState } from 'react';
 import '../global.css';
 import LocalMetricServiceSelector from './local-metric-service-selector.jsx';
+import { User } from '../js/user.js';
+import { ExistingState } from '../page/pages.js';
+import { ReferenceableReact } from '../js/client-util.js';
 
 /** @import {DBLocalMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js" */
-/** @import {Setters, States} from "../App.jsx" */
+/** @import {ExistingStateRef} from "../page/pages.js" */
 
 /**
  * @param {{
- *  states: States
- *  onLocalMetricSelected: (localMetric: DBLocalMetric) => void
- *  onLocalMetricServiceSelected: (localMetricService: DBPermissionedLocalMetricService) => void
- *  defaultLocalMetricService?: DBPermissionedLocalMetricService
- *  defaultLocalMetric?: DBLocalMetric
+ *  selectedLocalMetricRef?: ExistingStateRef<DBLocalMetric>
+ *  selectedLocalMetricServiceRef?: ExistingStateRef<DBPermissionedLocalMetricService>
  * }} param0
  * @returns
  */
-const LocalMetricSelector = ({states, onLocalMetricSelected, onLocalMetricServiceSelected, defaultLocalMetricService, defaultLocalMetric}) => {
-    onLocalMetricServiceSelected ??= () => {};
-    onLocalMetricSelected ??= () => {};
-    defaultLocalMetricService ??= user.localMetricServices()[0];
-    const [localMetricService, setLocalMetricService] = useState(defaultLocalMetricService);
-    defaultLocalMetric ??= localMetricService?.Local_Metrics?.[0];
+const LocalMetricSelector = ({selectedLocalMetricRef, selectedLocalMetricServiceRef}) => {
+    const LocalMetricSelect = ReferenceableReact();
 
-    useEffect(() => {
-        onLocalMetricSelected(defaultLocalMetric);
-    }, [])
-    useEffect(() => {
-        onLocalMetricServiceSelected(localMetricService);
-    }, [localMetricService]);
+    selectedLocalMetricServiceRef ??= ExistingState.stateRef(User.Global().localMetricServices()[0]);
+    selectedLocalMetricRef ??= ExistingState.stateRef(selectedLocalMetricServiceRef.get()?.Local_Metrics?.[0]);
+
+    const onAdd = () => {
+        const onLocalMetricServiceChanged = () => {
+            const localMetricService = selectedLocalMetricServiceRef.get();
+            LocalMetricSelect.dom.replaceChildren(...(localMetricService?.Local_Metrics ?? []).map(localMetric => (
+                <option dom value={localMetric.Local_Metric_ID}>{localMetric.Local_Metric_Name}</option>
+            )));
+            
+            const localMetricIDSelected = Number(LocalMetricSelect.dom.selectedOptions[0]?.value);
+            if (localMetricService !== undefined) {
+                selectedLocalMetricRef.update(localMetricService.Local_Metrics.find(localMetric => localMetric.Local_Metric_ID === localMetricIDSelected));
+            }
+        };
+        onLocalMetricServiceChanged();
+
+        let cleanup = () => {};
+        cleanup = selectedLocalMetricServiceRef.addOnUpdateCallback(onLocalMetricServiceChanged, cleanup);
+        return cleanup;
+    };
 
     return (
         <>
-            <LocalMetricServiceSelector states={states} defaultLocalMetricService={defaultLocalMetricService} onMetricServiceSelected={(localMetricService) => {
-                setLocalMetricService(localMetricService);
-            }}/>
-            <div style={{marginLeft: "8px"}}>
+            <LocalMetricServiceSelector selectedLocalMetricServiceRef={selectedLocalMetricServiceRef} />
+            <div style={{marginLeft: "8px"}} onAdd={onAdd}>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Select which local metric you wish to use: </span>
-                    {user.localMetricServices().length === 0
-                    ? <select style={{display: "inline-block"}} name="localMetricID"></select>
-                    : <select defaultValue={defaultLocalMetric?.Local_Metric_ID} style={{display: "inline-block"}} name="localMetricID" onChange={(e) => {
-                          const localMetricIDSelected = Number(e.currentTarget.selectedOptions[0].value);
-                          onLocalMetricSelected(
-                              localMetricService.Local_Metrics.filter(localMetricService => localMetricService.Local_Metric_ID === localMetricIDSelected)[0]
-                          );
-                      }}>
-                          {localMetricService.Local_Metrics.map(localMetric => (
-                              <option value={localMetric.Local_Metric_ID}>{localMetric.Local_Metric_Name}</option>
-                          ))}
-                      </select>
-                    }
+                    {LocalMetricSelect.react(<select name="localMetricID" style={{display: "inline-block"}} onChange={(e) => {
+                        const localMetricIDSelected = Number(e.currentTarget.selectedOptions[0].value);
+                        selectedLocalMetricRef.update(selectedLocalMetricServiceRef.get().Local_Metrics.find(localMetric => localMetric.Local_Metric_ID === localMetricIDSelected));
+                    }} ></select>)}
                 </div>
             </div>
         </>
