@@ -14,15 +14,8 @@ const FINISH_HYDRUS_JOB_TIMEOUT = 5000;
 export const POPULATE_DATA_TESTS = [
     {name: "HydrusImport", tests: async (driver) => {
         await navigateToHydrusImport(driver);
-
-        const hydrusImportPaths = [
-            path.resolve("./e2etest/data/hydrus-import.zip.001"),
-            path.resolve("./e2etest/data/hydrus-import.zip.002"),
-            path.resolve("./e2etest/data/hydrus-import.zip.003")
-        ]
-
         const fileSelect = await driver.findElement(By.name("partialFiles"));
-        await fileSelect.sendKeys(hydrusImportPaths.join('\n'));
+        await fileSelect.sendKeys(path.resolve("./e2etest/data/hydrus-import.zip"));
         const submitButton = await driver.findElement(xpathHelper({type: "input", hasValue: "Submit"}));
         await submitButton.click();
         await driver.wait(UNTIL_JOB_BEGIN, CREATE_HYDRUS_JOB_TIMEOUT);
