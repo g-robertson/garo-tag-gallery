@@ -1,0 +1,16 @@
+Tags:
+Scroll tags
+Shift click correctly selects multiple tags
+ctrl click correctly adds tags
+ctrl double click should add tag then add tags, not add tag then remove tag then add tags
+removing item from lazyselector should update scroll to include only content that can be scrolled to
+OR button should work
+
+
+
+File srach page:
+modify taggables should work
+trash selected taggables should work
+
+
+tags/taggables/metrics/parsers tabs should work

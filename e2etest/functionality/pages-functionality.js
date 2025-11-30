@@ -16,17 +16,22 @@ export async function createNewFileSearchPage(driver) {
  * @param {ThenableWebDriver} driver
  * @param {string} tag
  * @param {{
+ *   instance?: number
  *   waitForRefresh?: boolean
  * }=} options
  */
 export async function fileSearchSelectTag(driver, tag, options) {
     options ??= {};
     options.waitForRefresh ??= true;
+    options.instance ??= 1;
     // select tag
-    const tagSelector = await driver.findElement(xpathHelper({containsClass: "local-tags-selector", descendent: {
-        hasTitle: tag, containsClass: "lazy-selector-selectable-item"
-    }}));
-    await doubleClick(driver, tagSelector);
+    const tagSelectors = await driver.findElements(xpathHelper({containsClass: "local-tags-selector"}));
+    const tagSelector = tagSelectors[options.instance - 1];
+    if (tagSelector === undefined) {
+        throw `Could not find a tag selector instance #${options.instance}`;
+    }
+    const tagElement = tagSelector.findElement(xpathHelper({hasTitle: tag, containsClass: "lazy-selector-selectable-item"}));
+    await doubleClick(driver, tagElement);
     
     if (options.waitForRefresh) {
         await driver.sleep(DEFAULT_SLEEP_TIME);
@@ -100,6 +105,22 @@ export async function fileSearchMetricTag(driver, localMetricServiceName, metric
     await searchButton.click();
 
     await driver.sleep(DEFAULT_SLEEP_TIME);
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function clickModifyTaggablesButton(driver) {
+    const modifyTaggablesButton = await driver.findElement(xpathHelper({type: "input", hasValue: "Modify selected taggables"}));
+    await modifyTaggablesButton.click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function saveModifyTaggablesChanges(driver) {
+    const saveChangesButton = await driver.findElement(xpathHelper({type: "input", hasValue: "Save changes"}));
+    await saveChangesButton.click();
 }
 
 /**

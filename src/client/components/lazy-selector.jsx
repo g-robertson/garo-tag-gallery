@@ -293,8 +293,8 @@ function LazySelector({
         }
         
         cleanup = selectedIndicesRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup);
-        cleanup = widthAvailableRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup, {requireChangeForUpdate: true});
-        cleanup = heightAvailableRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup, {requireChangeForUpdate: true});
+        cleanup = columnCountAvailableRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup, {requireChangeForUpdate: true});
+        cleanup = rowCountAvailableRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup, {requireChangeForUpdate: true});
         cleanup = shownStartIndexRef.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, cleanup, {requireChangeForUpdate: true});
 
         const onValuesChange = () => {
@@ -368,10 +368,9 @@ function LazySelector({
         cleanup = lastClickedIndexRef.addOnUpdateCallback(onLastClickedIndexChanged, cleanup);
 
         const onActiveRealizedValuesChanged = (db) => {
-            console.log("on active realized values changed", valuesConstRef.get(), db);
             const realizedValues = realizedValuesRef.get();
             const rowItemElements = new Map();
-
+            console.log("active realized values changed");
             /** @type {JSX.Element[]} */
             const rows = [];
             for (let i = 0; i < rowCountAvailableRef.get(); ++i) {
@@ -495,9 +494,10 @@ function LazySelector({
                 {rows}
             </dom>));
         };
-        cleanup = realizedValuesRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged("rv"), cleanup);
-        cleanup = columnCountAvailableRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged("cc"), cleanup, {requireChangeForUpdate: true});
-        cleanup = shownStartIndexRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged("ssi"), cleanup, {requireChangeForUpdate: true});
+        cleanup = realizedValuesRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged(), cleanup);
+        cleanup = rowCountAvailableRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged(), cleanup, {requireChangeForUpdate: true});
+        cleanup = columnCountAvailableRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged(), cleanup, {requireChangeForUpdate: true});
+        cleanup = shownStartIndexRef.addOnUpdateCallback(() => onActiveRealizedValuesChanged(), cleanup, {requireChangeForUpdate: true});
 
         const onRootElementWidthChanged = () => {
             RootElement.dom.style.width = `${rootElementWidthRef.get()}px`;

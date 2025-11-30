@@ -70,6 +70,7 @@ export default async function get(dbs, req, res) {
         tag.Lookup_Name,
         tag.Client_Display_Name,
         tag.Namespaces,
-        tag.Tag_Count
+        tag.Tag_Count,
+        tag.tags.map(tag => tag.Local_Tag_Service_ID)
     ])));
 }

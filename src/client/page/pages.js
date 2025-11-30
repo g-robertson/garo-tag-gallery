@@ -14,14 +14,23 @@ import { clamp, mapNullCoalesce, randomID } from "../js/client-util.js";
 /**
  * @template T
  * @typedef {Object} AddOnUpdateCallbackOptions
- * @property {boolean} requireChangeForUpdate
- * @property {<MappedT>(val: T) => MappedT} valueMappingFunction
- * @property {<MappedT>(val: T) => MappedT} prevValueMappingFunction
+ * @property {boolean=} requireChangeForUpdate Value must change between previous onUpdate call to execute onUpdate
+ * @property {symbol=} produces In a set of callbacks with consumers of {symbol}, the producers of {symbol} must run first
+ * @property {Set<symbol>=} consumes In a set of callbacks with consumers of {symbol}, the producers of {symbol} must run first
+ * 
+ */
+/**
+ * @template T
+ * @typedef {(val: T, prevVal: T) => Promise<void>} OnUpdateCallback
  */
 
 /**
  * @template T
- * @typedef {(val: T, prevVal: T) => void} OnUpdateCallback
+ * @typedef {{
+ *     callback: OnUpdateCallback<T>
+ *     produces?: symbol
+ *     consumes: Set<symbol>
+ * }} OnUpdateCallbackInfo
  */
 
 /**
@@ -30,7 +39,7 @@ import { clamp, mapNullCoalesce, randomID } from "../js/client-util.js";
  * @property {<TransformV>(transform: (val: T) => TransformV) => ExistingStateConstRef<TransformV>} getTransformRef
  * @property {(val: T) => void} update
  * @property {() => void} forceUpdate
- * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: (() => void) | null, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
+ * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: () => void, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
  * @property {() => T} get
  */
 
@@ -38,9 +47,17 @@ import { clamp, mapNullCoalesce, randomID } from "../js/client-util.js";
  * @template T
  * @typedef {Object} ExistingStateConstRef
  * @property {<TransformV>(transform: (val: T) => TransformV) => ExistingStateConstRef<TransformV>} getTransformRef
- * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: (() => void) | null, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
+ * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: () => void, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
  * @property {() => T} get
  */
+
+/**
+ * @template T
+ * @typedef {Object} ExistingStateAsyncConstRef
+ * @property {(cleanupFunction: () => void) => Promise<() => void>} initialize
+ * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: () => void, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
+ * @property {() => T} get
+*/
 
 /** @template {any} [T=Record<string, any>] */
 export class ExistingState {
@@ -53,13 +70,8 @@ export class ExistingState {
     /** @type {Set<() => void>} */
     #onUpdateCallbacks = new Set();
     /** @template {keyof T} K */
-    /** @type {Map<K, Set<OnUpdateCallback<T[K]>>} */
+    /** @type {Map<K, Set<OnUpdateCallbackInfo<T[K]>} */
     #onUpdateCallbacksForKeys = new Map();
-    /** @type {Map<string, string[]>} */
-    #updateGroups = new Map();
-    /** @template {keyof T} K */
-    /** @type {Map<string, Set<{key: K, callback: OnUpdateCallback<T[K]>}>>} */
-    #onUpdateGroupCallbacksForKeys = new Map();
     // Updates to be always equal to whatever [this] is calling the callbacks, useful for when callbacks are consumed by another ExistingState
     #callbackSelf = () => { return this; };
     /**
@@ -95,15 +107,8 @@ export class ExistingState {
             const callbacksForKeys = mapNullCoalesce(this.#onUpdateCallbacksForKeys, key, new Set());
             for (const callback of callbacks) {
                 callbacksForKeys.add(callback);
-                callback(this.get(key));
             }
-        }
-        for (const [updateGroup, callbacks] of existingState.#onUpdateGroupCallbacksForKeys) {
-            const callbacksForUpdateGroup = mapNullCoalesce(this.#onUpdateGroupCallbacksForKeys, updateGroup, new Set());
-            for (const {key, callback} of callbacks) {
-                callbacksForUpdateGroup.add({key, callback});
-                callback(this.get(key));
-            }
+            this.forceUpdate(key);
         }
     }
 
@@ -124,7 +129,7 @@ export class ExistingState {
 
     /**
      * @param {() => void} onUpdateCallback 
-     * @param {(() => void) | null} cleanupFunction
+     * @param {() => void} cleanupFunction
      */
     addOnUpdateCallback(onUpdateCallback, cleanupFunction) {
         if (cleanupFunction === undefined) {
@@ -144,13 +149,28 @@ export class ExistingState {
 
     /**
      * @template {keyof T} K
+     * @param {OnUpdateCallback<T[K]>} onUpdateCallback
+     * @param {() => void} cleanupFunction
+     * @param {AddOnUpdateCallbackOptions<T>} options
+     * @param {T[K]} val
+     * @param {T[K]} prevVal
+     */
+    static async #executeOnUpdateCallback(onUpdateCallback, options, val, prevVal) {
+        options ??= {};
+        const requireChangeForUpdate = options.requireChangeForUpdate ?? false;
+        if (!requireChangeForUpdate) {
+            await onUpdateCallback(val, prevVal);
+        } else if (val !== prevVal) {
+            await onUpdateCallback(val, prevVal);
+        }
+    }
+
+    /**
+     * @template {keyof T} K
      * @param {K} key
      * @param {OnUpdateCallback<T[K]>} onUpdateCallback
-     * @param {(() => void) | null} cleanupFunction
-     * @param {{
-     *   updateGroup: string,
-     *   additionalCallbackOnUpdateGroup: string
-     * } & AddOnUpdateCallbackOptions<T>} options
+     * @param {() => void} cleanupFunction
+     * @param {AddOnUpdateCallbackOptions<T>} options
      */
     addOnUpdateCallbackForKey(key, onUpdateCallback, cleanupFunction, options) {
         if (cleanupFunction === undefined) {
@@ -158,48 +178,21 @@ export class ExistingState {
         }
         cleanupFunction ??= () => {};
         options ??= {};
-
-        const valueMappingFunction = options.valueMappingFunction ?? ((val) => val);
-        const prevValueMappingFunction = options.prevValueMappingFunction ?? valueMappingFunction;
-        const requireChangeForUpdate = options.requireChangeForUpdate ?? false;
+        options.consumes ??= new Set();
 
         const originalOnUpdateCallback = onUpdateCallback;
-        onUpdateCallback = (val, prevVal) => {
-            // Grab prevValue first in case valueMappingFunction mutates prevValue
-            const prevValMap = prevValueMappingFunction(prevVal);
-            const valMap = valueMappingFunction(val);
-
-            ++ExistingState.#callbackCount;
-
-            if (!requireChangeForUpdate) {
-                ++ExistingState.#callbacksRan;
-                originalOnUpdateCallback(valMap, prevValMap);
-            } else if (valMap !== prevValMap) {
-                ++ExistingState.#callbacksRan;
-                originalOnUpdateCallback(valMap, prevValMap);
-            }
-        }
-        
-        mapNullCoalesce(this.#onUpdateCallbacksForKeys, key, new Set()).add(onUpdateCallback);
-        if (options.updateGroup !== undefined) {
-            mapNullCoalesce(this.#updateGroups, key, []).push(options.updateGroup);
-        }
-
-        const onUpdateGroupCallback = {
-            key,
-            callback: onUpdateCallback
+        onUpdateCallback = {
+            callback: async (val, prevVal) => { await ExistingState.#executeOnUpdateCallback(originalOnUpdateCallback, options, val, prevVal); },
+            produces: options.produces,
+            consumes: options.consumes
         };
-        if (options.additionalCallbackOnUpdateGroup !== undefined) {
-            mapNullCoalesce(this.#onUpdateGroupCallbacksForKeys, options.additionalCallbackOnUpdateGroup, new Set()).add(onUpdateGroupCallback);
-        }
+
+        mapNullCoalesce(this.#onUpdateCallbacksForKeys, key, new Set()).add(onUpdateCallback);
 
         return () => {
             cleanupFunction();
             this.callbackSelf().#onUpdateCallbacksForKeys.get(key).delete(onUpdateCallback);
-            if (options.additionalCallbackOnUpdateGroup !== undefined) {
-                this.callbackSelf().#onUpdateGroupCallbacksForKeys.get(options.additionalCallbackOnUpdateGroup).delete(onUpdateGroupCallback);
-            }
-        };
+        }
     }
 
     get callbackCount() {
@@ -222,13 +215,22 @@ export class ExistingState {
      * @param {K} key
      * @param {T[K]} prevValue
      */
-    #onUpdateKey(key, prevValue) {
-        for (const onUpdateCallback of this.#onUpdateCallbacksForKeys.get(key) ?? []) {
-            onUpdateCallback(this.#state[key], prevValue);
-        }
-        for (const updateGroup of this.#updateGroups.get(key) ?? []) {
-            for (const onUpdateGroupCallback of this.#onUpdateGroupCallbacksForKeys.get(updateGroup) ?? []) {
-                onUpdateGroupCallback.callback(this.#state[onUpdateGroupCallback.key], this.#state[onUpdateGroupCallback.key]);
+    async #onUpdateKey(key, prevValue) {
+        // Order tree so that consumer always comes after producer
+        const callbackTree = [...(this.#onUpdateCallbacksForKeys.get(key) ?? [])].sort((a, b) => {
+            if (a.consumes.has(b.produces)) {
+                return 1;
+            } else if (b.consumes.has(a.produces)) {
+                return -1;
+            } else {
+                return 0;
+            }
+        })
+        for (const onUpdateCallback of callbackTree) {
+            if (onUpdateCallback.produces) {
+                await onUpdateCallback.callback(this.#state[key], prevValue);
+            } else {
+                onUpdateCallback.callback(this.#state[key], prevValue);
             }
         }
     }
@@ -309,34 +311,28 @@ export class ExistingState {
      */
     getTransformRef(key, transform) {
         const self = this;
+
         return {
             getTransformRef: (transform2) => {
                 return self.callbackSelf().getTransformRef(key, (val) => transform2(transform(val)));
             },
             addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
-                let valueMappingFunction = transform;
-                if (options?.valueMappingFunction) {
-                    valueMappingFunction = (val) => options.valueMappingFunction(transform(val));
-                }
-
-                let prevVal_ = valueMappingFunction(self.callbackSelf().#state[key]);
-                return self.callbackSelf().addOnUpdateCallbackForKey(key, (val, prevValue) => {
-                    onUpdateCallback(val, prevValue);
-                    prevVal_ = val;   
-                }, cleanupFunction, {
-                    valueMappingFunction,
-                    prevValueMappingFunction: () => prevVal_,
-                    ...options
-                });
+                let prevVal = transform(self.callbackSelf().#state[key]);
+                return self.callbackSelf().addOnUpdateCallbackForKey(key, val => {
+                    const transformVal = transform(val);
+                    ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
+                    prevVal = transformVal;
+                }, cleanupFunction);
             },
-            get() {return transform(self.callbackSelf().get(key)); }
+            get() { return transform(self.callbackSelf().#state[key]); }
         }
     }
 
     /**
+     * @template TransformV
      * @param {ExistingStateConstRef<unknown>[]} constRefs 
      * @param {() => TransformV} transform
-     * @return {ExistingStateConstRef<undefined>}
+     * @return {ExistingStateConstRef<TransformV>}
      */
     static tupleTransformRef(constRefs, transform) {
         return {
@@ -344,25 +340,62 @@ export class ExistingState {
                 return ExistingState.tupleTransformRef(constRefs, () => transform2(transform()))
             },
             addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
-                let valueMappingFunction = transform;
-                if (options?.valueMappingFunction) {
-                    valueMappingFunction = () => options.valueMappingFunction(transform());
-                }
-
-                let prevVal_ = valueMappingFunction();
+                let prevVal = transform();
                 for (const constRef of constRefs) {
-                    cleanupFunction = constRef.addOnUpdateCallback((val, prevVal) => {
-                        onUpdateCallback(val, prevVal);
-                        prevVal_ = val;
-                    }, cleanupFunction, {
-                        valueMappingFunction,
-                        prevValueMappingFunction: () => prevVal_,
-                        ...options
-                    });
+                    cleanupFunction = constRef.addOnUpdateCallback(() => {
+                        const transformVal = transform();
+                        ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
+                        prevVal = transformVal;
+                    }, cleanupFunction);
                 }
                 return cleanupFunction;
             },
-            get() {return transform(); }
+            get() { return transform(); }
+        }
+    }
+
+    /** @type {Map<symbol, any>} */
+    static #transformState = new Map();
+
+    /**
+     * @template TransformV
+     * @param {ExistingStateAsyncConstRef<unknown>[]} constRefs 
+     * @param {() => Promise<TransformV>} transform
+     * @return {ExistingStateAsyncConstRef<TransformV>}
+     */
+    static asyncTupleTransformRef(constRefs, transform) {
+        const transformID = Symbol();
+
+        return {
+            initialize: async (cleanupFunction) => {
+                if (cleanupFunction === undefined) {
+                    throw "You must specify a cleanup function or null for adding a callback for an existing state";
+                }
+                ExistingState.#transformState.set(transformID, await transform());
+
+                for (const constRef of constRefs) {
+                    cleanupFunction = constRef.addOnUpdateCallback(async () => {
+                        ExistingState.#transformState.set(transformID, await transform());
+                    }, cleanupFunction, {produces: transformID});
+                }
+
+                return () => {
+                    cleanupFunction();
+                    ExistingState.#transformState.delete(transformID);
+                }
+            },
+            addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
+                let prevVal = ExistingState.#transformState.get(transformID);
+                for (const constRef of constRefs) {
+                    cleanupFunction = constRef.addOnUpdateCallback(async () => {
+                        const transformVal = ExistingState.#transformState.get(transformID);
+                        ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
+                        prevVal = transformVal;
+                    }, cleanupFunction, {consumes: new Set([transformID])})
+                }
+                return cleanupFunction;
+            },
+            get: () => { return ExistingState.#transformState.get(transformID); }
         }
     }
 
@@ -561,7 +594,7 @@ export class Pages {
 
     /**
      * @param {() => void} onUpdateCallback
-     * @param {(() => void) | null} cleanupFunction
+     * @param {() => void} cleanupFunction
      */
     addOnUpdateCallback(onUpdateCallback, cleanupFunction) {
         if (cleanupFunction === undefined) {
@@ -585,7 +618,7 @@ export class Pages {
 
     /**
      * @param {() => void} onCurrentPageChangedCallback
-     * @param {(() => void) | null} cleanupFunction
+     * @param {() => void} cleanupFunction
      */
     addOnCurrentPageChangedCallback(onCurrentPageChangedCallback, cleanupFunction) {
         if (cleanupFunction === undefined) {

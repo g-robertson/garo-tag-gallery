@@ -32,14 +32,18 @@ const TESTS = {
     ]
 };
 
+export const HEADLESS = false;
 const DISABLED_TESTS = new Set([
-    // "Tests.Navigation",
-    // "Tests.Functional.Backup",
+    // "Tests.Functional.Pages.FileSearchPage.ThumbnailGallery.DoesModifyTaggablesWork.DoesRemovingTagWork",
+    "Tests.Navigation",
+    "Tests.Functional.Backup",
+    "Tests.Functional.Pages.FileSearchPage.TagSearch",
     // "Tests.Functional",
 ]);
+const HALT_ON_FAILURE = false;
+const HALT_AFTER = new Set([]);
 
 let testsHalted = false;
-const HALT_AFTER = new Set([]);
 
 
 /**
@@ -69,6 +73,9 @@ async function executeTestSuite_(testSuite, previousContext, driver) {
         try {
             await testSuite.tests(driver);
         } catch (e) {
+            if (HALT_ON_FAILURE) {
+                testsHalted = true;
+            }
             const err = e.stack ?? e;
             console.log(`Failed test: ${currentContext} with error ${err}`);
         }

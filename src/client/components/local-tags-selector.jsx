@@ -1,10 +1,10 @@
 import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
-import { useEffect } from "react";
 import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
 import { User } from "../js/user.js";
 import { Modals } from "../modal/modals.js";
 import {ExistingState} from "../page/pages.js";
+import { mapUnion } from "../js/client-util.js";
 
 /** @import {ExistingStateRef, ExistingStateConstRef} from "../page/pages.js" */
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
@@ -54,8 +54,8 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags) {
  *  selectedLocalTagServiceIDsRef?: ExistingStateRef<Set<number>>
  *  taggableCursorConstRef: ExistingStateConstRef<string>
  *  taggableIDsConstRef?: ExistingStateConstRef<number[]>
- *  tagsToRemove?: Set<string>
- *  tagsToAdd?: Map<string, ClientQueryTag>
+ *  tagsToRemoveConstRef?: ExistingStateConstRef<Map<number, Set<string>>>
+ *  tagsToAddConstRef?: ExistingStateConstRef<Map<number, Map<string, ClientQueryTag>>>
  *  multiSelect?: boolean
  *  excludeable?: boolean
  *  tagSelectionTitle?: string
@@ -69,8 +69,8 @@ const LocalTagsSelector = ({
     selectedLocalTagServiceIDsRef,
     taggableIDsConstRef,
     taggableCursorConstRef,
-    tagsToRemove,
-    tagsToAdd,
+    tagsToRemoveConstRef,
+    tagsToAddConstRef,
     multiSelect,
     excludeable,
     tagSelectionTitle,
@@ -86,28 +86,44 @@ const LocalTagsSelector = ({
     }
     existingState.initAssign("isExcludeOn", false, {isSaved: true});
     existingState.initAssign("tagFilterValue", "");
-    existingState.initAssign("tagsPreFilter", []);
     existingState.initAssign("tags", []);
     taggableCursorConstRef ??= ExistingState.stateRef(undefined);
     taggableIDsConstRef ??= ExistingState.stateRef(undefined);
-    tagsToRemove ??= new Set();
-    tagsToAdd ??= new Map();
+    tagsToRemoveConstRef ??= ExistingState.stateRef(new Map());
+    tagsToAddConstRef ??= ExistingState.stateRef(new Map());
+    const tagsPreFilter = ExistingState.asyncTupleTransformRef([selectedLocalTagServiceIDsRef, taggableCursorConstRef, taggableIDsConstRef], async () => {
+        return await getTagsFromLocalTagServiceIDs([...selectedLocalTagServiceIDsRef.get()], taggableCursorConstRef.get(), taggableIDsConstRef.get());
+    });
     multiSelect ??= true;
     excludeable ??= true;
     tagSelectionTitle ??= "Select tags";
     valueMappingFunction ??= MAP_TO_CLIENT_TAGS;
     onTagsSelected ??= () => {};
 
-    const onAdd = () => {
-        // Updates tags available in tag services
-        const onTagsPreFilterCriteriasChanged = async () => {
-            existingState.update("tagsPreFilter", await getTagsFromLocalTagServiceIDs([...selectedLocalTagServiceIDsRef.get()], taggableCursorConstRef.get(), taggableIDsConstRef.get()));
-        };
-        onTagsPreFilterCriteriasChanged();
+    const onAdd = async () => {
+        let cleanup = () => {};
+        cleanup = await tagsPreFilter.initialize(cleanup);
 
         // Updates tags allowed to be selected when tag criteria changes (tagsPreFilter, tagFilterValue)
         const onTagCriteriaChanged = () => {
-            let tags = existingState.get("tagsPreFilter").filter(tag => !tagsToRemove.has(tag.tagName) && !tagsToAdd.has(tag.tagName) && tag.tagCount !== 0);
+            const tagsToAdd = mapUnion(
+                [...tagsToAddConstRef.get()]
+                .filter(([localTagServiceID,]) => selectedLocalTagServiceIDsRef.get().has(localTagServiceID))
+                .map(([, tags]) => tags)
+            );
+            const tagsToRemove = tagsToRemoveConstRef.get();
+            let tags = tagsPreFilter.get();
+            tags = tags.filter(tag => {
+                if (tagsToAdd.has(tag.tagName) || tag.tagCount === 0) {
+                    return false;
+                }
+                // if every local tag service id on the tag has the tag removed, then it's removed
+                if (tag.localTagServiceIDs.every(localTagServiceID => tagsToRemove.get(localTagServiceID)?.has(tag.tagName))) {
+                    return false;
+                }
+
+                return true;
+            });
             tags.push(...tagsToAdd.values());
             tags = tags.sort((a, b) => b.tagCount - a.tagCount);
 
@@ -143,17 +159,15 @@ const LocalTagsSelector = ({
                 return true;
             });
 
-            console.log("tags criteria changed", existingState.get("tags"), tags);
-
             existingState.update("tags", tags);
         };
         onTagCriteriaChanged();
 
-        let cleanup = () => {};
-        cleanup = selectedLocalTagServiceIDsRef.addOnUpdateCallback(onTagsPreFilterCriteriasChanged, cleanup);
-        cleanup = taggableCursorConstRef.addOnUpdateCallback(onTagsPreFilterCriteriasChanged, cleanup);
-        cleanup = existingState.addOnUpdateCallbackForKey("tagsPreFilter", onTagCriteriaChanged, cleanup);
+
+        cleanup = tagsPreFilter.addOnUpdateCallback(onTagCriteriaChanged, cleanup);
         cleanup = existingState.addOnUpdateCallbackForKey("tagFilterValue", onTagCriteriaChanged, cleanup);
+        cleanup = tagsToAddConstRef.addOnUpdateCallback(onTagCriteriaChanged, cleanup);
+        cleanup = tagsToRemoveConstRef.addOnUpdateCallback(onTagCriteriaChanged, cleanup);
         return cleanup;
     };
 

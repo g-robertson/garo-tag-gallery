@@ -377,6 +377,7 @@ export function setIntersect(sets) {
 /**
  * @template K, V
  * @param {Map<K, V>[]} maps 
+ * @returns {Map<K, V>}
  */
 export function mapUnion(maps) {
     if (maps.length === 0) {

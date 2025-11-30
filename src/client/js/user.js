@@ -164,7 +164,7 @@ export class User {
 
     /**
      * @param {() => void} callback 
-     * @param {(() => void) | null} cleanupFunction
+     * @param {() => void} cleanupFunction
      */
     addOnLocalTagServicesUpdatedCallback(callback, cleanupFunction) {
         return this.#existingState.addOnUpdateCallbackForKey("localTagServices", callback, cleanupFunction);

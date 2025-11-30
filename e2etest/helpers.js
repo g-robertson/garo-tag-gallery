@@ -278,6 +278,20 @@ export async function checkForDownload(filePath, timeout) {
  * @param {Locator} locator
  * @param {number} count
  */
+export function untilCountElementsLocatedNotEquals(locator, count) {
+    /**
+     * @param {ThenableWebDriver} driver 
+     */
+    const untilElementsNotLocatedCallback = async (driver) => {
+        return (await driver.findElements(locator)).length !== count;
+    }
+    return untilElementsNotLocatedCallback;
+}
+
+/**
+ * @param {Locator} locator
+ * @param {number} count
+ */
 export function untilCountElementsLocated(locator, count) {
     /**
      * @param {ThenableWebDriver} driver 

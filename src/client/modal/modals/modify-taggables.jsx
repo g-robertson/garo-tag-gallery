@@ -5,8 +5,10 @@ import DialogBox from './dialog-box.jsx';
 import { mapNullCoalesce, mapUnion, setIntersect } from '../../js/client-util.js';
 import { updateTaggables } from '../../../api/client-get/update-taggables.js';
 import { Modals } from '../modals.js';
+import { ExistingState } from '../../page/pages.js';
+import { User } from '../../js/user.js';
 
-/** @import {ExistingStateConstRef} from "../../page/pages.js" */
+/** @import {ExistingStateConstRef, ExistingStateRef} from "../../page/pages.js" */
 /** @import {ExtraProperties} from "../modals.js" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
@@ -24,16 +26,14 @@ const REMOVE_TAGS = 1;
  * }}
 */
 export default function ModifyTaggablesModal({ extraProperties, modalResolve }) {
+    const localTagServicesConstRef = User.Global().localTagServicesRef();
+    /** @type {ExistingStateRef<Set<number>>} */
+    const selectedLocalTagServiceIDsRef = ExistingState.stateRef(new Set(localTagServicesConstRef.get().map(localTagService => localTagService.Local_Tag_Service_ID)));
     const taggableIDsConstRef = extraProperties.taggableIDsConstRef;
-    /** @type {[Map<number, Set<string>>, (tagsToRemove: Map<number, Set<string>>) => void]} */
-    const [tagsToRemove, setTagsToRemove] = useState(new Map());
-    /** @type {[Map<number, Map<string, ClientQueryTag>>, (tagsToAdd: Map<number, Map<string, ClientQueryTag>>) => void]} */
-    const [tagsToAdd, setTagsToAdd] = useState(new Map());
-    /** @type {[number[], (localTagServiceIDs: number[]) => void]} */
-    const [localTagServiceIDs, setLocalTagServiceIDs] = useState([]);
-
-    const tagsToRemoveForLocalTagServiceIDs = setIntersect(localTagServiceIDs.map(localTagServiceID => tagsToRemove.get(localTagServiceID) ?? new Set()));
-    const tagsToAddForLocalTagServiceIDs = mapUnion(localTagServiceIDs.map(localTagServiceID => tagsToAdd.get(localTagServiceID) ?? new Map()));
+    /** @type {ExistingStateRef<Map<number, Set<string>>>} */
+    const tagsToRemoveRef = ExistingState.stateRef(new Map());
+    /** @type {ExistingState<Map<number, Map<string, ClientQueryTag>>>} */
+    const tagsToAddRef = ExistingState.stateRef(new Map());
 
     return {
         component: (
@@ -42,10 +42,12 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                     <div style={{flex: 1}}></div>
                     <div style={{flex: 1}}>
                         <LocalTagsSelector
+                            localTagServicesConstRef={localTagServicesConstRef}
+                            selectedLocalTagServiceIDsRef={selectedLocalTagServiceIDsRef}
                             taggableCursorConstRef={extraProperties.taggableCursorConstRef}
                             taggableIDsConstRef={taggableIDsConstRef}
-                            tagsToRemove={tagsToRemoveForLocalTagServiceIDs}
-                            tagsToAdd={tagsToAddForLocalTagServiceIDs}
+                            tagsToRemoveConstRef={tagsToRemoveRef}
+                            tagsToAddConstRef={tagsToAddRef}
                             excludeable={false}
                             tagSelectionTitle="Add/remove tags"
                             onTagsSelected={async (tags, isExcludeOn) => {
@@ -55,7 +57,7 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                                     if (tag.tagCount !== Infinity) {
                                         definitelyAdd = false;
                                     }
-                                    if (tag.tagCount !== taggableIDsRef.get().length && !isExcludeOn) {
+                                    if (tag.tagCount !== taggableIDsConstRef.get().length && !isExcludeOn) {
                                         definitelyRemove = false;
                                     }
                                 }
@@ -84,7 +86,9 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                                     operationToPerform = addOrRemove;
                                 }
 
-                                for (const localTagServiceID of localTagServiceIDs) {
+                                const tagsToRemove = tagsToRemoveRef.get();
+                                const tagsToAdd = tagsToAddRef.get();
+                                for (const localTagServiceID of selectedLocalTagServiceIDsRef.get()) {
                                     const setToAdd = mapNullCoalesce(tagsToAdd, localTagServiceID, new Map());
                                     const setToRemove = mapNullCoalesce(tagsToRemove, localTagServiceID, new Set());
                                     for (const tag of tags) {
@@ -101,11 +105,10 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                                     }
                                 }
 
-                                setTagsToAdd(new Map(tagsToAdd));
-                                setTagsToRemove(new Map(tagsToRemove));
-                            }}
-                            onLocalTagServiceIDsChanged={(localTagServiceIDs) => {
-                                setLocalTagServiceIDs(localTagServiceIDs);
+                                console.log("force update");
+
+                                tagsToAddRef.forceUpdate();
+                                tagsToRemoveRef.forceUpdate();
                             }}
                         />
                     </div>
@@ -114,8 +117,8 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                     <input type="button" value="Save changes" onClick={async () => {
                         await updateTaggables(
                             taggableIDsConstRef.get(),
-                            [...tagsToAdd].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags.values()]]),
-                            [...tagsToRemove].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags]])
+                            [...tagsToAddRef.get()].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags.values()]]),
+                            [...tagsToRemoveRef.get()].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags]])
                         );
                         Modals.Global().popModal();
                     }}/>

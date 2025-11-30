@@ -1,9 +1,9 @@
 import { By, until } from "selenium-webdriver";
 import { deleteBackupedFiles, killServer, spawnServer } from "../server.js";
 import { authenticate } from "./authenticate.js";
-import { BY_THUMBNAIL_GALLERY_IMAGE, BySearchQueryTagService, BySearchTag, BySelectableTag, closeModal, closePage, DEFAULT_TIMEOUT_TIME, deleteDatabaseDefaults, doubleClick, findThumbnailGalleryImage, findThumbnailGalleryImages, readDownloadedFile, referenceDownloadedFile, rmDownloadedFile, UNTIL_GALLERY_OPEN, UNTIL_JOB_BEGIN, UNTIL_JOB_END, UNTIL_MODAL_OPEN, untilCountElementsLocated, untilElementsNotLocated, xpathHelper } from "../helpers.js";
+import { BY_THUMBNAIL_GALLERY_IMAGE, BySearchQueryTagService, BySearchTag, BySelectableTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, deleteDatabaseDefaults, doubleClick, findThumbnailGalleryImage, findThumbnailGalleryImages, readDownloadedFile, referenceDownloadedFile, rmDownloadedFile, UNTIL_GALLERY_OPEN, UNTIL_JOB_BEGIN, UNTIL_JOB_END, UNTIL_MODAL_OPEN, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../helpers.js";
 import { createBackupAsFile, createBackupAsText, importMappingsFromBackupFile } from "../functionality/file-functionality.js";
-import { applyTagFilter, assignMetricStar, createNewFileSearchPage, fileSearchMetricTag, fileSearchSelectQueriedTag, fileSearchSelectTag, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, toggleExcludeCheckbox } from "../functionality/pages-functionality.js";
+import { applyTagFilter, assignMetricStar, clickModifyTaggablesButton, createNewFileSearchPage, fileSearchMetricTag, fileSearchSelectQueriedTag, fileSearchSelectTag, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, saveModifyTaggablesChanges, toggleExcludeCheckbox } from "../functionality/pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../functionality/metrics-functionality.js";
 
@@ -58,7 +58,7 @@ const FILE_SEARCH_PAGE_TESTS = [
     {name: "Teardown", isTeardown: true, tests: async (driver) => {
         await closePage(driver);
     }},
-    {name: "MultipartTest", tests: [
+    {name: "TagServiceUpdatesSearchQuery", tests: [
         {name: "CreateTagServiceUpdatesSearchQuery", tests: async (driver) => {
             await createNewTagService(driver, TEST_TAG_SERVICE_NAME_1);
             await driver.wait(until.elementLocated(BySearchQueryTagService(TEST_TAG_SERVICE_NAME_1)), DEFAULT_TIMEOUT_TIME);
@@ -265,6 +265,47 @@ const FILE_SEARCH_PAGE_TESTS = [
                     }
                 }
                 await fileSearchSelectQueriedTag(driver, generateHasMetricComparisonGTETagName(TEST_METRIC_2_NAME, 4));
+            }}
+        ]}
+    ]},
+    {name: "ThumbnailGallery", tests: [
+        {name: "DoesModifyTaggablesOpen", tests: async (driver) => {
+            const image0 = await findThumbnailGalleryImage(driver, 0);
+            await image0.click();
+            await clickModifyTaggablesButton(driver);
+            await closeModal(driver);
+        }},
+        {name: "ResizingChangesThumbnailGalleryImageCount", tests: async (driver) => {
+            const imageCount = (await findThumbnailGalleryImages(driver)).length;
+            await driver.manage().window().setRect({width: 1080, height: 720});
+            await driver.wait(untilCountElementsLocatedNotEquals(BY_THUMBNAIL_GALLERY_IMAGE, imageCount));
+            await driver.manage().window().maximize();
+        }},
+        {name: "DoesModifyTaggablesWork", tests: [
+            {name: "Setup", isSetup: true, tests: async (driver) => {
+                await fileSearchSelectTag(driver, TEST_TAG_1);
+                await toggleExcludeCheckbox(driver);
+                await fileSearchSelectTag(driver, TEST_TAG_2);
+            }},
+            {name: "Teardown", isTeardown: true, tests: async (driver) => {
+                await fileSearchSelectQueriedTag(driver, TEST_TAG_1);
+                await toggleExcludeCheckbox(driver);
+                await fileSearchSelectTag(driver, `-${TEST_TAG_2}`);
+            }},
+            {name: "DoesRemovingTagWork", tests: async (driver) => {
+                const image0 = await findThumbnailGalleryImage(driver, 0);
+                await image0.click();
+                const image0Title = await image0.getAttribute("title");
+                await clickModifyTaggablesButton(driver);
+
+                await fileSearchSelectTag(driver, TEST_TAG_1, {instance: 2});
+                await saveModifyTaggablesChanges(driver);
+
+                const image0After = await findThumbnailGalleryImage(driver, 0);
+                const image0TitleAfter = await image0After.getAttribute("title");
+                if (image0Title === image0TitleAfter) {
+                    throw `Image 0 did not change after removing necessary tag from it`;
+                }
             }}
         ]}
     ]},

@@ -58,7 +58,7 @@ export class Modals {
     
     /**
      * @param {() => void} onUpdateCallback
-     * @param {(() => void) | null} cleanupFunction
+     * @param {() => void} cleanupFunction
      */
     addOnUpdateCallback(onUpdateCallback, cleanupFunction) {
         if (cleanupFunction === undefined) {

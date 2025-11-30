@@ -49,7 +49,7 @@ export class FetchCache {
     }
 
     regenerateTagsCache() {
-        for (const endpoint of TAG_ENDPOINTS) {
+        for (const endpoint of [...Object.keys(TAG_ENDPOINTS), ...Object.keys(FILE_ENDPOINTS)]) {
             this.#cache.delete(endpoint);
         }
         this.#generateCache();

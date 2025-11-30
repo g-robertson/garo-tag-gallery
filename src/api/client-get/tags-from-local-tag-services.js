@@ -18,6 +18,7 @@ import CreateMetricTag from "../../client/modal/modals/create-metric-tag.jsx";
  *     tagName: string,
  *     namespaces: string[]
  *     tagCount: number
+ *     localTagServiceIDs: number[]
  * }} ClientQueryTag
  */
 
@@ -34,6 +35,7 @@ function modalSystemClientQueryTag(displayName, modal) {
         displayName: `system:${displayName}`,
         namespaces: ['system'],
         tagCount: Infinity,
+        localTagServiceIDs: [SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID],
         modalTagInfo: {
             modal
         }
@@ -83,7 +85,8 @@ async function getTagsFromLocalTagServiceIDs_(localTagServiceIDs, taggableCursor
             displayName: tag[1],
             tagName: tag[0],
             namespaces: tag[2],
-            tagCount: tag[3]
+            tagCount: tag[3],
+            localTagServiceIDs: tag[4]
         })));
     }
 
@@ -103,7 +106,7 @@ export default async function getTagsFromLocalTagServiceIDs(localTagServiceIDs, 
         taggableCursor,
         taggableIDs
     );
-    if (localTagServiceIDs.findIndex((localTagServiceID => localTagServiceID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID)) === -1) {
+    if (!localTagServiceIDs.some((localTagServiceID => localTagServiceID === SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID))) {
         return tagsResponse;
     } else {
         return SYSTEM_CLIENT_TAGS.concat(tagsResponse);
