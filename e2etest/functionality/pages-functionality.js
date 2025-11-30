@@ -1,4 +1,4 @@
-import { DEFAULT_TIMEOUT_TIME, doubleClick, findMetricVisualizer, mouseOver, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
+import { DEFAULT_TIMEOUT_TIME, DEFAULT_SLEEP_TIME, doubleClick, findMetricVisualizer, mouseOver, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
 import { navigateToFileSearchPage } from "../navigation/pages-navigation.js";
 import {By, Key} from "selenium-webdriver"
 
@@ -29,7 +29,7 @@ export async function fileSearchSelectTag(driver, tag, options) {
     await doubleClick(driver, tagSelector);
     
     if (options.waitForRefresh) {
-        await driver.sleep(50);
+        await driver.sleep(DEFAULT_SLEEP_TIME);
     }
 }
 
@@ -99,7 +99,7 @@ export async function fileSearchMetricTag(driver, localMetricServiceName, metric
     const searchButton = await driver.findElement(xpathHelper({type: "input", hasValue: searchType}));
     await searchButton.click();
 
-    await driver.sleep(50);
+    await driver.sleep(DEFAULT_SLEEP_TIME);
 }
 
 /**

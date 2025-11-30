@@ -8,7 +8,8 @@ import { deleteTaggableService } from "./functionality/taggables-functionality.j
 
 /** @import {ThenableWebDriver, Locator, WebElement} from "selenium-webdriver" */
 
-export const DEFAULT_TIMEOUT_TIME = 500;
+export const DEFAULT_TIMEOUT_TIME = Number(process.env.DEFAULT_TIMEOUT_TIME);
+export const DEFAULT_SLEEP_TIME = Number(process.env.DEFAULT_SLEEP_TIME);
 export const DOWNLOAD_DIRECTORY = path.resolve(path.join(process.env.DATABASE_DIR, "e2e-downloads"));
 
 /**
