@@ -1,13 +1,13 @@
 import '../../global.css';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import DialogBox from './dialog-box.jsx';
-import { mapNullCoalesce } from '../../js/client-util.js';
+import { executeFunctions, mapNullCoalesce } from '../../js/client-util.js';
 import { updateTaggables } from '../../../api/client-get/update-taggables.js';
 import { Modals } from '../modals.js';
-import { ExistingState } from '../../page/pages.js';
+import { State } from '../../page/pages.js';
 import { User } from '../../js/user.js';
 
-/** @import {ExistingStateConstRef, ExistingStateRef} from "../../page/pages.js" */
+/** @import {ConstState, State} from "../../page/pages.js" */
 /** @import {ExtraProperties} from "../modals.js" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
@@ -18,21 +18,21 @@ const REMOVE_TAGS = 1;
 /** 
  * @param {{
  *  extraProperties: ExtraProperties<{
- *      taggableCursorConstRef: ExistingStateConstRef<string>
- *      taggableIDsConstRef: ExistingStateConstRef<number[]>
+ *      taggableCursorConstState: ConstState<string>
+ *      taggableIDsConstState: ConstState<number[]>
  *  }>
  *  modalResolve: (value: any) => void
  * }}
 */
 export default function ModifyTaggablesModal({ extraProperties, modalResolve }) {
-    const localTagServicesConstRef = User.Global().localTagServicesRef();
-    /** @type {ExistingStateRef<Set<number>>} */
-    const selectedLocalTagServiceIDsRef = ExistingState.stateRef(new Set(localTagServicesConstRef.get().map(localTagService => localTagService.Local_Tag_Service_ID)));
-    const taggableIDsConstRef = extraProperties.taggableIDsConstRef;
-    /** @type {ExistingStateRef<Map<number, Set<string>>>} */
-    const tagsToRemoveRef = ExistingState.stateRef(new Map());
-    /** @type {ExistingState<Map<number, Map<string, ClientQueryTag>>>} */
-    const tagsToAddRef = ExistingState.stateRef(new Map());
+    const localTagServicesConstState = User.Global().localTagServicesRef();
+    /** @type {State<Set<number>>} */
+    const selectedLocalTagServiceIDsState = new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID)));
+    const taggableIDsConstState = extraProperties.taggableIDsConstState;
+    /** @type {State<Map<number, Set<string>>>} */
+    const tagsToRemoveRef = new State(new Map());
+    /** @type {State<Map<number, Map<string, ClientQueryTag>>>} */
+    const tagsToAddRef = new State(new Map());
 
     return {
         component: (
@@ -41,12 +41,12 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                     <div style={{flex: 1}}></div>
                     <div style={{flex: 1}}>
                         <LocalTagsSelector
-                            localTagServicesConstRef={localTagServicesConstRef}
-                            selectedLocalTagServiceIDsRef={selectedLocalTagServiceIDsRef}
-                            taggableCursorConstRef={extraProperties.taggableCursorConstRef}
-                            taggableIDsConstRef={taggableIDsConstRef}
-                            tagsToRemoveConstRef={tagsToRemoveRef}
-                            tagsToAddConstRef={tagsToAddRef}
+                            localTagServicesConstState={localTagServicesConstState}
+                            selectedLocalTagServiceIDsState={selectedLocalTagServiceIDsState}
+                            taggableCursorConstState={extraProperties.taggableCursorConstState}
+                            taggableIDsConstState={taggableIDsConstState}
+                            tagsToRemoveConstState={tagsToRemoveRef}
+                            tagsToAddConstState={tagsToAddRef}
                             excludeable={false}
                             tagSelectionTitle="Add/remove tags"
                             onTagsSelected={async (tags, isExcludeOn) => {
@@ -56,7 +56,7 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                                     if (tag.tagCount !== Infinity) {
                                         definitelyAdd = false;
                                     }
-                                    if (tag.tagCount !== taggableIDsConstRef.get().length && !isExcludeOn) {
+                                    if (tag.tagCount !== taggableIDsConstState.get().length && !isExcludeOn) {
                                         definitelyRemove = false;
                                     }
                                 }
@@ -87,14 +87,14 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
 
                                 const tagsToRemove = tagsToRemoveRef.get();
                                 const tagsToAdd = tagsToAddRef.get();
-                                for (const localTagServiceID of selectedLocalTagServiceIDsRef.get()) {
+                                for (const localTagServiceID of selectedLocalTagServiceIDsState.get()) {
                                     const setToAdd = mapNullCoalesce(tagsToAdd, localTagServiceID, new Map());
                                     const setToRemove = mapNullCoalesce(tagsToRemove, localTagServiceID, new Set());
                                     for (const tag of tags) {
                                         if (operationToPerform === ADD_TAGS) {
                                             setToAdd.set(tag.tagName, {
                                                 ...tag,
-                                                tagCount: taggableIDsConstRef.get().length
+                                                tagCount: taggableIDsConstState.get().length
                                             });
                                             setToRemove.delete(tag.tagName);
                                         } else if (operationToPerform === REMOVE_TAGS) {
@@ -113,7 +113,7 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                 <div>
                     <input type="button" value="Save changes" onClick={async () => {
                         await updateTaggables(
-                            taggableIDsConstRef.get(),
+                            taggableIDsConstState.get(),
                             [...tagsToAddRef.get()].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags.values()]]),
                             [...tagsToRemoveRef.get()].map(([localTagServiceID, tags]) => [localTagServiceID, [...tags]])
                         );

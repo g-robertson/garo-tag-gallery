@@ -1,8 +1,8 @@
-/** @import {ExistingStateRef} from "../page/pages.js" */
+/** @import {State} from "../page/pages.js" */
 
 /**
  * @param {{
- *     selectedNumberRef: ExistingStateRef<number>
+ *     selectedNumberRef: State<number>
  *     minValue?: number
  *     maxValue?: number
  *     className?: string
@@ -22,7 +22,7 @@ function NumericInput({selectedNumberRef, minValue, maxValue, className}) {
                 newNumericValue = maxValue;
             }
             
-            selectedNumberRef.update(newNumericValue);
+            selectedNumberRef.set(newNumericValue);
             e.currentTarget.value = newNumericValue.toString();
         } else {
             e.currentTarget.value = selectedNumberRef.get().toString();

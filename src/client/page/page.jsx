@@ -3,18 +3,21 @@ import { Pages } from './pages.js';
 import DuplicatesProcessingPage, { DUPLICATES_PROCESSING_PAGE_NAME } from './pages/duplicates-page.jsx';
 
 import FileSearchPage, { FILE_SEARCH_PAGE_NAME } from './pages/file-search-page.jsx';
-import { ReferenceableReact } from '../js/client-util.js';
+import { executeFunctions, ReferenceableReact } from '../js/client-util.js';
 
 /**
  * @typedef {Object} PageType
  * @property {string} pageName
  * @property {string} pageDisplayName
  * @property {string} pageID
- * @property {any} existingState
+ * @property {any} persistentState
  * @property {Record<string, any>} extraProperties
 */
 
 const PageElement = () => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const PageContents = ReferenceableReact();
 
     const onAdd = () => {
@@ -37,7 +40,7 @@ const PageElement = () => {
                         if (page.pageType === FILE_SEARCH_PAGE_NAME) {
                             return <FileSearchPage page={page} />
                         } else if (page.pageType === DUPLICATES_PROCESSING_PAGE_NAME) {
-                            return <DuplicatesProcessingPage existingState={page.existingState} />
+                            return <DuplicatesProcessingPage persistentState={page.persistentState} />
                         }
                     })()}
                 </div>
@@ -45,9 +48,8 @@ const PageElement = () => {
         }
         onCurrentPageChanged();
 
-        let cleanup = () => {};
-        cleanup = Pages.Global().addOnCurrentPageChangedCallback(onCurrentPageChanged, cleanup);
-        return cleanup;
+        Pages.Global().addOnCurrentPageChangedCallback(onCurrentPageChanged, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     };
 
 

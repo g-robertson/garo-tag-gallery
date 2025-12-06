@@ -2,13 +2,15 @@ import '../global.css';
 
 import { Modals } from './modals.js';
 import ModalElement from './modal.jsx';
-import { ReferenceableReact } from '../js/client-util.js';
+import { executeFunctions, ReferenceableReact } from '../js/client-util.js';
 
 const ModalsElement = () => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const ModalsContainer = ReferenceableReact();
     const onAdd = () => {
-        let cleanup = () => {};
-        cleanup = Modals.Global().addOnPushCallback((modalInstance, index) => {
+        Modals.Global().addOnPushCallback((modalInstance, index) => {
             const lastChild = ModalsContainer.dom.lastChild;
             if (lastChild !== null) {
                 lastChild.style.pointerEvents = "none";
@@ -16,16 +18,16 @@ const ModalsElement = () => {
             ModalsContainer.dom.appendChild(<div dom style={{pointerEvents: "auto"}}>
                 <ModalElement modalInstance={modalInstance} index={index} />
             </div>
-        )}, cleanup);
+        )}, addToCleanup);
         
-        cleanup = Modals.Global().addOnPopCallback(() => {
+        Modals.Global().addOnPopCallback(() => {
             ModalsContainer.dom.removeChild(ModalsContainer.dom.lastChild);
             const lastChild = ModalsContainer.dom.lastChild;
             if (lastChild !== null) {
                 lastChild.style.pointerEvents = "auto";
             }
-        }, cleanup);
-        return cleanup;
+        }, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     };
 
     return ModalsContainer.react(<div onAdd={onAdd}></div>);

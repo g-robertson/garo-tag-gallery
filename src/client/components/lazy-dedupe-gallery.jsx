@@ -4,7 +4,7 @@ import { randomID } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 import { useEffect, useRef, useState } from 'react';
 import selectFiles from '../../api/client-get/select-files.js';
-import { ExistingState } from "../page/pages.js";
+import { PersistentState } from "../page/pages.js";
 
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
 
@@ -12,24 +12,24 @@ import { ExistingState } from "../page/pages.js";
  * @param {{
  *  fileComparisons: DBFileComparison[]
  *  initialFileComparisonIndex?: number
- *  existingState: ExistingState
+ *  persistentState: PersistentState
  * }} param0
  */
-const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, existingState}) => {
+const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persistentState}) => {
     const galleryID = useRef(randomID(32));
-    initialFileComparisonIndex ??= existingState.get("visibleIndex") ?? 0;
+    initialFileComparisonIndex ??= persistentState.get("visibleIndex") ?? 0;
     if (initialFileComparisonIndex === -1) {
         initialFileComparisonIndex = 0;
     }
     const [visibleIndex, setVisibleIndex] = useState(initialFileComparisonIndex);
 
-    fileComparisons ??= existingState.get("fileComparisons");
-    existingState.update("fileComparisons", fileComparisons);
+    fileComparisons ??= persistentState.get("fileComparisons");
+    persistentState.update("fileComparisons", fileComparisons);
 
-    const fileComparisonsEvaluated = useRef(existingState?.fileComparisonsEvaluated ?? {});
+    const fileComparisonsEvaluated = useRef(persistentState?.fileComparisonsEvaluated ?? {});
     const updateFileComparisonsEvaluated = (newFileComparisonsEvaluated) => {
         fileComparisonsEvaluated.current = newFileComparisonsEvaluated;
-        existingState.update("fileComparisonsEvaluated", fileComparisonsEvaluated.current);
+        persistentState.update("fileComparisonsEvaluated", fileComparisonsEvaluated.current);
     }
 
     /** @type {{out: (increment: number) => void}} */
@@ -40,7 +40,7 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, existin
     const VIDEO_ID = `video-${galleryID}`;
 
     useEffect(() => {
-        existingState.update("visibleIndex", visibleIndex);
+        persistentState.update("visibleIndex", visibleIndex);
 
         let vid = document.getElementById(VIDEO_ID);
         if (vid !== null) {
@@ -76,7 +76,7 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, existin
     }, [activeFile]);
 
     return <LazySelector
-        valuesConstRef={fileComparisons}
+        valuesConstState={fileComparisons}
         realizeSelectedValues={false}
         valuesRealizer={async (values) => {
             /** @type {Set<number>} */
@@ -209,7 +209,7 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, existin
                 </div>
                 <div style={{position: "absolute", bottom: "4px", right: "4px", flexDirection: "column"}}>
                     <input type="button" value="Commit" onClick={() => {
-                        console.log(existingState);
+                        console.log(persistentState);
                     }} />
                 </div>
 

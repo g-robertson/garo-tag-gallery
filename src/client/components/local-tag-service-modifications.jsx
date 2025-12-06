@@ -1,28 +1,30 @@
-import { ReferenceableReact } from "../js/client-util.js";
-import { ExistingState } from "../page/pages.js";
+import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
+import { State } from "../page/pages.js";
 
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
-/** @import {ExistingStateConstRef} from "../page/pages.js" */
+/** @import {ConstState} from "../page/pages.js" */
 
 /**
  * @param {{
- *     selectedLocalTagServiceConstRef?: ExistingStateConstRef<DBPermissionedLocalTagService>
+ *     selectedLocalTagServiceConstState?: ConstState<DBPermissionedLocalTagService>
  * }} param0 
  * @returns 
  */
-const LocalTagServiceModifications = ({selectedLocalTagServiceConstRef}) => {
+const LocalTagServiceModifications = ({selectedLocalTagServiceConstState}) => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const LocalTagServiceName = ReferenceableReact();
-    selectedLocalTagServiceConstRef ??= ExistingState.stateRef(undefined);
+    selectedLocalTagServiceConstState ??= new State(undefined);
     
     const onAdd = () => {
         const onSelectionChanged = () => {
-            LocalTagServiceName.dom.value = selectedLocalTagServiceConstRef.get()?.Service_Name ?? "My tag service";
+            LocalTagServiceName.dom.value = selectedLocalTagServiceConstState.get()?.Service_Name ?? "My tag service";
         };
         onSelectionChanged();
+        selectedLocalTagServiceConstState.addOnUpdateCallback(onSelectionChanged, addToCleanup);
 
-        let cleanup = () => {};
-        cleanup = selectedLocalTagServiceConstRef.addOnUpdateCallback(onSelectionChanged, cleanup);
-        return cleanup;
+        return () => executeFunctions(addToCleanup);
     }
     
     return (

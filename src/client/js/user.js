@@ -1,7 +1,7 @@
 /** @import {DBJoinedUser} from "../../db/user.js" */
 
 import getMe from "../../api/client-get/me.js";
-import { Pages, Page, ExistingState } from "../page/pages.js";
+import { State } from "../page/pages.js";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "./tags.js";
 
 export const PERMISSIONS = Object.freeze({
@@ -49,17 +49,16 @@ export const METHOD_TO_PERMISSION_BIT = Object.freeze({
 /** @typedef {"GET" | "POST" | "PUT" | "DELETE"} HTTPMethod */
 
 export class User {
-    /** @type {ExistingState<{
-        localTagServices: DBJoinedUser['Local_Tag_Services']
-        localMetricServices: DBJoinedUser['Local_Metric_Services']
-    }>} */
-    #existingState = new ExistingState();
     #id;
     #name;
     #isAdmin = false;
     #createdDate;
+    /** @type {State<DBJoinedUser['Local_Tag_Services']} */
+    #localTagServices = new State();
     #localTaggableServices;
     #localURLGeneratorServices;
+    /** @type {State<DBJoinedUser['Local_Metric_Services']} */
+    #localMetricServices = new State();
 
     #pages;
 
@@ -91,9 +90,9 @@ export class User {
         this.#name = json.User_Name ?? "";
         this.#createdDate = json.User_Created_Date ?? 0;
         this.#isAdmin = json.Is_Administrator ?? false;
-        this.#existingState.update("localTagServices", json.Local_Tag_Services ?? []);
+        this.#localTagServices.set(json.Local_Tag_Services ?? []);
         this.#localTaggableServices = json.Local_Taggable_Services ?? [];
-        this.#existingState.update("localMetricServices", json.Local_Metric_Services ?? []);
+        this.#localMetricServices.set(json.Local_Metric_Services ?? []);
         this.#localURLGeneratorServices = json.Local_URL_Generator_Services ?? [];
 
         this.#pages = json.JSON_Pages;
@@ -131,7 +130,8 @@ export class User {
     static makeGlobal(newUser) {
         const oldGlobal = User.#Gl_User;
         User.#Gl_User = newUser;
-        User.#Gl_User.#existingState.consumeCallbacks(oldGlobal.#existingState);
+        User.#Gl_User.#localTagServices.consumeCallbacks(oldGlobal.#localTagServices);
+        User.#Gl_User.#localMetricServices.consumeCallbacks(oldGlobal.#localMetricServices);
     }
 
     static async refreshGlobal() {
@@ -164,18 +164,18 @@ export class User {
 
     /**
      * @param {() => void} callback 
-     * @param {() => void} cleanupFunction
+     * @param {(() => void)[]} addCleanupTo
      */
-    addOnLocalTagServicesUpdatedCallback(callback, cleanupFunction) {
-        return this.#existingState.addOnUpdateCallbackForKey("localTagServices", callback, cleanupFunction);
+    addOnLocalTagServicesUpdatedCallback(callback, addCleanupTo) {
+        return this.#localTagServices.addOnUpdateCallback(callback, {addCleanupTo});
     }
 
     localTagServices() {
-        return this.#existingState.get("localTagServices");
+        return this.#localTagServices.get();
     }
 
     localTagServicesRef() {
-        return this.#existingState.getConstRef("localTagServices");
+        return this.#localTagServices.asConst();
     }
 
     /**
@@ -191,15 +191,18 @@ export class User {
         return User.#transformLocalTagServicesAvailable(this.localTagServices());
     }
 
-    localTagServicesAvailableRef() {
-        return this.#existingState.getTransformRef("localTagServices", User.#transformLocalTagServicesAvailable);
+    /**
+     * @param {(() => void)[]} addToCleanup 
+     */
+    localTagServicesAvailableRef(addToCleanup) {
+        return this.#localTagServices.asTransform(User.#transformLocalTagServicesAvailable, addToCleanup);
     }
 
     /**
      * @param {DBJoinedUser['Local_Tag_Services']} localTagServices 
      */
     setLocalTagServices(localTagServices) {
-        this.#existingState.update("localTagServices", localTagServices);
+        this.#localTagServices.set(localTagServices);
     }
 
     localTaggableServices() {
@@ -214,18 +217,18 @@ export class User {
     }
 
     localMetricServices() {
-        return this.#existingState.get("localMetricServices");
+        return this.#localMetricServices.get();
     }
 
     localMetricServicesRef() {
-        return this.#existingState.getConstRef("localMetricServices");
+        return this.#localMetricServices.asConst();
     }
 
     /**
      * @param {ReturnType<typeof this.localMetricServices>} localMetricServices 
      */
     setLocalMetricServices(localMetricServices) {
-        this.#existingState.update("localMetricServices", localMetricServices);
+        this.#localMetricServices.set(localMetricServices);
     }
 
     localURLGeneratorServices() {
@@ -333,9 +336,9 @@ export class User {
             User_Created_Date: this.#createdDate,
             Is_Administrator: this.#isAdmin,
 
-            Local_Tag_Services: this.#existingState.get("localTagServices"),
+            Local_Tag_Services: this.#localTagServices.get(),
             Local_Taggable_Services: this.#localTaggableServices,
-            Local_Metric_Services: this.#existingState.get("localMetricServices"),
+            Local_Metric_Services: this.#localMetricServices.get(),
             Local_URL_Generator_Services: this.#localURLGeneratorServices,
 
             JSON_Pages: this.#pages,

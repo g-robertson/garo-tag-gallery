@@ -1,7 +1,8 @@
 import DualListboxLazyTextObjectSelector from '../../components/dual-listbox-lazy-text-object-selector.jsx';
 import '../../global.css';
+import { executeFunctions } from '../../js/client-util.js';
 import { Modals } from '../../modal/modals.js';
-import { ExistingState } from '../../page/pages.js';
+import { State } from '../../page/pages.js';
 
 /** @import {ExtraProperties} from "../modals.js" */
 /** @import {Modal} from "../modals.js" */
@@ -15,7 +16,7 @@ import { ExistingState } from '../../page/pages.js';
  * }}
 */
 export default function SelectFromListOfTags({ extraProperties, modalResolve }) {
-    const selectedTagsRef = ExistingState.stateRef(new Set());
+    const selectedTagsRef = new State(new Set());
 
     return {
         component: (

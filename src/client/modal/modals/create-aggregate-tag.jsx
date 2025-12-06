@@ -9,10 +9,10 @@ import NumericInput from '../../components/numeric-input.jsx';
 import { clientSearchQueryToDisplayName } from '../../js/tags.js';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
-import { ExistingState } from '../../page/pages.js';
-import { ReferenceableReact } from '../../js/client-util.js';
+import { State } from '../../page/pages.js';
+import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {ExistingStateRef} from "../../page/pages.js" */
+/** @import {State} from "../../page/pages.js" */
 /** @import {ExtraProperties} from "../modals.js" */
 /** @import {ClientAggregateTag, ClientAggregateTagCondition, ClientComparator, ClientSearchTag} from "../../../api/post/search-taggables.js" */
 /** @import {DisplayClientTagGroup} from "../../components/tag-groups-selector.jsx" */
@@ -24,26 +24,29 @@ import { ReferenceableReact } from '../../js/client-util.js';
  * } param0}
 */
 export default function CreateAggregateTag({extraProperties, modalResolve}) {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const SpecifyTagGroupTags = ReferenceableReact();
     const TagOccurrencesCountSpecifyQuery = ReferenceableReact();
     const TagOccurrencesPercentageSpecifyQuery = ReferenceableReact();
     const TagOccurrencesPercentageSpecifyQueries = ReferenceableReact();
     const CreateAggregateTagButton = ReferenceableReact();
 
-    /** @type {ExistingStateRef<DisplayClientTagGroup | undefined} */
-    const tagGroupRef = ExistingState.stateRef(undefined);
-    /** @type {ExistingStateRef<ClientAggregateTagCondition[]} */
-    const conditionsRef = ExistingState.stateRef([]);
+    /** @type {State<DisplayClientTagGroup | undefined} */
+    const tagGroupRef = new State(undefined);
+    /** @type {State<ClientAggregateTagCondition[]} */
+    const conditionsRef = new State([]);
 
-    /** @type {ExistingStateRef<ClientComparator>} */
-    const countComparatorRef = ExistingState.stateRef("<");
-    const countValueRef = ExistingState.stateRef(0);
-    /** @type {ExistingStateRef<ClientComparator>} */
-    const percentageComparatorRef = ExistingState.stateRef("<");
-    const percentageValueRef = ExistingState.stateRef(0);
-    /** @type {ExistingStateRef<ClientComparator>} */
-    const percentageOfSecondQueryComparatorRef = ExistingState.stateRef("<");
-    const percentageOfSecondQueryValueRef = ExistingState.stateRef(0);
+    /** @type {State<ClientComparator>} */
+    const countComparatorRef = new State("<");
+    const countValueRef = new State(0);
+    /** @type {State<ClientComparator>} */
+    const percentageComparatorRef = new State("<");
+    const percentageValueRef = new State(0);
+    /** @type {State<ClientComparator>} */
+    const percentageOfSecondQueryComparatorRef = new State("<");
+    const percentageOfSecondQueryValueRef = new State(0);
 
     const onAdd = () => {
         const onTagGroupChanged = () => {
@@ -55,9 +58,8 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
         };
         onTagGroupChanged();
 
-        let cleanup = () => {};
-        cleanup = tagGroupRef.addOnUpdateCallback(onTagGroupChanged, cleanup);
-        return cleanup;
+        tagGroupRef.addOnUpdateCallback(onTagGroupChanged, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     }
 
     return {
@@ -67,17 +69,17 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                 <TagGroupsSelector
                     multiSelect={false}
                     onTagGroupsSelected={(tagGroups) => {
-                        tagGroupRef.update(tagGroups[0]);
+                        tagGroupRef.set(tagGroups[0]);
                     }} />
             </div>
             <div style={{marginLeft: 8, marginTop: 4}}>
-                Select a tag group from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjectsConstRef={tagGroupRef.getTransformRef(tagGroup => [tagGroup])} elementsSelectable={false} scrollbarWidth={0} /></div>
+                Select a tag group from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjectsConstState={tagGroupRef.asTransform(tagGroup => [tagGroup], addToCleanup)} elementsSelectable={false} scrollbarWidth={0} /></div>
             </div>
             <div style={{marginLeft: 8, flexDirection: "column"}}>
                 <div style={{marginTop: 4}}>Where the tags within the group must follow any selected conditions below</div>
                 <div style={{marginTop: 4}}>Conditions selected:</div>
                 <div style={{height: 100, marginTop: 4}}>
-                    <LazyTextObjectSelector textObjectsConstRef={conditionsRef} multiSelect={false} onValuesDoubleClicked={(_, indicesSelected) => {
+                    <LazyTextObjectSelector textObjectsConstState={conditionsRef} multiSelect={false} onValuesDoubleClicked={(_, indicesSelected) => {
                         conditionsRef.get().splice(indicesSelected[0], 1);
                         conditionsRef.forceUpdate();
                     }} />
@@ -133,10 +135,10 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                     <div className="count-matching-query-condition" style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [count] taggables that match a specified query (can be empty)</div>
                         <div style={{marginTop: 8}}>
-                            <div><input checked={true} style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
-                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update("<=")} />&lt;=</div>
-                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update(">")} />&gt;</div>
-                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update(">=")} />&gt;=</div>
+                            <div><input checked={true} style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.set("<")} defaultChecked={true} />&lt;</div>
+                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.set("<=")} />&lt;=</div>
+                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.set(">")} />&gt;</div>
+                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.set(">=")} />&gt;=</div>
                             <div style={{marginLeft: 8}}>Count: <div style={{marginTop: -2, marginLeft: 4}}>
                                 <NumericInput selectedNumberRef={countValueRef} />
                             </div></div>
@@ -163,10 +165,10 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                     <div className="percentage-matching-query-condition" style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [percentage] taggables match a specified query</div>
                         <div style={{marginTop: 8}}>
-                            <div><input checked={true} style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
-                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update("<=")} />&lt;=</div>
-                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update(">")} />&gt;</div>
-                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update(">=")} />&gt;=</div>
+                            <div><input checked={true} style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.set("<")} defaultChecked={true} />&lt;</div>
+                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.set("<=")} />&lt;=</div>
+                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.set(">")} />&gt;</div>
+                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.set(">=")} />&gt;=</div>
                             <div style={{marginLeft: 8}}>Percentage (0-100%): <div style={{marginTop: -2, marginLeft: 4}}>
                                 <NumericInput
                                     selectedNumberRef={percentageValueRef}
@@ -196,10 +198,10 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                     <div className="percentage-of-subquery-matching-query-condition" style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [percentage] of taggables that match a specified query match a second specified query</div>
                         <div style={{marginTop: 8}}>
-                            <div><input checked={true} style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
-                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update("<=")} />&lt;=</div>
-                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update(">")} />&gt;</div>
-                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update(">=")} />&gt;=</div>
+                            <div><input checked={true} style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.set("<")} defaultChecked={true} />&lt;</div>
+                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.set("<=")} />&lt;=</div>
+                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.set(">")} />&gt;</div>
+                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.set(">=")} />&gt;=</div>
                             <div style={{marginLeft: 8}}>Percentage (0-100%): <div style={{marginTop: -2, marginLeft: 4}}>
                                 <NumericInput
                                     selectedNumberRef={percentageOfSecondQueryValueRef}

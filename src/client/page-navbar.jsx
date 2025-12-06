@@ -1,8 +1,11 @@
 import './global.css';
 import { Pages } from './page/pages.js';
-import { ReferenceableReact } from './js/client-util.js';
+import { executeFunctions, ReferenceableReact } from './js/client-util.js';
 
 const PageNavbar = () => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const PageNavbarContents = ReferenceableReact();
 
     const onAdd = () => {
@@ -24,9 +27,8 @@ const PageNavbar = () => {
         }
         onPageUpdate();
 
-        let cleanup = () => {};
-        cleanup = Pages.Global().addOnUpdateCallback(onPageUpdate, cleanup);
-        return cleanup;
+        Pages.Global().addOnUpdateCallback(onPageUpdate, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     };
 
     return <div className="page-navbar-scroller" onAdd={onAdd}>

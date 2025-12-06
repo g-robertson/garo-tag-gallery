@@ -1,11 +1,11 @@
 import LazySelector from "./lazy-selector.jsx";
 
-/** @import {ExistingStateConstRef} from "../page/pages.js" */
+/** @import {ConstState} from "../page/pages.js" */
 
 /**
  * @template T
  * @param {{
- *  textObjectsConstRef: ExistingStateConstRef<T[]>
+ *  textObjectsConstState: ConstState<T[]>
  *  onValuesSelected?: (valuesSelected: T[], indicesSelected: number[]) => void
  *  onValuesDoubleClicked?: (valuesSelected: T[], indicesSelected: number[]) => void
  *  customItemComponent?: (param0: {realizedValue: T, index: number}) => JSX.Element
@@ -16,7 +16,7 @@ import LazySelector from "./lazy-selector.jsx";
  * }} param0
  */
 const LazyTextObjectSelector = ({
-    textObjectsConstRef,
+    textObjectsConstState,
     onValuesSelected,
     onValuesDoubleClicked,
     customItemComponent,
@@ -28,7 +28,7 @@ const LazyTextObjectSelector = ({
     scrollbarWidth ??= 17;
     customItemComponent ??= ({realizedValue}) => (<>{realizedValue.displayName}</>);
     return <LazySelector
-        valuesConstRef={textObjectsConstRef}
+        valuesConstState={textObjectsConstState}
         onValuesDoubleClicked={onValuesDoubleClicked}
         onValuesSelected={onValuesSelected}
         customItemComponent={customItemComponent}

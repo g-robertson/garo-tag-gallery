@@ -5,8 +5,8 @@ import deleteLocalTaggableService from '../../../api/client-get/delete-local-tag
 import LocalTaggableServiceModifications from '../../components/local-taggable-service-modifications.jsx';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
-import { ExistingState } from '../../page/pages.js';
-import { ReferenceableReact } from '../../js/client-util.js';
+import { State } from '../../page/pages.js';
+import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
 /** @import {ExtraProperties} from "../modals.js" */
 
@@ -17,9 +17,12 @@ import { ReferenceableReact } from '../../js/client-util.js';
  * }}
 */
 export default function UpdateLocalTaggableService({ extraProperties, modalResolve }) {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const ModifySelectedTaggableService = ReferenceableReact();
     const DeleteSelectedTaggableService = ReferenceableReact();
-    const selectedLocalTaggableServiceRef = ExistingState.stateRef(User.Global().localTaggableServices()[0]);
+    const selectedLocalTaggableServiceRef = new State(User.Global().localTaggableServices()[0]);
 
     const onAdd = () => {
         const onLocalTaggableServiceSelected = () => {
@@ -29,17 +32,16 @@ export default function UpdateLocalTaggableService({ extraProperties, modalResol
         };
         onLocalTaggableServiceSelected();
 
-        let cleanup = () => {};
-        cleanup = selectedLocalTaggableServiceRef.addOnUpdateCallback(onLocalTaggableServiceSelected, cleanup);
-        return cleanup;
+        selectedLocalTaggableServiceRef.addOnUpdateCallback(onLocalTaggableServiceSelected, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     };
 
     return {
         component: (
-            <div style={{flexDirection: "column"}} onAdd={onAdd}>
+            <div onAdd={onAdd} style={{flexDirection: "column"}}>
                 <form action="/api/post/update-local-taggable-service" target="frame" method="POST">
                     <LocalTaggableServiceSelector selectedLocalTaggableServiceRef={selectedLocalTaggableServiceRef} />
-                    <LocalTaggableServiceModifications selectedLocalTaggableServiceConstRef={selectedLocalTaggableServiceRef} />
+                    <LocalTaggableServiceModifications selectedLocalTaggableServiceConstState={selectedLocalTaggableServiceRef} />
                     <div style={{marginLeft: "8px"}}>
                         {ModifySelectedTaggableService.react(<input type="submit" value="Modify selected taggable service" />)}
                     </div>

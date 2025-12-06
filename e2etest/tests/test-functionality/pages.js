@@ -371,7 +371,6 @@ const FILE_SEARCH_PAGE_TESTS = [
                 await selectTagFromTagSearchQuery(driver, `-${TEST_TAG_2}`);
             }},
             {name: "DoesRemovingTagWork", tests: async (driver) => {
-                await driver.sleep(1000);
                 const image0 = await findThumbnailGalleryImage(driver, 0);
                 await image0.click();
                 const image0Title = await image0.getAttribute("title");
@@ -390,7 +389,6 @@ const FILE_SEARCH_PAGE_TESTS = [
         ]},
         {name: "DoesTrashingTaggablesWork", tests: [
             {name: "DoesRemovingSingularTaggableWork", tests: async (driver) => {
-                await driver.sleep(1000);
                 const image0 = await findThumbnailGalleryImage(driver, 1);
                 await image0.click();
                 const image0Title = await image0.getAttribute("title");

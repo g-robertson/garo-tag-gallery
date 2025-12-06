@@ -5,8 +5,8 @@ import LocalMetricServiceSelector from '../../components/local-metric-service-se
 import deleteLocalMetricService from '../../../api/client-get/delete-local-metric-service.js';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
-import { ReferenceableReact } from '../../js/client-util.js';
-import { ExistingState } from '../../page/pages.js';
+import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
+import { State } from '../../page/pages.js';
 
 /** @import {ExtraProperties} from "../modals.js" */
 
@@ -17,9 +17,12 @@ import { ExistingState } from '../../page/pages.js';
  * }}
 */
 export default function UpdateLocalMetricService({ extraProperties, modalResolve }) {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const ModifySelectedMetricService = ReferenceableReact();
     const DeleteSelectedMetricService = ReferenceableReact();
-    const selectedLocalMetricServiceRef = ExistingState.stateRef(User.Global().localMetricServices()[0]);
+    const selectedLocalMetricServiceRef = new State(User.Global().localMetricServices()[0]);
 
     const onAdd = () => {
         const onLocalMetricServiceSelected = () => {
@@ -29,18 +32,17 @@ export default function UpdateLocalMetricService({ extraProperties, modalResolve
         };
         onLocalMetricServiceSelected();
 
-        let cleanup = () => {};
-        cleanup = selectedLocalMetricServiceRef.addOnUpdateCallback(onLocalMetricServiceSelected, cleanup);
-        return cleanup;
+        selectedLocalMetricServiceRef.addOnUpdateCallback(onLocalMetricServiceSelected, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     };
 
 
     return {
         component: (
-            <div style={{flexDirection: "column"}} onAdd={onAdd}>
+            <div onAdd={onAdd} style={{flexDirection: "column"}}>
                 <form action="/api/post/update-local-metric-service" target="frame" method="POST">
                     <LocalMetricServiceSelector selectedLocalMetricServiceRef={selectedLocalMetricServiceRef} />
-                    <LocalMetricServiceModifications selectedLocalMetricServiceConstRef={selectedLocalMetricServiceRef} />
+                    <LocalMetricServiceModifications selectedLocalMetricServiceConstState={selectedLocalMetricServiceRef} />
                     <div style={{marginLeft: "8px"}}>
                         {ModifySelectedMetricService.react(<input type="submit" value="Modify selected metric service" />)}
                     </div>

@@ -1,7 +1,7 @@
 import '../global.css';
-import { randomID, ReferenceableReact, unusedID } from '../js/client-util.js';
+import { executeFunctions, randomID, ReferenceableReact, unusedID } from '../js/client-util.js';
 
-/** @import {ExistingStateRef, ExistingStateConstRef} from "../page/pages.js" */
+/** @import {State, ConstState} from "../page/pages.js" */
 
 /**
  * @template T
@@ -13,23 +13,26 @@ import { randomID, ReferenceableReact, unusedID } from '../js/client-util.js';
 /**
  * @template T
  * @param {{
- *  optionsConstRef: ExistingStateConstRef<MultiSelectOption<T>[]>
- *  selectedOptionsRef: ExistingStateRef<Set<T>>
+ *  optionsConstState: ConstState<MultiSelectOption<T>[]>
+ *  selectedOptionsRef: State<Set<T>>
  * }} param0
  * @returns
  */
-const MultiSelect = ({optionsConstRef, selectedOptionsRef}) => {
+const MultiSelect = ({optionsConstState, selectedOptionsRef}) => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const AllSelectedCheckbox = ReferenceableReact();
     const OptionsContainer = ReferenceableReact();
     
     const onAdd = () => {
         const onSelectedOptionsChanged = () => {
-            AllSelectedCheckbox.dom.checked = optionsConstRef.get().length === selectedOptionsRef.get().size;
+            AllSelectedCheckbox.dom.checked = optionsConstState.get().length === selectedOptionsRef.get().size;
         };
         onSelectedOptionsChanged();
 
         const onOptionsChanged = () => {
-            OptionsContainer.dom.replaceChildren(...(optionsConstRef.get().map(option => {
+            OptionsContainer.dom.replaceChildren(...(optionsConstState.get().map(option => {
                 const checkboxID = unusedID() + "-labelled-checkbox";
                 return (
                     <div dom className="multiselect-option">
@@ -48,22 +51,22 @@ const MultiSelect = ({optionsConstRef, selectedOptionsRef}) => {
             
             // Remove invalid options from selected options when options are changed
             const validOptions = new Set();
-            for (const option of optionsConstRef.get()) {
+            for (const option of optionsConstState.get()) {
                 if (selectedOptionsRef.get().has(option.value)) {
                     validOptions.add(option.value);
                 }
             }
 
             if (validOptions.size !== selectedOptionsRef.get().size) {
-                selectedOptionsRef.update(validOptions);
+                selectedOptionsRef.set(validOptions);
             }
         };
         onOptionsChanged();
 
-        let cleanup = () => {};
-        cleanup = optionsConstRef.addOnUpdateCallback(onOptionsChanged, cleanup);
-        cleanup = selectedOptionsRef.addOnUpdateCallback(onSelectedOptionsChanged, cleanup);
-        return cleanup;
+        optionsConstState.addOnUpdateCallback(onOptionsChanged, addToCleanup);
+        selectedOptionsRef.addOnUpdateCallback(onSelectedOptionsChanged, addToCleanup);
+
+        return () => executeFunctions(addToCleanup);
     };
     
     return (
@@ -71,7 +74,7 @@ const MultiSelect = ({optionsConstRef, selectedOptionsRef}) => {
             <div>
                 {AllSelectedCheckbox.react(<input type="checkbox" onClick={(e) => {
                     // Set selected options to options if set, set to nothing if unset
-                    selectedOptionsRef.update(new Set(e.currentTarget.checked ? optionsConstRef.get().map(option => option.value) : []));
+                    selectedOptionsRef.set(new Set(e.currentTarget.checked ? optionsConstState.get().map(option => option.value) : []));
                     for (const child of OptionsContainer.dom.querySelectorAll("input")) {
                         child.checked = e.currentTarget.checked;
                     }

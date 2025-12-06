@@ -3,7 +3,8 @@ import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import NumericInput from '../../components/numeric-input.jsx';
 import { Modals } from '../../modal/modals.js';
 import { User } from '../../js/user.js';
-import { ExistingState } from '../../page/pages.js';
+import { State } from '../../page/pages.js';
+import { executeFunctions } from '../../js/client-util.js';
 
 /** @import {ExtraProperties} from "../modals.js" */
 /** @import {DBLocalMetric} from "../../../db/metrics.js" */
@@ -34,13 +35,13 @@ function createLocalMetricComparison(localMetric, comparator, metricComparisonVa
  * } param0}
 */
 export default function CreateMetricTag({ extraProperties, modalResolve }) {
-    const selectedLocalMetricServiceRef = ExistingState.stateRef(User.Global().localMetricServices()[0]);
-    const selectedLocalMetricRef = ExistingState.stateRef(selectedLocalMetricServiceRef.get()?.Local_Metrics?.[0]);
-    const metricComparisonValueRef = ExistingState.stateRef(0);
+    const selectedLocalMetricServiceRef = new State(User.Global().localMetricServices()[0]);
+    const selectedLocalMetricRef = new State(selectedLocalMetricServiceRef.get()?.Local_Metrics?.[0]);
+    const metricComparisonValueRef = new State(0);
 
     return {
         component: (
-            <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
+            <div onAdd={onAdd} style={{width: "100%", height: "100%", flexDirection: "column"}}>
                 <LocalMetricSelector
                     selectedLocalMetricServiceRef={selectedLocalMetricServiceRef}
                     selectedLocalMetricRef={selectedLocalMetricRef}

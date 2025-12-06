@@ -9,7 +9,7 @@ import '../../global.css';
  *  extraProperties: ExtraProperties<{
  *      fileComparisons: any[]
  *      initialFileComparisonIndex?: number
- *      existingState?: any
+ *      persistentState?: any
  *  }>
  *  modalResolve: (value: any) => void
  * }}
@@ -21,7 +21,7 @@ export default function DedupeGalleryModal({ extraProperties, modalResolve }) {
                 <LazyDedupeGallery
                     fileComparisons={extraProperties.fileComparisons}
                     initialFileComparisonIndex={extraProperties?.initialFileComparisonIndex}
-                    existingState={extraProperties.existingState}
+                    persistentState={extraProperties.persistentState}
                 />
             </div>
         ),

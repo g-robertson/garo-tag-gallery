@@ -1,28 +1,30 @@
-import { ReferenceableReact } from "../js/client-util.js";
-import { ExistingState } from "../page/pages.js";
+import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
+import { State } from "../page/pages.js";
 
 /** @import {DBPermissionedLocalMetricService} from "../../db/metrics.js" */
-/** @import {ExistingStateConstRef} from "../page/pages.js" */
+/** @import {ConstState} from "../page/pages.js" */
 
 /**
  * @param {{
- *     selectedLocalMetricServiceConstRef?: ExistingStateConstRef<DBPermissionedLocalMetricService>
+ *     selectedLocalMetricServiceConstState?: ConstState<DBPermissionedLocalMetricService>
  * }} param0 
  * @returns 
  */
-const LocalMetricServiceModifications = ({selectedLocalMetricServiceConstRef}) => {
+const LocalMetricServiceModifications = ({selectedLocalMetricServiceConstState}) => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const LocalMetricServiceName = ReferenceableReact();
-    selectedLocalMetricServiceConstRef ??= ExistingState.stateRef(undefined);
+    selectedLocalMetricServiceConstState ??= new State(undefined);
     
     const onAdd = () => {
         const onSelectionChanged = () => {
-            LocalMetricServiceName.dom.value = selectedLocalMetricServiceConstRef.get()?.Service_Name ?? "My metric service";
+            LocalMetricServiceName.dom.value = selectedLocalMetricServiceConstState.get()?.Service_Name ?? "My metric service";
         }
         onSelectionChanged();
+        selectedLocalMetricServiceConstState.addOnUpdateCallback(onSelectionChanged, addToCleanup);
 
-        let cleanup = () => {};
-        cleanup = selectedLocalMetricServiceConstRef.addOnUpdateCallback(onSelectionChanged, cleanup);
-        return cleanup;
+        return () => executeFunctions(addToCleanup);
     };
     
     return (

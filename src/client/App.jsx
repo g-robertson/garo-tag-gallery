@@ -9,8 +9,12 @@ import { Jobs } from './jobs.js';
 import JobsElement from "./jobs.jsx";
 import { Page, Pages } from './page/pages.js';
 import setUserPages from '../api/client-get/set-user-pages.js';
+import { executeFunctions } from './js/client-util.js';
 
 const App = () => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const onAdd = () => {
         User.refreshGlobal().then(() => {
             Pages.makeGlobal(new Pages(User.Global().pages().map(Page.fromJSON)));
@@ -21,13 +25,12 @@ const App = () => {
             document.getElementById("non-modal-content").style.pointerEvents = Modals.Global().modals.length === 0 ? "auto" : "none";
         };
 
-        let cleanup = () => {};
-        cleanup = Modals.Global().addOnUpdateCallback(removePointerIfModals, cleanup);
-        cleanup = Pages.Global().addOnUpdateCallback(() => {
+        Modals.Global().addOnUpdateCallback(removePointerIfModals, addToCleanup);
+        Pages.Global().addOnUpdateCallback(() => {
             setUserPages(Pages.Global());
-        }, cleanup);
+        }, addToCleanup);
 
-        return cleanup;
+        return () => executeFunctions(addToCleanup);
     };
 
     return (

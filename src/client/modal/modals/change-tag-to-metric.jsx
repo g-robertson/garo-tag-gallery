@@ -4,11 +4,11 @@ import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
 import { User } from '../../js/user.js';
-import { ExistingState } from '../../page/pages.js';
-import { ReferenceableReact } from '../../js/client-util.js';
+import { State } from '../../page/pages.js';
+import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
 /** @import {ExtraProperties} from "../modals.js" */
-/** @import {ExistingStateRef} from "../../page/pages.js" */
+/** @import {State} from "../../page/pages.js" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 
 /** 
@@ -18,15 +18,18 @@ import { ReferenceableReact } from '../../js/client-util.js';
  * }}
 */
 export default function ChangeTagToMetricModal({ extraProperties, modalResolve }) {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const SuccessMessage = ReferenceableReact();
     const MetricValue = ReferenceableReact();
     const TagLookupName = ReferenceableReact();
     const LocalTagServiceIDs = ReferenceableReact();
 
-    const localTagServicesConstRef = User.Global().localTagServicesRef();
-    const selectedLocalTagServiceIDsRef = ExistingState.stateRef(new Set(localTagServicesConstRef.get().map(localTagService => localTagService.Local_Tag_Service_ID)));
-    /** @type {ExistingStateRef<ClientQueryTag>} */
-    const tagRef = ExistingState.stateRef(undefined);
+    const localTagServicesConstState = User.Global().localTagServicesRef();
+    const selectedLocalTagServiceIDsState = new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID)));
+    /** @type {State<ClientQueryTag>} */
+    const tagRef = new State(undefined);
 
     const onAdd = () => {
         const onTagSelected = () => {
@@ -38,35 +41,34 @@ export default function ChangeTagToMetricModal({ extraProperties, modalResolve }
         }
 
         const onSelectedLocalTagServiceIDsChange = () => {
-            LocalTagServiceIDs.dom.replaceChildren(...[...selectedLocalTagServiceIDsRef.get()].map(localTagServiceID => (
+            LocalTagServiceIDs.dom.replaceChildren(...[...selectedLocalTagServiceIDsState.get()].map(localTagServiceID => (
                 <option dom value={localTagServiceID} selected={true}></option>
             )));
         };
         onSelectedLocalTagServiceIDsChange();
 
-        let cleanup = () => {};
-        cleanup = tagRef.addOnUpdateCallback(onTagSelected, cleanup);
-        cleanup = selectedLocalTagServiceIDsRef.addOnUpdateCallback(onSelectedLocalTagServiceIDsChange, cleanup);
-        return cleanup;
+        tagRef.addOnUpdateCallback(onTagSelected, addToCleanup);
+        selectedLocalTagServiceIDsState.addOnUpdateCallback(onSelectedLocalTagServiceIDsChange, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     }
 
     return {
         component: <div className="change-tag-to-metric-modal" style={{width: "100%", flexDirection: "column"}} onAdd={onAdd}>
             <div style={{flex: "4 1 100%", margin: 8}}>
                 <LocalTagsSelector
-                    localTagServicesConstRef={localTagServicesConstRef}
-                    selectedLocalTagServiceIDsRef={selectedLocalTagServiceIDsRef}
+                    localTagServicesConstState={localTagServicesConstState}
+                    selectedLocalTagServiceIDsState={selectedLocalTagServiceIDsState}
                     multiSelect={false}
                     excludeable={false}
                     onTagsSelected={(tags) => {
-                        tagRef.update(tags[0]);
+                        tagRef.set(tags[0]);
                     }}
                 />
             </div>
             <div style={{marginLeft: 8}}>
                 Select a tag from above:
                 <div style={{height: 20, flexGrow: 100}}>
-                    <LazyTextObjectSelector textObjectsConstRef={tagRef.getTransformRef(tag => (tag !== null ? [tag] : []))} elementsSelectable={false} scrollbarWidth={0} />
+                    <LazyTextObjectSelector textObjectsConstState={tagRef.asTransform(tag => (tag !== null ? [tag] : []), addToCleanup)} elementsSelectable={false} scrollbarWidth={0} />
                 </div>
             </div>
             <form style={{flex: 5}} action="/api/post/change-tag-to-metric" target="frame" method="POST">

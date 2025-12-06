@@ -158,6 +158,15 @@ export function bjsonParse(json) {
 }
 
 /**
+ * @param {(() => void)[]} fns 
+ */
+export function executeFunctions(fns) {
+    for (const fn of fns) {
+        fn();
+    }
+}
+
+/**
  * @param {Set} set1 
  * @param {Set} set2 
  */

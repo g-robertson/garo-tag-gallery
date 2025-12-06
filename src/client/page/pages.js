@@ -4,521 +4,412 @@
  * @property {string} pageType
  * @property {string} pageDisplayName
  * @property {string} pageID
- * @property {any} existingState
+ * @property {any} persistentState
  * @property {Record<string, any>} extraProperties
 */
 
 import setUserPages from "../../api/client-get/set-user-pages.js";
-import { clamp, mapNullCoalesce, unusedID } from "../js/client-util.js";
+import { clamp, unusedID } from "../js/client-util.js";
 
 /**
- * @template T
- * @typedef {Object} AddOnUpdateCallbackOptions
- * @property {boolean=} requireChangeForUpdate Value must change between previous onUpdate call to execute onUpdate
- * @property {symbol=} produces In a set of callbacks with consumers of {symbol}, the producers of {symbol} must run first
- * @property {Set<symbol>=} consumes In a set of callbacks with consumers of {symbol}, the producers of {symbol} must run first
- * 
- */
-/**
- * @template T
- * @typedef {(val: T, prevVal: T) => Promise<void>} OnUpdateCallback
+ * @typedef {Object} StateCallbackOptions
+ * @property {boolean=} requireChangeForUpdate
  */
 
 /**
  * @template T
- * @typedef {{
- *     callback: OnUpdateCallback<T>
- *     produces?: symbol
- *     consumes: Set<symbol>
- * }} OnUpdateCallbackInfo
+ * @typedef {(previousValue: T, currentValue: T) => void} StateCallback
  */
 
 /**
  * @template T
- * @typedef {Object} ExistingStateRef
- * @property {<TransformV>(transform: (val: T) => TransformV) => ExistingStateConstRef<TransformV>} getTransformRef
- * @property {(val: T) => void} update
- * @property {() => void} forceUpdate
- * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: () => void, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
- * @property {() => T} get
+ * @typedef {Object} StateCallbackInfo
+ * @property {StateCallback<T>} callback
+ * @property {StateCallbackOptions} options
+ */
+
+/**
+ * @typedef {Object} StateOptions
  */
 
 /**
  * @template T
- * @typedef {Object} ExistingStateConstRef
- * @property {<TransformV>(transform: (val: T) => TransformV) => ExistingStateConstRef<TransformV>} getTransformRef
- * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: () => void, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
- * @property {() => T} get
+ * @typedef {Object} StateTransformOptions
+ * @property {T=} initialValue
  */
 
 /**
  * @template T
- * @typedef {Object} ExistingStateAsyncConstRef
- * @property {(cleanupFunction: () => void) => (() => void)} assignCleanup
- * @property {<TransformV>(transform: (val: T) => Promise<TransformV>) => ExistingStateAsyncConstRef<TransformV>} getAsyncTransformRef
- * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: () => void, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
- * @property {() => T} get
-*/
+ * @typedef {Object} StateTransformOptions
+ * @property {T=} initialValue
+ * @property {boolean=} waitForSet
+ */
 
-/** @template {any} [T=Record<string, any>] */
-export class ExistingState {
-    /** @type {T} */
-    #state = {};
-    /** @type {Set<keyof T>} */
-    #savedKeys = new Set();
-    /** @type {Map<string, ExistingState>} */
-    #innerStates = new Map();
-    /** @type {Set<() => void>} */
-    #onUpdateCallbacks = new Set();
-    /** @template {keyof T} K */
-    /** @type {Map<K, Set<OnUpdateCallbackInfo<T[K]>} */
-    #onUpdateCallbacksForKeys = new Map();
-    // Updates to be always equal to whatever [this] is calling the callbacks, useful for when callbacks are consumed by another ExistingState
-    #callbackSelf = () => { return this; };
+/** @template T */
+export class State {
+    /** @type {Set<StateCallbackInfo<T>>} */
+    #callbackInfos = new Set();
+    /** @type {{ref: T}} */
+    #valueRef = {ref: undefined};
+
     /**
-     * @param {T=} state
-     * @param {{
-     *   fromSaved?: boolean
-     * }} options
+     * @param {T} initialValue
+     * @param {StateOptions} options
      */
-    constructor(state, options) {
+    constructor(initialValue, options) {
         options ??= {};
-        this.#state = state ?? {};
-        for (const key in this.#state) {
-            this.#savedKeys.add(key);
-        }
-    }
-
-    callbackSelf() {
-        return this.#callbackSelf();
+        this.#valueRef.ref = initialValue;
     }
 
     /**
-     * @param {ExistingState} existingState 
+     * @param {StateCallback<T>} callback 
+     * @param {(() => void)[]} addToCleanup
+     * @param {StateCallbackOptions} options 
      */
-    consumeCallbacks(existingState) {
-        const self = this;
-        // Set old existing state to propogate to next object's self
-        existingState.#callbackSelf = () => { return self.callbackSelf(); }
-        for (const callback of existingState.#onUpdateCallbacks) {
-            this.#onUpdateCallbacks.add(callback);
-            callback();
-        }
-        for (const [key, callbacks] of existingState.#onUpdateCallbacksForKeys) {
-            const callbacksForKeys = mapNullCoalesce(this.#onUpdateCallbacksForKeys, key, new Set());
-            for (const callback of callbacks) {
-                callbacksForKeys.add(callback);
-            }
-            this.forceUpdate(key);
-        }
-    }
-
-    toJSON() {
-        const jsonState = {};
-        for (const key in this.#state) {
-            if (this.#savedKeys.has(key)) {
-                const innerState = this.#innerStates.get(key);
-                if (innerState !== undefined) {
-                    jsonState[key] = innerState.toJSON();
-                } else {
-                    jsonState[key] = this.#state[key];
-                }
-            }
-        }
-        return jsonState;
-    }
-
-    /**
-     * @param {() => void} onUpdateCallback 
-     * @param {() => void} cleanupFunction
-     */
-    addOnUpdateCallback(onUpdateCallback, cleanupFunction) {
-        if (cleanupFunction === undefined) {
-            throw "You must specify a cleanup function or null for adding a callback for an existing state";
-        }
-        cleanupFunction ??= () => {};
-        this.#onUpdateCallbacks.add(onUpdateCallback);
-
-        return () => {
-            cleanupFunction();
-            this.#onUpdateCallbacks.delete(onUpdateCallback);
-        }
-    }
-
-    static #callbackCount = 0;
-    static #callbacksRan = 0;
-
-    /**
-     * @template {keyof T} K
-     * @param {OnUpdateCallback<T[K]>} onUpdateCallback
-     * @param {() => void} cleanupFunction
-     * @param {AddOnUpdateCallbackOptions<T>} options
-     * @param {T[K]} val
-     * @param {T[K]} prevVal
-     */
-    static async #executeOnUpdateCallback(onUpdateCallback, options, val, prevVal) {
+    addOnUpdateCallback(callback, addToCleanup, options) {
         options ??= {};
-        const requireChangeForUpdate = options.requireChangeForUpdate ?? false;
-        if (!requireChangeForUpdate) {
-            await onUpdateCallback(val, prevVal);
-        } else if (val !== prevVal) {
-            await onUpdateCallback(val, prevVal);
+        if (addToCleanup === undefined) {
+            throw new Error("State variable does not have a cleanup collection specified for callback, one must be specified.");
         }
-    }
 
-    /**
-     * @template {keyof T} K
-     * @param {K} key
-     * @param {OnUpdateCallback<T[K]>} onUpdateCallback
-     * @param {() => void} cleanupFunction
-     * @param {AddOnUpdateCallbackOptions<T>} options
-     */
-    addOnUpdateCallbackForKey(key, onUpdateCallback, cleanupFunction, options) {
-        if (cleanupFunction === undefined) {
-            throw "You must specify a cleanup function or null for adding a callback for an existing state key";
-        }
-        cleanupFunction ??= () => {};
-        options ??= {};
-        options.consumes ??= new Set();
-
-        const originalOnUpdateCallback = onUpdateCallback;
-        onUpdateCallback = {
-            callback: async (val, prevVal) => { await ExistingState.#executeOnUpdateCallback(originalOnUpdateCallback, options, val, prevVal); },
-            produces: options.produces,
-            consumes: options.consumes
+        const callbackInfo = {callback, options};
+        this.#callbackInfos.add(callbackInfo);
+        
+        const cleanupFunction = () => {
+            this.#callbackInfos.delete(callbackInfo);
         };
-
-        mapNullCoalesce(this.#onUpdateCallbacksForKeys, key, new Set()).add(onUpdateCallback);
-
-        return () => {
-            cleanupFunction();
-            this.callbackSelf().#onUpdateCallbacksForKeys.get(key).delete(onUpdateCallback);
-        }
-    }
-
-    get callbackCount() {
-        let count = this.#onUpdateCallbacks.length;
-        for (const key in this.#onUpdateCallbacksForKeys) {
-            count += this.#onUpdateCallbacksForKeys[key].length;
-        }
-
-        return count;
-    }
-
-    #onUpdate() {
-        for (const onUpdateCallback of this.#onUpdateCallbacks) {
-            onUpdateCallback();
+        if (addToCleanup !== undefined) {
+            addToCleanup.push(cleanupFunction);
         }
     }
 
     /**
-     * @template {keyof T} K
-     * @param {K} key
-     * @param {T[K]} prevValue
+     * @param {T} previousValue 
+     * @param {T} value 
      */
-    async #onUpdateKey(key, prevValue) {
-        // Order tree so that consumer always comes after producer
-        const callbackTree = [...(this.#onUpdateCallbacksForKeys.get(key) ?? [])].sort((a, b) => {
-            if (a.consumes.has(b.produces)) {
-                return 1;
-            } else if (b.consumes.has(a.produces)) {
-                return -1;
-            } else {
-                return 0;
-            }
-        })
-        for (const onUpdateCallback of callbackTree) {
-            if (onUpdateCallback.produces) {
-                await onUpdateCallback.callback(this.#state[key], prevValue);
-            } else {
-                onUpdateCallback.callback(this.#state[key], prevValue);
-            }
-        }
-    }
-
-    /**
-     * @template {keyof T} K
-     * @param {K} key
-     */
-    get(key) {
-        return this.#state[key];
-    }
-
-    /**
-     * @template V
-     * @param {V} val
-     */
-    static stateRef(val) {
-        /** @type {ExistingState<{ref: V}} */
-        const state = new ExistingState();
-        state.update("ref", val);
-        return state.getRef("ref");
-    }
-
-    static constStateRef(val) {
-        /** @type {ExistingState<{ref: V}} */
-        const state = new ExistingState();
-        state.update("ref", val);
-        return state.getConstRef("ref");
-    }
-
-    /**
-     * @description Returns a permanently alive reference to the key along with means to callback when it is updated
-     * @template {keyof T} K
-     * @param {K} key 
-     * @returns {ExistingStateRef<T[K]>}
-     */
-    getRef(key) {
-        const self = this;
-        return {
-            getTransformRef: (transform) => {
-                return self.callbackSelf().getTransformRef(key, transform);
-            },
-            addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
-                return self.callbackSelf().addOnUpdateCallbackForKey(key, onUpdateCallback, cleanupFunction, options);
-            },
-            update: (val) => { self.update(key, val); },
-            forceUpdate() { self.callbackSelf().forceUpdate(key); },
-            get() {return self.callbackSelf().get(key); },
-        }
-    }
-
-    /**
-     * @description Returns a permanently alive reference to the key along with means to callback when it is updated
-     * @template {keyof T} K
-     * @param {K} key 
-     * @returns {ExistingStateConstRef<T[K]>}
-     */
-    getConstRef(key) {
-        const self = this;
-        return {
-            getTransformRef: (transform) => {
-                return self.callbackSelf().getTransformRef(key, transform);
-            },
-            addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
-                return self.callbackSelf().addOnUpdateCallbackForKey(key, onUpdateCallback, cleanupFunction, options);
-            },
-            get() {return self.callbackSelf().get(key); }
-        }
-    }
-
-    /**
-     * @description Returns a permanently alive reference to the key along with means to callback when it is updated, that is transformed by transform function when retrieved
-     * @template {keyof T} K
-     * @template TransformV
-     * @param {K} key 
-     * @param {(value: T[K]) => TransformV} transform
-     * @returns {ExistingStateConstRef<TransformV>}
-     */
-    getTransformRef(key, transform) {
-        const self = this;
-
-        return {
-            getTransformRef: (transform2) => {
-                return self.callbackSelf().getTransformRef(key, (val) => transform2(transform(val)));
-            },
-            addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
-                let prevVal = transform(self.callbackSelf().#state[key]);
-                return self.callbackSelf().addOnUpdateCallbackForKey(key, async (val) => {
-                    const transformVal = transform(val);
-                    await ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
-                    prevVal = transformVal;
-                }, cleanupFunction, options);
-            },
-            get() { return transform(self.callbackSelf().#state[key]); }
-        }
-    }
-
-    /**
-     * @template TransformV
-     * @param {ExistingStateConstRef<unknown>[]} constRefs 
-     * @param {() => TransformV} transform
-     * @return {ExistingStateConstRef<TransformV>}
-     */
-    static tupleTransformRef(constRefs, transform) {
-        return {
-            getTransformRef: (transform2) => {
-                return ExistingState.tupleTransformRef(constRefs, () => transform2(transform()))
-            },
-            addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
-                let prevVal = transform();
-                for (const constRef of constRefs) {
-                    cleanupFunction = constRef.addOnUpdateCallback(async () => {
-                        const transformVal = transform();
-                        await ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
-                        prevVal = transformVal;
-                    }, cleanupFunction, options);
+    #onUpdate(previousValue, value) {
+        for (const callbackInfo of this.#callbackInfos) {
+            if (callbackInfo.options.requireChangeForUpdate === true) {
+                if (previousValue !== value) {
+                    callbackInfo.callback(previousValue, value);
                 }
-                return cleanupFunction;
-            },
-            get() { return transform(); }
+            } else {
+                callbackInfo.callback(previousValue, value);
+            }
         }
     }
 
-    /** @type {Map<symbol, {cleanupAssigned: boolean, value: any, updating: Promise}>} */
-    static #transformState = new Map();
+    set(value) {
+        const previousValue = this.#valueRef.ref;
+        this.#valueRef.ref = value;
+        this.#onUpdate(previousValue, this.#valueRef.ref);
+    }
 
+    /** @type {State<T>} */
+    #movedFrom;
     /**
-     * @template TransformV
-     * @param {ExistingStateAsyncConstRef<unknown>[]} constRefs 
-     * @param {() => Promise<TransformV>} transform
-     * @param {TransformV>} initialValue
-     * @param {{
-     *     waitForSet?: boolean
-     * }} options
-     * @return {ExistingStateAsyncConstRef<TransformV>}
+     * @param {State<T>} otherState 
      */
-    static asyncTupleTransformRef(constRefs, transform, initialValue, options) {
-        options ??= {};
-        options.waitForSet ??= false;
+    consumeCallbacks(otherState) {
+        const otherStateCallbacks = otherState.#callbackInfos;
+        const otherStateValueRef = otherState.#valueRef;
+        for (const callback of otherStateCallbacks) {
+            this.#callbackInfos.add(callback)
+        }
 
-        const transformID = Symbol();
-        ExistingState.#transformState.set(transformID, {
-            cleanupAssigned: false,
-            value: initialValue,
-            updating: undefined
-        });
-        const onUpdateCallbacks = [];
+        // Move all moved from states to be equivalent to the current state
+        this.#movedFrom = otherState
+        let movedFromState = this.#movedFrom;
+        while (movedFromState !== undefined) {
+            movedFromState.#callbackInfos = this.#callbackInfos;
+            movedFromState.#valueRef = this.#valueRef;
 
-        const globalCleanupFunctions = [];
-        for (const constRef of constRefs) {
-            globalCleanupFunctions.push(constRef.addOnUpdateCallback(async () => {
-                ExistingState.#transformState.get(transformID).value = await transform();
-            }, null, {produces: transformID}));
+            movedFromState = movedFromState.#movedFrom;
         }
         
-        globalCleanupFunctions.push(() => {
-            ExistingState.#transformState.delete(transformID);
-        });
-        const globalCleanup = () => {
-            for (const globalCleanupFunction of globalCleanupFunctions) {
-                globalCleanupFunction();
-            }
-        };
+        for (const callback of otherStateCallbacks) {
+            callback.callback(otherStateValueRef.ref, this.#valueRef.ref);
+        }
+    }
 
-        /** @type {ExistingStateAsyncConstRef<TransformV>} */
-        const ref = {
-            assignCleanup: (cleanupFunction) => {
-                ExistingState.#transformState.get(transformID).cleanupAssigned = true;
-                return () => {
-                    globalCleanup();
-                    cleanupFunction();
-                };
-            },
-            getAsyncTransformRef: (transform2) => {
-                const asyncTransformRef = ExistingState.asyncTupleTransformRef(constRefs, async () => {
-                    return await transform2(await transform());
+    forceUpdate() {
+        this.#onUpdate(this.#valueRef.ref, this.#valueRef.ref);
+    }
+
+    get() {
+        return this.#valueRef.ref;
+    }
+
+    /**
+     * @returns {ConstState<T>}
+     */
+    asConst() {
+        return new ConstState(this);
+    }
+
+    /**
+     * @template T2
+     * @param {(currentValue: T) => T2} transform
+     * @param {(() => void)[]} addToCleanup
+     * @param {StateTransformOptions<T2>=} options
+     * @returns {ConstState<T2>}
+     */
+    asTransform(transform, addToCleanup, options) {
+        options ??= {};
+        const state = new State();
+
+        this.addOnUpdateCallback((_, currentValue) => {
+            state.set(transform(currentValue))
+        }, addToCleanup);
+        state.set(transform(this.#valueRef.ref));
+
+        return new ConstState(state);
+    }
+
+    /**
+     * @template R1, R2, R3, R4, R5, R6, R7
+     * @typedef {(
+     *     transforms: [
+     *         (currentValue: T) => R1,
+     *         (currentValue: T) => R2,
+     *         (currentValue: T) => R3,
+     *         (currentValue: T) => R4, 
+     *         (currentValue: T) => R5, 
+     *         (currentValue: T) => R6, 
+     *         (currentValue: T) => R7, 
+     *     ],
+     *     addToCleanup: (() => void)[],
+     *     options: StateTransformOptions=
+     * ) => [
+     *     ConstState<R1>,
+     *     ConstState<R2>,
+     *     ConstState<R3>,
+     *     ConstState<R4>, 
+     *     ConstState<R5>, 
+     *     ConstState<R6>, 
+     *     ConstState<R7>, 
+     * ]} AsAtomicTransformFunction
+     **/
+
+    /**
+     * @template R1, R2, R3, R4, R5, R6, R7
+     * @type {AsAtomicTransformFunction<R1, R2, R3, R4, R5, R6, R7>}
+     **/
+    asAtomicTransforms(transforms, addToCleanup, options) {
+        options ??= {};
+        const states = transforms.map(() => new State());
+
+        this.addOnUpdateCallback((_, currentValue) => {
+            for (let i = 0; i < transforms.length; ++i) {
+                states[i].#valueRef.ref = transforms[i](currentValue);
+            }
+            for (const state of states) {
+                state.forceUpdate();
+            }
+        }, addToCleanup);
+        for (let i = 0; i < transforms.length; ++i) {
+            states[i].#valueRef.ref = transforms[i](this.#valueRef.ref);
+        }
+        for (const state of states) {
+            state.forceUpdate();
+        }
+
+        return states.map(state => new ConstState(state));
+    }
+
+    /**
+     * @template T
+     * @param {State[]} states 
+     * @param {() => T} transform 
+     * @param {(() => void)[]} addToCleanup
+     * @param {StateTransformOptions<T>=} options
+     */
+    static tupleTransform(states, transform, addToCleanup, options) {
+        options ??= {};
+        /** @type {State<T>} */
+        const transformState = new State();
+
+        for (const state of states) {
+            state.addOnUpdateCallback(() => {
+                transformState.set(transform());
+            }, addToCleanup)
+        }
+        transformState.set(transform());
+
+        return new ConstState(transformState);
+    }
+
+    /**
+     * @template T
+     * @param {State[]} states 
+     * @param {() => Promise<T>} asyncTransform 
+     * @param {(() => void)[]} addToCleanup
+     * @param {StateAsyncTransformOptions<T>=} options
+     */
+    static asyncTupleTransform(states, asyncTransform, addToCleanup, options) {
+        options ??= {};
+        /** @type {State<T>} */
+        const transformState = new State(options.initialValue);
+
+        for (const state of states) {
+            state.addOnUpdateCallback(() => {
+                asyncTransform().then(result => {
+                    transformState.set(result);
                 });
-                let childCleanup = () => {};
-                childCleanup = asyncTransformRef.assignCleanup(childCleanup);
-                globalCleanupFunctions.push(childCleanup);
-                return asyncTransformRef;
-            },
-            addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
-                if (!ExistingState.#transformState.get(transformID).cleanupAssigned) {
-                    throw "Cleanup was not assigned for async tuple transform ref before using addOnUpdateCallback()";
-                }
-                let prevVal = ExistingState.#transformState.get(transformID).value;
-                for (const constRef of constRefs) {
-                    const realCB = async () => {
-                        const transformVal = ExistingState.#transformState.get(transformID).value;
-                        ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
-                        prevVal = transformVal;
-                    };
-
-                    cleanupFunction = constRef.addOnUpdateCallback(realCB, cleanupFunction, {...options, consumes: new Set([transformID])});
-                    onUpdateCallbacks.push(realCB);
-                }
-                return cleanupFunction;
-            },
-            get: () => {
-                if (!ExistingState.#transformState.get(transformID).cleanupAssigned) {
-                    throw "Cleanup was not assigned for async tuple transform ref before using get()";
-                }
-                return ExistingState.#transformState.get(transformID).value;
-            }
-        };
-
-        if (!options.waitForSet) {
-            transform().then(value => {
-                ExistingState.#transformState.get(transformID).value = value;
-                for (const callback of onUpdateCallbacks) {
-                    callback();
-                }
+            }, addToCleanup)
+        }
+        if (options.waitForSet !== true) {
+            asyncTransform().then(result => {
+                transformState.set(result);
             });
         }
 
-        return ref;
+        return new ConstState(transformState);
     }
+}
 
-    clear() {
-        const oldState = this.#state;
-        this.#state = {};
-        this.#innerStates = new Map();
-        for (const key in this.#onUpdateCallbacksForKeys) {
-            this.#onUpdateKey(key, oldState[key]);
-        }
-        this.#onUpdate();
+/** @template T */
+export class ConstState {
+    /** @type {State<T>} */
+    #state;
+
+    /**
+     * @param {State<T>} state 
+     */
+    constructor(state) {
+        this.#state = state;
     }
 
     /**
-     * @template {keyof T} K
-     * @param {K} key 
-     * @param {T[K]} value
-     * @param {{
-     *   isSaved?: boolean
-     * }} options
+     * @param {StateCallback<T>} callback 
+     * @param {StateCallbackOptions} options 
      */
-    initAssign(key, value, options) {
-        options ??= {};
+    addOnUpdateCallback(callback, options) {
+        this.#state.addOnUpdateCallback(callback, options);
+    }
 
-        this.#state[key] ??= value;
-        if (options.isSaved === true) {
-            this.#savedKeys.add(key);
-        }
+    get() {
+        return this.#state.get();
     }
 
     /**
-     * @template {keyof T} K
-     * @param {K} key 
-     * @param {T[K]} value 
+     * @template T
+     * @param {T} value 
      */
-    update(key, value) {
-        const prevValue = this.#state[key];
-        this.#state[key] = value;
-        this.#onUpdateKey(key, prevValue);
-        this.#onUpdate();
+    static instance(value) {
+        return new ConstState(new State(value));
     }
     
     /**
-     * @template {keyof T} K
-     * @param {K} key 
+     * @template T2
+     * @param {(currentValue: T) => T2} transform
+     * @param {StateTransformOptions<T2>=} options
      */
-    forceUpdate(key) {
-        this.#onUpdateKey(key, this.#state[key]);
-        this.#onUpdate();
+    asTransform(transform, options) {
+        options ??= {};
+        return this.#state.asTransform(transform, options);
+    }
+    
+    /**
+     * @template R1, R2, R3, R4, R5, R6, R7
+     * @type {AsAtomicTransformFunction<R1, R2, R3, R4, R5, R6, R7>}
+     **/
+    asAtomicTransforms(transforms, addToCleanup, options) {
+        return this.#state.asAtomicTransforms(transforms, addToCleanup, options);
+    }
+}
+
+/**
+ * @typedef {Object} _PersistentStateOptions
+ * @property {boolean=} isSaved
+ * @property {(() => void)[]=} addToCleanup
+ **/
+
+/** @typedef {_PersistentStateOptions & StateCallbackOptions} PersistentStateOptions */
+
+/** @typedef {Record<string, any>} PriorPersistentState */
+/** @typedef {(persistentState: PersistentState) => void} PersistentStateCallback */
+
+export class PersistentState {
+    /** @type {PriorPersistentState} */
+    #priorState = {};
+    /** @type {PersistentStateCallback[]} */
+    #callbacks = [];
+    /** @type {Map<string, State | PersistentState | ConstState>} */
+    #states = new Map();
+    /** @type {Set<string>} */
+    #savedKeys = new Set();
+
+    /**
+     * @param {} priorState
+     */
+    constructor(priorState) {
+        this.#priorState = priorState ?? {};
+    }
+
+    set(priorState) {
+        this.#priorState = priorState;
+    }
+    
+    toJSON() {
+        const jsonState = {};
+        for (const [key, state] of this.#states) {
+            if (state instanceof PersistentState) {
+                jsonState[key] = state.toJSON();
+            } else if (this.#savedKeys.has(key)) {
+                jsonState[key] = state.get();
+            }
+        }
+        
+        return jsonState;
+    }
+
+    #onUpdate() {
+        for (const callback of this.#callbacks) {
+            callback(this);
+        }
     }
 
     /**
-     * @template {keyof T} K
-     * @param {K} key 
+     * @template {State | PersistentState | ConstState} T
+     * @param {string} key 
+     * @param {T} state 
+     * @param {PersistentStateOptions} options
+     * @returns T
      */
-    getInnerState(key) {
-        let innerState = this.#innerStates.get(key);
-        if (innerState !== undefined) {
-            return innerState;
+    registerState(key, state, options) {
+        options ??= {};
+
+        if (!(state instanceof PersistentState) && options.addToCleanup === undefined) {
+            throw new Error("You must specify a cleanup function in options when registering a non-persistent State to a PersistentState")
         }
 
-        this.#savedKeys.add(key);
-        this.#state[key] ??= {};
-        innerState = new ExistingState(this.#state[key]);
-        // No cleanup necessary, if this needs cleaned up then the inner state is gone and unreferenceable
-        innerState.addOnUpdateCallback(() => {
-            this.update(key, innerState.#state);
-        }, null);
-        this.#innerStates.set(key, innerState);
+        if (state instanceof ConstState) {
+            if (options.isSaved) {
+                throw new Error("state cannot be ConstState and saved as ConstState cannot be written to from the saved value");
+            } else {
+                delete this.#priorState[key];
+            }
+        }
+        
+        if (options.isSaved === true) {
+            this.#savedKeys.add(key);
+        }
 
-        return innerState;
+        this.#states.set(key, state);
+        if (this.#priorState[key] !== undefined) {
+            state.set(this.#priorState[key]);
+            delete this.#priorState[key];
+        }
+        state.addOnUpdateCallback(this.#onUpdate.bind(this), options.addToCleanup, {...options, requireChangeForUpdate: true});
+        return state;
+    }
+
+    /**
+     * @param {PersistentStateCallback} callback 
+     */
+    addOnUpdateCallback(callback) {
+        this.#callbacks.push(callback);
     }
 }
 
@@ -526,22 +417,22 @@ export class Page {
     #pageType;
     #pageDisplayName;
     #pageID;
-    #existingState;
+    #persistentState;
     #extraProperties;
 
     /**
      * @param {string} pageType 
      * @param {string} pageDisplayName 
-     * @param {ExistingState=} existingState
+     * @param {PersistentState=} persistentState
      * @param {Record<string, any>=} extraProperties
      * @param {string=} pageID
      */
-    constructor(pageType, pageDisplayName, existingState, extraProperties, pageID) {
+    constructor(pageType, pageDisplayName, persistentState, extraProperties, pageID) {
         this.#pageType = pageType;
         this.#pageDisplayName = pageDisplayName;
-        this.#existingState = existingState ?? new ExistingState();
+        this.#persistentState = persistentState ?? new PersistentState();
         // no cleanup needed, page will already be destroyed if this needs cleaned up
-        this.#existingState.addOnUpdateCallback(() => {setUserPages(Pages.Global());}, null);
+        this.#persistentState.addOnUpdateCallback(() => {setUserPages(Pages.Global());});
         this.#extraProperties = extraProperties ?? {};
         this.#pageID = pageID ?? unusedID();
     }
@@ -553,7 +444,7 @@ export class Page {
         return new Page(
             pageJSON.pageType,
             pageJSON.pageDisplayName,
-            new ExistingState(pageJSON.existingState),
+            new PersistentState(pageJSON.persistentState),
             pageJSON.extraProperties,
             pageJSON.pageID
         );
@@ -563,7 +454,7 @@ export class Page {
         return {
             pageType: this.#pageType,
             pageDisplayName: this.#pageDisplayName,
-            existingState: this.#existingState.toJSON(),
+            persistentState: this.#persistentState.toJSON(),
             extraProperties: this.#extraProperties,
             pageID: this.#pageID
         };
@@ -581,8 +472,8 @@ export class Page {
         return this.#pageID;
     }
 
-    get existingState() {
-        return this.#existingState;
+    get persistentState() {
+        return this.#persistentState;
     }
 
     get extraProperties() {
@@ -646,20 +537,18 @@ export class Pages {
 
     /**
      * @param {() => void} onUpdateCallback
-     * @param {() => void} cleanupFunction
+     * @param {(() => void)[]} addToCleanup
      */
-    addOnUpdateCallback(onUpdateCallback, cleanupFunction) {
-        if (cleanupFunction === undefined) {
-            throw "You must specify a cleanup function or null for adding a callback for pages";
+    addOnUpdateCallback(onUpdateCallback, addToCleanup) {
+        if (addToCleanup === undefined) {
+            throw "You must specify a cleanup function array for adding a callback for pages";
         }
-        cleanupFunction ??= () => {};
 
         this.#onUpdateCallbacks.add(onUpdateCallback);
 
-        return () => {
-            cleanupFunction();
+        addToCleanup.push(() => {
             this.#onUpdateCallbacks.delete(onUpdateCallback);
-        }
+        });
     }
     
     #onCurrentPageChanged() {
@@ -670,20 +559,18 @@ export class Pages {
 
     /**
      * @param {() => void} onCurrentPageChangedCallback
-     * @param {() => void} cleanupFunction
+     * @param {(() => void)[]} addToCleanup
      */
-    addOnCurrentPageChangedCallback(onCurrentPageChangedCallback, cleanupFunction) {
-        if (cleanupFunction === undefined) {
-            throw "You must specify a cleanup function or null for adding a callback for pages";
+    addOnCurrentPageChangedCallback(onCurrentPageChangedCallback, addToCleanup) {
+        if (addToCleanup === undefined) {
+            throw "You must specify a cleanup function array for adding a callback for pages";
         }
-        cleanupFunction ??= () => {};
 
         this.#onCurrentPageChangedCallbacks.add(onCurrentPageChangedCallback);
 
-        return () => {
-            cleanupFunction();
+        addToCleanup.push(() => {
             this.#onCurrentPageChangedCallbacks.delete(onCurrentPageChangedCallback);
-        }
+        });
     }
 
     /**

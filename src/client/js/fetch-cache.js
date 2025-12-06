@@ -1,12 +1,13 @@
 import { searchTaggables } from "../../api/client-get/search-taggables.js";
 import selectFiles from "../../api/client-get/select-files.js";
 import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
-import { ExistingState } from "../page/pages.js";
+import { State, ConstState } from "../page/pages.js";
 import { RealizationMap } from "./client-util.js";
 
 /** @typedef {"tags" | "taggables" | "files"} ResettableCacheType */
 /**
  * @typedef {Object} FetchCacheOptions
+ * @property {any} initialValue
  * @property {boolean=} waitForSet
  */
 
@@ -18,8 +19,6 @@ import { RealizationMap } from "./client-util.js";
 function CacheProperty(options) {
     return options;
 }
-
-/** @import {ExistingStateRef, ExistingStateConstRef, ExistingStateAsyncConstRef} from "../page/pages.js" */
 
 const CachePropertiesArray = /** @type {const} */ ([
     ["getTagsFromLocalTagServiceIDs", CacheProperty({resetsWith: new Set(["tags", "taggables"])})],
@@ -36,7 +35,7 @@ export class FetchCache {
         endpoint, {
             /** @type {RealizationMap<string, any>} */
             values: new RealizationMap(),
-            state: ExistingState.stateRef()
+            state: new State()
         }
     ]));
 
@@ -60,30 +59,29 @@ export class FetchCache {
 
     /**
      * @template HashMethod, ApiMethod
-     * @param {ExistingStateConstRef<any>[]} constRefs 
+     * @param {ConstState<any>[]} constStates 
      * @param {Endpoint} cacheName 
      * @param {HashMethod} hasher 
      * @param {ApiMethod} apiMethod
-     * @param {any} initialValue
+     * @param {(() => void)[]} addToCleanup
      * @param {FetchCacheOptions} options
-     * @returns {ExistingStateAsyncConstRef<Awaited<ReturnType<ApiMethod>>>}
+     * @returns {ConstState<Awaited<ReturnType<ApiMethod>>>}
      */
-    #apiCallAsyncConstRef(constRefs, cacheName, hasher, apiMethod, initialValue, options) {
+    #apiCallConstState(constStates, cacheName, hasher, apiMethod, addToCleanup, options) {
         const cache = this.#cache.get(cacheName);
-        return ExistingState.asyncTupleTransformRef([
-            ...constRefs,
+        return State.asyncTupleTransform([
+            ...constStates,
             cache.state
         ], async () => {
-            const values = constRefs.map(ref => ref.get());
+            const values = constStates.map(ref => ref.get());
             const hash = hasher(...values);
             if (cache.values.getStatus(hash) === "empty") {
                 cache.values.setAwaiting(hash);
                 cache.values.set(hash, await apiMethod(...values));
             }
             const returned = await cache.values.get(hash);
-            console.log("awaited return", returned);
             return returned;
-        }, initialValue, options)
+        }, addToCleanup, options);
     }
 
     /**
@@ -97,50 +95,58 @@ export class FetchCache {
         return `${localTagServiceIDs.join("\x01")}\x02${taggableCursor}\x02${taggableIDs.join("\x01")}`;
     }
     /**
-     * @param {ExistingStateConstRef<number[]>} localTagServiceIDsConstRef 
-     * @param {ExistingStateConstRef<string>} taggableCursorConstRef 
-     * @param {ExistingStateConstRef<number[]>} taggableIDsConstRef
+     * @param {ConstState<number[]>} localTagServiceIDsConstState 
+     * @param {ConstState<string>} taggableCursorConstState 
+     * @param {ConstState<number[]>} taggableIDsConstState
+     * @param {(() => void)[]} addToCleanup
      * @param {FetchCacheOptions} options
      */
-    getTagsFromLocalTagServiceIDsAsyncConstRef(localTagServiceIDsConstRef, taggableCursorConstRef, taggableIDsConstRef, options) {
-        return this.#apiCallAsyncConstRef(
-            [localTagServiceIDsConstRef, taggableCursorConstRef, taggableIDsConstRef],
+    getTagsFromLocalTagServiceIDsConstState(localTagServiceIDsConstState, taggableCursorConstState, taggableIDsConstState, addToCleanup, options) {
+        return this.#apiCallConstState(
+            [localTagServiceIDsConstState, taggableCursorConstState, taggableIDsConstState],
             "getTagsFromLocalTagServiceIDs",
             FetchCache.#getTagsFromLocalTagServiceIDsHash,
             getTagsFromLocalTagServiceIDs,
-            [],
-            options
+            addToCleanup,
+            {
+                initialValue: [],
+                ...options
+            }
         );
     }
     
     /**
-     * @param {ClientSearchQuery} clientSearchQuery 
+     * @param {ClientSearchQuery} clientSearchQuery
      * @param {WantedCursor} wantedCursor
      * @param {SearchWantedField | SearchWantedField[]} wantedFields
-     * @param {number[]} localTagServiceIDs 
+     * @param {number[]} localTagServiceIDs
      */
     static #searchTaggablesHash(clientSearchQuery, wantedCursor, wantedFields, localTagServiceIDs) {
         return `${JSON.stringify(clientSearchQuery)}\x02${wantedCursor}\x02${JSON.stringify(wantedFields)}\x02${localTagServiceIDs.join("\x01")}`;
     }
 
     /**
-     * @param {ExistingStateConstRef<ClientSearchQuery>} clientSearchQuery
-     * @param {ExistingStateConstRef<WantedCursor>} wantedCursor
-     * @param {ExistingStateConstRef<SearchWantedField | SearchWantedField[]>} wantedFields
-     * @param {ExistingStateConstRef<number[]>} localTagServiceIDs
+     * @param {ConstState<ClientSearchQuery>} clientSearchQueryConstState
+     * @param {ConstState<WantedCursor>} wantedCursorConstState
+     * @param {ConstState<SearchWantedField | SearchWantedField[]>} wantedFieldsConstState
+     * @param {ConstState<number[]>} localTagServiceIDsConstState
+     * @param {(() => void)[]} addToCleanup
      * @param {FetchCacheOptions} options
      */
-    searchTaggablesAsyncConstRef(clientSearchQueryConstRef, wantedCursorConstRef, wantedFieldsConstRef, localTagServiceIDsConstRef, options) {
-        return this.#apiCallAsyncConstRef(
-            [clientSearchQueryConstRef, wantedCursorConstRef, wantedFieldsConstRef, localTagServiceIDsConstRef],
+    searchTaggablesConstState(clientSearchQueryConstState, wantedCursorConstState, wantedFieldsConstState, localTagServiceIDsConstState, addToCleanup, options) {
+        return this.#apiCallConstState(
+            [clientSearchQueryConstState, wantedCursorConstState, wantedFieldsConstState, localTagServiceIDsConstState],
             "searchTaggables",
             FetchCache.#searchTaggablesHash,
             searchTaggables,
+            addToCleanup,
             {
-                cursor: undefined,
-                result: []
-            },
-            options
+                initialValue: {
+                    cursor: undefined,
+                    result: []
+                },
+                ...options
+            }
         );
     }
     
@@ -151,17 +157,21 @@ export class FetchCache {
         return `${fileIDs.join("\x01")}`;
     }
     /**
-     * @param {ExistingStateConstRef<number[]>} fileIDsConstRef
+     * @param {ConstState<number[]>} fileIDsConstState
+     * @param {(() => void)[]} addToCleanup
      * @param {FetchCacheOptions} options
      */
-    selectFilesAsyncConstRef(fileIDsConstRef) {
-        return this.#apiCallAsyncConstRef(
-            [fileIDsConstRef],
+    selectFilesConstState(fileIDsConstState, addToCleanup, options) {
+        return this.#apiCallConstState(
+            [fileIDsConstState],
             "selectFiles",
             FetchCache.#selectFilesHash,
             selectFiles,
-            [],
-            options
+            addToCleanup,
+            {
+                initialValue: [],
+                ...options
+            }
         );
     }
 }

@@ -77,48 +77,50 @@ export class Modals {
     
     /**
      * @param {() => void} onUpdateCallback
-     * @param {() => void} cleanupFunction
+     * @param {(() => void)[]} addToCleanup
      */
-    addOnUpdateCallback(onUpdateCallback, cleanupFunction) {
-        if (cleanupFunction === undefined) {
-            throw "You must specify a cleanup function or null for adding a callback to a modal";
+    addOnUpdateCallback(onUpdateCallback, addToCleanup) {
+        if (addToCleanup === undefined) {
+            throw "You must specify a cleanup function array for adding a callback to a modal";
         }
-        cleanupFunction ??= () => {};
 
         this.#onUpdateCallbacks.add(onUpdateCallback);
 
-        return () => {
-            cleanupFunction();
+        addToCleanup.push(() => {
             this.#onUpdateCallbacks.delete(onUpdateCallback);
-        }
+        });
     }
 
-    addOnPushCallback(onPushCallback, cleanupFunction) {
-        if (cleanupFunction === undefined) {
-            throw "You must specify a cleanup function or null for adding a callback to a modal";
+    /**
+     * @param {() => void} onPushCallback
+     * @param {(() => void)[]} addToCleanup
+     */
+    addOnPushCallback(onPushCallback, addToCleanup) {
+        if (addToCleanup === undefined) {
+            throw "You must specify a cleanup function array for adding a callback to a modal";
         }
-        cleanupFunction ??= () => {};
 
         this.#onPushCallbacks.add(onPushCallback);
 
-        return () => {
-            cleanupFunction();
+        addToCleanup.push(() => {
             this.#onPushCallbacks.delete(onPushCallback);
-        }
+        });
     }
 
-    addOnPopCallback(onPopCallback, cleanupFunction) {
-        if (cleanupFunction === undefined) {
-            throw "You must specify a cleanup function or null for adding a callback to a modal";
+    /**
+     * @param {() => void} onPopCallback
+     * @param {(() => void)[]} addToCleanup
+     */
+    addOnPopCallback(onPopCallback, addToCleanup) {
+        if (addToCleanup === undefined) {
+            throw "You must specify a cleanup function array for adding a callback to a modal";
         }
-        cleanupFunction ??= () => {};
 
         this.#onPopCallbacks.add(onPopCallback);
 
-        return () => {
-            cleanupFunction();
+        addToCleanup.push(() => {
             this.#onPopCallbacks.delete(onPopCallback);
-        }
+        });
     }
 
     /**

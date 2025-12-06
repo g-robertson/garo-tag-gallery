@@ -1,13 +1,14 @@
 import getNamespaces from "../../api/client-get/namespaces.js";
+import { executeFunctions } from "../js/client-util.js";
 import { User } from "../js/user.js";
-import { ExistingState } from "../page/pages.js";
+import { State } from "../page/pages.js";
 import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
 
 /** @import {DBNamespace} from "../../db/tags.js" */
 /** @import {DBLocalMetric} from "../../db/metrics.js" */
 /** @import {ClientTagGroup} from "../../api/post/search-taggables.js" */
-/** @import {ExistingStateRef} from "../page/pages.js" */
+/** @import {State} from "../page/pages.js" */
 
 /**
  * @typedef {{
@@ -25,14 +26,16 @@ import MultiSelect from "./multi-select.jsx";
  * }} param0
  */
 const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
+    /** @type {(() => {})[]} */
+    const addToCleanup = [];
     multiSelect ??= true;
     onTagGroupsSelected ??= () => {};
     const NAMESPACES_SELECTED = 0;
     const METRIC_RATINGS_SELECTED = 1;
-    const selectedTagGroupOptionsRef = ExistingState.stateRef(new Set([NAMESPACES_SELECTED, METRIC_RATINGS_SELECTED]));
-    /** @type {ExistingStateRef<DBNamespace[]>} */
-    const namespacesRef = ExistingState.stateRef([]);
-    const tagGroupsConstRef = ExistingState.tupleTransformRef([selectedTagGroupOptionsRef, namespacesRef], () => {
+    const selectedTagGroupOptionsRef = new State(new Set([NAMESPACES_SELECTED, METRIC_RATINGS_SELECTED]));
+    /** @type {State<DBNamespace[]>} */
+    const namespacesRef = new State([]);
+    const tagGroupsConstState = State.tupleTransform([selectedTagGroupOptionsRef, namespacesRef], () => {
         const selectedTagGroupOptions = selectedTagGroupOptionsRef.get();
         /** @type {DisplayClientTagGroup[]} */
         let tagGroups = [];
@@ -58,15 +61,19 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
         }
 
         return tagGroups;
-    });
+    }, addToCleanup);
 
-    getNamespaces().then(namespaces => namespacesRef.update(namespaces));
+    const onAdd = () => {
+        return () => executeFunctions(addToCleanup);
+    }
+
+    getNamespaces().then(namespaces => namespacesRef.set(namespaces));
 
     return (
-        <div style={{flexDirection: "column", width: "100%"}}>
+        <div onAdd={onAdd} style={{flexDirection: "column", width: "100%"}}>
             <div>Tag groups to view:</div>
             <div>
-                <MultiSelect optionsConstRef={ExistingState.constStateRef([
+                <MultiSelect optionsConstState={ConstState.instance([
                     {
                         value: NAMESPACES_SELECTED,
                         displayName: "Namespaces"
@@ -82,7 +89,7 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
             
             <div style={{flex: 5}}>
                 {<LazyTextObjectSelector
-                    textObjectsConstRef={tagGroupsConstRef}
+                    textObjectsConstState={tagGroupsConstState}
                     onValuesDoubleClicked={(valuesSelected) => {
                         onTagGroupsSelected(valuesSelected);
                     }}

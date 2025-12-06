@@ -1,26 +1,25 @@
-import { ReferenceableReact } from "../js/client-util.js";
+import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
 
 /** @import {DBPermissionedLocalTaggableService} from "../../db/taggables.js" */
-/** @import {ExistingStateConstRef} from "../page/pages.js" */
+/** @import {ConstState} from "../page/pages.js" */
 
 /**
  * @param {{
- *     selectedLocalTaggableServiceConstRef?: ExistingStateConstRef<DBPermissionedLocalTaggableService>
+ *     selectedLocalTaggableServiceConstState?: ConstState<DBPermissionedLocalTaggableService>
  * }} param0 
  * @returns 
  */
-const LocalTaggableServiceModifications = ({selectedLocalTaggableServiceConstRef}) => {
+const LocalTaggableServiceModifications = ({selectedLocalTaggableServiceConstState}) => {
     const LocalTaggableServiceName = ReferenceableReact();
     
     const onAdd = () => {
         const onSelectionChanged = () => {
-            LocalTaggableServiceName.dom.value = selectedLocalTaggableServiceConstRef.get()?.Service_Name ?? "My taggable service";
+            LocalTaggableServiceName.dom.value = selectedLocalTaggableServiceConstState.get()?.Service_Name ?? "My taggable service";
         };
         onSelectionChanged();
+        selectedLocalTaggableServiceConstState.addOnUpdateCallback(onSelectionChanged, addToCleanup);
 
-        let cleanup = () => {};
-        cleanup = selectedLocalTaggableServiceConstRef.addOnUpdateCallback(onSelectionChanged, cleanup);
-        return cleanup;
+        return () => executeFunctions(addToCleanup);
     };
     
     return (

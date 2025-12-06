@@ -2,11 +2,10 @@ import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
 import { User } from "../js/user.js";
 import { Modals } from "../modal/modals.js";
-import {ExistingState} from "../page/pages.js";
-import { mapUnion } from "../js/client-util.js";
+import { PersistentState, State, ConstState } from "../page/pages.js";
+import { executeFunctions, mapUnion } from "../js/client-util.js";
 import { FetchCache } from "../js/fetch-cache.js";
 
-/** @import {ExistingStateRef, ExistingStateConstRef} from "../page/pages.js" */
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
 /** @import {ClientQueryTag} from "../../api/client-get/tags-from-local-tag-services.js" */
 /** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
@@ -42,20 +41,13 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags) {
 /**
  * @template {any} [T=ClientQueryTag]
  * @param {{
- *  existingState?: ExistingState<{
- *    multiSelectOptions: MultiSelectOption<number>[]
- *    selectedLocalTagServiceIDs: number[]
- *    isExcludeOn: boolean
- *    tagFilterValue: string
- *    tagsPreFilter: ClientQueryTag[]
- *    tags: ClientQueryTag[]
- *  }>
- *  localTagServicesConstRef?: ExistingStateConstRef<DBPermissionedLocalTagService[]>
- *  selectedLocalTagServiceIDsRef?: ExistingStateRef<Set<number>>
- *  taggableCursorConstRef: ExistingStateConstRef<string>
- *  taggableIDsConstRef?: ExistingStateConstRef<number[]>
- *  tagsToRemoveConstRef?: ExistingStateConstRef<Map<number, Set<string>>>
- *  tagsToAddConstRef?: ExistingStateConstRef<Map<number, Map<string, ClientQueryTag>>>
+ *  persistentState?: PersistentState
+ *  localTagServicesConstState?: ConstState<DBPermissionedLocalTagService[]>
+ *  selectedLocalTagServiceIDsState?: State<Set<number>>
+ *  taggableCursorConstState: ConstState<string>
+ *  taggableIDsConstState?: ConstState<number[]>
+ *  tagsToRemoveConstState?: ConstState<Map<number, Set<string>>>
+ *  tagsToAddConstState?: ConstState<Map<number, Map<string, ClientQueryTag>>>
  *  multiSelect?: boolean
  *  excludeable?: boolean
  *  tagSelectionTitle?: string
@@ -64,37 +56,43 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags) {
  * }} param0
  */
 const LocalTagsSelector = ({
-    existingState,
-    localTagServicesConstRef,
-    selectedLocalTagServiceIDsRef,
-    taggableIDsConstRef,
-    taggableCursorConstRef,
-    tagsToRemoveConstRef,
-    tagsToAddConstRef,
+    persistentState,
+    localTagServicesConstState,
+    selectedLocalTagServiceIDsState,
+    taggableIDsConstState,
+    taggableCursorConstState,
+    tagsToRemoveConstState,
+    tagsToAddConstState,
     multiSelect,
     excludeable,
     tagSelectionTitle,
     valueMappingFunction,
     onTagsSelected,
 }) => {
-    localTagServicesConstRef ??= User.Global().localTagServicesAvailableRef();
-    existingState ??= new ExistingState();
-    // If no provided reference to selection, then create one in this component's state, and save it
-    if (selectedLocalTagServiceIDsRef === undefined) {
-        existingState.initAssign("selectedLocalTagServiceIDs", new Set(localTagServicesConstRef.get().map(localTagService => localTagService.Local_Tag_Service_ID)), {isSaved: true});
-        selectedLocalTagServiceIDsRef = existingState.getRef("selectedLocalTagServiceIDs");
-    }
-    existingState.initAssign("isExcludeOn", false, {isSaved: true});
-    existingState.initAssign("tagFilterValue", "");
-    existingState.initAssign("tags", []);
-    taggableCursorConstRef ??= ExistingState.stateRef(undefined);
-    taggableIDsConstRef ??= ExistingState.stateRef(undefined);
-    tagsToRemoveConstRef ??= ExistingState.stateRef(new Map());
-    tagsToAddConstRef ??= ExistingState.stateRef(new Map());
-    const tagsPreFilter = FetchCache.Global().getTagsFromLocalTagServiceIDsAsyncConstRef(
-        selectedLocalTagServiceIDsRef.getTransformRef(selectedLocalTagServiceIDs => [...selectedLocalTagServiceIDs]),
-        taggableCursorConstRef,
-        taggableIDsConstRef
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
+    localTagServicesConstState ??= User.Global().localTagServicesAvailableRef();
+    persistentState ??= new PersistentState();
+    
+    selectedLocalTagServiceIDsState = persistentState.registerState(
+        "selectedLocalTagServiceIDs",
+        selectedLocalTagServiceIDsState ?? new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID))),
+        {isSaved: true, addToCleanup}
+    );
+    const isExcludeOnState = persistentState.registerState("isExcludeOn", new State(false), {isSaved: true, addToCleanup});
+    const tagFilterValueState = persistentState.registerState("tagFilterValue", new State(""), {addToCleanup});
+    /** @type {State<ClientQueryTag[]>} */
+    const tagsState = persistentState.registerState("tags", new State([]), {addToCleanup});
+    taggableCursorConstState ??= new State(undefined);
+    taggableIDsConstState ??= new State(undefined);
+    tagsToRemoveConstState ??= new State(new Map());
+    tagsToAddConstState ??= new State(new Map());
+    const tagsPreFilter = FetchCache.Global().getTagsFromLocalTagServiceIDsConstState(
+        selectedLocalTagServiceIDsState.asTransform(selectedLocalTagServiceIDs => [...selectedLocalTagServiceIDs], addToCleanup),
+        taggableCursorConstState,
+        taggableIDsConstState,
+        addToCleanup
     );
     multiSelect ??= true;
     excludeable ??= true;
@@ -102,17 +100,16 @@ const LocalTagsSelector = ({
     valueMappingFunction ??= MAP_TO_CLIENT_TAGS;
     onTagsSelected ??= () => {};
 
-    const onAdd = async () => {
-        let cleanup = () => {};
+    const onAdd = () => {
 
         // Updates tags allowed to be selected when tag criteria changes (tagsPreFilter, tagFilterValue)
         const onTagCriteriaChanged = () => {
             const tagsToAdd = mapUnion(
-                [...tagsToAddConstRef.get()]
-                .filter(([localTagServiceID,]) => selectedLocalTagServiceIDsRef.get().has(localTagServiceID))
+                [...tagsToAddConstState.get()]
+                .filter(([localTagServiceID,]) => selectedLocalTagServiceIDsState.get().has(localTagServiceID))
                 .map(([, tags]) => tags)
             );
-            const tagsToRemove = tagsToRemoveConstRef.get();
+            const tagsToRemove = tagsToRemoveConstState.get();
             let tags = tagsPreFilter.get();
             tags = tags.filter(tag => {
                 if (tagsToAdd.has(tag.tagName) || tag.tagCount === 0) {
@@ -128,7 +125,7 @@ const LocalTagsSelector = ({
             tags.push(...tagsToAdd.values());
             tags = tags.sort((a, b) => b.tagCount - a.tagCount);
 
-            const tagFilterValue = existingState.get("tagFilterValue");
+            const tagFilterValue = tagFilterValueState.get();
             tags = tags.filter(tag => {
                 const colonSplitTagFilter = tagFilterValue.split(':');
                 let tagNameMatchedPartsFrom = colonSplitTagFilter.length;
@@ -160,30 +157,27 @@ const LocalTagsSelector = ({
                 return true;
             });
 
-            console.log("Existing state updated", tags);
-            existingState.update("tags", tags);
+            tagsState.set(tags);
         };
-        cleanup = tagsPreFilter.assignCleanup(cleanup);
-
         onTagCriteriaChanged();
 
-        cleanup = tagsPreFilter.addOnUpdateCallback(onTagCriteriaChanged, cleanup);
-        cleanup = existingState.addOnUpdateCallbackForKey("tagFilterValue", onTagCriteriaChanged, cleanup);
-        cleanup = tagsToAddConstRef.addOnUpdateCallback(onTagCriteriaChanged, cleanup);
-        cleanup = tagsToRemoveConstRef.addOnUpdateCallback(onTagCriteriaChanged, cleanup);
-        return cleanup;
+        tagsPreFilter.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup);
+        tagFilterValueState.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup);
+        tagsToAddConstState.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup);
+        tagsToRemoveConstState.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     };
 
     return (
-        <div class="local-tags-selector" style={{flexDirection: "column", width: "100%"}} onAdd={onAdd}>
+        <div onAdd={onAdd} class="local-tags-selector" style={{flexDirection: "column", width: "100%"}}>
             <div>Tag services to view/add from:</div>
             <div className="tag-service-selector" style={{flex: 1, overflowY: "auto"}}>
                 <MultiSelect
-                    optionsConstRef={localTagServicesConstRef.getTransformRef(localTagServices => localTagServices.map(localTagService => ({
+                    optionsConstState={localTagServicesConstState.asTransform(localTagServices => localTagServices.map(localTagService => ({
                         value: localTagService.Local_Tag_Service_ID,
                         displayName: localTagService.Service_Name
-                    })))}
-                    selectedOptionsRef={selectedLocalTagServiceIDsRef}
+                    })), addToCleanup)}
+                    selectedOptionsRef={selectedLocalTagServiceIDsState}
                 />
             </div>
             {tagSelectionTitle}:
@@ -211,8 +205,8 @@ const LocalTagsSelector = ({
                         tagName = displayName.slice(lastColonIndex + 1);
                     }
 
-                    const isExcludeOn = existingState.get("isExcludeOn");
-                    const foundSameTag = existingState.get("tags").find(tag => tag.tagName === displayName);
+                    const isExcludeOn = isExcludeOnState.get();
+                    const foundSameTag = tagsState.get().find(tag => tag.tagName === displayName);
                     if (foundSameTag !== undefined) {
                         onTagsSelected([foundSameTag], Boolean(isExcludeOn ^ excludeFromTag));
                     } else {
@@ -226,28 +220,28 @@ const LocalTagsSelector = ({
                             Lookup_Name: tagName
                         };
 
-                        onTagsSelected([enteredClientTag], Boolean(isExcludeOn ^ excludeFromTag), selectedLocalTagServiceIDsRef.get());
+                        onTagsSelected([enteredClientTag], Boolean(isExcludeOn ^ excludeFromTag), selectedLocalTagServiceIDsState.get());
                     }
 
-                    existingState.update("tagFilterValue", "");
+                    tagFilterValueState.set("");
                     e.currentTarget.value = "";
                 }
             }} onInput={(e) => {
-                existingState.update("tagFilterValue", e.currentTarget.value);
+                tagFilterValueState.set(e.currentTarget.value);
             }}/></div>
             {excludeable
-                ? <div>Exclude: <input class="exclude-checkbox" type="checkbox" checked={existingState.get("isExcludeOn") ?? false} onChange={(e) => {
-                    existingState.update("isExcludeOn", e.currentTarget.checked);
+                ? <div>Exclude: <input class="exclude-checkbox" type="checkbox" checked={isExcludeOnState.get()} onChange={(e) => {
+                    isExcludeOnState.set(e.currentTarget.checked);
                 }}/></div>
                 : <></>
             }
             
             <div style={{flex: 5}}>
                 {<LazyTextObjectSelector
-                    textObjectsConstRef={existingState.getConstRef("tags")}
+                    textObjectsConstState={tagsState.asConst()}
                     onValuesDoubleClicked={async (valuesSelected) => {
                         const mappedValues = await valueMappingFunction(valuesSelected);
-                        onTagsSelected(mappedValues, existingState.get("isExcludeOn"), selectedLocalTagServiceIDsRef.get());
+                        onTagsSelected(mappedValues, isExcludeOnState.get(), selectedLocalTagServiceIDsState.get());
                     }}
                     customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== Infinity ? ` (${realizedValue.tagCount})` : ""}</>}
                     customTitleRealizer={(realizedValue) => realizedValue.displayName}

@@ -13,7 +13,7 @@ import LazyDedupePreviewGallery from '../../components/lazy-dedupe-preview-galle
 import DedupeGalleryModal from '../../modal/modals/dedupe-gallery.jsx';
 import DialogBox from '../../modal/modals/dialog-box.jsx';
 import { mergeGroups } from '../../js/client-util.js';
-import { ExistingState } from '../page/pages.js';
+import { PersistentState } from '../page/pages.js';
 import { Modals } from '../../modal/modals.js';
 import { Jobs } from '../../jobs.js';
 
@@ -47,17 +47,17 @@ function mapToFiles(searchResult) {
 
 /** 
  * @param {{
- *  existingState: ExistingState
+ *  persistentState: PersistentState
  * }}
 */
-const DuplicatesProcessingPage = ({existingState}) => {
-    const tagsSelectorState = existingState.getInnerState("tagsSelector");
-    const dedupeGalleryState = existingState.getInnerState("dedupeGallery");
+const DuplicatesProcessingPage = ({persistentState}) => {
+    const tagsSelectorState = persistentState.getInnerState("tagsSelector");
+    const dedupeGalleryState = persistentState.getInnerState("dedupeGallery");
 
-    const defaultMaxSearchDistance = existingState?.maxSearchDistance ?? (REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER);
+    const defaultMaxSearchDistance = persistentState?.maxSearchDistance ?? (REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER);
     /** @type {[number, (maxSearchDistance: number) => void]} */
     const [maxSearchDistance, setMaxSearchDistance] = useState(defaultMaxSearchDistance);
-    useEffect(() => {existingState.update("maxSearchDistance", maxSearchDistance);}, [maxSearchDistance]);
+    useEffect(() => {persistentState.update("maxSearchDistance", maxSearchDistance);}, [maxSearchDistance]);
     const [fileCursor, setFileCursor] = useState();
     /** @type {[ClientFile[], (files: ClientFile[]) => void]} */
     const [files, setFiles] = useState([]);
@@ -171,7 +171,7 @@ const DuplicatesProcessingPage = ({existingState}) => {
             });
             if (optionSelected === REOPEN_BUTTON) {
                 Modals.Global().pushModal(DedupeGalleryModal, {
-                    existingState: dedupeGalleryState
+                    persistentState: dedupeGalleryState
                 });
                 return;
             }
@@ -187,7 +187,7 @@ const DuplicatesProcessingPage = ({existingState}) => {
         Modals.Global().pushModal(DedupeGalleryModal, {
             fileComparisons,
             initialFileComparisonIndex,
-            existingState: dedupeGalleryState
+            persistentState: dedupeGalleryState
         });
     };
 
@@ -206,7 +206,7 @@ const DuplicatesProcessingPage = ({existingState}) => {
                             makeSearch();
                         }}
 
-                        existingState={tagsSelectorState}
+                        persistentState={tagsSelectorState}
                     />
                 </div>
             </div>

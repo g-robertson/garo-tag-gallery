@@ -5,29 +5,36 @@ import CreateOrSearchGroup from '../modal/modals/create-or-search-group.jsx';
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
 import LocalTagsSelector, { MAP_TO_CLIENT_SEARCH_QUERY } from './local-tags-selector.jsx';
 import { clientSearchQueryToDisplayName, isConflictingClientSearchQuery } from '../js/tags.js';
-import { ExistingState } from '../page/pages.js';
+import { PersistentState, State } from '../page/pages.js';
 import { Modals } from '../modal/modals.js';
-/** @import {ExistingStateConstRef} from "../page/pages.js" */
+import { executeFunctions } from '../js/client-util.js';
+/** @import {ConstState} from "../page/pages.js" */
 /** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
 /** @import {DBPermissionedLocalTagService} from '../../db/tags.js' */
 
 /**
  * @param {{
  *  initialSelectedTags?: ClientSearchQuery[]
- *  taggableCursorConstRef: ExistingStateConstRef<string>
+ *  taggableCursorConstState: ConstState<string>
  *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery, localTagServiceIDs: number[]) => void
  *  searchType?: "intersect" | "union"
- *  existingState?: ExistingState<{
- *    clientSearchQuery: ClientSearchQuery[]
- *    selectedLocalTagServiceIDs: Set<number>
- *  }>
+ *  persistentState?: PersistentState
  * }} param0
  */
-const TagsSelector = ({initialSelectedTags, taggableCursorConstRef, onSearchChanged, searchType, existingState}) => {
-    const localTagServicesConstRef = User.Global().localTagServicesAvailableRef();
-    existingState ??= new ExistingState();
-    existingState.initAssign("clientSearchQuery", initialSelectedTags ?? [], {isSaved: true});
-    existingState.initAssign("selectedLocalTagServiceIDs", new Set(localTagServicesConstRef.get().map(localTagService => localTagService.Local_Tag_Service_ID)), {isSaved: true});
+const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchChanged, searchType, persistentState}) => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
+    const localTagServicesConstState = User.Global().localTagServicesAvailableRef(addToCleanup);
+    persistentState ??= new PersistentState();
+    /** @type {State<ClientSearchQuery[]>} */
+    const clientSearchQueryState = persistentState.registerState("clientSearchQuery", new State(initialSelectedTags ?? []), {isSaved: true, addToCleanup});
+    /** @type {State<Set<number>>} */
+    const selectedLocalTagServiceIDsState = persistentState.registerState(
+        "selectedLocalTagServiceIDs",
+        new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID))),
+        {isSaved: true, addToCleanup}
+    );
     onSearchChanged ??= () => {};
     searchType ??= "intersect";
 
@@ -35,14 +42,14 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstRef, onSearchChan
         const searchChanged = () => {
             onSearchChanged({
                 type: searchType,
-                value: existingState.get("clientSearchQuery")
-            }, [...existingState.get("selectedLocalTagServiceIDs")]);
+                value: clientSearchQueryState.get()
+            }, [...selectedLocalTagServiceIDsState.get()]);
         };
         searchChanged();
-        let cleanup = () => {};
-        cleanup = existingState.addOnUpdateCallbackForKey("clientSearchQuery", searchChanged, cleanup);
-        cleanup = existingState.addOnUpdateCallbackForKey("selectedLocalTagServiceIDs", searchChanged, cleanup);
-        return cleanup;
+
+        clientSearchQueryState.addOnUpdateCallback(searchChanged, addToCleanup);
+        selectedLocalTagServiceIDsState.addOnUpdateCallback(searchChanged, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     };
 
     return (
@@ -50,13 +57,13 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstRef, onSearchChan
             Search:
             <div class="tag-search-query" style={{flex: "3 0 15%"}}>
                 <LazyTextObjectSelector
-                    textObjectsConstRef={existingState.getConstRef("clientSearchQuery")}
+                    textObjectsConstState={clientSearchQueryState.asConst()}
                     onValuesDoubleClicked={((_, indices) => {
-                        const clientSearchQuery = existingState.get("clientSearchQuery");
+                        const clientSearchQuery = clientSearchQueryState.get();
                         for (const index of indices.sort((a, b) => b - a)) {
                             clientSearchQuery.splice(index, 1);
                         }
-                        existingState.update("clientSearchQuery", clientSearchQuery);
+                        clientSearchQueryState.forceUpdate();
                     })}
                     customItemComponent={({realizedValue, index}) => (<div style={{width: "100%", position: "relative"}}>
                         <input type="button" style={{position: "absolute", top:0, right: 4}} value="OR" onClick={async () => {
@@ -71,13 +78,13 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstRef, onSearchChan
                                 return;
                             }
 
-                            const clientSearchQuery = existingState.get("clientSearchQuery");
+                            const clientSearchQuery = clientSearchQueryState.get();
                             if (orGroupSearchQuery.value.length === 0) {
                                 clientSearchQuery.splice(index, 1);
                             } else {
                                 clientSearchQuery[index] = orGroupSearchQuery;
                             }
-                            existingState.update("clientSearchQuery", clientSearchQuery);
+                            clientSearchQueryState.forceUpdate();
                         }} />
                         <div className="lazy-selector-selectable-item-portion" style={{width: "100%", overflowX: "hidden"}}>{clientSearchQueryToDisplayName(realizedValue)}</div>
                     </div>)}
@@ -86,12 +93,12 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstRef, onSearchChan
             </div>
             <div style={{flex: "3 1 100%", height: "80%"}}>
                 <LocalTagsSelector 
-                    existingState={existingState.getInnerState("localTagsSelector")}
-                    localTagServicesConstRef={localTagServicesConstRef}
-                    selectedLocalTagServiceIDsRef={existingState.getRef("selectedLocalTagServiceIDs")}
-                    taggableCursorConstRef={taggableCursorConstRef}
+                    persistentState={persistentState.registerState("localTagsSelector", new PersistentState())}
+                    localTagServicesConstState={localTagServicesConstState}
+                    selectedLocalTagServiceIDsState={selectedLocalTagServiceIDsState}
+                    taggableCursorConstState={taggableCursorConstState}
                     onTagsSelected={(clientQueriesToAdd, isExcludeOn) => {
-                        const clientSearchQuery = existingState.get("clientSearchQuery");
+                        const clientSearchQuery = clientSearchQueryState.get();
                         for (let clientSearchQueryToAdd of clientQueriesToAdd) {
                             /** @type {ClientSearchQuery} */
                             if (isExcludeOn) {
@@ -119,7 +126,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstRef, onSearchChan
                                 clientSearchQuery.push(clientSearchQueryToAdd);
                             }
                         }
-                        existingState.update("clientSearchQuery", clientSearchQuery);
+                        clientSearchQueryState.forceUpdate();
                     }}
                     valueMappingFunction={MAP_TO_CLIENT_SEARCH_QUERY}
                 />

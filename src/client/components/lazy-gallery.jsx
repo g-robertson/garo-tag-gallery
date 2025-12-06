@@ -1,11 +1,11 @@
 import { preload } from 'react-dom';
 import '../global.css';
-import { fbjsonParse, ReferenceableReact } from '../js/client-util.js';
+import { executeFunctions, fbjsonParse, ReferenceableReact } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 import { METRIC_TYPES } from '../js/metrics.js';
 import applyMetricToTaggable from '../../api/client-get/apply-metric-to-taggable.js';
 import { User } from '../js/user.js';
-import { ExistingState } from '../page/pages.js';
+import { ConstState, State } from '../page/pages.js';
 
 /** @import {DBUserFacingLocalFile} from "../../db/taggables.js" */
 
@@ -25,7 +25,7 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
     }
 
     return <LazySelector
-        valuesConstRef={ExistingState.stateRef(taggableIDs)}
+        valuesConstState={ConstState.instance(taggableIDs)}
         valuesRealizer={async (values) => {
             const response = await fetch("/api/post/select-user-facing-taggables", {
                 body: JSON.stringify({
@@ -57,8 +57,11 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                     {index + 1} / {taggableIDs.length}
                 </div>
                 {MetricsElement.react(<div style={{position: "absolute", top: "3vh", right: "0", flexDirection: "column"}} onAdd={() => {
-                    const metricValuesMapRef = ExistingState.stateRef(new Map(realizedValue.Metrics.map(metric => [metric.Local_Metric_ID, metric])));
-                    const metricStarsHoveredRef = ExistingState.stateRef({localMetricID: -1, starsHovered: -1})
+                    /** @type {(() => void)[]} */
+                    const addToCleanup = [];
+
+                    const metricValuesMapRef = new State(new Map(realizedValue.Metrics.map(metric => [metric.Local_Metric_ID, metric])));
+                    const metricStarsHoveredRef = new State({localMetricID: -1, starsHovered: -1})
 
                     const onMetricsChanged = () => {
                         const metricValuesMap = metricValuesMapRef.get();
@@ -101,10 +104,10 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                                                       await applyMetricToTaggable(Number(realizedValue.Taggable_ID), localMetric.Local_Metric_ID, i);
                                                   }}
                                                   onMouseOver={() => {
-                                                    metricStarsHoveredRef.update({localMetricID: localMetric.Local_Metric_ID, starsHovered: i});
+                                                    metricStarsHoveredRef.set({localMetricID: localMetric.Local_Metric_ID, starsHovered: i});
                                                   }}
                                                   onMouseLeave={() => {
-                                                    metricStarsHoveredRef.update({localMetricID: -1, starsHovered: -1});
+                                                    metricStarsHoveredRef.set({localMetricID: -1, starsHovered: -1});
                                                   }}
                                             >★</span>
                                         );
@@ -117,11 +120,10 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                     };
                     onMetricsChanged();
                     
-                    let cleanup = () => {};
-                    cleanup = localMetricServicesRef.addOnUpdateCallback(onMetricsChanged, cleanup);
-                    cleanup = metricValuesMapRef.addOnUpdateCallback(onMetricsChanged, cleanup);
-                    cleanup = metricStarsHoveredRef.addOnUpdateCallback(onMetricsChanged, cleanup);
-                    return cleanup;
+                    localMetricServicesRef.addOnUpdateCallback(onMetricsChanged, addToCleanup);
+                    metricValuesMapRef.addOnUpdateCallback(onMetricsChanged, addToCleanup);
+                    metricStarsHoveredRef.addOnUpdateCallback(onMetricsChanged, addToCleanup);
+                    return () => executeFunctions(addToCleanup);
                 }}></div>)}
 
                 {(VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_Extension) !== -1)

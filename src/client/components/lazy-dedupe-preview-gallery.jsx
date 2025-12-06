@@ -23,7 +23,7 @@ const LazyDedupePreviewGallery = ({fileComparisonPairs, onValuesDoubleClicked}) 
     onValuesDoubleClicked ??= () => {};
 
     return <LazySelector
-        valuesConstRef={fileComparisonPairs}
+        valuesConstState={fileComparisonPairs}
         realizeSelectedValues={false}
         valuesRealizer={async (values) => {
             /** @type {Set<number>} */

@@ -1,16 +1,17 @@
-import { ExistingState } from '../page/pages.js';
+import { State } from '../page/pages.js';
 import '../global.css';
 
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
+import { executeFunctions } from '../js/client-util.js';
 
 
-/** @import {ExistingStateRef} from '../page/pages.js' */
+/** @import {State} from '../page/pages.js' */
 
 /**
  * @template T
  * @param {{
  *  items: T[]
- *  selectedItemsRef: ExistingStateRef<Set<T>>
+ *  selectedItemsRef: State<Set<T>>
  *  initialSelectedItemIndices?: number[]
  *  onSelectionChanged?: (selectedItems: T) => void
  *  customItemSelectedComponent: (param0: {realizedValue: T, index: number}) => JSX.Element
@@ -27,15 +28,22 @@ const DualListboxLazyTextObjectSelector = ({
     customItemSelectorComponent,
     customTitleRealizer
 }) => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     itemSelectorHeaderComponent ??= <></>;
     customTitleRealizer ??= () => "";
 
+    const onAdd = () => {
+        return () => executeFunctions(onAdd);
+    };
+
     return (
-        <div style={{width: "100%", flexDirection: "column", margin: 4}}>
+        <div onAdd={onAdd} style={{width: "100%", flexDirection: "column", margin: 4}}>
             Selected items:
             <div style={{flex: 1}}>
                 {<LazyTextObjectSelector
-                    textObjectsConstRef={selectedItemsRef.getTransformRef(selectedItems => [...selectedItems])}
+                    textObjectsConstState={selectedItemsRef.asTransform(selectedItems => [...selectedItems], addToCleanup)}
                     onValuesDoubleClicked={((items) => {
                         const selectedItems = selectedItemsRef.get();
                         for (const item of items) {
@@ -51,7 +59,7 @@ const DualListboxLazyTextObjectSelector = ({
             {itemSelectorHeaderComponent}
             <div style={{marginTop: 8, flex: 3}}>
                 {<LazyTextObjectSelector
-                    textObjectsConstRef={ExistingState.stateRef(items)}
+                    textObjectsConstState={ConstState.instance(items)}
                     onValuesDoubleClicked={(items) => {
                         const selectedItems = selectedItemsRef.get();
                         for (const item of items) {

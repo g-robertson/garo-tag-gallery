@@ -9,22 +9,22 @@ const THUMB_ORIGINAL_HEIGHT = 200;
 const THUMB_WIDTH = 150;
 const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH);
 
-/** @import {ExistingStateConstRef} from "../page/pages.js" */
+/** @import {ConstState} from "../page/pages.js" */
 /** @import {DBUserFacingLocalFile} from "../../db/taggables.js" */
 
 /**
  * @param {{
- *  taggableIDsConstRef: ExistingStateConstRef<number[]>
+ *  taggableIDsConstState: ConstState<number[]>
  *  onValuesSelected?: (valuesSelected: DBUserFacingLocalFile[], indices: number[]) => void
  *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingLocalFile[], indices: number[], indexClicked: number) => void
  * }} param0
  */
-const LazyThumbnailGallery = ({taggableIDsConstRef, onValuesSelected, onValuesDoubleClicked}) => {
+const LazyThumbnailGallery = ({taggableIDsConstState, onValuesSelected, onValuesDoubleClicked}) => {
     onValuesSelected ??= () => {};
     onValuesDoubleClicked ??= () => {};
 
     return <LazySelector
-        valuesConstRef={taggableIDsConstRef}
+        valuesConstState={taggableIDsConstState}
         realizeSelectedValues={false}
         valuesRealizer={async (values) => {
             const response = await fetch("/api/post/select-user-facing-taggables", {

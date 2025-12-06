@@ -1,4 +1,4 @@
-import { ExistingState } from "../page/pages.js";
+import { State } from "../page/pages.js";
 
 /**
  * 
@@ -9,11 +9,11 @@ import { ExistingState } from "../page/pages.js";
  */
 export const OnFormSubmit = ({onFormSubmit}) => {
     onFormSubmit ??= () => {};
-    const firstLoad = ExistingState.stateRef(true);
+    let firstLoad = true;
 
     return <iframe id="frame" name="frame" style={{display: "none"}} onLoad={(e) => {
-        if (firstLoad.get()) {
-            firstLoad.update(false);
+        if (firstLoad) {
+            firstLoad = false;
         } else {
             if (e.currentTarget.contentWindow.performance.getEntriesByType("navigation")[0].responseStatus === 200) {
                 onFormSubmit();

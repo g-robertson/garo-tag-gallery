@@ -5,8 +5,8 @@ import LocalTagServiceModifications from '../../components/local-tag-service-mod
 import deleteLocalTagService from '../../../api/client-get/delete-local-tag-service.js';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
-import { ExistingState } from '../../page/pages.js';
-import { ReferenceableReact } from '../../js/client-util.js';
+import { State } from '../../page/pages.js';
+import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
 /** @import {ExtraProperties} from "../modals.js" */
 
@@ -17,9 +17,12 @@ import { ReferenceableReact } from '../../js/client-util.js';
  * }}
 */
 export default function UpdateLocalTagService({ extraProperties, modalResolve }) {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+
     const ModifySelectedTagService = ReferenceableReact();
     const DeleteSelectedTagService = ReferenceableReact();
-    const selectedLocalTagServiceRef = ExistingState.stateRef(User.Global().localTagServices()[0]);
+    const selectedLocalTagServiceRef = new State(User.Global().localTagServices()[0]);
 
     const onAdd = () => {
         const onLocalTagServiceSelected = () => {
@@ -29,17 +32,16 @@ export default function UpdateLocalTagService({ extraProperties, modalResolve })
         };
         onLocalTagServiceSelected();
 
-        let cleanup = () => {};
-        cleanup = selectedLocalTagServiceRef.addOnUpdateCallback(onLocalTagServiceSelected, cleanup);
-        return cleanup;
+        selectedLocalTagServiceRef.addOnUpdateCallback(onLocalTagServiceSelected, addToCleanup);
+        return () => executeFunctions(addToCleanup);
     };
 
     return {
         component: (
-            <div style={{flexDirection: "column"}} onAdd={onAdd}>
+            <div onAdd={onAdd} style={{flexDirection: "column"}}>
                 <form action="/api/post/update-local-tag-service" target="frame" method="POST">
                     <LocalTagServiceSelector selectedLocalTagServiceRef={selectedLocalTagServiceRef} />
-                    <LocalTagServiceModifications selectedLocalTagServiceConstRef={selectedLocalTagServiceRef} />
+                    <LocalTagServiceModifications selectedLocalTagServiceConstState={selectedLocalTagServiceRef} />
                     <div style={{marginLeft: "8px"}}>
                         {ModifySelectedTagService.react(<input type="submit" value="Modify selected tag service" />)}
                     </div>

@@ -1,11 +1,11 @@
 import '../../global.css';
 import TagsSelector from '../../components/tags-selector.jsx';
 import { Modals } from '../../modal/modals.js';
-import { ExistingState } from '../../page/pages.js';
+import { State } from '../../page/pages.js';
 
 /** @import {ExtraProperties} from "../modals.js" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
-/** @import {ExistingStateRef} "../../page/pages.js" */
+/** @import {State} "../../page/pages.js" */
 
 /** 
  * @param {{
@@ -19,10 +19,11 @@ import { ExistingState } from '../../page/pages.js';
  * }}
 */
 export default function TagSelectorModal({ extraProperties, modalResolve }) {
-    /** @type {ExistingStateRef<ClientSearchQuery | null>} */
-    const searchObjectsRef = ExistingState.stateRef(null);
+    /** @type {State<ClientSearchQuery | null>} */
+    const searchObjectsRef = new State(null);
     extraProperties.initialSelectedTags ??= [];
 
+    
     return {
         component: (
             <div class="tag-selector-modal" style={{width: "100%", height: "100%", flexDirection: "column"}}>
@@ -32,7 +33,7 @@ export default function TagSelectorModal({ extraProperties, modalResolve }) {
                         searchType={extraProperties.searchType}
                         initialSelectedTags={extraProperties.initialSelectedTags}
                         onSearchChanged={(clientSearchQuery) => {
-                            searchObjectsRef.update(clientSearchQuery);
+                            searchObjectsRef.set(clientSearchQuery);
                         }}
                     />
                 </div>
