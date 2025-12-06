@@ -4,11 +4,13 @@ import LazyThumbnailGallery from '../../components/lazy-thumbnail-gallery.jsx';
 
 import GalleryModal from '../../modal/modals/gallery.jsx';
 import ModifyTaggablesModal from '../../modal/modals/modify-taggables.jsx';
-import { searchTaggables } from '../../../api/client-get/search-taggables.js';
 import { trashTaggables } from '../../../api/client-get/trash-taggables.js';
 import { ExistingState, Page } from '../../page/pages.js';
 import { Modals } from '../../modal/modals.js';
 import { ReferenceableReact } from '../../js/client-util.js';
+import { FetchCache } from '../../js/fetch-cache.js';
+
+/** @import {ExistingStateRef, ExistingStateAsyncConstRef} from "../../page/pages.js" */
 
 /** 
  * @param {{
@@ -20,7 +22,6 @@ const FileSearchPageElement = ({page}) => {
      * @type {ExistingState<{
      *   taggableCursor: string | undefined,
      *   taggableIDs: number[],
-     *   selectedTaggableIDs: number[]
      * }}
      */
     const existingState = page.existingState;
@@ -28,52 +29,57 @@ const FileSearchPageElement = ({page}) => {
     const TrashSelectedTaggablesButton = ReferenceableReact();
     existingState.initAssign("taggableCursor", undefined);
     existingState.initAssign("taggableIDs", []);
-    existingState.initAssign("selectedTaggableIDs", []);
+    /** @type {ExistingStateRef<number[]>} */
+    const selectedTaggableIDsRef = ExistingState.stateRef([]);
+    const clientSearchQueryRef = ExistingState.stateRef(null);
+    const localTagServiceIDsRef = ExistingState.stateRef([]);
+    const taggablesResultRef = FetchCache.Global().searchTaggablesAsyncConstRef(
+        clientSearchQueryRef,
+        ExistingState.constStateRef("Taggable"),
+        ExistingState.constStateRef("Taggable_ID"),
+        localTagServiceIDsRef,
+        {waitForSet: true}
+    );
+
+    let cleanup = () => {};
+    cleanup = taggablesResultRef.assignCleanup(cleanup);
+
+    const onSearchChanged = () => {
+        existingState.update("taggableCursor", taggablesResultRef.get().cursor);
+        existingState.update("taggableIDs", taggablesResultRef.get().result);
+    }
+    cleanup = taggablesResultRef.addOnUpdateCallback(onSearchChanged, cleanup);
 
     const onAdd = () => {
         const onSelectedTaggables = () => {
-            const selectedTaggableIDs = existingState.get("selectedTaggableIDs");
+            const selectedTaggableIDs = selectedTaggableIDsRef.get();
             ModifySelectedTaggablesButton.dom.disabled = selectedTaggableIDs.length === 0;
             TrashSelectedTaggablesButton.dom.disabled = selectedTaggableIDs.length === 0;
         };
         onSelectedTaggables();
 
-        let cleanup = () => {};
-        cleanup = existingState.addOnUpdateCallbackForKey("selectedTaggableIDs", onSelectedTaggables, cleanup);
+        cleanup = selectedTaggableIDsRef.addOnUpdateCallback(onSelectedTaggables, cleanup);
         return cleanup;
     };
-
-    const tagsSelectorState = existingState.getInnerState("tagsSelector");
-
-    const previousSearch = ExistingState.stateRef(null);
-    const makeSearch = async () => {
-        const result = await searchTaggables(previousSearch.get().clientSearchQuery, "Taggable", "Taggable_ID", previousSearch.get().localTagServiceIDs);
-        existingState.update("taggableCursor", result.cursor);
-        existingState.update("taggableIDs", result.result);
-    };
-
 
     return (
         <div style={{width: "100%", height: "100%"}} onAdd={onAdd}>
             <div style={{flex: 1, height: "100%"}}>
-                {<TagsSelector
+                <TagsSelector
                     taggableCursorConstRef={existingState.getConstRef("taggableCursor")}
                     onSearchChanged={async (clientSearchQuery, localTagServiceIDs) => {
-                        previousSearch.update({
-                            clientSearchQuery,
-                            localTagServiceIDs
-                        });
-                        makeSearch();
+                        clientSearchQueryRef.update(clientSearchQuery);
+                        localTagServiceIDsRef.update(localTagServiceIDs);
                     }}
-                    existingState={tagsSelectorState}
-                />}
+                    existingState={existingState.getInnerState("tagsSelector")}
+                />
             </div>
             <div style={{width: "auto", flex: 3, flexDirection: "column", height: "100%"}}>
                 <div>
                     {ModifySelectedTaggablesButton.react(<input type="button" value="Modify selected taggables" onClick={async () => {
                         await Modals.Global().pushModal(ModifyTaggablesModal, {
                             taggableCursorConstRef: existingState.getConstRef("taggableCursor"),
-                            taggableIDsConstRef: existingState.getConstRef("selectedTaggableIDs")
+                            taggableIDsConstRef: selectedTaggableIDsRef
                         });
                     }} />)}
                     {TrashSelectedTaggablesButton.react(<input type="button" value="Trash selected taggables" onClick={() => {
@@ -82,7 +88,7 @@ const FileSearchPageElement = ({page}) => {
                             return;
                         }
 
-                        trashTaggables(existingState.get("selectedTaggableIDs"));
+                        trashTaggables(selectedTaggableIDsRef.get());
                     }} />)}
                 </div>
                 <div style={{flex: 1}}>
@@ -90,7 +96,7 @@ const FileSearchPageElement = ({page}) => {
                         taggableIDsConstRef={existingState.getConstRef("taggableIDs")}
                         onValuesSelected={(_, indices) => {
                             const taggableIDs = existingState.get("taggableIDs");
-                            existingState.update("selectedTaggableIDs", indices.map(index => taggableIDs[index]));
+                            selectedTaggableIDsRef.update(indices.map(index => taggableIDs[index]));
                         }}
                         onValuesDoubleClicked={(_, indices, indexClicked) => {
                             const taggableIDs = existingState.get("taggableIDs");

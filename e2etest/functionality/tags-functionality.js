@@ -10,11 +10,12 @@ import {By} from "selenium-webdriver"
  */
 export async function createNewTagService(driver, name) {
     await navigateToCreateTagService(driver);
+
     const serviceName = await driver.findElement(By.name("serviceName"));
     await realClear(serviceName);
     await serviceName.sendKeys(name);
-    const submitButton = await driver.findElement(xpathHelper({hasValue: "Submit"}));
-    await submitButton.click();
+
+    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -27,15 +28,14 @@ export async function createNewTagService(driver, name) {
  */
 export async function modifyTagService(driver, name, modifications) {
     await navigateToModifyTagServices(driver);
-    const tagServiceSelect = await driver.findElement(By.name("localTagServiceID"));
-    await tagServiceSelect.click();
-    const localTagService = await driver.findElement(xpathHelper({type: "option", containsText: name}));
-    await localTagService.click();
+    await driver.findElement(By.name("localTagServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: name})).click();
+
     const serviceName = await driver.findElement(By.name("serviceName"));
     await realClear(serviceName);
     await serviceName.sendKeys(modifications.name);
-    const modifyButton = await driver.findElement(xpathHelper({hasValue: "Modify selected tag service"}));
-    await modifyButton.click();
+
+    await driver.findElement(xpathHelper({hasValue: "Modify selected tag service"})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -45,13 +45,11 @@ export async function modifyTagService(driver, name, modifications) {
  */
 export async function deleteTagService(driver, name) {
     await navigateToModifyTagServices(driver);
-    const tagService = await driver.findElement(By.name("localTagServiceID"));
-    await tagService.click();
-    const localTagService = await driver.findElement(xpathHelper({type: "option", containsText: name}));
-    await localTagService.click();
-    const deleteButton = await driver.findElement(xpathHelper({hasValue: "Delete selected tag service"}));
-    await deleteButton.click();
-    const deleteTagServiceConfirm = await driver.switchTo().alert();
-    await deleteTagServiceConfirm.accept();
+    
+    await driver.findElement(By.name("localTagServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: name})).click();
+    await driver.findElement(xpathHelper({hasValue: "Delete selected tag service"})).click();
+    await driver.switchTo().alert().accept();
+    
     await driver.wait(UNTIL_MODAL_CLOSE);
 }

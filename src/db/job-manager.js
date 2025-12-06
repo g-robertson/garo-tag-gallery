@@ -16,6 +16,7 @@
  * @property {boolean} done
  */
 
+import { randomBytes } from "crypto";
 import { mapNullCoalesce, randomID } from "../client/js/client-util.js";
 
 export class Job {
@@ -52,7 +53,7 @@ export class Job {
         totalEstimatedSubtasks ??= Job.UNKNOWN_SUBTASK_ESTIMATE;
 
         this.#generator = generator();
-        this.#jobID = randomID(32);
+        this.#jobID = randomBytes(16).toString("hex");
         this.#jobName = jobName;
         this.#jobType = jobType;
         this.#durationBetweenTasks = durationBetweenTasks;

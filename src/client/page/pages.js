@@ -9,7 +9,7 @@
 */
 
 import setUserPages from "../../api/client-get/set-user-pages.js";
-import { clamp, mapNullCoalesce, randomID } from "../js/client-util.js";
+import { clamp, mapNullCoalesce, unusedID } from "../js/client-util.js";
 
 /**
  * @template T
@@ -54,7 +54,8 @@ import { clamp, mapNullCoalesce, randomID } from "../js/client-util.js";
 /**
  * @template T
  * @typedef {Object} ExistingStateAsyncConstRef
- * @property {(cleanupFunction: () => void) => Promise<() => void>} initialize
+ * @property {(cleanupFunction: () => void) => (() => void)} assignCleanup
+ * @property {<TransformV>(transform: (val: T) => Promise<TransformV>) => ExistingStateAsyncConstRef<TransformV>} getAsyncTransformRef
  * @property {(onUpdateCallback: OnUpdateCallback<T>, cleanupFunction: () => void, options?: AddOnUpdateCallbackOptions<T>) => (() => void)} addOnUpdateCallback
  * @property {() => T} get
 */
@@ -318,11 +319,11 @@ export class ExistingState {
             },
             addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
                 let prevVal = transform(self.callbackSelf().#state[key]);
-                return self.callbackSelf().addOnUpdateCallbackForKey(key, val => {
+                return self.callbackSelf().addOnUpdateCallbackForKey(key, async (val) => {
                     const transformVal = transform(val);
-                    ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
+                    await ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
                     prevVal = transformVal;
-                }, cleanupFunction);
+                }, cleanupFunction, options);
             },
             get() { return transform(self.callbackSelf().#state[key]); }
         }
@@ -342,11 +343,11 @@ export class ExistingState {
             addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
                 let prevVal = transform();
                 for (const constRef of constRefs) {
-                    cleanupFunction = constRef.addOnUpdateCallback(() => {
+                    cleanupFunction = constRef.addOnUpdateCallback(async () => {
                         const transformVal = transform();
-                        ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
+                        await ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
                         prevVal = transformVal;
-                    }, cleanupFunction);
+                    }, cleanupFunction, options);
                 }
                 return cleanupFunction;
             },
@@ -354,49 +355,100 @@ export class ExistingState {
         }
     }
 
-    /** @type {Map<symbol, any>} */
+    /** @type {Map<symbol, {cleanupAssigned: boolean, value: any, updating: Promise}>} */
     static #transformState = new Map();
 
     /**
      * @template TransformV
      * @param {ExistingStateAsyncConstRef<unknown>[]} constRefs 
      * @param {() => Promise<TransformV>} transform
+     * @param {TransformV>} initialValue
+     * @param {{
+     *     waitForSet?: boolean
+     * }} options
      * @return {ExistingStateAsyncConstRef<TransformV>}
      */
-    static asyncTupleTransformRef(constRefs, transform) {
+    static asyncTupleTransformRef(constRefs, transform, initialValue, options) {
+        options ??= {};
+        options.waitForSet ??= false;
+
         const transformID = Symbol();
+        ExistingState.#transformState.set(transformID, {
+            cleanupAssigned: false,
+            value: initialValue,
+            updating: undefined
+        });
+        const onUpdateCallbacks = [];
 
-        return {
-            initialize: async (cleanupFunction) => {
-                if (cleanupFunction === undefined) {
-                    throw "You must specify a cleanup function or null for adding a callback for an existing state";
-                }
-                ExistingState.#transformState.set(transformID, await transform());
+        const globalCleanupFunctions = [];
+        for (const constRef of constRefs) {
+            globalCleanupFunctions.push(constRef.addOnUpdateCallback(async () => {
+                ExistingState.#transformState.get(transformID).value = await transform();
+            }, null, {produces: transformID}));
+        }
+        
+        globalCleanupFunctions.push(() => {
+            ExistingState.#transformState.delete(transformID);
+        });
+        const globalCleanup = () => {
+            for (const globalCleanupFunction of globalCleanupFunctions) {
+                globalCleanupFunction();
+            }
+        };
 
-                for (const constRef of constRefs) {
-                    cleanupFunction = constRef.addOnUpdateCallback(async () => {
-                        ExistingState.#transformState.set(transformID, await transform());
-                    }, cleanupFunction, {produces: transformID});
-                }
-
+        /** @type {ExistingStateAsyncConstRef<TransformV>} */
+        const ref = {
+            assignCleanup: (cleanupFunction) => {
+                ExistingState.#transformState.get(transformID).cleanupAssigned = true;
                 return () => {
+                    globalCleanup();
                     cleanupFunction();
-                    ExistingState.#transformState.delete(transformID);
-                }
+                };
+            },
+            getAsyncTransformRef: (transform2) => {
+                const asyncTransformRef = ExistingState.asyncTupleTransformRef(constRefs, async () => {
+                    return await transform2(await transform());
+                });
+                let childCleanup = () => {};
+                childCleanup = asyncTransformRef.assignCleanup(childCleanup);
+                globalCleanupFunctions.push(childCleanup);
+                return asyncTransformRef;
             },
             addOnUpdateCallback: (onUpdateCallback, cleanupFunction, options) => {
-                let prevVal = ExistingState.#transformState.get(transformID);
+                if (!ExistingState.#transformState.get(transformID).cleanupAssigned) {
+                    throw "Cleanup was not assigned for async tuple transform ref before using addOnUpdateCallback()";
+                }
+                let prevVal = ExistingState.#transformState.get(transformID).value;
                 for (const constRef of constRefs) {
-                    cleanupFunction = constRef.addOnUpdateCallback(async () => {
-                        const transformVal = ExistingState.#transformState.get(transformID);
+                    const realCB = async () => {
+                        const transformVal = ExistingState.#transformState.get(transformID).value;
                         ExistingState.#executeOnUpdateCallback(onUpdateCallback, options, transformVal, prevVal);
                         prevVal = transformVal;
-                    }, cleanupFunction, {consumes: new Set([transformID])})
+                    };
+
+                    cleanupFunction = constRef.addOnUpdateCallback(realCB, cleanupFunction, {...options, consumes: new Set([transformID])});
+                    onUpdateCallbacks.push(realCB);
                 }
                 return cleanupFunction;
             },
-            get: () => { return ExistingState.#transformState.get(transformID); }
+            get: () => {
+                if (!ExistingState.#transformState.get(transformID).cleanupAssigned) {
+                    throw "Cleanup was not assigned for async tuple transform ref before using get()";
+                }
+                return ExistingState.#transformState.get(transformID).value;
+            }
+        };
+
+        if (!options.waitForSet) {
+            transform().then(value => {
+                ExistingState.#transformState.get(transformID).value = value;
+                for (const callback of onUpdateCallbacks) {
+                    callback();
+                }
+            });
         }
+
+        return ref;
     }
 
     clear() {
@@ -491,7 +543,7 @@ export class Page {
         // no cleanup needed, page will already be destroyed if this needs cleaned up
         this.#existingState.addOnUpdateCallback(() => {setUserPages(Pages.Global());}, null);
         this.#extraProperties = extraProperties ?? {};
-        this.#pageID = pageID ?? randomID(32);
+        this.#pageID = pageID ?? unusedID();
     }
 
     /**

@@ -34,13 +34,14 @@ const TESTS = {
 
 export const HEADLESS = false;
 const DISABLED_TESTS = new Set([
-    // "Tests.Functional.Pages.FileSearchPage.ThumbnailGallery.DoesModifyTaggablesWork.DoesRemovingTagWork",
     "Tests.Navigation",
-    "Tests.Functional.Backup",
+    "Tests.Functional.Files",
+    // "Tests.Functional.Pages",
+    //"Tests.Functional.Metrics",
     "Tests.Functional.Pages.FileSearchPage.TagSearch",
     // "Tests.Functional",
 ]);
-const HALT_ON_FAILURE = false;
+const HALT_ON_FAILURE = true;
 const HALT_AFTER = new Set([]);
 
 let testsHalted = false;

@@ -1,5 +1,4 @@
 import { fbjsonParse } from "../../client/js/client-util.js";
-import { FetchCache } from "../../client/js/fetch-cache.js";
 import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import CreateAggregateTag from "../../client/modal/modals/create-aggregate-tag.jsx";
 import CreateMetricTag from "../../client/modal/modals/create-metric-tag.jsx";
@@ -47,15 +46,6 @@ const SYSTEM_CLIENT_TAGS = [
     modalSystemClientQueryTag("metric", CreateMetricTag)
 ];
 
-/**
- * @param {number[]} localTagServiceIDs
- * @param {string=} taggableCursor
- * @param {number[]=} taggableIDs
- */
-function getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableCursor, taggableIDs) {
-    taggableIDs ??= [];
-    return `${localTagServiceIDs.join("\x01")}\x02${taggableCursor ?? ""}\x02${taggableIDs.join("\x01")}`;
-}
 
 /**
  * @param {number[]} localTagServiceIDs
@@ -63,36 +53,29 @@ function getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableCursor, t
  * @param {number[]=} taggableIDs
  */
 async function getTagsFromLocalTagServiceIDs_(localTagServiceIDs, taggableCursor, taggableIDs) {
-    const hash = getTagsFromLocalTagServiceIDsHash(localTagServiceIDs, taggableCursor, taggableIDs);
-    const tagsFromLocalTagServiceIDsCache = FetchCache.Global().cache("tags-from-local-tag-services");
-    if (tagsFromLocalTagServiceIDsCache.getStatus(hash) === "empty") {
-        tagsFromLocalTagServiceIDsCache.setAwaiting(hash);
-        const response = await fetch("/api/post/tags-from-local-tag-services", {
-            body: JSON.stringify({
-                localTagServiceIDs,
-                taggableCursor,
-                taggableIDs
-            }),
-            headers: {
-              "Content-Type": "application/json",
-            },
-            method: "POST"
-        });
-
-        tagsFromLocalTagServiceIDsCache.set(hash, (await fbjsonParse(response)).map(tag => ({
-            type: "tagByLookup",
-            Lookup_Name: tag[0],
-            displayName: tag[1],
-            tagName: tag[0],
-            namespaces: tag[2],
-            tagCount: tag[3],
-            localTagServiceIDs: tag[4]
-        })));
-    }
+    const response = await fetch("/api/post/tags-from-local-tag-services", {
+        body: JSON.stringify({
+            localTagServiceIDs,
+            taggableCursor,
+            taggableIDs
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST"
+    });
 
     /** @type {ClientQueryTag[]} */
-    const response = await tagsFromLocalTagServiceIDsCache.get(hash);
-    return response;
+    const sanitizedResponse = (await fbjsonParse(response)).map(tag => ({
+        type: "tagByLookup",
+        Lookup_Name: tag[0],
+        displayName: tag[1],
+        tagName: tag[0],
+        namespaces: tag[2],
+        tagCount: tag[3],
+        localTagServiceIDs: tag[4]
+    }));
+    return sanitizedResponse;
 }
 
 /**

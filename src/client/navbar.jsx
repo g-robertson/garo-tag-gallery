@@ -56,10 +56,6 @@ const Navbar = () => {
                     <a href="/api/get/backup" download="garo-backup.json"><div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
                     }}>Download backup</div></a>
-                    <div className="topbar-dropdown-option" onClick={() => {
-                        setMenuOpened(null);
-                        //Modals.Global().pushModal(DELETE_DATABASE_MODAL_PROPERTIES.modalType);
-                    }}>Delete database</div>
                 </div>)}
             </div>
             <div className="topbar-dropdown">
@@ -68,7 +64,6 @@ const Navbar = () => {
                     <div className="topbar-dropdown-option" onClick={() => {
                         const page = new Page(FILE_SEARCH_PAGE_NAME, FILE_SEARCH_PAGE_DEFAULT_DISPLAY_NAME);
                         Pages.Global().addPage(page);
-
                         setMenuOpened(null);
                     }}>New file search page</div>
                     {/* Duplicates processing needs further implementation
@@ -76,7 +71,7 @@ const Navbar = () => {
                         Pages.Global().addPage({
                             pageName: DUPLICATES_PROCESSING_PAGE_NAME,
                             pageDisplayName: DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME,
-                            pageID: randomID(32)
+                            pageID: unusedID()
                         });
 
                         setMenuOpened(null);

@@ -4,7 +4,6 @@ import DuplicatesProcessingPage, { DUPLICATES_PROCESSING_PAGE_NAME } from './pag
 
 import FileSearchPage, { FILE_SEARCH_PAGE_NAME } from './pages/file-search-page.jsx';
 import { ReferenceableReact } from '../js/client-util.js';
-import { useEffect } from 'react';
 
 /**
  * @typedef {Object} PageType
@@ -18,7 +17,7 @@ import { useEffect } from 'react';
 const PageElement = () => {
     const PageContents = ReferenceableReact();
 
-    useEffect(() => {
+    const onAdd = () => {
         const onCurrentPageChanged = () => {
             const page = Pages.Global().currentPage;
             if (page === undefined) {
@@ -49,10 +48,10 @@ const PageElement = () => {
         let cleanup = () => {};
         cleanup = Pages.Global().addOnCurrentPageChangedCallback(onCurrentPageChanged, cleanup);
         return cleanup;
-    }, []);
+    };
 
 
-    return PageContents.react(<div className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}></div>);
+    return PageContents.react(<div onAdd={onAdd} className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}></div>);
 };
 
 export default PageElement;

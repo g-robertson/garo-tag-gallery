@@ -6,31 +6,43 @@ import { xpathHelper } from "../helpers.js";
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToCreateMetricService(driver) {
-    const metricsNav = await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"}));
+    await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"})).click();
 
-    await metricsNav.click();
-    const newMetricServiceNav = await driver.findElement(xpathHelper({containsText: "Create new metric service", containsClass: "topbar-dropdown-option"}));
-    await newMetricServiceNav.click();
+    await driver.findElement(xpathHelper({containsText: "Create new metric service", containsClass: "topbar-dropdown-option"})).click();
 }
 
 /**
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToModifyMetricServices(driver) {
-    const metricsNav = await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"}));
+    await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"})).click();
 
-    await metricsNav.click();
-    const modifyMetricServiceNav = await driver.findElement(xpathHelper({containsText: "Update/delete existing metric service", containsClass: "topbar-dropdown-option"}));
-    await modifyMetricServiceNav.click();
+    await driver.findElement(xpathHelper({containsText: "Update/delete existing metric service", containsClass: "topbar-dropdown-option"})).click();
 }
 
 /**
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToCreateNewMetric(driver) {
-    const metricsNav = await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"}));
+    await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"})).click();
 
-    await metricsNav.click();
-    const newMetricNav = await driver.findElement(xpathHelper({containsText: "Create new metric", notContainsText: "Create new metric service", containsClass: "topbar-dropdown-option"}));
-    await newMetricNav.click();
+    await driver.findElement(xpathHelper({containsText: "Create new metric", notContainsText: "Create new metric service", containsClass: "topbar-dropdown-option"})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function navigateToModifyMetric(driver) {
+    await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"})).click();
+
+    await driver.findElement(xpathHelper({containsText: "Update/delete existing metric", containsClass: "topbar-dropdown-option"})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function navigateToChangeTagToMetric(driver) {
+    await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"})).click();
+
+    await driver.findElement(xpathHelper({containsText: "Change tag to metric", containsClass: "topbar-dropdown-option"})).click();
 }

@@ -18,7 +18,7 @@ const LocalTaggableServiceSelector = ({selectedLocalTaggableServiceRef}) => {
         <div style={{marginLeft: "8px"}}>
             <div style={{margin: "2px 0 2px 0"}}>
                 <span>Select which local taggable service you wish to use: </span>
-                <select style={{display: "inline-block"}} name="localTaggableServiceID" defaultValue={selectedLocalTaggableServiceRef.get()?.Local_Taggable_Service_ID} onChange={(e) => {
+                <select style={{display: "inline-block"}} name="localTaggableServiceID" value={selectedLocalTaggableServiceRef.get()?.Local_Taggable_Service_ID} onChange={(e) => {
                     const selectedLocalTaggableServiceID = Number(e.currentTarget.selectedOptions[0].value);
                     selectedLocalTaggableServiceRef.update(User.Global().localTaggableServices().find(localTaggableService => localTaggableService.Local_Taggable_Service_ID === selectedLocalTaggableServiceID));
                 }}>

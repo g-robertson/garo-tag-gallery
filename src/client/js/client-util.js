@@ -12,16 +12,27 @@ export async function fbjsonParse(response) {
     }
 }
 
-const ALPHABET = "abcdefghijklmnopqrstuvwxyz";
+const ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 /**
- * 
  * @param {number} size 
  */
 export function randomID(size) {
     let id = "";
     for (let i = 0; i < size; ++i) {
-        const rnd = Math.floor(Math.random() * 26);
+        const rnd = Math.floor(Math.random() * ALPHABET.length);
         id += ALPHABET[rnd];
+    }
+
+    return id;
+}
+
+let unusedIDCount = 1;
+export function unusedID() {
+    let id = "__u-";
+    let idNumber = ++unusedIDCount;
+    while (idNumber > 0) {
+        id += ALPHABET[idNumber % ALPHABET.length];
+        idNumber = Math.floor(idNumber / ALPHABET.length);
     }
 
     return id;
@@ -261,30 +272,27 @@ export function mapNullCoalesce(map, key, value) {
  * @template K, V
  */
 export class RealizationMap {
-    /** @type {RealizationMap<K, V>} */
-    #prev = undefined;
-    /** @type {Map<K, V>} */
-    #values = new Map();
-    /** @type {Map<string, "filled" | "awaiting">} */
-    #valueStatuses = new Map();
-    /** @type {Map<K, (() => void)[]>} */
-    #valueOnFillCallbacks = new Map();
-    
-    /**
-     * @param {RealizationMap<K, V>} prev 
-     */
-    constructor(prev) {
-        this.#prev = prev;
-        if (this.#prev !== undefined) {
-            this.#prev._removePrev();
-        }
+    /** 
+     * @type {Map<K, {
+     *     value: V,
+     *     status: "filled" | "awaiting",
+     *     onFillCallbacks: (() => void)[]
+     * }>}
+     **/
+    #state = new Map();
+    static #defaultState() {
+        return {value: undefined, status: "awaiting", onFillCallbacks: []};
+    }
+
+    clear() {
+        this.#state = new Map();
     }
 
     /**
      * @param {K} key 
      */
     setAwaiting(key) {
-        this.#valueStatuses.set(key, "awaiting");
+        mapNullCoalesce(this.#state, key, RealizationMap.#defaultState());
     }
 
     /**
@@ -292,15 +300,11 @@ export class RealizationMap {
      * @param {V} value
      */
     set(key, value) {
-        this.#values.set(key, value);
-        this.#valueStatuses.set(key, "filled");
-        const callbacks = this.#valueOnFillCallbacks.get(key);
-        if (callbacks === undefined) {
-            return;
-        } else {
-            for (const callback of callbacks) {
-                callback();
-            }
+        const keyState = mapNullCoalesce(this.#state, key, RealizationMap.#defaultState());
+        keyState.value = value;
+        keyState.status = "filled";
+        for (const callback of keyState.onFillCallbacks) {
+            callback();
         }
     }
 
@@ -308,16 +312,16 @@ export class RealizationMap {
      * @param {K} key 
      */
     async get(key) {
-        if (this.#valueStatuses.get(key) === "filled") {
-            return this.#values.get(key);
+        const keyState = mapNullCoalesce(this.#state, key, RealizationMap.#defaultState());
+        if (keyState?.status === "filled") {
+            return keyState.value;
         } else {
             const getPromise = new Promise(resolve => {
-                mapNullCoalesce(this.#valueOnFillCallbacks, key, []);
-                this.#valueOnFillCallbacks.get(key).push(() => {
-                    resolve(this.#values.get(key));
-                });
-                if (this.#valueStatuses.get(key) === "filled") {
-                    resolve(this.#values.get(key));
+                keyState.onFillCallbacks.push(() => {
+                    resolve(this.#state.get(key).value);
+                })
+                if (keyState.status === "filled") {
+                    resolve(keyState.value);
                 }
             })
 
@@ -329,8 +333,9 @@ export class RealizationMap {
      * @param {K} key 
      */
     getOrUndefined(key) {
-        if (this.#valueStatuses.get(key) === "filled") {
-            return this.#values.get(key);
+        const keyState = this.#state.get(key);
+        if (keyState?.status === "filled") {
+            return keyState.value;
         } else {
             return undefined;
         }
@@ -340,15 +345,11 @@ export class RealizationMap {
      * @param {K} key 
      */
     getStatus(key) {
-        return this.#valueStatuses.get(key) ?? "empty";
+        return this.#state.get(key)?.status ?? "empty";
     }
 
     size() {
-        return this.#valueStatuses.size;
-    }
-
-    _removePrev() {
-        this.#prev = undefined;
+        return this.#state.size;
     }
 }
 

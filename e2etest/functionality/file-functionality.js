@@ -32,6 +32,6 @@ export async function importMappingsFromBackupFile(driver, backupFileName) {
     await navigateToImportMappingsFromBackup(driver);
     const backupFileInput = await driver.findElement(By.name("backup-file"));
     backupFileInput.sendKeys(backupFileName);
-    const submitButton = await driver.findElement(xpathHelper({hasValue:"Import from backup"}));
-    await submitButton.click();
+    
+    await driver.findElement(xpathHelper({hasValue:"Import from backup"})).click();
 }

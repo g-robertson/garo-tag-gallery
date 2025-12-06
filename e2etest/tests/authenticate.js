@@ -9,10 +9,8 @@ import {By} from "selenium-webdriver";
  */
 export async function authenticate(driver, port, accessKey) {
     await driver.get(`http://localhost:${port}`);
-    const name = await driver.findElement(By.name("accessKey"));
-    await name.sendKeys(accessKey);
-    const submit = await driver.findElement(By.css("[type=submit]"));
-    await submit.click();
+    await driver.findElement(By.name("accessKey")).sendKeys(accessKey);
+    await driver.findElement(By.css("[type=submit]")).click();
 
     const root = await driver.findElements(By.id("root"));
     if (root.length === 0) {

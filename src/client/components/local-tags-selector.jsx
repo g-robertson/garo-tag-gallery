@@ -1,10 +1,10 @@
 import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
-import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
 import { User } from "../js/user.js";
 import { Modals } from "../modal/modals.js";
 import {ExistingState} from "../page/pages.js";
 import { mapUnion } from "../js/client-util.js";
+import { FetchCache } from "../js/fetch-cache.js";
 
 /** @import {ExistingStateRef, ExistingStateConstRef} from "../page/pages.js" */
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
@@ -91,9 +91,11 @@ const LocalTagsSelector = ({
     taggableIDsConstRef ??= ExistingState.stateRef(undefined);
     tagsToRemoveConstRef ??= ExistingState.stateRef(new Map());
     tagsToAddConstRef ??= ExistingState.stateRef(new Map());
-    const tagsPreFilter = ExistingState.asyncTupleTransformRef([selectedLocalTagServiceIDsRef, taggableCursorConstRef, taggableIDsConstRef], async () => {
-        return await getTagsFromLocalTagServiceIDs([...selectedLocalTagServiceIDsRef.get()], taggableCursorConstRef.get(), taggableIDsConstRef.get());
-    });
+    const tagsPreFilter = FetchCache.Global().getTagsFromLocalTagServiceIDsAsyncConstRef(
+        selectedLocalTagServiceIDsRef.getTransformRef(selectedLocalTagServiceIDs => [...selectedLocalTagServiceIDs]),
+        taggableCursorConstRef,
+        taggableIDsConstRef
+    );
     multiSelect ??= true;
     excludeable ??= true;
     tagSelectionTitle ??= "Select tags";
@@ -102,7 +104,6 @@ const LocalTagsSelector = ({
 
     const onAdd = async () => {
         let cleanup = () => {};
-        cleanup = await tagsPreFilter.initialize(cleanup);
 
         // Updates tags allowed to be selected when tag criteria changes (tagsPreFilter, tagFilterValue)
         const onTagCriteriaChanged = () => {
@@ -159,10 +160,12 @@ const LocalTagsSelector = ({
                 return true;
             });
 
+            console.log("Existing state updated", tags);
             existingState.update("tags", tags);
         };
-        onTagCriteriaChanged();
+        cleanup = tagsPreFilter.assignCleanup(cleanup);
 
+        onTagCriteriaChanged();
 
         cleanup = tagsPreFilter.addOnUpdateCallback(onTagCriteriaChanged, cleanup);
         cleanup = existingState.addOnUpdateCallbackForKey("tagFilterValue", onTagCriteriaChanged, cleanup);
@@ -171,7 +174,6 @@ const LocalTagsSelector = ({
         return cleanup;
     };
 
-    // TODO: Separate out top half of this from the LazyTextObjectSelector
     return (
         <div class="local-tags-selector" style={{flexDirection: "column", width: "100%"}} onAdd={onAdd}>
             <div>Tag services to view/add from:</div>
@@ -185,7 +187,7 @@ const LocalTagsSelector = ({
                 />
             </div>
             {tagSelectionTitle}:
-            <div><input class="tag-filter-input" type="text" onInput={(e) => {
+            <div><input class="tag-filter-input" type="text" onKeyUp={(e) => {
                 if (e.key === "Enter") {
                     let displayName = e.currentTarget.value;
                     if (displayName === "") {
@@ -229,12 +231,12 @@ const LocalTagsSelector = ({
 
                     existingState.update("tagFilterValue", "");
                     e.currentTarget.value = "";
-                } else {
-                    existingState.update("tagFilterValue", e.currentTarget.value);
                 }
+            }} onInput={(e) => {
+                existingState.update("tagFilterValue", e.currentTarget.value);
             }}/></div>
             {excludeable
-                ? <div>Exclude: <input class="exclude-checkbox" type="checkbox" onChange={(e) => {
+                ? <div>Exclude: <input class="exclude-checkbox" type="checkbox" checked={existingState.get("isExcludeOn") ?? false} onChange={(e) => {
                     existingState.update("isExcludeOn", e.currentTarget.checked);
                 }}/></div>
                 : <></>

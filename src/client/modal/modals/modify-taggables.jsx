@@ -1,8 +1,7 @@
 import '../../global.css';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
-import { useState } from 'react';
 import DialogBox from './dialog-box.jsx';
-import { mapNullCoalesce, mapUnion, setIntersect } from '../../js/client-util.js';
+import { mapNullCoalesce } from '../../js/client-util.js';
 import { updateTaggables } from '../../../api/client-get/update-taggables.js';
 import { Modals } from '../modals.js';
 import { ExistingState } from '../../page/pages.js';
@@ -37,7 +36,7 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
 
     return {
         component: (
-            <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
+            <div className="modify-taggables-modal" style={{width: "100%", height: "100%", flexDirection: "column"}}>
                 <div style={{width: "100%", height: "100%"}}>
                     <div style={{flex: 1}}></div>
                     <div style={{flex: 1}}>
@@ -95,7 +94,7 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                                         if (operationToPerform === ADD_TAGS) {
                                             setToAdd.set(tag.tagName, {
                                                 ...tag,
-                                                tagCount: taggableIDsRef.get().length
+                                                tagCount: taggableIDsConstRef.get().length
                                             });
                                             setToRemove.delete(tag.tagName);
                                         } else if (operationToPerform === REMOVE_TAGS) {
@@ -104,8 +103,6 @@ export default function ModifyTaggablesModal({ extraProperties, modalResolve }) 
                                         }
                                     }
                                 }
-
-                                console.log("force update");
 
                                 tagsToAddRef.forceUpdate();
                                 tagsToRemoveRef.forceUpdate();

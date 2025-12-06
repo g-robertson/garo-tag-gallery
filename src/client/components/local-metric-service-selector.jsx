@@ -18,7 +18,7 @@ const LocalMetricServiceSelector = ({selectedLocalMetricServiceRef}) => {
         <div style={{marginLeft: "8px"}}>
             <div style={{margin: "2px 0 2px 0"}}>
                 <span>Select which local metric service you wish to use: </span>
-                <select style={{display: "inline-block"}} name="localMetricServiceID" defaultValue={selectedLocalMetricServiceRef?.Local_Metric_Service_ID} onChange={(e) => {
+                <select style={{display: "inline-block"}} name="localMetricServiceID" value={selectedLocalMetricServiceRef?.Local_Metric_Service_ID} onChange={(e) => {
                     const selectedLocalMetricServiceID = Number(e.currentTarget.selectedOptions[0].value);
                     selectedLocalMetricServiceRef.update(User.Global().localMetricServices().find(localMetricService => localMetricService.Local_Metric_Service_ID === selectedLocalMetricServiceID));
                 }}>

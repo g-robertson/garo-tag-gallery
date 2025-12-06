@@ -1,5 +1,5 @@
 import '../global.css';
-import { ReferenceableReact } from '../js/client-util.js';
+import { randomID, ReferenceableReact, unusedID } from '../js/client-util.js';
 
 /** @import {ExistingStateRef, ExistingStateConstRef} from "../page/pages.js" */
 
@@ -29,19 +29,22 @@ const MultiSelect = ({optionsConstRef, selectedOptionsRef}) => {
         onSelectedOptionsChanged();
 
         const onOptionsChanged = () => {
-            OptionsContainer.dom.replaceChildren(...(optionsConstRef.get().map(option => (
-                <div dom className="multiselect-option">
-                    <input type="checkbox" checked={selectedOptionsRef.get().has(option.value)} className="multiselect-checkbox" onChange={(e) => {
-                        if (e.currentTarget.checked) {
-                            selectedOptionsRef.get().add(option.value)
-                            selectedOptionsRef.forceUpdate();
-                        } else {
-                            selectedOptionsRef.get().delete(option.value)
-                            selectedOptionsRef.forceUpdate();
-                        }
-                    }}/> {option.displayName}
-                </div>
-            ))));
+            OptionsContainer.dom.replaceChildren(...(optionsConstRef.get().map(option => {
+                const checkboxID = unusedID() + "-labelled-checkbox";
+                return (
+                    <div dom className="multiselect-option">
+                        <input type="checkbox" id={checkboxID} checked={selectedOptionsRef.get().has(option.value)} className="multiselect-checkbox" onChange={(e) => {
+                            if (e.currentTarget.checked) {
+                                selectedOptionsRef.get().add(option.value)
+                                selectedOptionsRef.forceUpdate();
+                            } else {
+                                selectedOptionsRef.get().delete(option.value)
+                                selectedOptionsRef.forceUpdate();
+                            }
+                        }}/><label for={checkboxID}>{option.displayName}</label>
+                    </div>
+                );
+            })));
             
             // Remove invalid options from selected options when options are changed
             const validOptions = new Set();

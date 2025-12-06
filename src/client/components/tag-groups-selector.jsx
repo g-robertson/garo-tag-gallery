@@ -32,9 +32,10 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
     const selectedTagGroupOptionsRef = ExistingState.stateRef(new Set([NAMESPACES_SELECTED, METRIC_RATINGS_SELECTED]));
     /** @type {ExistingStateRef<DBNamespace[]>} */
     const namespacesRef = ExistingState.stateRef([]);
-    const tagGroupsConstRef = selectedTagGroupOptionsRef.getTransformRef(selectedTagGroupOptions => {
+    const tagGroupsConstRef = ExistingState.tupleTransformRef([selectedTagGroupOptionsRef, namespacesRef], () => {
+        const selectedTagGroupOptions = selectedTagGroupOptionsRef.get();
         /** @type {DisplayClientTagGroup[]} */
-        const tagGroups = [];
+        let tagGroups = [];
         if (selectedTagGroupOptions.has(METRIC_RATINGS_SELECTED)) {
             tagGroups = tagGroups.concat(User.Global().localMetricServices().map(localMetricService => localMetricService.Local_Metrics).flat().map(localMetric => ({
                 type: "applied-metrics",
@@ -57,7 +58,7 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
         }
 
         return tagGroups;
-    })
+    });
 
     getNamespaces().then(namespaces => namespacesRef.update(namespaces));
 

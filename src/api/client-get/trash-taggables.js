@@ -15,5 +15,6 @@ export async function trashTaggables(taggableIDs) {
         },
         method: "POST"
     });
-    FetchCache.Global().regenerateTagsCache();
+    FetchCache.Global().resetCacheType("tags");
+    FetchCache.Global().resetCacheType("taggables");
 }

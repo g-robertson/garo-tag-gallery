@@ -1,12 +1,13 @@
 import { existsSync } from "fs";
 import { readFile, rm } from "fs/promises";
 import path from "path";
-import {By, Key, until} from "selenium-webdriver";
+import {Button, By, Key, Origin, until} from "selenium-webdriver";
 import { navigateToModifyTaggableServices } from "./navigation/taggables-navigation.js";
 import { deleteTagService } from "./functionality/tags-functionality.js";
 import { deleteTaggableService } from "./functionality/taggables-functionality.js";
 
 /** @import {ThenableWebDriver, Locator, WebElement} from "selenium-webdriver" */
+/** @import {IDirection} from "selenium-webdriver/lib/input.js" */
 
 export const DEFAULT_TIMEOUT_TIME = Number(process.env.DEFAULT_TIMEOUT_TIME);
 export const DEFAULT_SLEEP_TIME = Number(process.env.DEFAULT_SLEEP_TIME);
@@ -32,15 +33,18 @@ export const UNTIL_MODAL_CLOSE = untilElementsNotLocated(By.className("modal"));
 
 export const UNTIL_GALLERY_OPEN = until.elementsLocated(By.className("gallery-item"));
 
+export const ByPage = By.className("page-navbar-topbar-dropdown-title")
+
 /**
  * @param {ThenableWebDriver} driver 
  */
 export async function findPages(driver) {
-    return await driver.findElements(By.className("page-navbar-topbar-dropdown-title"));
+    return await driver.findElements(ByPage);
 }
 
 /**
  * @param {ThenableWebDriver} driver 
+ * @param {number} pageNumber
  */
 export async function selectPage(driver, pageNumber) {
     const pages = await findPages(driver);
@@ -95,7 +99,7 @@ export function BySearchTag(tag) {
 export function BySelectableTag(tag) {
     return xpathHelper({containsClass: "local-tags-selector", descendent: {
         containsClass: "lazy-selector-selectable-item",
-        hasTitle: tag
+        hasTitle: tag ?? true
     }});
 }
 
@@ -103,10 +107,21 @@ export function BySelectableTag(tag) {
  * @param {string} tagServiceName
  */
 export function BySearchQueryTagService(tagServiceName) {
-    return xpathHelper({containsClass: "tag-service-selector", descendent: {
+    return ByMultiSelectOption(tagServiceName, {ancestorWithClass: "tag-service-selector"});
+}
+
+/**
+ * @param {string} multiSelectOption
+ * @param {{
+ *     ancestorWithClass?: string 
+ * }=} options
+ */
+export function ByMultiSelectOption(multiSelectOption, options) {
+    options ??= {};
+    return xpathHelper({containsClass: options.ancestorWithClass, descendent: {
         containsClass: "multiselect-option",
-        containsText: tagServiceName
-    }})
+        descendentContainsText: multiSelectOption,
+    }});
 }
 
 export const UNTIL_JOB_BEGIN = until.elementLocated(By.className("job"));
@@ -152,6 +167,15 @@ export async function deleteDatabaseDefaults(driver) {
 
 /**
  * @param {ThenableWebDriver} driver
+ * @param {string} keys
+ */
+export async function sendKeys(driver, keys) {
+    const actions = driver.actions({async: true});
+    await actions.sendKeys(keys).perform();
+}
+
+/**
+ * @param {ThenableWebDriver} driver
  * @param {WebElement} element 
  */
 export async function mouseOver(driver, element) {
@@ -161,11 +185,68 @@ export async function mouseOver(driver, element) {
 
 /**
  * @param {ThenableWebDriver} driver
+ * @param {IDirection} direction 
+ */
+export async function mouseMove(driver, direction) {
+    const actions = driver.actions({async: true});
+    await actions.move({origin: Origin.VIEWPORT, x: direction.x, y: direction.y, duration: 0}).perform();
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {WebElement} element 
+ */
+export async function mouseDown(driver, element) {
+    const actions = driver.actions({async: true});
+    await actions.move({origin: element, x: 0, y: 0, duration: 0}).perform();
+    await actions.press(Button.LEFT).perform();
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ */
+export async function mouseUp(driver) {
+    const actions = driver.actions({async: true});
+    await actions.release(Button.LEFT).perform();
+}
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {WebElement} element 
+ * @param {IDirection} direction 
+ */
+export async function drag(driver, element, direction) {
+    await mouseDown(driver, element);
+    await mouseMove(driver, direction);
+    await mouseUp(driver);
+}
+
+/**
+ * @param {ThenableWebDriver} driver
  * @param {WebElement} element 
  */
 export async function doubleClick(driver, element) {
     const actions = driver.actions({async: true});
     await actions.doubleClick(element).perform();
+}
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {number} deltaY 
+ */
+export async function scroll(driver, element, deltaY, scrollCount) {
+    await driver.executeAsyncScript(`
+        const element = arguments[0];
+        const deltaY = arguments[1];
+        const scrollCount = arguments[2];
+        
+        for (let i = 0; i < scrollCount; ++i) {
+            element.dispatchEvent(new WheelEvent('wheel', {view: window, bubbles: true, cancelable: true, clientX: 0, clientY: 0, deltaY}));
+        };
+        arguments[arguments.length - 1]();
+    `, element, deltaY, scrollCount);
 }
 
 /**
@@ -179,7 +260,10 @@ export async function doubleClick(driver, element) {
  * @property {string=} hasClass
  * @property {string=} hasID
  * @property {string=} hasValue
- * @property {string=} hasTitle
+ * @property {string=} valueContains
+ * @property {(string | boolean)=} hasTitle
+ * @property {string=} hasInputType
+ * @property {boolean=} isDisabled
  * @property {number=} nthParent
  * @property {XPathHelper=} descendent
  */
@@ -219,13 +303,26 @@ function xpathHelper_(options) {
     if (options.hasValue) {
         xpathSpecifiers.push(`@value="${options.hasValue}"`);
     }
+    if (options.valueContains) {
+        xpathSpecifiers.push(`contains(@value, "${options.valueContains}")`);
+    }
     if (options.hasTitle) {
-        xpathSpecifiers.push(`@title="${options.hasTitle}"`)
+        if (options.hasTitle === true) {
+            xpathSpecifiers.push(`boolean(@title)`);
+        } else {
+            xpathSpecifiers.push(`@title="${options.hasTitle}"`)
+        }
+    }
+    if (options.hasInputType) {
+        xpathSpecifiers.push(`@type="${options.hasInputType}"`);
     }
     if (options.dataContains) {
         for (const [key, value] of options.dataContains) {
             xpathSpecifiers.push(`contains(@${key}, "${value}")`);
         }
+    }
+    if (options.isDisabled) {
+        xpathSpecifiers.push(`@disabled=${options.isDisabled}`);
     }
     let descendent = "";
     if (options.descendent) {

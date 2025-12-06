@@ -223,7 +223,7 @@ const DuplicatesProcessingPage = ({existingState}) => {
                                                 + " will almost always be just false positives\n"
                                                 + `Maximum value allowed for input is ${MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} as higher values would just cause lower performance for no more similar images`
                     }>search distance</HoverInfo> of pairs:
-                    <div style={{marginLeft: 4}}><NumericInput  minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} defaultValue={defaultMaxSearchDistance} onChange={(num) => {
+                    <div style={{marginLeft: 4}}><NumericInput  minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} value={defaultMaxSearchDistance} onChange={(num) => {
                         setMaxSearchDistance(num);
                     }} /></div></div>
                 <div style={{marginTop: 4}}>Taggables included in query: {taggableIDs.length}</div>

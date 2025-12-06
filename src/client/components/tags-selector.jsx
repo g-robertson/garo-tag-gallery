@@ -17,7 +17,7 @@ import { Modals } from '../modal/modals.js';
  *  taggableCursorConstRef: ExistingStateConstRef<string>
  *  onSearchChanged?: (clientSearchQuery: ClientSearchQuery, localTagServiceIDs: number[]) => void
  *  searchType?: "intersect" | "union"
- *  existingState: ExistingState<{
+ *  existingState?: ExistingState<{
  *    clientSearchQuery: ClientSearchQuery[]
  *    selectedLocalTagServiceIDs: Set<number>
  *  }>
@@ -25,9 +25,9 @@ import { Modals } from '../modal/modals.js';
  */
 const TagsSelector = ({initialSelectedTags, taggableCursorConstRef, onSearchChanged, searchType, existingState}) => {
     const localTagServicesConstRef = User.Global().localTagServicesAvailableRef();
+    existingState ??= new ExistingState();
     existingState.initAssign("clientSearchQuery", initialSelectedTags ?? [], {isSaved: true});
     existingState.initAssign("selectedLocalTagServiceIDs", new Set(localTagServicesConstRef.get().map(localTagService => localTagService.Local_Tag_Service_ID)), {isSaved: true});
-    const localTagsSelectorState = existingState.getInnerState("localTagsSelector");
     onSearchChanged ??= () => {};
     searchType ??= "intersect";
 
@@ -86,7 +86,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstRef, onSearchChan
             </div>
             <div style={{flex: "3 1 100%", height: "80%"}}>
                 <LocalTagsSelector 
-                    existingState={localTagsSelectorState}
+                    existingState={existingState.getInnerState("localTagsSelector")}
                     localTagServicesConstRef={localTagServicesConstRef}
                     selectedLocalTagServiceIDsRef={existingState.getRef("selectedLocalTagServiceIDs")}
                     taggableCursorConstRef={taggableCursorConstRef}

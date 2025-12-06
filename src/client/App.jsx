@@ -1,4 +1,3 @@
-import React, { useEffect } from 'react';
 import './global.css';
 import Navbar from './navbar.jsx';
 import { User } from './js/user.js';
@@ -12,7 +11,7 @@ import { Page, Pages } from './page/pages.js';
 import setUserPages from '../api/client-get/set-user-pages.js';
 
 const App = () => {
-    useEffect(() => {
+    const onAdd = () => {
         User.refreshGlobal().then(() => {
             Pages.makeGlobal(new Pages(User.Global().pages().map(Page.fromJSON)));
         });
@@ -29,10 +28,10 @@ const App = () => {
         }, cleanup);
 
         return cleanup;
-    }, []);
+    };
 
     return (
-        <div>
+        <div onAdd={onAdd}>
             <div id="non-modal-content" style={{flexDirection: "column"}}>
                 <div>
                     <Navbar />

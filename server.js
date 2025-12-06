@@ -80,7 +80,7 @@ async function main() {
   const app = express();
   app.use(cookieParser());
   app.use(express.json({limit: "1MB"}));
-  app.use(express.urlencoded());
+  app.use(express.urlencoded({extended: true}));
 
   // normalize url by removing query string, and body by making it {} when not there
   app.use((req, res) => {

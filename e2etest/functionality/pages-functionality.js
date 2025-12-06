@@ -1,6 +1,6 @@
-import { DEFAULT_TIMEOUT_TIME, DEFAULT_SLEEP_TIME, doubleClick, findMetricVisualizer, mouseOver, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
+import { DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, findMetricVisualizer, mouseOver, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
 import { navigateToFileSearchPage } from "../navigation/pages-navigation.js";
-import {By, Key} from "selenium-webdriver"
+import {By, Condition, Key, until} from "selenium-webdriver"
 
 /** @import {ThenableWebDriver} from "selenium-webdriver" */
 
@@ -16,21 +16,22 @@ export async function createNewFileSearchPage(driver) {
  * @param {ThenableWebDriver} driver
  * @param {string} tag
  * @param {{
- *   instance?: number
+ *   parentHasClass?: string
  *   waitForRefresh?: boolean
  * }=} options
  */
-export async function fileSearchSelectTag(driver, tag, options) {
+export async function selectTagFromLocalTagSelector(driver, tag, options) {
     options ??= {};
     options.waitForRefresh ??= true;
     options.instance ??= 1;
-    // select tag
-    const tagSelectors = await driver.findElements(xpathHelper({containsClass: "local-tags-selector"}));
-    const tagSelector = tagSelectors[options.instance - 1];
-    if (tagSelector === undefined) {
-        throw `Could not find a tag selector instance #${options.instance}`;
+    if (options.instance === 2) {
+        options.instance = 1;
     }
-    const tagElement = tagSelector.findElement(xpathHelper({hasTitle: tag, containsClass: "lazy-selector-selectable-item"}));
+    const tagElement = await driver.findElement(xpathHelper({containsClass: options.parentHasClass, descendent: {
+        containsClass: "local-tags-selector", descendent: {
+            hasTitle: tag, containsClass: "lazy-selector-selectable-item"
+        }
+    }}));
     await doubleClick(driver, tagElement);
     
     if (options.waitForRefresh) {
@@ -45,12 +46,9 @@ export async function fileSearchSelectTag(driver, tag, options) {
  *   waitForRefresh?: boolean
  * }=} options
  */
-export async function fileSearchSelectQueriedTag(driver, tag, options) {
+export async function selectTagFromTagSearchQuery(driver, tag, options) {
     options ??= {};
     options.waitForRefresh ??= true;
-    // get current local tags selector
-    const localTagsSelector = await driver.findElement(xpathHelper({containsClass: "local-tags-selector"}));
-    const untilRefresh = await untilLocalTagsSelectorRefresh(localTagsSelector);
 
     // select tag
     const tagSelector = await driver.findElement(xpathHelper({containsClass: "tag-search-query", descendent: {
@@ -60,8 +58,112 @@ export async function fileSearchSelectQueriedTag(driver, tag, options) {
     
     if (options.waitForRefresh) {
         // then wait for current local tags selector to refresh, this ensures next call will not reference a stale element
-        await driver.wait(untilRefresh);
+        await driver.sleep(DEFAULT_SLEEP_TIME);
     }
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ */
+export async function selectOrTag(driver) {
+    await driver.findElement(xpathHelper({type: "input", hasValue: "OR"})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ */
+export async function saveOrTag(driver) {
+    await driver.findElement(xpathHelper({type: "input", hasValue: "Select OR Group"})).click();
+}
+
+export const AGGREGATE_TAG_TYPES = /** @type {const} */ ({
+    NAMESPACE: "aggregate namespace",
+    METRIC: "aggregate metric"
+});
+
+/** @typedef {(typeof AGGREGATE_TAG_TYPES)[keyof typeof AGGREGATE_TAG_TYPES]} AggregateTagType */
+
+/**
+ * @typedef {Object} AggregateTag
+ * @property {AggregateTagType} type
+ * @property {string} item
+ **/
+
+export const AGGREGATE_CONDITION_TYPES = /** @type {const} */ ({
+    NOT_IN_LIST: "not-in-list-condition",
+    COUNT_MATCHING: "count-matching-query-condition",
+    PERCENTAGE_MATCHING: "percentage-matching-query-condition",
+    PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY: "percentage-of-subquery-matching-query-condition"
+});
+
+/** @typedef {(typeof AGGREGATE_CONDITION_TYPES)[keyof typeof AGGREGATE_CONDITION_TYPES]} AggregateConditionType */
+
+export const COMPARATORS = /** @type {const} */ ({
+    LT: "<",
+    LTE: "<=",
+    GT: ">",
+    GTE: ">="
+});
+
+/** @typedef {(typeof COMPARATORS)[keyof typeof COMPARATORS]} Comparator */
+
+/** 
+ * @typedef {Object} AggregateCondition
+ * @property {AggregateConditionType} type
+ * @property {Comparator=} comparator
+ * @property {number} value
+ * @property {string[]} query1
+ * @property {string[]} query2
+ **/
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {AggregateTag} aggregateTag 
+ * @param {AggregateCondition[]} conditions 
+ */
+export async function addAggregateTag(driver, aggregateTag, conditions) {
+    await selectTagFromLocalTagSelector(driver, "system:aggregate tags");
+    const aggregateTagElement = await driver.findElement(xpathHelper({hasTitle: `${aggregateTag.type}:${aggregateTag.item}`}));
+    await doubleClick(driver, aggregateTagElement);
+    for (const condition of conditions) {
+        if (condition.type === AGGREGATE_CONDITION_TYPES.NOT_IN_LIST) {
+            const specifyTagsButton = await driver.findElement(xpathHelper({type: "input", hasValue: "Specify tags"}));
+            await specifyTagsButton.click();
+            for (const tag of condition.query1) {
+                const tagElement = await driver.findElement(xpathHelper({containsClass: "select-from-list-of-tags-modal", descendent: {hasTitle: tag}}));
+                await doubleClick(driver, tagElement);
+            }
+            const selectQueryButton = await driver.findElement(xpathHelper({containsClass: "select-from-list-of-tags-modal", descendent: {type: "input", hasInputType: "button"}}));
+            await selectQueryButton.click();
+        } else if (
+            condition.type === AGGREGATE_CONDITION_TYPES.COUNT_MATCHING
+         || condition.type === AGGREGATE_CONDITION_TYPES.PERCENTAGE_MATCHING
+         || condition.type === AGGREGATE_CONDITION_TYPES.PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY) {
+            await driver.findElement(xpathHelper({hasClass: condition.type, descendent: {containsText: condition.comparator, descendent: {type: "input"}}})).click();
+
+            const valueElement = await driver.findElement(xpathHelper({hasClass: condition.type, descendent: {type: "input", hasInputType: "text"}}));
+            await realClear(valueElement);
+            await valueElement.sendKeys(condition.value);
+            await realFocus(valueElement);
+
+            // Specify query(ies)
+            await driver.findElement(xpathHelper({hasClass: condition.type, descendent: {type: "input", hasInputType: "button"}})).click();
+            for (const tag of condition.query1) {
+                await selectTagFromLocalTagSelector(driver, tag, {parentHasClass: "tag-selector-modal"});
+            }
+            await driver.findElement(xpathHelper({hasClass: "tag-selector-modal", descendent: {type: "input", hasInputType: "button", valueContains: "Select"}})).click();
+
+            if (condition.type === AGGREGATE_CONDITION_TYPES.PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY) {
+                for (const tag of condition.query2) {
+                    await selectTagFromLocalTagSelector(driver, tag, {parentHasClass: "tag-selector-modal"});
+                }
+                await driver.findElement(xpathHelper({hasClass: "tag-selector-modal", descendent: {type: "input", hasInputType: "button", valueContains: "Select"}})).click();
+            }
+        }
+    }
+
+    await driver.findElement(xpathHelper({hasValue: "Create Aggregate Tag"})).click();
 }
 
 export const METRIC_TAG_SEARCH_TYPES = /** @type {const} */ ({
@@ -84,25 +186,20 @@ export const METRIC_TAG_SEARCH_TYPES = /** @type {const} */ ({
  */
 export async function fileSearchMetricTag(driver, localMetricServiceName, metricName, searchType, comparison) {
     comparison ??= 0;
-    await fileSearchSelectTag(driver, "system:metric", {waitForRefresh: false});
+    await selectTagFromLocalTagSelector(driver, "system:metric", {waitForRefresh: false});
     
-    const metricServiceSelect = await driver.findElement(By.name("localMetricServiceID"));
-    await metricServiceSelect.click();
-    const localMetricService = await driver.findElement(xpathHelper({type: "option", containsText: localMetricServiceName}));
-    await localMetricService.click();
+    await driver.findElement(By.name("localMetricServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: localMetricServiceName})).click();
 
-    const metricSelect = await driver.findElement(By.name("localMetricID"));
-    await metricSelect.click();
-    const localMetric = await driver.findElement(xpathHelper({type: "option", containsText: metricName}));
-    await localMetric.click();
+    await driver.findElement(By.name("localMetricID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: metricName})).click();
 
     const localMetricComparison = await driver.findElement(xpathHelper({containsClass: "metric-tag-comparison"}));
     await realClear(localMetricComparison);
     await localMetricComparison.sendKeys(comparison);
     await realFocus(localMetricComparison);
 
-    const searchButton = await driver.findElement(xpathHelper({type: "input", hasValue: searchType}));
-    await searchButton.click();
+    await driver.findElement(xpathHelper({type: "input", hasValue: searchType})).click();
 
     await driver.sleep(DEFAULT_SLEEP_TIME);
 }
@@ -111,16 +208,46 @@ export async function fileSearchMetricTag(driver, localMetricServiceName, metric
  * @param {ThenableWebDriver} driver 
  */
 export async function clickModifyTaggablesButton(driver) {
-    const modifyTaggablesButton = await driver.findElement(xpathHelper({type: "input", hasValue: "Modify selected taggables"}));
-    await modifyTaggablesButton.click();
+    await driver.findElement(xpathHelper({type: "input", hasValue: "Modify selected taggables"})).click();
 }
 
 /**
  * @param {ThenableWebDriver} driver 
  */
 export async function saveModifyTaggablesChanges(driver) {
-    const saveChangesButton = await driver.findElement(xpathHelper({type: "input", hasValue: "Save changes"}));
-    await saveChangesButton.click();
+    await driver.findElement(xpathHelper({type: "input", hasValue: "Save changes"})).click();
+}
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {{
+ *     addTagsNoConfirm?: string[],
+ *     removeTagsNoConfirm?: string[]
+ * }} options 
+ */
+export async function modifyTaggables(driver, options) {
+    options.addTagsNoConfirm ??= [];
+    options.removeTagsNoConfirm ??= [];
+
+    await clickModifyTaggablesButton(driver);
+    for (const tagToAdd of options.addTagsNoConfirm) {
+        await applyTagFilter(driver, tagToAdd, {parentHasClass: "modify-taggables-modal"});
+        await enterTagFilter(driver, {parentHasClass: "modify-taggables-modal"})
+    }
+    for (const tagToRemove of options.removeTagsNoConfirm) {
+        await selectTagFromLocalTagSelector(driver, tagToRemove, {parentHasClass: "modify-taggables-modal"});
+    }
+    await saveModifyTaggablesChanges(driver);
+}
+
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function trashTaggables(driver) {
+    await driver.findElement(xpathHelper({type: "input", hasValue: "Trash selected taggables"})).click();
+    await driver.switchTo().alert().accept();
 }
 
 /**
@@ -173,18 +300,32 @@ export function generateHasMetricComparisonGTETagName(metricName, comparisonValu
  * @param {ThenableWebDriver} driver
  */
 export async function toggleExcludeCheckbox(driver) {
-    const excludeCheckbox = await driver.findElement(xpathHelper({containsClass: "exclude-checkbox"}));
-    await excludeCheckbox.click();
+    await driver.findElement(xpathHelper({containsClass: "exclude-checkbox"})).click();
 }
 
 /**
  * @param {ThenableWebDriver} driver
  * @param {string} text
+ * @param {{
+ *   parentHasClass?: string
+ * }=} options
  */
-export async function applyTagFilter(driver, text) {
-    const tagFilterInput = await driver.findElement(xpathHelper({containsClass: "tag-filter-input"}));
+export async function applyTagFilter(driver, text, options) {
+    options ??= {};
+    const tagFilterInput = await driver.findElement(xpathHelper({containsClass: options.parentHasClass, descendent: {containsClass: "tag-filter-input"}}));
     await realClear(tagFilterInput);
     await tagFilterInput.sendKeys(text);
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {{
+ *   parentHasClass?: string
+ * }=} options
+ */
+export async function enterTagFilter(driver, options) {
+    options ??= {};
+    await driver.findElement(xpathHelper({containsClass: options.parentHasClass, descendent: {containsClass: "tag-filter-input"}})).sendKeys(Key.ENTER);
 }
 
 /**

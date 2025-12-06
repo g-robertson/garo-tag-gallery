@@ -1,7 +1,7 @@
 import { createNewFileSearchPage } from "../functionality/pages-functionality.js";
 import { closeModal, closePage, findModals, findPages, rmDownloadedFile, selectPage, xpathHelper } from "../helpers.js";
 import { navigateToBackup, navigateToHydrusImport, navigateToImportMappingsFromBackup } from "../navigation/file-navigation.js";
-import { navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
+import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
 import { navigateToFileSearchPage } from "../navigation/pages-navigation.js";
 import { navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
 import { navigateToCreateTagService, navigateToModifyTagServices } from "../navigation/tags-navigation.js";
@@ -93,22 +93,14 @@ export const NAVIGATE_METRICS_MENU_TESTS = [
         await closeModal(driver);
     }},
     {name: "NavigateToModifyMetric", tests: async (driver) => {
-        const metricsNav = await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"}));
-
-        await metricsNav.click();
-        const modifyMetricNav = await driver.findElement(xpathHelper({containsText: "Update/delete existing metric", containsClass: "topbar-dropdown-option"}));
-        await modifyMetricNav.click();
+        await navigateToModifyMetric(driver);
         if ((await findModals(driver)).length === 0) {
             throw "Modal not visible after navigating to modify metric";
         }
         await closeModal(driver);
     }},
     {name: "NavigateToChangeTagToMetric", tests: async (driver) => {
-        const metricsNav = await driver.findElement(xpathHelper({containsText: "Metrics", containsClass: "topbar-dropdown-title"}));
-
-        await metricsNav.click();
-        const changeTagToMetricNav = await driver.findElement(xpathHelper({containsText: "Change tag to metric", containsClass: "topbar-dropdown-option"}));
-        await changeTagToMetricNav.click();
+        await navigateToChangeTagToMetric(driver);
         if ((await findModals(driver)).length === 0) {
             throw "Modal not visible after navigating to change tag to metric";
         }
@@ -119,11 +111,9 @@ export const NAVIGATE_METRICS_MENU_TESTS = [
 /** @type {TestSuite[]} */
 export const NAVIGATE_PARSERS_MENU_TESTS = [
     {name: "NavigateToCreateNewURLGeneratorService", tests: async (driver) => {
-        const parsersNav = await driver.findElement(xpathHelper({containsText: "Parsers", containsClass: "topbar-dropdown-title"}));
+        await driver.findElement(xpathHelper({containsText: "Parsers", containsClass: "topbar-dropdown-title"})).click();
 
-        await parsersNav.click();
-        const newURLGeneratorServiceNav = await driver.findElement(xpathHelper({containsText: "Create new URL generator service", containsClass: "topbar-dropdown-option"}));
-        await newURLGeneratorServiceNav.click();
+        await driver.findElement(xpathHelper({containsText: "Create new URL generator service", containsClass: "topbar-dropdown-option"})).click();
         if ((await findModals(driver)).length === 0) {
             throw "Modal not visible after navigating to create new URL generator service";
         }

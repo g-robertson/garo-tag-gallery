@@ -57,7 +57,6 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  *  realizeMinimumCount?: number
  *  customItemComponent?: (param0: {realizedValue: Awaited<R>, index: number, setRealizedValue: (realizedValue: Awaited<R>) => void, width: number, height: number}) => JSX.Element
  *  customTitleRealizer?: (realizedValue: Awaited<R>) => string,
- *  incrementIndexOut?: {out: (increment: number) => void}
  *  itemProperties: ItemProperties
  *  scrollbarIncrement?: number
  *  initialLastClickedIndex?: number
@@ -79,7 +78,6 @@ function LazySelector({
     realizeMinimumCount,
     customItemComponent,
     customTitleRealizer,
-    incrementIndexOut,
     itemProperties,
     scrollbarIncrement,
     initialLastClickedIndex,
@@ -97,7 +95,6 @@ function LazySelector({
     realizeMinimumCount ??= 0;
     customItemComponent ??= ({realizedValue}) => (<>{realizedValue}</>);
     customTitleRealizer ??= () => "";
-    incrementIndexOut ??= {};
     itemProperties.horizontalMargin ??= 0;
     itemProperties.verticalMargin ??= 0;
     scrollbarIncrement ??= 4;
@@ -138,6 +135,7 @@ function LazySelector({
         }
         return heightAvailable;
     });
+
     const columnCountAvailableRef = ExistingState.tupleTransformRef([widthAvailableRef, fullItemWidthRef], () => {
         if (fullItemWidthRef.get() === 0) {
             return 0;
@@ -173,19 +171,11 @@ function LazySelector({
             return 0;
         }
 
-        return Math.max((columnCountAvailableRef.get() * Math.ceil(valuesLength / columnCountAvailableRef.get())) - currentItemsShownCountRef.get(), 0);
+        return Math.max((columnCountAvailableRef.get() * Math.ceil(valuesConstRef.get().length / columnCountAvailableRef.get())) - currentItemsShownCountRef.get(), 0);
     });
-    incrementIndexOut.out = (increment) => {
-        shownStartIndexRef.update(clampShownStartIndex(shownStartIndexRef.get() + increment, lastPossibleShownStartIndexRef.get(), columnCountAvailableRef.get()));
-    }
 
     /** @type {ExistingStateRef<number | null>} */
     const lastClickedIndexRef = ExistingState.stateRef(initialLastClickedIndex);
-
-    const clampedStartIndex = clampShownStartIndex(shownStartIndexRef.get(), lastPossibleShownStartIndexRef.get(), columnCountAvailableRef.get());
-    if (shownStartIndexRef.get() !== clampedStartIndex) {
-        shownStartIndexRef.update(clampedStartIndex);
-    }
 
     const valuesRealizationSync = ExistingState.stateRef(0);
     /**
@@ -343,13 +333,13 @@ function LazySelector({
         cleanup = selectedIndicesRef.addOnUpdateCallback(onRowItemsSelectedChanged, cleanup);
         cleanup = rowItemElementsRef.addOnUpdateCallback(onRowItemsSelectedChanged, cleanup);
         
-        const onLastClickedIndexChanged = (newLastClickedIndex) => {
+        const onLastClickedIndexChanged = () => {
             preShiftClickIndices.update(null);
 
-            if (lastClickedIndexRef.get() === null || lastClickedIndexRef.get() === newLastClickedIndex) {
+            if (lastClickedIndexRef.get() === null) {
                 return;
             }
-
+            
             if (lastClickedIndexRef.get() < shownStartIndexRef.get()) {
                 shownStartIndexRef.update(clampShownStartIndex(
                     Math.floor(lastClickedIndexRef.get() / columnCountAvailableRef.get()) * columnCountAvailableRef.get(),
@@ -359,18 +349,27 @@ function LazySelector({
             }
             if (lastClickedIndexRef.get() > shownEndIndexRef.get()) {
                 shownStartIndexRef.update(clampShownStartIndex(
-                    Math.ceil((lastClickedIndexRef.get() - currentItemsShownCountRef.get()) / columnCountAvailableRef.get()) * columnCountAvailableRef.get(),
+                    Math.ceil((lastClickedIndexRef.get() - currentItemsShownCountRef.get() + 1) / columnCountAvailableRef.get()) * columnCountAvailableRef.get(),
                     lastPossibleShownStartIndexRef.get(),
                     columnCountAvailableRef.get()
                 ));
             }
         };
-        cleanup = lastClickedIndexRef.addOnUpdateCallback(onLastClickedIndexChanged, cleanup);
+        cleanup = lastClickedIndexRef.addOnUpdateCallback(onLastClickedIndexChanged, cleanup, {requireChangeForUpdate: true});
 
-        const onActiveRealizedValuesChanged = (db) => {
+        const onShownStartIndexClampConditionsChange = () => {
+            shownStartIndexRef.update(clampShownStartIndex(
+                shownStartIndexRef.get(),
+                lastPossibleShownStartIndexRef.get(),
+                columnCountAvailableRef.get()
+            ));
+        };
+        cleanup = lastPossibleShownStartIndexRef.addOnUpdateCallback(onShownStartIndexClampConditionsChange, cleanup, {requireChangeForUpdate: true});
+        cleanup = columnCountAvailableRef.addOnUpdateCallback(onShownStartIndexClampConditionsChange, cleanup, {requireChangeForUpdate: true});
+
+        const onActiveRealizedValuesChanged = () => {
             const realizedValues = realizedValuesRef.get();
             const rowItemElements = new Map();
-            console.log("active realized values changed");
             /** @type {JSX.Element[]} */
             const rows = [];
             for (let i = 0; i < rowCountAvailableRef.get(); ++i) {
@@ -521,7 +520,7 @@ function LazySelector({
         const onClickFocusOutListener = (e) => {
             let parent = e.target;
             do {
-                if (parent === RootElement) {
+                if (parent === RootElement.dom) {
                     return;
                 }
                 parent = parent.parentElement;
@@ -560,8 +559,9 @@ function LazySelector({
                 const newIndex = clamp(lastClickedIndexRef.get() + change, 0, valuesConstRef.get().length - 1);
                 if (newIndex !== lastClickedIndexRef.get()) {
                     lastClickedIndexRef.update(newIndex);
-                    selectedIndicesRef.get().clear();
-                    selectedIndicesRef.add(newIndex);
+                    const selectedIndices = selectedIndicesRef.get();
+                    selectedIndices.clear();
+                    selectedIndices.add(newIndex);
                     selectedIndicesRef.forceUpdate();
                 }
             };

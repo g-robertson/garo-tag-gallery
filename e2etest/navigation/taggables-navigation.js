@@ -6,9 +6,7 @@ import { xpathHelper } from "../helpers.js";
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToModifyTaggableServices(driver) {
-    const taggablesNav = await driver.findElement(xpathHelper({containsText: "Taggables", containsClass: "topbar-dropdown-title"}));
+    await driver.findElement(xpathHelper({containsText: "Taggables", containsClass: "topbar-dropdown-title"})).click();
 
-    await taggablesNav.click();
-    const modifyTaggableServiceNav = await driver.findElement(xpathHelper({containsText: "Update/delete existing taggable service", containsClass: "topbar-dropdown-option"}));
-    await modifyTaggableServiceNav.click();
+    await driver.findElement(xpathHelper({containsText: "Update/delete existing taggable service", containsClass: "topbar-dropdown-option"})).click();
 }

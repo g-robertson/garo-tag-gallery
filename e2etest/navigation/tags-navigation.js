@@ -6,20 +6,16 @@ import { xpathHelper } from "../helpers.js";
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToCreateTagService(driver) {
-    const tagsNav = await driver.findElement(xpathHelper({containsText: "Tags", containsClass: "topbar-dropdown-title"}));
+    await driver.findElement(xpathHelper({containsText: "Tags", containsClass: "topbar-dropdown-title"})).click();
 
-    await tagsNav.click();
-    const newTagServiceNav = await driver.findElement(xpathHelper({containsText: "Create new tag service", containsClass: "topbar-dropdown-option"}));
-    await newTagServiceNav.click();
+    await driver.findElement(xpathHelper({containsText: "Create new tag service", containsClass: "topbar-dropdown-option"})).click();
 }
 
 /**
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToModifyTagServices(driver) {
-    const tagsNav = await driver.findElement(xpathHelper({containsText: "Tags", containsClass: "topbar-dropdown-title"}));
+    await driver.findElement(xpathHelper({containsText: "Tags", containsClass: "topbar-dropdown-title"})).click();
 
-    await tagsNav.click();
-    const modifyTagServiceNav = await driver.findElement(xpathHelper({containsText: "Update/delete existing tag service", containsClass: "topbar-dropdown-option"}));
-    await modifyTagServiceNav.click();
+    await driver.findElement(xpathHelper({containsText: "Update/delete existing tag service", containsClass: "topbar-dropdown-option"})).click();
 }

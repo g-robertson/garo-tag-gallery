@@ -517,7 +517,7 @@ export async function validate(dbs, req, res) {
     const wantedFields = Z_WANTED_FIELD.or(z.array(Z_WANTED_FIELD)).safeParse(req?.body?.wantedFields, {path: ["wantedFields"]});
     if (!wantedFields.success) return wantedFields.error.message;
 
-    const localTagServiceIDs = z.array(z.number().nonnegative().int()
+    const localTagServiceIDs = z.array(z.coerce.number().nonnegative().int()
         .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
     ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
     if (!localTagServiceIDs.success) return localTagServiceIDs.error.message;

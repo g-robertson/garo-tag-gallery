@@ -2,23 +2,24 @@
 import React from "react";
 import jsxRuntime from "react/jsx-runtime";
 
-const ALPHABET = "abcdefghijklmnopqrstuvwxyz";
-/**
- * 
- * @param {number} size 
- */
-function randomID(size) {
-    let id = "";
-    for (let i = 0; i < size; ++i) {
-        const rnd = Math.floor(Math.random() * 26);
-        id += ALPHABET[rnd];
+const ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+let unusedIDCount = 1;
+function unusedID() {
+    let id = "__u-";
+    let idNumber = ++unusedIDCount;
+    while (idNumber > 0) {
+        id += ALPHABET[idNumber % ALPHABET.length];
+        idNumber = Math.floor(idNumber / ALPHABET.length);
     }
 
     return id;
 }
 
 const PROP_REMAPPING = new Map([
-    ["ondoubleclick", "ondblclick"]
+    ["ondoubleclick", "ondblclick"],
+    ["for", "htmlFor"],
+    ["class", "className"]
 ]);
 
 const EVENT_PROPS = new Set([
@@ -146,13 +147,20 @@ const EASY_PROPS = new Set([
     "src",
     "controls",
     "enctype",
-    "multiple"
+    "multiple",
+    "href",
+    "download",
+    "selected",
+    "for",
+    "htmlFor",
+    "class",
+    "className"
 ]);
 
 const OnAddEvents = new Map();
 const OnRemoveEvents = new Map();
 window.addEventListener("load", () => {
-    const observer = new MutationObserver(() => {
+    const observationFunction = () => {
         for (const [reactRef, onAdd] of OnAddEvents) {
             if (document.querySelector(`[data-react-ref=${reactRef}]`) !== null) {
                 // Remove event before calling as onAdd could mutate document and cause another observation
@@ -170,9 +178,11 @@ window.addEventListener("load", () => {
                 onRemove();
             }
         }
-    });
+    }
 
+    const observer = new MutationObserver(observationFunction);
     observer.observe(document.body, {childList: true, subtree: true});
+    observationFunction();
 })
 
 const stringNumbers = new Set(["flex", "flexGrow", "zIndex"]);
@@ -271,11 +281,6 @@ function domCreateElement(type, props) {
         }
     }
 
-    const className = props.className ?? props.class;
-    if (className !== undefined) {
-        element.className = className;
-    }
-
     for (const child of domProcessChildren(type, props)) {
         element.appendChild(child);
     }
@@ -289,9 +294,9 @@ function domCreateElement(type, props) {
 
 export const Fragment = jsxRuntime.Fragment;
 export const jsx = (type, props, key) => {
-    props['data-react-ref'] = randomID(32);
+    props['data-react-ref'] = unusedID();
     // I don't care about key because I'm not really using react for this
-    key ??= randomID(32);
+    key ??= unusedID();
     if (type === "dom" || props.dom === true) {
         return domCreateElement(type, props, key);
     } else {
@@ -300,9 +305,9 @@ export const jsx = (type, props, key) => {
 }
 export const jsxDEV = jsx;
 export const jsxs = (type, props, key) => {
-    props['data-react-ref'] = randomID(32);
+    props['data-react-ref'] = unusedID();
     // I don't care about key because I'm not really using react for this
-    key ??= randomID(32);
+    key ??= unusedID();
     if (type === "dom" || props.dom === true) {
         return domCreateElement(type, props, key);
     } else {

@@ -19,7 +19,7 @@ export default function CreateURLGeneratorService({ extraProperties, modalResolv
                     <div style={{marginLeft: "8px"}}>
                         <div style={{margin: "2px 0 2px 0"}}>
                             <span>Choose a name for your URL generator service: </span>
-                            <input name="serviceName" defaultValue="My URL Generator service" type="text" />
+                            <input name="serviceName" value="My URL Generator service" type="text" />
                         </div>
                     </div>
                     <div style={{marginLeft: "8px"}}>

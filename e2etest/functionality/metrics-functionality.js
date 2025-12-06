@@ -1,6 +1,7 @@
-import { realClear, UNTIL_MODAL_CLOSE, xpathHelper } from "../helpers.js";
-import { navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
-import {By, Key} from "selenium-webdriver"
+import { closeModal, DEFAULT_TIMEOUT_TIME, realClear, UNTIL_MODAL_CLOSE, xpathHelper } from "../helpers.js";
+import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
+import {By, Key, until} from "selenium-webdriver"
+import { applyTagFilter, selectTagFromLocalTagSelector } from "./pages-functionality.js";
 
 /** @import {ThenableWebDriver} from "selenium-webdriver" */
 
@@ -10,11 +11,12 @@ import {By, Key} from "selenium-webdriver"
  */
 export async function createNewMetricService(driver, name) {
     await navigateToCreateMetricService(driver);
+
     const serviceName = await driver.findElement(By.name("serviceName"));
     await realClear(serviceName);
     await serviceName.sendKeys(name);
-    const submitButton = await driver.findElement(xpathHelper({hasValue: "Submit"}));
-    await submitButton.click();
+
+    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -24,14 +26,12 @@ export async function createNewMetricService(driver, name) {
  */
 export async function deleteMetricService(driver, name) {
     await navigateToModifyMetricServices(driver);
-    const metricService = await driver.findElement(By.name("localMetricServiceID"));
-    await metricService.click();
-    const localMetricService = await driver.findElement(xpathHelper({type: "option", containsText: name}));
-    await localMetricService.click();
-    const deleteButton = await driver.findElement(xpathHelper({hasValue: "Delete selected metric service"}));
-    await deleteButton.click();
-    const deleteMetricServiceConfirm = await driver.switchTo().alert();
-    await deleteMetricServiceConfirm.accept();
+
+    await driver.findElement(By.name("localMetricServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: name})).click();
+    await driver.findElement(xpathHelper({hasValue: "Delete selected metric service"})).click();
+    await driver.switchTo().alert().accept();
+
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -59,10 +59,8 @@ export async function createNewMetric(driver, metric) {
     metric.upperBound ??= 10;
     await navigateToCreateNewMetric(driver);
     
-    const metricServiceSelect = await driver.findElement(By.name("localMetricServiceID"));
-    await metricServiceSelect.click();
-    const localMetricService = await driver.findElement(xpathHelper({type: "option", containsText: metric.metricServiceName}));
-    await localMetricService.click();
+    await driver.findElement(By.name("localMetricServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: metric.metricServiceName})).click();
 
     const metricName = await driver.findElement(By.name("metricName"));
     await realClear(metricName);
@@ -80,12 +78,41 @@ export async function createNewMetric(driver, metric) {
     await realClear(metricPrecision);
     await metricPrecision.sendKeys(metric.precision);
 
-    const metricTypeSelect = await driver.findElement(By.name("metricType"));
-    await metricTypeSelect.click();
-    const metricTypeOption = await driver.findElement(xpathHelper({type: "option", containsText: metric.type}));
-    await metricTypeOption.click();
+    await driver.findElement(By.name("metricType")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: metric.type})).click();
+    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
 
-    const submitButton = await driver.findElement(xpathHelper({hasValue: "Submit"}));
-    await submitButton.click();
     await driver.wait(UNTIL_MODAL_CLOSE);
+}
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {string} tag 
+ * @param {string} localMetricServiceName 
+ * @param {string} localMetricName 
+ * @param {number} metricValue 
+ * @param {boolean} removeExistingTag 
+ */
+export async function changeTagToMetric(driver, tag, localMetricServiceName, localMetricName, metricValue, removeExistingTag) {
+    await navigateToChangeTagToMetric(driver);
+    await applyTagFilter(driver, tag, {parentHasClass: "change-tag-to-metric-modal"});
+    await selectTagFromLocalTagSelector(driver, tag, {parentHasClass: "change-tag-to-metric-modal"});
+
+    await driver.findElement(By.name("localMetricServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: localMetricServiceName})).click();
+    await driver.findElement(By.name("localMetricID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: localMetricName})).click();
+
+    const metricValueInput = await driver.findElement(By.name("metricValue"));
+    await realClear(metricValueInput);
+    await metricValueInput.sendKeys(metricValue);
+
+    if (removeExistingTag) {
+        await driver.findElement(By.name("removeExistingTag")).click();
+    }
+
+    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
+    await driver.wait(until.elementLocated(xpathHelper({containsText: "Successfully set tag "})), DEFAULT_TIMEOUT_TIME);
+    await closeModal(driver);
 }

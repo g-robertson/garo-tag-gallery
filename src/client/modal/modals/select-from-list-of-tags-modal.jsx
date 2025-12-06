@@ -19,7 +19,7 @@ export default function SelectFromListOfTags({ extraProperties, modalResolve }) 
 
     return {
         component: (
-            <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
+            <div className="select-from-list-of-tags-modal" style={{width: "100%", height: "100%", flexDirection: "column"}}>
                 Select from list of tags:
                 <div style={{width: "100%", height: "100%"}}>
                     <DualListboxLazyTextObjectSelector
@@ -27,6 +27,7 @@ export default function SelectFromListOfTags({ extraProperties, modalResolve }) 
                         selectedItemsRef={selectedTagsRef}
                         customItemSelectorComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
                         customItemSelectedComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
+                        customTitleRealizer={(realizedValue) => realizedValue.displayName}
                     />
                 </div>
                 <input style={{margin: 8}} type="button" value="Select tags" onClick={() => {

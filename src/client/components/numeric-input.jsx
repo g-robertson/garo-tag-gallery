@@ -13,7 +13,7 @@ function NumericInput({selectedNumberRef, minValue, maxValue, className}) {
     minValue ??= -Infinity;
     maxValue ??= Infinity;
 
-    return <input className={className} type="text" defaultValue={selectedNumberRef.get().toString()} onBlur={e => {
+    return <input className={className} type="text" value={selectedNumberRef.get().toString()} onBlur={e => {
         let newNumericValue = Number(e.currentTarget.value);
         if (Number.isFinite(newNumericValue)) {
             if (newNumericValue < minValue) {

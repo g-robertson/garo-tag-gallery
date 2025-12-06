@@ -3,7 +3,6 @@ import '../global.css';
 import { fbjsonParse, ReferenceableReact } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 import { METRIC_TYPES } from '../js/metrics.js';
-import { useState } from 'react';
 import applyMetricToTaggable from '../../api/client-get/apply-metric-to-taggable.js';
 import { User } from '../js/user.js';
 import { ExistingState } from '../page/pages.js';

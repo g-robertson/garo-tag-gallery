@@ -82,7 +82,7 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                         conditionsRef.forceUpdate();
                     }} />
                 </div>
-                <div style={{marginTop: 8, flexDirection: "column"}}>
+                <div className="not-in-list-condition" style={{marginTop: 8, flexDirection: "column"}}>
                     <div>
                         Apply condition: Tag must not be within specified list of tags
                         {SpecifyTagGroupTags.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify tags" onClick={async () => {
@@ -130,10 +130,10 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                             conditionsRef.forceUpdate();
                         }}/>)}
                     </div>
-                    <div style={{flexDirection: "column", marginTop: 4}}>
+                    <div className="count-matching-query-condition" style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [count] taggables that match a specified query (can be empty)</div>
                         <div style={{marginTop: 8}}>
-                            <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
+                            <div><input checked={true} style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
                             <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update("<=")} />&lt;=</div>
                             <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update(">")} />&gt;</div>
                             <div><input style={{marginTop: -2}} name="countComparator" type="radio" onClick={() => countComparatorRef.update(">=")} />&gt;=</div>
@@ -160,16 +160,16 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                             }} />)}
                         </div>
                     </div>
-                    <div style={{flexDirection: "column", marginTop: 4}}>
+                    <div className="percentage-matching-query-condition" style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [percentage] taggables match a specified query</div>
                         <div style={{marginTop: 8}}>
-                            <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
+                            <div><input checked={true} style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
                             <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update("<=")} />&lt;=</div>
                             <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update(">")} />&gt;</div>
                             <div><input style={{marginTop: -2}} name="percentageComparator" type="radio" onClick={() => percentageComparatorRef.update(">=")} />&gt;=</div>
                             <div style={{marginLeft: 8}}>Percentage (0-100%): <div style={{marginTop: -2, marginLeft: 4}}>
                                 <NumericInput
-                                    selectedNumberRef={percentageValueRef.get()}
+                                    selectedNumberRef={percentageValueRef}
                                     minValue={0}
                                     maxValue={100}
                                 />
@@ -193,16 +193,16 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                             }} />)}
                         </div>
                     </div>
-                    <div style={{flexDirection: "column", marginTop: 4}}>
+                    <div className="percentage-of-subquery-matching-query-condition" style={{flexDirection: "column", marginTop: 4}}>
                         <div>Apply condition: Tag must have [more/less] than [percentage] of taggables that match a specified query match a second specified query</div>
                         <div style={{marginTop: 8}}>
-                            <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
+                            <div><input checked={true} style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update("<")} defaultChecked={true} />&lt;</div>
                             <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update("<=")} />&lt;=</div>
                             <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update(">")} />&gt;</div>
                             <div><input style={{marginTop: -2}} name="percentageOfSecondQueryComparator" type="radio" onClick={() => percentageOfSecondQueryComparatorRef.update(">=")} />&gt;=</div>
                             <div style={{marginLeft: 8}}>Percentage (0-100%): <div style={{marginTop: -2, marginLeft: 4}}>
                                 <NumericInput
-                                    selectedNumberRef={percentageOfSecondQueryValueRef.get()}
+                                    selectedNumberRef={percentageOfSecondQueryValueRef}
                                     minValue={0}
                                     maxValue={100}
                                 />

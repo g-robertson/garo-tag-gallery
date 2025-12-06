@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mapNullCoalesce, randomID, T_MINUTE } from "../client/js/client-util.js";
+import { randomBytes } from "crypto";
 
 /** @import {Databases} from "./db-util.js" */
 
@@ -31,7 +32,7 @@ export class Cursor {
         cursorTimeout
     }) {
         cursorTimeout ??= 10 * T_MINUTE;
-        this.#id = randomID(32);
+        this.#id = randomBytes(16).toString('hex');
         this.#cursorType = cursorType;
         this.#cursorValue = cursorValue;
         this.#cursorTimeout = cursorTimeout;

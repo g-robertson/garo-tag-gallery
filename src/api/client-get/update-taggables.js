@@ -19,5 +19,6 @@ export async function updateTaggables(taggableIDs, tagsToAdd, tagsToRemove) {
         },
         method: "POST"
     });
-    FetchCache.Global().regenerateTagsCache();
+    FetchCache.Global().resetCacheType("tags");
+    FetchCache.Global().resetCacheType("taggables");
 }

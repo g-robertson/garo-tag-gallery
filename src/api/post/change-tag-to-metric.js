@@ -1,16 +1,21 @@
 /**
  * @import {APIFunction} from "../api-types.js"
- * @import {DBLocalTag} from "../../db/tags.js"
  */
 
 import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 import { AppliedMetrics, LocalMetricServices } from "../../db/metrics.js";
 import { LocalTags, LocalTagServices } from "../../db/tags.js";
+import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 
 export async function validate(dbs, req, res) {
-    const localTagID = z.coerce.number().nonnegative().int().safeParse(req?.body?.localTagID, {path: ["localTagID"]});
-    if (!localTagID.success) return localTagID.error.message;
+    const tagLookupName = z.string().safeParse(req?.body?.tagLookupName, {path: ["tagLookupName"]});
+    if (!tagLookupName.success) return tagLookupName.error.message;
+
+    const localTagServiceIDs = z.array(z.coerce.number().nonnegative().int()
+        .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
+    ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
+    if (!localTagServiceIDs.success) { return localTagServiceIDs.error.message; }
 
     const removeExistingTag = req?.body?.removeExistingTag === "on";
 
@@ -20,13 +25,13 @@ export async function validate(dbs, req, res) {
     const metricValue = z.coerce.number().finite().safeParse(req?.body?.metricValue, {path: ["metricValue"]});
     if (!metricValue.success) return metricValue.error.message;
 
-    const localTag = await LocalTags.selectByID(dbs, localTagID.data);
-    if (localTag === undefined) {
-        return "local tag ID did not exist";
+    const localTags = await LocalTags.selectManyByLookupNames(dbs, [tagLookupName.data], localTagServiceIDs.data)
+    if (localTags.length === 0) {
+        return "Local tag by lookup name did not exist";
     }
 
     return {
-        localTag,
+        localTags,
         removeExistingTag,
         localMetricID: localMetricID.data,
         metricValue: metricValue.data
@@ -53,16 +58,19 @@ export async function checkPermission(dbs, req, res) {
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
-    await AppliedMetrics.userConvertFromLocalTag(
-        dbs, 
-        req.body.localTag,
-        {
-            Local_Metric_ID: req.body.localMetricID,
-            User_ID: req.user.id(),
-            Applied_Value: req.body.metricValue
-        },
-        req.body.removeExistingTag,
-        req.user
-    );
+    for (const localTag of req.body.localTags) {
+        await AppliedMetrics.userConvertFromLocalTag(
+            dbs, 
+            localTag,
+            {
+                Local_Metric_ID: req.body.localMetricID,
+                User_ID: req.user.id(),
+                Applied_Value: req.body.metricValue
+            },
+            req.body.removeExistingTag,
+            req.user
+        );
+    }
+    
     res.status(200).send("Tag to metric done");
 }

@@ -35,7 +35,7 @@ const DualListboxLazyTextObjectSelector = ({
             Selected items:
             <div style={{flex: 1}}>
                 {<LazyTextObjectSelector
-                    textObjectsConstRef={selectedItemsRef}
+                    textObjectsConstRef={selectedItemsRef.getTransformRef(selectedItems => [...selectedItems])}
                     onValuesDoubleClicked={((items) => {
                         const selectedItems = selectedItemsRef.get();
                         for (const item of items) {
@@ -44,7 +44,7 @@ const DualListboxLazyTextObjectSelector = ({
                         selectedItemsRef.forceUpdate();
                     })}
                     multiSelect={true}
-                    customItemComponent={({realizedValue, index}) => customItemSelectedComponent({realizedValue: items[realizedValue], index})}
+                    customItemComponent={({realizedValue, index}) => customItemSelectedComponent({realizedValue, index})}
                     customTitleRealizer={customTitleRealizer}
                 />}
             </div>
@@ -58,6 +58,7 @@ const DualListboxLazyTextObjectSelector = ({
                             if (selectedItems.has(item)) {
                                 selectedItems.delete(item);
                             } else {
+                                console.log("added ", item);
                                 selectedItems.add(item);
                             }
                         }

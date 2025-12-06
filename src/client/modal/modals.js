@@ -29,6 +29,10 @@ export class Modals {
     #modals = [];
     /** @type {Set<() => void>} */
     #onUpdateCallbacks = new Set();
+    /** @type {Set<(modalInstance: ModalInstance, index: number) => void>} */
+    #onPushCallbacks = new Set();
+    /** @type {Set<() => void>} */
+    #onPopCallbacks = new Set();
 
     static #Gl_Modals = new Modals();
 
@@ -48,6 +52,21 @@ export class Modals {
 
     get modals() {
         return this.#modals;
+    }
+
+    #onPop() {
+        for (const callback of this.#onPopCallbacks) {
+            callback();
+        }
+    }
+
+    /**
+     * @param {ModalInstance} modalInstance 
+     */
+    #onPush(modalInstance) {
+        for (const callback of this.#onPushCallbacks) {
+            callback(modalInstance, this.#modals.length - 1);
+        }
     }
 
     #onUpdate() {
@@ -74,6 +93,34 @@ export class Modals {
         }
     }
 
+    addOnPushCallback(onPushCallback, cleanupFunction) {
+        if (cleanupFunction === undefined) {
+            throw "You must specify a cleanup function or null for adding a callback to a modal";
+        }
+        cleanupFunction ??= () => {};
+
+        this.#onPushCallbacks.add(onPushCallback);
+
+        return () => {
+            cleanupFunction();
+            this.#onPushCallbacks.delete(onPushCallback);
+        }
+    }
+
+    addOnPopCallback(onPopCallback, cleanupFunction) {
+        if (cleanupFunction === undefined) {
+            throw "You must specify a cleanup function or null for adding a callback to a modal";
+        }
+        cleanupFunction ??= () => {};
+
+        this.#onPopCallbacks.add(onPopCallback);
+
+        return () => {
+            cleanupFunction();
+            this.#onPopCallbacks.delete(onPopCallback);
+        }
+    }
+
     /**
      * @param {() => Modal} modal
      * @param {ExtraProperties=} extraProperties
@@ -87,12 +134,14 @@ export class Modals {
                 extraProperties,
                 resolve
             });
+            self.#onPush(self.#modals[self.#modals.length - 1]);
             self.#onUpdate();
         });
     }
 
     popModal() {
         this.#modals.pop().resolve();
+        this.#onPop();
         this.#onUpdate();
     }
 }

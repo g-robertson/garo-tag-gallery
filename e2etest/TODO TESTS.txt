@@ -1,16 +1,18 @@
-Tags:
-Scroll tags
-Shift click correctly selects multiple tags
-ctrl click correctly adds tags
-ctrl double click should add tag then add tags, not add tag then remove tag then add tags
-removing item from lazyselector should update scroll to include only content that can be scrolled to
-OR button should work
+Assumed working implies there is no test, but the functionality likely works
 
+priority queued:
+priority-1 dev concern/minor-2: website is responding too slow for selenium tests to work properly on certain reactive clickable elements, likely from ExistingState async changes
+priority-1 cosmetic/minor-2: scrolling should not visibly clears selection
+priority-1 cosmetic/minor-1: right close page button should work
+priority-2 assumed working-0: Tag service selector
+priority-2 assumed working-0: Shift click correctly selects multiple tags
+priority-2 assumed working-0: ctrl click correctly adds tags
+priority-2 assumed working-0: tags/taggables/metrics/parsers tabs should work
+priority-2 assumed working-0: trash multiple taggables
+priority-2 assumed working-0: modify multiple taggables
+priority-3 cosmetic/minor-1: ctrl double click should add tag then add tags, not add tag then remove tag then add tags
+priority-3 feature: dedupe page
+priority-3 assumed working-0: Scroll tags
+priority-4 feature: back page in gallery should close gallery
 
-
-File srach page:
-modify taggables should work
-trash selected taggables should work
-
-
-tags/taggables/metrics/parsers tabs should work
+Tests existing with issues:

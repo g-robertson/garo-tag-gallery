@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import './global.css';
 
 import { Jobs } from './jobs.js';
@@ -6,7 +5,7 @@ import { ReferenceableReact } from './js/client-util.js';
 
 const JobsElement = () => {
     const JobsContainer = ReferenceableReact();
-    useEffect(() => {
+    const onAdd = () => {
         const onJobsUpdate = () => {
             JobsContainer.dom.replaceChildren(...(Jobs.Global().nonMinimizedJobs.map(job => (
                 <div dom className="job" style={{flexDirection: "column", width: "20vw"}}>
@@ -34,9 +33,9 @@ const JobsElement = () => {
         };
         Jobs.Global().addOnJobsUpdateCallback(onJobsUpdate);
         Jobs.Global().addOnJobsMinimizedUpdateCallback(onJobsUpdate);
-    }, []);
+    };
 
-    return JobsContainer.react(<div style={{right: 0, bottom: 0, position: "absolute", flexDirection: "column", zIndex: 9999}}></div>);
+    return JobsContainer.react(<div onAdd={onAdd} style={{right: 0, bottom: 0, position: "absolute", flexDirection: "column", zIndex: 9999}}></div>);
 };
 
 export default JobsElement;

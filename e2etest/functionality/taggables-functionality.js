@@ -10,13 +10,11 @@ import {By} from "selenium-webdriver"
  */
 export async function deleteTaggableService(driver, name) {
     await navigateToModifyTaggableServices(driver);
-    const taggableService = await driver.findElement(By.name("localTaggableServiceID"));
-    await taggableService.click();
-    const localTaggableService = await driver.findElement(xpathHelper({type: "option", containsText: name}));
-    await localTaggableService.click();
-    const deleteButton = await driver.findElement(xpathHelper({hasValue: "Delete selected taggable service"}));
-    await deleteButton.click();
-    const deleteTaggableServiceConfirm = await driver.switchTo().alert();
-    await deleteTaggableServiceConfirm.accept();
+    
+    await driver.findElement(By.name("localTaggableServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", containsText: name})).click();
+    await driver.findElement(xpathHelper({hasValue: "Delete selected taggable service"})).click();
+    await driver.switchTo().alert().accept();
+
     await driver.wait(UNTIL_MODAL_CLOSE);
 }

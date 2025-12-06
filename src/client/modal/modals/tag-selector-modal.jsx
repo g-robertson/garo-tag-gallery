@@ -25,7 +25,7 @@ export default function TagSelectorModal({ extraProperties, modalResolve }) {
 
     return {
         component: (
-            <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
+            <div class="tag-selector-modal" style={{width: "100%", height: "100%", flexDirection: "column"}}>
                 {extraProperties.titleText}
                 <div style={{width: "100%", height: "100%"}}>
                     <TagsSelector
@@ -37,7 +37,7 @@ export default function TagSelectorModal({ extraProperties, modalResolve }) {
                     />
                 </div>
                 <input style={{margin: 8}} type="button" value={extraProperties.selectionButtonText} onClick={() => {
-                    modalResolve(searchObjectsRef.current);
+                    modalResolve(searchObjectsRef.get());
                     Modals.Global().popModal();
                 }} />
             </div>

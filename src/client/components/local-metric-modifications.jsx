@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { METRIC_TYPES } from "../js/metrics.js";
 import { clamp, ReferenceableReact } from "../js/client-util.js";
 import HoverInfo from "./hover-info.jsx";

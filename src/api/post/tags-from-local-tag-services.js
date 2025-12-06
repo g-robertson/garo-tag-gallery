@@ -16,7 +16,7 @@ import { bjsonStringify } from "../../client/js/client-util.js";
  * @param {Parameters<APIValidationFunction>[2]} res 
  */
 export async function validate(dbs, req, res) {
-    const localTagServiceIDs = z.array(z.number().nonnegative().int()
+    const localTagServiceIDs = z.array(z.coerce.number().nonnegative().int()
         .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
     ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
     if (!localTagServiceIDs.success) return localTagServiceIDs.error.message;
