@@ -10,6 +10,9 @@ import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
  * @returns 
  */
 const LocalTaggableServiceModifications = ({selectedLocalTaggableServiceConstState}) => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
+    
     const LocalTaggableServiceName = ReferenceableReact();
     
     const onAdd = () => {

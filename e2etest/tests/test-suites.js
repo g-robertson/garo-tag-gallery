@@ -37,15 +37,16 @@ const TESTS = {
 
 export const HEADLESS = false;
 const DISABLED_TESTS = new Set([
-    "Tests.Navigation",
-    "Tests.Functional.Files",
+    // "Tests.Navigation",
+    // "Tests.Functional.Files",
     // "Tests.Functional.Pages",
-    //"Tests.Functional.Metrics",
-    "Tests.Functional.Pages.FileSearchPage.TagSearch",
+    // "Tests.Functional.Metrics",
+    // "Tests.Functional.Pages.FileSearchPage.TagSearch",
     // "Tests.Functional",
 ]);
 const HALT_ON_FAILURE = true;
 const HALT_AFTER = new Set([]);
+const DISPLAY_PRIORITY_ITEMS = 0;
 
 let testFailCount = 0;
 let testCount = 0;
@@ -59,8 +60,9 @@ const unimplementedTests = [];
  * @param {TestSuite} testSuite 
  * @param {string} previousContext
  * @param {ThenableWebDriver} driver
+ * @param {boolean} skippingTests
  */
-async function executeTestSuite_(testSuite, previousContext, driver) {
+async function executeTestSuite_(testSuite, previousContext, driver, skippingTests) {
     if (testsHalted) {
         return;
     }
@@ -72,13 +74,19 @@ async function executeTestSuite_(testSuite, previousContext, driver) {
     }
     if (DISABLED_TESTS.has(currentContext)) {
         console.log(`Skipping tests: ${currentContext}`);
-        return;
+        skippingTests = true;
     }
-    console.log(`Executing tests: ${currentContext}`);
+    if (!skippingTests) {
+        console.log(`Executing tests: ${currentContext}`);
+    }
 
     /** @type {TestSuite[]} */
     let teardowns = [];
     if (typeof testSuite.tests === "function") {
+        if (skippingTests) {
+            return;
+        }
+
         ++testCount;
         try {
             await testSuite.tests(driver);
@@ -95,7 +103,7 @@ async function executeTestSuite_(testSuite, previousContext, driver) {
             if (test.isTeardown ?? false) {
                 teardowns.push(test);
             } else {
-                await executeTestSuite_(test, currentContext, driver);
+                await executeTestSuite_(test, currentContext, driver, skippingTests);
             }
         }
     } else {
@@ -106,7 +114,7 @@ async function executeTestSuite_(testSuite, previousContext, driver) {
     }
 
     for (const teardown of teardowns) {
-        await executeTestSuite_(teardown, currentContext, driver);
+        await executeTestSuite_(teardown, currentContext, driver, skippingTests);
     }
 
     if (HALT_AFTER.has(currentContext)) {
@@ -136,16 +144,18 @@ export async function executeTestSuite(driver, logs) {
         console.log(`E2E testing failed, only ${testCount - testFailCount}/${testCount} tests passed`);
     }
 
-    const remainingItems = unimplementedTests.sort((a, b) => {
-        if (a.priority < b.priority) {
-            return -1;
-        } else if (a.priority > b.priority) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }).slice(0, 3).reverse();
 
-    console.log("Priority items remaining to work on: ", remainingItems);
+    if (DISPLAY_PRIORITY_ITEMS !== 0) {
+        const remainingItems = unimplementedTests.sort((a, b) => {
+            if (a.priority < b.priority) {
+                return -1;
+            } else if (a.priority > b.priority) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }).slice(0, DISPLAY_PRIORITY_ITEMS).reverse();
+        console.log("Priority items remaining to work on: ", remainingItems);
+    }
     await killServer();
 }

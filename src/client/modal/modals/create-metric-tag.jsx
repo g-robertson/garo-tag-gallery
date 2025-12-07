@@ -41,7 +41,7 @@ export default function CreateMetricTag({ extraProperties, modalResolve }) {
 
     return {
         component: (
-            <div onAdd={onAdd} style={{width: "100%", height: "100%", flexDirection: "column"}}>
+            <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
                 <LocalMetricSelector
                     selectedLocalMetricServiceRef={selectedLocalMetricServiceRef}
                     selectedLocalMetricRef={selectedLocalMetricRef}

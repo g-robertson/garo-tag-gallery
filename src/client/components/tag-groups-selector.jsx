@@ -1,14 +1,13 @@
 import getNamespaces from "../../api/client-get/namespaces.js";
 import { executeFunctions } from "../js/client-util.js";
 import { User } from "../js/user.js";
-import { State } from "../page/pages.js";
+import { ConstState, State } from "../page/pages.js";
 import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
 
 /** @import {DBNamespace} from "../../db/tags.js" */
 /** @import {DBLocalMetric} from "../../db/metrics.js" */
 /** @import {ClientTagGroup} from "../../api/post/search-taggables.js" */
-/** @import {State} from "../page/pages.js" */
 
 /**
  * @typedef {{

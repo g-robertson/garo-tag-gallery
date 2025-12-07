@@ -32,7 +32,9 @@ const PageElement = () => {
                 <div className="page-topbar">
                     <div className="page-topbar-right">
                         <div className="page-title">{page.pageDisplayName}</div>
-                        <div className="page-cancel">X</div>
+                        <div className="page-cancel" onClick={() => {
+                            Pages.Global().removePage(page)
+                        }}>X</div>
                     </div>
                 </div>
                 <div className="page-contents">

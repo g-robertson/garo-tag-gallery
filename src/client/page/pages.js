@@ -617,4 +617,12 @@ export class Pages {
         }
         this.#onUpdate();
     }
+    
+    /**
+     * @param {Page} page 
+     */
+    removePage(page) {
+        const pageIndex = this.#pages.findIndex(pagesPage => pagesPage === page);
+        this.removePageAt(pageIndex);
+    }
 };

@@ -1,4 +1,4 @@
-import { State } from '../page/pages.js';
+import { ConstState, State } from '../page/pages.js';
 import '../global.css';
 
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
@@ -35,7 +35,7 @@ const DualListboxLazyTextObjectSelector = ({
     customTitleRealizer ??= () => "";
 
     const onAdd = () => {
-        return () => executeFunctions(onAdd);
+        return () => executeFunctions(addToCleanup);
     };
 
     return (

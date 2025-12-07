@@ -483,7 +483,6 @@ function LazySelector({
                         rowItemElements.set(itemIndex, rowItemElement);
                     }
                 }
-                rowItemElementsState.set(rowItemElements);
 
 
                 rows.push(<div style={{width: "100%", height: fullItemHeightState.get()}}>
@@ -494,6 +493,8 @@ function LazySelector({
             SelectableContents.dom.replaceChildren(...(<dom>
                 {rows}
             </dom>));
+
+            rowItemElementsState.set(rowItemElements);
         };
         realizedValuesState.addOnUpdateCallback(() => onActiveRealizedValuesChanged(), addToCleanup);
         rowCountAvailableState.addOnUpdateCallback(() => onActiveRealizedValuesChanged(), addToCleanup, {requireChangeForUpdate: true});

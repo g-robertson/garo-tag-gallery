@@ -48,11 +48,10 @@ const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(untilElementsNotLocated(BySearchQueryTagService(TEST_TAG_SERVICE_RENAME_1)), DEFAULT_TIMEOUT_TIME);
         }}
     ]},
-    {name: "RightClosePageButtonShouldWork", tests: {
-        priority: BUG_PRIORITIES.CURRENT_WORK,
-        notice: BUG_NOTICES.MINOR,
-        impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
-        expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+    {name: "RightClosePageButtonShouldWork", tests: async (driver) => {
+        await createNewFileSearchPage(driver);
+        await driver.findElement(xpathHelper({hasClass: "page-topbar-right", descendent: {hasClass: "page-cancel"}})).click();
+        await driver.wait(untilCountElementsLocated(ByPage, 1), DEFAULT_TIMEOUT_TIME);  
     }},
     {name: "TagSearch", tests: [
         {name: "Navigation", tests: [
@@ -95,11 +94,13 @@ const FILE_SEARCH_PAGE_TESTS = [
                 impact: BUG_IMPACTS.ASSUMED_WORKING,
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
             }},
-            {name: "ScrollingShouldNotClearVisibleSelection", tests: {
-                priority: BUG_PRIORITIES.CURRENT_WORK,
-                notice: BUG_NOTICES.MEDIUM,
-                impact: BUG_IMPACTS.COSMETIC,
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            {name: "ScrollingShouldNotClearVisibleSelection", tests: async (driver) => {
+                await driver.findElement(xpathHelper({hasTitle: TEST_TAG_1})).click();
+                
+                const selectableContents = await driver.findElement(xpathHelper({hasClass: "local-tags-selector", descendent: {hasClass: "lazy-selector-selectable-contents"}}));
+                await scroll(driver, selectableContents, 10, 1);
+                await scroll(driver, selectableContents, -10, 1);
+                await driver.wait(until.elementLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "ShiftClickTagsWorksCorrectly", tests: {
                 priority: BUG_PRIORITIES.NEXT_WORK,
