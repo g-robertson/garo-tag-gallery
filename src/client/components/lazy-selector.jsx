@@ -416,14 +416,6 @@ function LazySelector({
                                             selectedIndices.clear();
                                             selectedIndices.add(itemIndex);
                                             selectedIndicesState.forceUpdate();
-                                        } else if (e.ctrlKey) {
-                                            lastClickedIndexState.set(itemIndex);
-                                            newSelectedIndices = selectedIndices;
-                                            if (newSelectedIndices.has(itemIndex)) {
-                                                newSelectedIndices.delete(itemIndex);
-                                            } else {
-                                                newSelectedIndices.add(itemIndex);
-                                            }
                                         } else if (e.shiftKey) {
                                             // Maintains prior state from before shift click
                                             if (preShiftClickIndicesState.get() === null) {
@@ -443,6 +435,14 @@ function LazySelector({
 
                                             for (; from <= to; ++from) {
                                                 newSelectedIndices.add(from);
+                                            }
+                                        } else if (e.ctrlKey) {
+                                            lastClickedIndexState.set(itemIndex);
+                                            newSelectedIndices = selectedIndices;
+                                            if (newSelectedIndices.has(itemIndex)) {
+                                                newSelectedIndices.delete(itemIndex);
+                                            } else {
+                                                newSelectedIndices.add(itemIndex);
                                             }
                                         } else if (!selectedIndices.has(itemIndex)) {
                                             lastClickedIndexState.set(itemIndex);

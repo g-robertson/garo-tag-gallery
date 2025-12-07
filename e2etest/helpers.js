@@ -103,6 +103,13 @@ export function BySelectableTag(tag) {
     }});
 }
 
+export function BySelectedTag() {
+    return xpathHelper({containsClass: "local-tags-selector", descendent: {
+        containsClass: ["lazy-selector-selectable-item", "selected"],
+        hasTitle: true
+    }});
+}
+
 /**
  * @param {string} tagServiceName
  */
@@ -163,90 +170,6 @@ export async function findMetricVisualizer(driver, metricName, starCount) {
 export async function deleteDatabaseDefaults(driver) {
     await deleteTagService(driver, "Default local tags");
     await deleteTaggableService(driver, "Default local taggables");
-}
-
-/**
- * @param {ThenableWebDriver} driver
- * @param {string} keys
- */
-export async function sendKeys(driver, keys) {
-    const actions = driver.actions({async: true});
-    await actions.sendKeys(keys).perform();
-}
-
-/**
- * @param {ThenableWebDriver} driver
- * @param {WebElement} element 
- */
-export async function mouseOver(driver, element) {
-    const actions = driver.actions({async: true});
-    await actions.move({origin: element, x: 0, y: 0, duration: 0}).perform();
-}
-
-/**
- * @param {ThenableWebDriver} driver
- * @param {IDirection} direction 
- */
-export async function mouseMove(driver, direction) {
-    const actions = driver.actions({async: true});
-    await actions.move({origin: Origin.VIEWPORT, x: direction.x, y: direction.y, duration: 0}).perform();
-}
-
-/**
- * @param {ThenableWebDriver} driver
- * @param {WebElement} element 
- */
-export async function mouseDown(driver, element) {
-    const actions = driver.actions({async: true});
-    await actions.move({origin: element, x: 0, y: 0, duration: 0}).perform();
-    await actions.press(Button.LEFT).perform();
-}
-
-/**
- * @param {ThenableWebDriver} driver
- */
-export async function mouseUp(driver) {
-    const actions = driver.actions({async: true});
-    await actions.release(Button.LEFT).perform();
-}
-
-/**
- * 
- * @param {ThenableWebDriver} driver 
- * @param {WebElement} element 
- * @param {IDirection} direction 
- */
-export async function drag(driver, element, direction) {
-    await mouseDown(driver, element);
-    await mouseMove(driver, direction);
-    await mouseUp(driver);
-}
-
-/**
- * @param {ThenableWebDriver} driver
- * @param {WebElement} element 
- */
-export async function doubleClick(driver, element) {
-    const actions = driver.actions({async: true});
-    await actions.doubleClick(element).perform();
-}
-
-/**
- * 
- * @param {ThenableWebDriver} driver 
- * @param {number} deltaY 
- */
-export async function scroll(driver, element, deltaY, scrollCount) {
-    await driver.executeAsyncScript(`
-        const element = arguments[0];
-        const deltaY = arguments[1];
-        const scrollCount = arguments[2];
-        
-        for (let i = 0; i < scrollCount; ++i) {
-            element.dispatchEvent(new WheelEvent('wheel', {view: window, bubbles: true, cancelable: true, clientX: 0, clientY: 0, deltaY}));
-        };
-        arguments[arguments.length - 1]();
-    `, element, deltaY, scrollCount);
 }
 
 /**
@@ -422,6 +345,108 @@ export async function readDownloadedFile(filePath) {
  */
 export async function rmDownloadedFile(filePath) {
     await rm(referenceDownloadedFile(filePath));
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {string} keys
+ */
+export async function sendKeys(driver, keys) {
+    await driver.actions({async: true}).sendKeys(keys).perform();
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {WebElement} element 
+ */
+export async function mouseOver(driver, element) {
+    await driver.actions({async: true}).move({origin: element, x: 0, y: 0, duration: 0}).perform();
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {IDirection} direction 
+ */
+export async function mouseMove(driver, direction) {
+    await driver.actions({async: true}).move({origin: Origin.VIEWPORT, x: direction.x, y: direction.y, duration: 0}).perform();
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {WebElement} element 
+ */
+export async function mouseDown(driver, element) {
+    const actions = driver.actions({async: true});
+    await actions.move({origin: element, x: 0, y: 0, duration: 0}).perform();
+    await actions.press(Button.LEFT).perform();
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ */
+export async function mouseUp(driver) {
+    await driver.actions({async: true}).release(Button.LEFT).perform();
+}
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {WebElement} element 
+ * @param {IDirection} direction 
+ */
+export async function drag(driver, element, direction) {
+    await mouseDown(driver, element);
+    await mouseMove(driver, direction);
+    await mouseUp(driver);
+}
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {WebElement} element 
+ * @param {{
+ *     shift?: boolean
+ *     ctrl?: boolean
+ * }} options 
+ */
+export async function modClick(driver, element, options) {
+    options.ctrl ??= false;
+    options.shift ??= false;
+
+    await driver.executeAsyncScript(`
+        const element = arguments[0];
+        const ctrlKey = arguments[1];
+        const shiftKey = arguments[2];
+        
+        element.dispatchEvent(new MouseEvent('click', {view: window, bubbles: true, ctrlKey, shiftKey}));
+        arguments[arguments.length - 1]();
+    `, element, options.ctrl, options.shift);
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {WebElement} element 
+ */
+export async function doubleClick(driver, element) {
+    await driver.actions({async: true}).doubleClick(element).perform();
+}
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {number} deltaY 
+ */
+export async function scroll(driver, element, deltaY, scrollCount) {
+    await driver.executeAsyncScript(`
+        const element = arguments[0];
+        const deltaY = arguments[1];
+        const scrollCount = arguments[2];
+        
+        for (let i = 0; i < scrollCount; ++i) {
+            element.dispatchEvent(new WheelEvent('wheel', {view: window, bubbles: true, cancelable: true, clientX: 0, clientY: 0, deltaY}));
+        };
+        arguments[arguments.length - 1]();
+    `, element, deltaY, scrollCount);
 }
 
 /**

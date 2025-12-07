@@ -1,5 +1,5 @@
 import { Key, until } from "selenium-webdriver";
-import { BY_THUMBNAIL_GALLERY_IMAGE, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
+import { BY_THUMBNAIL_GALLERY_IMAGE, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, modClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
 import { addAggregateTag, AGGREGATE_CONDITION_TYPES, AGGREGATE_TAG_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, enterTagFilter, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveModifyTaggablesChanges, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../functionality/pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../functionality/metrics-functionality.js";
@@ -102,20 +102,39 @@ const FILE_SEARCH_PAGE_TESTS = [
                 await scroll(driver, selectableContents, -10, 1);
                 await driver.wait(until.elementLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
             }},
-            {name: "ShiftClickTagsWorksCorrectly", tests: {
-                priority: BUG_PRIORITIES.NEXT_WORK,
-                notice: BUG_NOTICES.ASSUMED_WORKING,
-                impact: BUG_IMPACTS.ASSUMED_WORKING,
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            {name: "ShiftClickTagsWorksCorrectly", tests: async (driver) => {
+                await applyTagFilter(driver, "CLEAR SELECTION");
+                await applyTagFilter(driver, "");
+
+                await driver.findElement(BySelectableTag(TEST_TAG_1)).click();
+                await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_3)), {shift: true});
+                await driver.wait(untilCountElementsLocated(BySelectedTag(), 5), DEFAULT_TIMEOUT_TIME);
+                await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_2)), {shift: true});
+                await driver.wait(untilCountElementsLocated(BySelectedTag(), 2), DEFAULT_TIMEOUT_TIME);
             }},
-            {name: "CtrlClickTagsWorksCorrectly", tests: {
-                priority: BUG_PRIORITIES.NEXT_WORK,
-                notice: BUG_NOTICES.ASSUMED_WORKING,
-                impact: BUG_IMPACTS.ASSUMED_WORKING,
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            {name: "CtrlClickTagsWorksCorrectly", tests: async (driver) => {
+                await applyTagFilter(driver, "CLEAR SELECTION");
+                await applyTagFilter(driver, "");
+                
+                await driver.findElement(BySelectableTag(TEST_TAG_1)).click();
+                await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_3)), {ctrl: true});
+                await driver.wait(untilCountElementsLocated(BySelectedTag(), 2), DEFAULT_TIMEOUT_TIME);
+                await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_2)), {ctrl: true});
+                await driver.wait(untilCountElementsLocated(BySelectedTag(), 3), DEFAULT_TIMEOUT_TIME);
+            }},
+            {name: "CtrlShiftClickTagsShiftHasPrecedence", tests: async (driver) => {
+                await applyTagFilter(driver, "CLEAR SELECTION");
+                await applyTagFilter(driver, "");
+
+                await driver.findElement(BySelectableTag(TEST_TAG_1)).click();
+                await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_3)), {ctrl: true, shift: true});
+                await driver.wait(untilCountElementsLocated(BySelectedTag(), 5), DEFAULT_TIMEOUT_TIME);
             }},
         ]},
         {name: "TagSelectionUpdatesSearchQuery", tests: async (driver) => {
+            await applyTagFilter(driver, "CLEAR SELECTION");
+            await applyTagFilter(driver, "");
+
             // Search query
             await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
             // implement limit tag, then finish search query testing by checking if all images have tag here

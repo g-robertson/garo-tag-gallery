@@ -18,6 +18,7 @@ export async function createNewFileSearchPage(driver) {
  * @param {{
  *   parentHasClass?: string
  *   waitForRefresh?: boolean
+ *   shiftClick?: boolean
  * }=} options
  */
 export async function selectTagFromLocalTagSelector(driver, tag, options) {
