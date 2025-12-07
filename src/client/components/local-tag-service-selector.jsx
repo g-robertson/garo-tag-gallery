@@ -8,15 +8,15 @@ import { State } from '../page/pages.js';
 
 /**
  * @param {{
- *  selectedLocalTagServiceRef: State<DBPermissionedLocalTagService>
+ *  selectedLocalTagServiceState: State<DBPermissionedLocalTagService>
  * }} param0
  * @returns
  */
-const LocalTagServiceSelector = ({selectedLocalTagServiceRef}) => {
+const LocalTagServiceSelector = ({selectedLocalTagServiceState}) => {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
-    selectedLocalTagServiceRef ??= new State(User.Global().localTagServices()[0]);
+    selectedLocalTagServiceState ??= new State(User.Global().localTagServices()[0]);
 
     const onAdd = () => {
         return () => executeFunctions(addToCleanup);
@@ -26,9 +26,9 @@ const LocalTagServiceSelector = ({selectedLocalTagServiceRef}) => {
         <div onAdd={onAdd} style={{marginLeft: "8px"}}>
             <div style={{margin: "2px 0 2px 0"}}>
                 <span>Select which local tag service you wish to use: </span>
-                <select style={{display: "inline-block"}} name="localTagServiceID" value={selectedLocalTagServiceRef.get()?.Local_Tag_Service_ID} onChange={(e) => {
-                    const selectedLocalTagServiceRefID = Number(e.currentTarget.selectedOptions[0].value);
-                    selectedLocalTagServiceRef.set(User.Global().localTagServices().find(localTagService => localTagService.Local_Tag_Service_ID === selectedLocalTagServiceRefID));
+                <select style={{display: "inline-block"}} name="localTagServiceID" value={selectedLocalTagServiceState.get()?.Local_Tag_Service_ID} onChange={(e) => {
+                    const selectedLocalTagServiceStateID = Number(e.currentTarget.selectedOptions[0].value);
+                    selectedLocalTagServiceState.set(User.Global().localTagServices().find(localTagService => localTagService.Local_Tag_Service_ID === selectedLocalTagServiceStateID));
                 }}>
                     {User.Global().localTagServices().map(localTagService => (
                         <option value={localTagService.Local_Tag_Service_ID}>{localTagService.Service_Name}</option>

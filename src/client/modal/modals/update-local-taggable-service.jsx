@@ -22,17 +22,17 @@ export default function UpdateLocalTaggableService({ extraProperties, modalResol
 
     const ModifySelectedTaggableService = ReferenceableReact();
     const DeleteSelectedTaggableService = ReferenceableReact();
-    const selectedLocalTaggableServiceRef = new State(User.Global().localTaggableServices()[0]);
+    const selectedLocalTaggableServiceState = new State(User.Global().localTaggableServices()[0]);
 
     const onAdd = () => {
         const onLocalTaggableServiceSelected = () => {
-            const inputsDisabled = selectedLocalTaggableServiceRef.get() === undefined;
+            const inputsDisabled = selectedLocalTaggableServiceState.get() === undefined;
             ModifySelectedTaggableService.dom.disabled = inputsDisabled;
             DeleteSelectedTaggableService.dom.disabled = inputsDisabled;
         };
         onLocalTaggableServiceSelected();
 
-        selectedLocalTaggableServiceRef.addOnUpdateCallback(onLocalTaggableServiceSelected, addToCleanup);
+        selectedLocalTaggableServiceState.addOnUpdateCallback(onLocalTaggableServiceSelected, addToCleanup);
         return () => executeFunctions(addToCleanup);
     };
 
@@ -40,8 +40,8 @@ export default function UpdateLocalTaggableService({ extraProperties, modalResol
         component: (
             <div onAdd={onAdd} style={{flexDirection: "column"}}>
                 <form action="/api/post/update-local-taggable-service" target="frame" method="POST">
-                    <LocalTaggableServiceSelector selectedLocalTaggableServiceRef={selectedLocalTaggableServiceRef} />
-                    <LocalTaggableServiceModifications selectedLocalTaggableServiceConstState={selectedLocalTaggableServiceRef} />
+                    <LocalTaggableServiceSelector selectedLocalTaggableServiceState={selectedLocalTaggableServiceState} />
+                    <LocalTaggableServiceModifications selectedLocalTaggableServiceConstState={selectedLocalTaggableServiceState} />
                     <div style={{marginLeft: "8px"}}>
                         {ModifySelectedTaggableService.react(<input type="submit" value="Modify selected taggable service" />)}
                     </div>
@@ -51,7 +51,7 @@ export default function UpdateLocalTaggableService({ extraProperties, modalResol
                         const confirm = window.confirm("Are you sure you want to delete this taggable service?\nWARNING: This will remove every taggable (file/collection) that exists under this taggable service");
                         if (confirm) {
                             (async () => {
-                                await deleteLocalTaggableService(selectedLocalTaggableServiceRef.get().Local_Taggable_Service_ID);
+                                await deleteLocalTaggableService(selectedLocalTaggableServiceState.get().Local_Taggable_Service_ID);
                                 await User.refreshGlobal();
                                 Modals.Global().popModal();
                             })();

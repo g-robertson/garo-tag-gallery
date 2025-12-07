@@ -26,14 +26,14 @@ export default function ChangeTagToMetricModal({ extraProperties, modalResolve }
     const TagLookupName = ReferenceableReact();
     const LocalTagServiceIDs = ReferenceableReact();
 
-    const localTagServicesConstState = User.Global().localTagServicesRef();
+    const localTagServicesConstState = User.Global().localTagServicesState();
     const selectedLocalTagServiceIDsState = new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID)));
     /** @type {State<ClientQueryTag>} */
-    const tagRef = new State(undefined);
+    const tagState = new State(undefined);
 
     const onAdd = () => {
         const onTagSelected = () => {
-            const tag = tagRef.get();
+            const tag = tagState.get();
 
             if (tag !== undefined) {
                 TagLookupName.dom.value = tag.Lookup_Name;
@@ -47,7 +47,7 @@ export default function ChangeTagToMetricModal({ extraProperties, modalResolve }
         };
         onSelectedLocalTagServiceIDsChange();
 
-        tagRef.addOnUpdateCallback(onTagSelected, addToCleanup);
+        tagState.addOnUpdateCallback(onTagSelected, addToCleanup);
         selectedLocalTagServiceIDsState.addOnUpdateCallback(onSelectedLocalTagServiceIDsChange, addToCleanup);
         return () => executeFunctions(addToCleanup);
     }
@@ -61,14 +61,14 @@ export default function ChangeTagToMetricModal({ extraProperties, modalResolve }
                     multiSelect={false}
                     excludeable={false}
                     onTagsSelected={(tags) => {
-                        tagRef.set(tags[0]);
+                        tagState.set(tags[0]);
                     }}
                 />
             </div>
             <div style={{marginLeft: 8}}>
                 Select a tag from above:
                 <div style={{height: 20, flexGrow: 100}}>
-                    <LazyTextObjectSelector textObjectsConstState={tagRef.asTransform(tag => (tag !== null ? [tag] : []), addToCleanup)} elementsSelectable={false} scrollbarWidth={0} />
+                    <LazyTextObjectSelector textObjectsConstState={tagState.asTransform(tag => (tag !== null ? [tag] : []), addToCleanup)} elementsSelectable={false} scrollbarWidth={0} />
                 </div>
             </div>
             <form style={{flex: 5}} action="/api/post/change-tag-to-metric" target="frame" method="POST">
@@ -86,7 +86,7 @@ export default function ChangeTagToMetricModal({ extraProperties, modalResolve }
                     <input type="submit" value="Submit" />
                 </div>
                 <OnFormSubmit onFormSubmit={() => {
-                    SuccessMessage.dom.textContent = `Successfully set tag ${tagRef.get().displayName} to metric value ${MetricValue.dom.value}`;
+                    SuccessMessage.dom.textContent = `Successfully set tag ${tagState.get().displayName} to metric value ${MetricValue.dom.value}`;
                 }}/>
                 {SuccessMessage.react(<div style={{color: "green"}}></div>)}
             </form>

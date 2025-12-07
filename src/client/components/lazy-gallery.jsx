@@ -17,7 +17,7 @@ import { ConstState, State } from '../page/pages.js';
  */
 const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
     const MetricsElement = ReferenceableReact();
-    const localMetricServicesRef = User.Global().localMetricServicesRef();
+    const localMetricServicesState = User.Global().localMetricServicesState();
 
     initialTaggableIndex ??= 0;
     if (initialTaggableIndex < 0) {
@@ -66,7 +66,7 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                     const onMetricsChanged = () => {
                         const metricValuesMap = metricValuesMapRef.get();
                         const metricStarsHovered = metricStarsHoveredRef.get();
-                        MetricsElement.dom.replaceChildren(...localMetricServicesRef.get().map(
+                        MetricsElement.dom.replaceChildren(...localMetricServicesState.get().map(
                             localMetricService => localMetricService.Local_Metrics
                         ).flat().map(localMetric => (<div dom className="metric-visual-container">
                             <div style={{flexDirection: "column", justifyItems: "center"}}>{localMetric.Local_Metric_Name}</div>
@@ -120,7 +120,7 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                     };
                     onMetricsChanged();
                     
-                    localMetricServicesRef.addOnUpdateCallback(onMetricsChanged, addToCleanup);
+                    localMetricServicesState.addOnUpdateCallback(onMetricsChanged, addToCleanup);
                     metricValuesMapRef.addOnUpdateCallback(onMetricsChanged, addToCleanup);
                     metricStarsHoveredRef.addOnUpdateCallback(onMetricsChanged, addToCleanup);
                     return () => executeFunctions(addToCleanup);

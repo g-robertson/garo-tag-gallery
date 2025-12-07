@@ -1,4 +1,4 @@
-import { concatCallback, executeFunctions, ReferenceableReact } from "../js/client-util.js";
+import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
 import { State } from "../page/pages.js";
 
 const SCROLL_CURSOR_MIN_LENGTH = 20;
@@ -36,10 +36,10 @@ const Scrollbar = ({
     /** @type {State<number | null>} */
     const preClickitemPositionState = new State(null);
     /** @type {State<number | null>} */
-    const clickedCursorPosRef = new State(null);
+    const clickedCursorPosState = new State(null);
     /** @type {State<number | null>} */
-    const clickedScrollbarPosRef = new State(null);
-    const lastPossibleScrollPositionRef = State.tupleTransform([totalItemsConstState, itemsDisplayedConstState, scrollbarIntervalConstState], () => {
+    const clickedScrollbarPosState = new State(null);
+    const lastPossibleScrollPositionState = State.tupleTransform([totalItemsConstState, itemsDisplayedConstState, scrollbarIntervalConstState], () => {
         return Math.max(Math.ceil((totalItemsConstState.get() - itemsDisplayedConstState.get()) / scrollbarIntervalConstState.get()) * scrollbarIntervalConstState.get(), 0);
     }, addToCleanup);
 
@@ -47,20 +47,20 @@ const Scrollbar = ({
     const ScrollCursor = ReferenceableReact();
     
 
-    const scrollCursorLengthRef = State.tupleTransform([lengthConstState, itemsDisplayedConstState, totalItemsConstState], () => {
+    const scrollCursorLengthState = State.tupleTransform([lengthConstState, itemsDisplayedConstState, totalItemsConstState], () => {
         if (totalItemsConstState.get() !== 0) {
             return Math.max(SCROLL_CURSOR_MIN_LENGTH, lengthConstState.get() * Math.min(1, itemsDisplayedConstState.get() / totalItemsConstState.get()));
         }
         return lengthConstState.get();
     }, addToCleanup);
 
-    const scrollBarTravelDistanceRef = State.tupleTransform([lengthConstState, scrollCursorLengthRef], () => {
-        return lengthConstState.get() - scrollCursorLengthRef.get();
+    const scrollBarTravelDistanceState = State.tupleTransform([lengthConstState, scrollCursorLengthState], () => {
+        return lengthConstState.get() - scrollCursorLengthState.get();
     }, addToCleanup);
 
-    const scrollbarPositionTopRef = State.tupleTransform([itemPositionState, lastPossibleScrollPositionRef, scrollBarTravelDistanceRef], () => {
-        if (lastPossibleScrollPositionRef.get() !== 0) {
-            return (itemPositionState.get() / lastPossibleScrollPositionRef.get()) * scrollBarTravelDistanceRef.get();
+    const scrollbarPositionTopState = State.tupleTransform([itemPositionState, lastPossibleScrollPositionState, scrollBarTravelDistanceState], () => {
+        if (lastPossibleScrollPositionState.get() !== 0) {
+            return (itemPositionState.get() / lastPossibleScrollPositionState.get()) * scrollBarTravelDistanceState.get();
         }
         return 0;
     }, addToCleanup)
@@ -69,8 +69,8 @@ const Scrollbar = ({
     const getClampedItemPosition = (itemPosition) => {
         if (itemPosition < 0) {
             itemPosition = 0;
-        } else if (itemPosition > lastPossibleScrollPositionRef.get()) {
-            itemPosition = lastPossibleScrollPositionRef.get();
+        } else if (itemPosition > lastPossibleScrollPositionState.get()) {
+            itemPosition = lastPossibleScrollPositionState.get();
         }
         
         if (scrollbarIntervalConstState.get() === 0) {
@@ -92,13 +92,13 @@ const Scrollbar = ({
     }
 
     const scrollbarMove = (pos) => {
-        if (RootElement.dom === null || pos === null || scrollBarTravelDistanceRef.get() === 0) {
+        if (RootElement.dom === null || pos === null || scrollBarTravelDistanceState.get() === 0) {
             return;
         }
 
         const elemTop = window.pageYOffset + RootElement.dom.getBoundingClientRect().top;
-        const amountTraversed = (pos - elemTop - (scrollCursorLengthRef.get() / 2)) / scrollBarTravelDistanceRef.get();
-        itemPositionState.set(getClampedItemPosition(Math.floor(amountTraversed * lastPossibleScrollPositionRef.get())));
+        const amountTraversed = (pos - elemTop - (scrollCursorLengthState.get() / 2)) / scrollBarTravelDistanceState.get();
+        itemPositionState.set(getClampedItemPosition(Math.floor(amountTraversed * lastPossibleScrollPositionState.get())));
     }
 
     const onAdd = () => {
@@ -112,18 +112,18 @@ const Scrollbar = ({
         const onScrollCursorLengthChanged = () => {
             if (ScrollCursor.dom === null) return;
 
-            ScrollCursor.dom.style.height = `${scrollCursorLengthRef.get()}px`;
-            ScrollCursor.dom.style.lineHeight = `${scrollCursorLengthRef.get()}px`;
+            ScrollCursor.dom.style.height = `${scrollCursorLengthState.get()}px`;
+            ScrollCursor.dom.style.lineHeight = `${scrollCursorLengthState.get()}px`;
         }
-        scrollCursorLengthRef.addOnUpdateCallback(onScrollCursorLengthChanged, addToCleanup, {requireChangeForUpdate: true});
+        scrollCursorLengthState.addOnUpdateCallback(onScrollCursorLengthChanged, addToCleanup, {requireChangeForUpdate: true});
 
         const onScrollbarPositionTopChanged = () => {
             if (ScrollCursor.dom === null) return;
             
-            ScrollCursor.dom.style.marginTop = `${scrollbarPositionTopRef.get()}px`;
+            ScrollCursor.dom.style.marginTop = `${scrollbarPositionTopState.get()}px`;
         }
         // ideally this would requireChangeForUpdate, doesn't work!!!
-        scrollbarPositionTopRef.addOnUpdateCallback(onScrollbarPositionTopChanged, addToCleanup, {requireChangeForUpdate: true, debug:true});
+        scrollbarPositionTopState.addOnUpdateCallback(onScrollbarPositionTopChanged, addToCleanup, {requireChangeForUpdate: true, debug:true});
 
         for (const item of alternativeScrollingElements) {
             item.dom.addEventListener("wheel", wheelListener);
@@ -138,26 +138,26 @@ const Scrollbar = ({
             }
         });
 
-        clickedScrollbarPosRef.addOnUpdateCallback(scrollbarMove, addToCleanup);
+        clickedScrollbarPosState.addOnUpdateCallback(scrollbarMove, addToCleanup);
 
         const mouseMoveListener = (e) => {
-            if (clickedScrollbarPosRef.get() !== null) {
+            if (clickedScrollbarPosState.get() !== null) {
                 scrollbarMove(e.clientY);
             }
-            if (clickedCursorPosRef.get() === null || scrollBarTravelDistanceRef.get() === 0) {
+            if (clickedCursorPosState.get() === null || scrollBarTravelDistanceState.get() === 0) {
                 return;
             }
 
-            const pixelDelta = e.pageY - clickedCursorPosRef.get();
-            const traveledIndices = Math.floor((pixelDelta / scrollBarTravelDistanceRef.get()) * lastPossibleScrollPositionRef.get());
+            const pixelDelta = e.pageY - clickedCursorPosState.get();
+            const traveledIndices = Math.floor((pixelDelta / scrollBarTravelDistanceState.get()) * lastPossibleScrollPositionState.get());
             itemPositionState.set(getClampedItemPosition(preClickitemPositionState.get() + traveledIndices));
         };
         window.addEventListener("mousemove", mouseMoveListener);
         addToCleanup.push(() => window.removeEventListener("mousemove", mouseMoveListener));
 
         const mouseUpListener = () => {
-            clickedScrollbarPosRef.set(null);
-            clickedCursorPosRef.set(null);  
+            clickedScrollbarPosState.set(null);
+            clickedCursorPosState.set(null);  
         };
         window.addEventListener("mouseup", mouseUpListener);
         addToCleanup.push(() => window.removeEventListener("mouseup", mouseUpListener));
@@ -172,13 +172,13 @@ const Scrollbar = ({
                 return;
             }
 
-            clickedScrollbarPosRef.set(e.clientY);
+            clickedScrollbarPosState.set(e.clientY);
         }}>
             {ScrollCursor.react(<div className="scroll-cursor"
                  style={{width: "100%"}}
                  onMouseDown={(e) => {
                     preClickitemPositionState.set(itemPositionState.get());
-                    clickedCursorPosRef.set(e.pageY);
+                    clickedCursorPosState.set(e.pageY);
                  }}>&#8801;</div>)}
         </div>
     )

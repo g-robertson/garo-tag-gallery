@@ -443,28 +443,40 @@ const FILE_SEARCH_PAGE_TESTS = [
 
                 await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
             }},
-            {name: "DoesModifyingMultipleTaggablesWork", tests: {
-                priority: BUG_PRIORITIES.NEXT_WORK,
-                notice: BUG_NOTICES.ASSUMED_WORKING,
-                impact: BUG_IMPACTS.ASSUMED_WORKING,
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            {name: "DoesModifyingMultipleTaggablesWork", tests: async (driver) => {
+                const image0 = await findThumbnailGalleryImage(driver, 0);
+                await image0.click();
+                const image0Title = await image0.getAttribute("title");
+                const image1 = await findThumbnailGalleryImage(driver, 1);
+                await modClick(driver, image1, {ctrl: true})
+                const image1Title = await image1.getAttribute("title");
+                await modifyTaggables(driver, {addTagsNoConfirm: [TEST_TAG_2]});
+
+                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image1Title})), DEFAULT_TIMEOUT_TIME);
             }},
         ]},
         {name: "DoesTrashingTaggablesWork", tests: [
             {name: "DoesRemovingSingularTaggableWork", tests: async (driver) => {
-                const image0 = await findThumbnailGalleryImage(driver, 1);
+                const image0 = await findThumbnailGalleryImage(driver, 0);
                 await image0.click();
                 const image0Title = await image0.getAttribute("title");
                 await trashTaggables(driver);
 
                 await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
             }},
-            {name: "DoesTrashingMultipleTaggablesWork", tests: {
-                priority: BUG_PRIORITIES.NEXT_WORK,
-                notice: BUG_NOTICES.ASSUMED_WORKING,
-                impact: BUG_IMPACTS.ASSUMED_WORKING,
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
-            }},
+            {name: "DoesTrashingMultipleTaggablesWork", tests: async (driver) => {
+                const image0 = await findThumbnailGalleryImage(driver, 0);
+                await image0.click();
+                const image0Title = await image0.getAttribute("title");
+                const image1 = await findThumbnailGalleryImage(driver, 1);
+                await modClick(driver, image1, {ctrl: true})
+                const image1Title = await image1.getAttribute("title");
+                await trashTaggables(driver);
+
+                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image1Title})), DEFAULT_TIMEOUT_TIME);
+            }}
         ]},
         {name: "ResizingChangesThumbnailGalleryImageCount", tests: async (driver) => {
             const imageCount = (await findThumbnailGalleryImages(driver)).length;

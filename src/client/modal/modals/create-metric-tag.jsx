@@ -35,20 +35,20 @@ function createLocalMetricComparison(localMetric, comparator, metricComparisonVa
  * } param0}
 */
 export default function CreateMetricTag({ extraProperties, modalResolve }) {
-    const selectedLocalMetricServiceRef = new State(User.Global().localMetricServices()[0]);
-    const selectedLocalMetricRef = new State(selectedLocalMetricServiceRef.get()?.Local_Metrics?.[0]);
-    const metricComparisonValueRef = new State(0);
+    const selectedLocalMetricServiceState = new State(User.Global().localMetricServices()[0]);
+    const selectedLocalMetricState = new State(selectedLocalMetricServiceState.get()?.Local_Metrics?.[0]);
+    const metricComparisonValueState = new State(0);
 
     return {
         component: (
             <div style={{width: "100%", height: "100%", flexDirection: "column"}}>
                 <LocalMetricSelector
-                    selectedLocalMetricServiceRef={selectedLocalMetricServiceRef}
-                    selectedLocalMetricRef={selectedLocalMetricRef}
+                    selectedLocalMetricServiceState={selectedLocalMetricServiceState}
+                    selectedLocalMetricState={selectedLocalMetricState}
                 />
                 <div>
                     <input value="Has Metric In Metric Service" type="button" onClick={() => {
-                        const localMetricService = selectedLocalMetricServiceRef.get();
+                        const localMetricService = selectedLocalMetricServiceState.get();
                         /** @type {ClientSearchTagInLocalMetricServiceID} */
                         const localMetricServiceIDTag = {
                             type: "inLocalMetricServiceID",
@@ -59,7 +59,7 @@ export default function CreateMetricTag({ extraProperties, modalResolve }) {
                         Modals.Global().popModal();
                     }}/>
                     <input value="Has Metric" type="button" onClick={() => {
-                        const localMetric = selectedLocalMetricRef.get();
+                        const localMetric = selectedLocalMetricState.get();
                         /** @type {ClientSearchTagHasMetricID} */
                         const localMetricIDTag = {
                             type: "hasLocalMetricID",
@@ -72,22 +72,22 @@ export default function CreateMetricTag({ extraProperties, modalResolve }) {
                 </div>
                 <div>
                     <input type="button" value="Metric is <" onClick={() => {
-                        modalResolve(createLocalMetricComparison(selectedLocalMetricRef.get(), "<", metricComparisonValueRef.get()));
+                        modalResolve(createLocalMetricComparison(selectedLocalMetricState.get(), "<", metricComparisonValueState.get()));
                         Modals.Global().popModal();
                     }} />
                     <input type="button" value="Metric is <=" onClick={() => {
-                        modalResolve(createLocalMetricComparison(selectedLocalMetricRef.get(), "<=", metricComparisonValueRef.get()));
+                        modalResolve(createLocalMetricComparison(selectedLocalMetricState.get(), "<=", metricComparisonValueState.get()));
                         Modals.Global().popModal();
                     }} />
                     <input type="button" value="Metric is >" onClick={() => {
-                        modalResolve(createLocalMetricComparison(selectedLocalMetricRef.get(), ">", metricComparisonValueRef.get()));
+                        modalResolve(createLocalMetricComparison(selectedLocalMetricState.get(), ">", metricComparisonValueState.get()));
                         Modals.Global().popModal();
                     }} />
                     <input type="button" value="Metric is >=" onClick={() => {
-                        modalResolve(createLocalMetricComparison(selectedLocalMetricRef.get(), ">=", metricComparisonValueRef.get()));
+                        modalResolve(createLocalMetricComparison(selectedLocalMetricState.get(), ">=", metricComparisonValueState.get()));
                         Modals.Global().popModal();
                     }} />
-                    <NumericInput className="metric-tag-comparison" selectedNumberRef={metricComparisonValueRef} />
+                    <NumericInput className="metric-tag-comparison" selectedNumberState={metricComparisonValueState} />
                 </div>
             </div>
         ),

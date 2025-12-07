@@ -15,6 +15,7 @@ import { DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME, DUPLICATES_PROCESSING_
 import {Page, Pages} from './page/pages.js'
 import { Modals } from './modal/modals.js';
 import { ReferenceableReact } from './js/client-util.js';
+import CreateLocalTaggableService from './modal/modals/create-local-taggable-service.jsx';
 
 const MENUS = {
     File: ReferenceableReact(),
@@ -94,6 +95,10 @@ const Navbar = () => {
             <div className="topbar-dropdown">
                 <div className="topbar-dropdown-title" onClick={() => toggleMenuOpened(MENUS.Taggables)}>Taggables</div>
                 {MENUS.Taggables.react(<div className="topbar-dropdown-options" style={{display: "none"}}>
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                        Modals.Global().pushModal(CreateLocalTaggableService);
+                    }}>Create new taggable service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
                         Modals.Global().pushModal(UpdateLocalTaggableService);

@@ -3,7 +3,7 @@ import { closeModal, closePage, findModals, findPages, rmDownloadedFile, selectP
 import { navigateToBackup, navigateToHydrusImport, navigateToImportMappingsFromBackup } from "../navigation/file-navigation.js";
 import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
 import { navigateToFileSearchPage } from "../navigation/pages-navigation.js";
-import { navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
+import { navigateToCreateTaggableService, navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
 import { navigateToCreateTagService, navigateToModifyTagServices } from "../navigation/tags-navigation.js";
 
 /** @import {ThenableWebDriver} from "selenium-webdriver" */
@@ -60,6 +60,13 @@ export const NAVIGATE_TAGS_MENU_TESTS = [
 
 /** @type {TestSuite[]} */
 export const NAVIGATE_TAGGABLES_MENU_TESTS = [
+    {name: "NavigateToCreateTaggableService", tests: async (driver) => {
+        await navigateToCreateTaggableService(driver);
+        if ((await findModals(driver)).length === 0) {
+            throw "Modal not visible after navigating to create new taggable service";
+        }
+        await closeModal(driver);
+    }},
     {name: "NavigateToModifyTaggableServices", tests: async (driver) => {
         await navigateToModifyTaggableServices(driver);
         if ((await findModals(driver)).length === 0) {

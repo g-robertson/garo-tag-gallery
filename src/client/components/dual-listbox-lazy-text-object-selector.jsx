@@ -11,7 +11,7 @@ import { executeFunctions } from '../js/client-util.js';
  * @template T
  * @param {{
  *  items: T[]
- *  selectedItemsRef: State<Set<T>>
+ *  selectedItemsState: State<Set<T>>
  *  initialSelectedItemIndices?: number[]
  *  onSelectionChanged?: (selectedItems: T) => void
  *  customItemSelectedComponent: (param0: {realizedValue: T, index: number}) => JSX.Element
@@ -22,7 +22,7 @@ import { executeFunctions } from '../js/client-util.js';
  */
 const DualListboxLazyTextObjectSelector = ({
     items,
-    selectedItemsRef,
+    selectedItemsState,
     customItemSelectedComponent,
     itemSelectorHeaderComponent,
     customItemSelectorComponent,
@@ -43,13 +43,13 @@ const DualListboxLazyTextObjectSelector = ({
             Selected items:
             <div style={{flex: 1}}>
                 {<LazyTextObjectSelector
-                    textObjectsConstState={selectedItemsRef.asTransform(selectedItems => [...selectedItems], addToCleanup)}
+                    textObjectsConstState={selectedItemsState.asTransform(selectedItems => [...selectedItems], addToCleanup)}
                     onValuesDoubleClicked={((items) => {
-                        const selectedItems = selectedItemsRef.get();
+                        const selectedItems = selectedItemsState.get();
                         for (const item of items) {
                             selectedItems.delete(item);
                         }
-                        selectedItemsRef.forceUpdate();
+                        selectedItemsState.forceUpdate();
                     })}
                     multiSelect={true}
                     customItemComponent={({realizedValue, index}) => customItemSelectedComponent({realizedValue, index})}
@@ -61,7 +61,7 @@ const DualListboxLazyTextObjectSelector = ({
                 {<LazyTextObjectSelector
                     textObjectsConstState={ConstState.instance(items)}
                     onValuesDoubleClicked={(items) => {
-                        const selectedItems = selectedItemsRef.get();
+                        const selectedItems = selectedItemsState.get();
                         for (const item of items) {
                             if (selectedItems.has(item)) {
                                 selectedItems.delete(item);
@@ -70,7 +70,7 @@ const DualListboxLazyTextObjectSelector = ({
                                 selectedItems.add(item);
                             }
                         }
-                        selectedItemsRef.forceUpdate();
+                        selectedItemsState.forceUpdate();
                     }}
                     multiSelect={true}
                     customItemComponent={customItemSelectorComponent}

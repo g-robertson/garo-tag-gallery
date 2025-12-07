@@ -1,8 +1,23 @@
-import { UNTIL_MODAL_CLOSE, xpathHelper } from "../helpers.js";
-import { navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
+import { realClear, UNTIL_MODAL_CLOSE, xpathHelper } from "../helpers.js";
+import { navigateToCreateTaggableService, navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
 import {By} from "selenium-webdriver"
 
 /** @import {ThenableWebDriver} from "selenium-webdriver" */
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {string} name
+ */
+export async function createNewTaggableService(driver, name) {
+    await navigateToCreateTaggableService(driver);
+
+    const serviceName = await driver.findElement(By.name("serviceName"));
+    await realClear(serviceName);
+    await serviceName.sendKeys(name);
+
+    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
+    await driver.wait(UNTIL_MODAL_CLOSE);
+}
 
 /**
  * @param {ThenableWebDriver} driver

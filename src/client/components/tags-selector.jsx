@@ -25,7 +25,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchCh
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
-    const localTagServicesConstState = User.Global().localTagServicesAvailableRef(addToCleanup);
+    const localTagServicesConstState = User.Global().localTagServicesAvailableState(addToCleanup);
     persistentState ??= new PersistentState();
     /** @type {State<ClientSearchQuery[]>} */
     const clientSearchQueryState = persistentState.registerState("clientSearchQuery", new State(initialSelectedTags ?? []), {isSaved: true, addToCleanup});

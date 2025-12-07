@@ -16,7 +16,7 @@ import { State } from '../../page/pages.js';
  * }}
 */
 export default function SelectFromListOfTags({ extraProperties, modalResolve }) {
-    const selectedTagsRef = new State(new Set());
+    const selectedTagsState = new State(new Set());
 
     return {
         component: (
@@ -25,14 +25,14 @@ export default function SelectFromListOfTags({ extraProperties, modalResolve }) 
                 <div style={{width: "100%", height: "100%"}}>
                     <DualListboxLazyTextObjectSelector
                         items={extraProperties.tags}
-                        selectedItemsRef={selectedTagsRef}
+                        selectedItemsState={selectedTagsState}
                         customItemSelectorComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
                         customItemSelectedComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
                         customTitleRealizer={(realizedValue) => realizedValue.displayName}
                     />
                 </div>
                 <input style={{margin: 8}} type="button" value="Select tags" onClick={() => {
-                    modalResolve([...selectedTagsRef.get()]);
+                    modalResolve([...selectedTagsState.get()]);
                     Modals.Global().popModal();
                 }} />
             </div>

@@ -22,17 +22,17 @@ export default function UpdateLocalTagService({ extraProperties, modalResolve })
 
     const ModifySelectedTagService = ReferenceableReact();
     const DeleteSelectedTagService = ReferenceableReact();
-    const selectedLocalTagServiceRef = new State(User.Global().localTagServices()[0]);
+    const selectedLocalTagServiceState = new State(User.Global().localTagServices()[0]);
 
     const onAdd = () => {
         const onLocalTagServiceSelected = () => {
-            const inputsDisabled = selectedLocalTagServiceRef.get() === undefined;
+            const inputsDisabled = selectedLocalTagServiceState.get() === undefined;
             ModifySelectedTagService.dom.disabled = inputsDisabled;
             DeleteSelectedTagService.dom.disabled = inputsDisabled;
         };
         onLocalTagServiceSelected();
 
-        selectedLocalTagServiceRef.addOnUpdateCallback(onLocalTagServiceSelected, addToCleanup);
+        selectedLocalTagServiceState.addOnUpdateCallback(onLocalTagServiceSelected, addToCleanup);
         return () => executeFunctions(addToCleanup);
     };
 
@@ -40,8 +40,8 @@ export default function UpdateLocalTagService({ extraProperties, modalResolve })
         component: (
             <div onAdd={onAdd} style={{flexDirection: "column"}}>
                 <form action="/api/post/update-local-tag-service" target="frame" method="POST">
-                    <LocalTagServiceSelector selectedLocalTagServiceRef={selectedLocalTagServiceRef} />
-                    <LocalTagServiceModifications selectedLocalTagServiceConstState={selectedLocalTagServiceRef} />
+                    <LocalTagServiceSelector selectedLocalTagServiceState={selectedLocalTagServiceState} />
+                    <LocalTagServiceModifications selectedLocalTagServiceConstState={selectedLocalTagServiceState} />
                     <div style={{marginLeft: "8px"}}>
                         {ModifySelectedTagService.react(<input type="submit" value="Modify selected tag service" />)}
                     </div>
@@ -52,7 +52,7 @@ export default function UpdateLocalTagService({ extraProperties, modalResolve })
                         const confirm = window.confirm("Are you sure you want to delete this tag service?\nWARNING: This will remove every tag that exists under this tag service");
                         if (confirm) {
                             (async () => {
-                                await deleteLocalTagService(selectedLocalTagServiceRef.get().Local_Tag_Service_ID);
+                                await deleteLocalTagService(selectedLocalTagServiceState.get().Local_Tag_Service_ID);
                                 await User.refreshGlobal();
                                 Modals.Global().popModal();
                             })();

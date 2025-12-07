@@ -38,9 +38,9 @@ const TESTS = {
 export const HEADLESS = false;
 const DISABLED_TESTS = new Set([
     "Tests.Navigation",
-    "Tests.Functional.Files",
-    // "Tests.Functional.Pages",
-    // "Tests.Functional.Metrics",
+    // "Tests.Functional.Files",
+    "Tests.Functional.Pages",
+    "Tests.Functional.Metrics",
     // "Tests.Functional.Pages.FileSearchPage.TagSearch",
     // "Tests.Functional",
 ]);

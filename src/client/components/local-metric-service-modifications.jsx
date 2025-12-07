@@ -1,8 +1,7 @@
 import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
-import { State } from "../page/pages.js";
+import { ConstState } from "../page/pages.js";
 
 /** @import {DBPermissionedLocalMetricService} from "../../db/metrics.js" */
-/** @import {ConstState} from "../page/pages.js" */
 
 /**
  * @param {{
@@ -15,7 +14,7 @@ const LocalMetricServiceModifications = ({selectedLocalMetricServiceConstState})
     const addToCleanup = [];
 
     const LocalMetricServiceName = ReferenceableReact();
-    selectedLocalMetricServiceConstState ??= new State(undefined);
+    selectedLocalMetricServiceConstState ??= ConstState.instance(undefined);
     
     const onAdd = () => {
         const onSelectionChanged = () => {

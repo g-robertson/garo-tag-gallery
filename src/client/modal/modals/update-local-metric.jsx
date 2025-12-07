@@ -23,18 +23,18 @@ export default function UpdateLocalMetric({ extraProperties, modalResolve }) {
     const ModifySelectedMetric = ReferenceableReact();
     const DeleteSelectedMetric = ReferenceableReact();
 
-    const selectedLocalMetricServiceRef = new State(User.Global().localMetricServices()[0]);
-    const selectedLocalMetricRef = new State(selectedLocalMetricServiceRef.get()?.Local_Metrics?.[0]);
+    const selectedLocalMetricServiceState = new State(User.Global().localMetricServices()[0]);
+    const selectedLocalMetricState = new State(selectedLocalMetricServiceState.get()?.Local_Metrics?.[0]);
 
     const onAdd = () => {
         const onLocalMetricSelected = () => {
-            const inputsDisabled = selectedLocalMetricRef.get() === undefined;
+            const inputsDisabled = selectedLocalMetricState.get() === undefined;
             ModifySelectedMetric.dom.disabled = inputsDisabled;
             DeleteSelectedMetric.dom.disabled = inputsDisabled;
         };
         onLocalMetricSelected();
 
-        selectedLocalMetricRef.addOnUpdateCallback(onLocalMetricSelected, addToCleanup);
+        selectedLocalMetricState.addOnUpdateCallback(onLocalMetricSelected, addToCleanup);
         return () => executeFunctions(addToCleanup);
     };
 
@@ -42,8 +42,8 @@ export default function UpdateLocalMetric({ extraProperties, modalResolve }) {
         component: (
             <div onAdd={onAdd} style={{flexDirection: "column"}}>
                 <form action="/api/post/update-local-metric" target="frame" method="POST">
-                    <LocalMetricSelector selectedLocalMetricServiceRef={selectedLocalMetricServiceRef} selectedLocalMetricRef={selectedLocalMetricRef}/>
-                    <LocalMetricModifications selectedLocalMetricConstState={selectedLocalMetricRef} />
+                    <LocalMetricSelector selectedLocalMetricServiceState={selectedLocalMetricServiceState} selectedLocalMetricState={selectedLocalMetricState}/>
+                    <LocalMetricModifications selectedLocalMetricConstState={selectedLocalMetricState} />
                     <div style={{marginLeft: "8px"}}>
                         {ModifySelectedMetric.react(<input type="submit" value="Modify selected metric" />)}
                     </div>
@@ -53,7 +53,7 @@ export default function UpdateLocalMetric({ extraProperties, modalResolve }) {
                         const confirm = window.confirm("Are you sure you want to delete this metric?\nWARNING: This will remove every application of this metric that you have placed on taggables");
                         if (confirm) {
                             (async () => {
-                                await deleteLocalMetric(selectedLocalMetricRef.get().Local_Metric_ID);
+                                await deleteLocalMetric(selectedLocalMetricState.get().Local_Metric_ID);
                                 await User.refreshGlobal();
                                 Modals.Global().popModal();
                             })();

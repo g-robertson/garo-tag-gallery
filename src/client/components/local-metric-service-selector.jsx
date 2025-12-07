@@ -8,14 +8,14 @@ import { State } from '../page/pages.js';
 
 /**
  * @param {{
- *  selectedLocalMetricServiceRef: State<DBPermissionedLocalMetricService>
+ *  selectedLocalMetricServiceState: State<DBPermissionedLocalMetricService>
  * }} param0
  * @returns
  */
-const LocalMetricServiceSelector = ({selectedLocalMetricServiceRef}) => {
+const LocalMetricServiceSelector = ({selectedLocalMetricServiceState}) => {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
-    selectedLocalMetricServiceRef ??= new State(User.Global().localMetricServices()[0]);
+    selectedLocalMetricServiceState ??= new State(User.Global().localMetricServices()[0]);
 
     const onAdd = () => {
         return () => executeFunctions(addToCleanup);
@@ -25,9 +25,9 @@ const LocalMetricServiceSelector = ({selectedLocalMetricServiceRef}) => {
         <div onAdd={onAdd} style={{marginLeft: "8px"}}>
             <div style={{margin: "2px 0 2px 0"}}>
                 <span>Select which local metric service you wish to use: </span>
-                <select style={{display: "inline-block"}} name="localMetricServiceID" value={selectedLocalMetricServiceRef?.Local_Metric_Service_ID} onChange={(e) => {
+                <select style={{display: "inline-block"}} name="localMetricServiceID" value={selectedLocalMetricServiceState?.Local_Metric_Service_ID} onChange={(e) => {
                     const selectedLocalMetricServiceID = Number(e.currentTarget.selectedOptions[0].value);
-                    selectedLocalMetricServiceRef.set(User.Global().localMetricServices().find(localMetricService => localMetricService.Local_Metric_Service_ID === selectedLocalMetricServiceID));
+                    selectedLocalMetricServiceState.set(User.Global().localMetricServices().find(localMetricService => localMetricService.Local_Metric_Service_ID === selectedLocalMetricServiceID));
                 }}>
                     {User.Global().localMetricServices().map(localMetricService => (
                         <option value={localMetricService.Local_Metric_Service_ID}>{localMetricService.Service_Name}</option>

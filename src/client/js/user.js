@@ -174,7 +174,7 @@ export class User {
         return this.#localTagServices.get();
     }
 
-    localTagServicesRef() {
+    localTagServicesState() {
         return this.#localTagServices.asConst();
     }
 
@@ -194,7 +194,7 @@ export class User {
     /**
      * @param {(() => void)[]} addToCleanup 
      */
-    localTagServicesAvailableRef(addToCleanup) {
+    localTagServicesAvailableState(addToCleanup) {
         return this.#localTagServices.asTransform(User.#transformLocalTagServicesAvailable, addToCleanup);
     }
 
@@ -220,7 +220,7 @@ export class User {
         return this.#localMetricServices.get();
     }
 
-    localMetricServicesRef() {
+    localMetricServicesState() {
         return this.#localMetricServices.asConst();
     }
 

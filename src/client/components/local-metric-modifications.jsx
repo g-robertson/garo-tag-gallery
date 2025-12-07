@@ -1,10 +1,9 @@
 import { METRIC_TYPES } from "../js/metrics.js";
 import { clamp, executeFunctions, ReferenceableReact } from "../js/client-util.js";
 import HoverInfo from "./hover-info.jsx";
-import { State } from "../page/pages.js";
+import { State, ConstState } from "../page/pages.js";
 
 /** @import {DBLocalMetric} from "../../db/metrics.js" */
-/** @import {ConstState} from "../page/pages.js" */
 
 function clampServiceType(metricType) {
     if (isNaN(metricType)) {
@@ -71,7 +70,7 @@ const LocalMetricModifications = ({selectedLocalMetricConstState}) => {
     const LocalMetricPrecisionReal = ReferenceableReact();
     const LocalMetricMetricType = ReferenceableReact();
 
-    selectedLocalMetricConstState ??= new State(undefined);
+    selectedLocalMetricConstState ??= ConstState.instance(undefined);
     const precisionState = new State(selectedLocalMetricConstState.get()?.Local_Metric_Precision ?? 0);
     const metricTypeState = new State(selectedLocalMetricConstState.get()?.Local_Metric_Type ?? METRIC_TYPES.NUMERIC);
 

@@ -20,7 +20,7 @@ import { State } from '../../page/pages.js';
 */
 export default function TagSelectorModal({ extraProperties, modalResolve }) {
     /** @type {State<ClientSearchQuery | null>} */
-    const searchObjectsRef = new State(null);
+    const searchObjectsState = new State(null);
     extraProperties.initialSelectedTags ??= [];
 
     
@@ -33,12 +33,12 @@ export default function TagSelectorModal({ extraProperties, modalResolve }) {
                         searchType={extraProperties.searchType}
                         initialSelectedTags={extraProperties.initialSelectedTags}
                         onSearchChanged={(clientSearchQuery) => {
-                            searchObjectsRef.set(clientSearchQuery);
+                            searchObjectsState.set(clientSearchQuery);
                         }}
                     />
                 </div>
                 <input style={{margin: 8}} type="button" value={extraProperties.selectionButtonText} onClick={() => {
-                    modalResolve(searchObjectsRef.get());
+                    modalResolve(searchObjectsState.get());
                     Modals.Global().popModal();
                 }} />
             </div>

@@ -72,7 +72,7 @@ const LocalTagsSelector = ({
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
-    localTagServicesConstState ??= User.Global().localTagServicesAvailableRef();
+    localTagServicesConstState ??= User.Global().localTagServicesAvailableState();
     persistentState ??= new PersistentState();
     
     selectedLocalTagServiceIDsState = persistentState.registerState(

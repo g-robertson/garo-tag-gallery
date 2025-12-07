@@ -1,7 +1,7 @@
 import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
+import { ConstState } from "../page/pages.js";
 
 /** @import {DBPermissionedLocalTaggableService} from "../../db/taggables.js" */
-/** @import {ConstState} from "../page/pages.js" */
 
 /**
  * @param {{
@@ -14,6 +14,7 @@ const LocalTaggableServiceModifications = ({selectedLocalTaggableServiceConstSta
     const addToCleanup = [];
     
     const LocalTaggableServiceName = ReferenceableReact();
+    selectedLocalTaggableServiceConstState ??= ConstState.instance(undefined);
     
     const onAdd = () => {
         const onSelectionChanged = () => {
