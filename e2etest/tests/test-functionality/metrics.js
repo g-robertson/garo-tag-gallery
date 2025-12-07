@@ -3,6 +3,7 @@ import { applyTagFilter, createNewFileSearchPage, enterTagFilter, selectTagFromL
 import { ByMultiSelectOption, closeModal, DEFAULT_TIMEOUT_TIME, doubleClick, findThumbnailGalleryImage, untilCountElementsLocated, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
 import { changeTagToMetric, createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../functionality/metrics-functionality.js";
 import { navigateToChangeTagToMetric } from "../../navigation/metrics-navigation.js";
+import { BUG_IMPACTS, BUG_NOTICES, BUG_PRIORITIES, IMPLEMENTATION_DIFFICULTIES } from "../../unimplemented-test-info.js";
 
 /** @import {TestSuite} from "../test-suites.js" */
 
@@ -34,6 +35,12 @@ export const METRICS_TESTS = [
     }},
     {name: "Teardown", isTeardown: true, tests: async (driver) => {
         await deleteMetricService(driver, TEST_METRIC_SERVICE_1);
+    }},
+    {name: "RestOfFunctions", tests: {
+        priority: BUG_PRIORITIES.NEXT_WORK,
+        notice: BUG_NOTICES.ASSUMED_WORKING,
+        impact: BUG_IMPACTS.ASSUMED_WORKING,
+        expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY
     }},
     {name: "ChangeTagToMetric", tests: [
         {name: "Setup", isSetup: true, tests: async (driver) => {

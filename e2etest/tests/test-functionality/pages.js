@@ -3,6 +3,7 @@ import { BY_THUMBNAIL_GALLERY_IMAGE, ByPage, BySearchQueryTagService, BySearchTa
 import { addAggregateTag, AGGREGATE_CONDITION_TYPES, AGGREGATE_TAG_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, enterTagFilter, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveModifyTaggablesChanges, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../functionality/pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../functionality/metrics-functionality.js";
+import { BUG_PRIORITIES, BUG_NOTICES, BUG_IMPACTS, IMPLEMENTATION_DIFFICULTIES } from "../../unimplemented-test-info.js";
 
 /** @import {TestSuite} from "../test-suites.js" */
 
@@ -47,6 +48,12 @@ const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(untilElementsNotLocated(BySearchQueryTagService(TEST_TAG_SERVICE_RENAME_1)), DEFAULT_TIMEOUT_TIME);
         }}
     ]},
+    {name: "RightClosePageButtonShouldWork", tests: {
+        priority: BUG_PRIORITIES.CURRENT_WORK,
+        notice: BUG_NOTICES.MINOR,
+        impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
+        expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+    }},
     {name: "TagSearch", tests: [
         {name: "Navigation", tests: [
             {name: "ArrowKeyNavigationWorks", tests: async (driver) => {
@@ -81,7 +88,31 @@ const FILE_SEARCH_PAGE_TESTS = [
                 await driver.wait(until.elementLocated(BySelectableTag()), DEFAULT_TIMEOUT_TIME);
 
                 await selectTagFromTagSearchQuery(driver, tagTitle);
-            }}
+            }},
+            {name: "ScrollingTagsFunctions", tests: {
+                priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
+                notice: BUG_NOTICES.ASSUMED_WORKING,
+                impact: BUG_IMPACTS.ASSUMED_WORKING,
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            }},
+            {name: "ScrollingShouldNotClearVisibleSelection", tests: {
+                priority: BUG_PRIORITIES.CURRENT_WORK,
+                notice: BUG_NOTICES.MEDIUM,
+                impact: BUG_IMPACTS.COSMETIC,
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            }},
+            {name: "ShiftClickTagsWorksCorrectly", tests: {
+                priority: BUG_PRIORITIES.NEXT_WORK,
+                notice: BUG_NOTICES.ASSUMED_WORKING,
+                impact: BUG_IMPACTS.ASSUMED_WORKING,
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            }},
+            {name: "CtrlClickTagsWorksCorrectly", tests: {
+                priority: BUG_PRIORITIES.NEXT_WORK,
+                notice: BUG_NOTICES.ASSUMED_WORKING,
+                impact: BUG_IMPACTS.ASSUMED_WORKING,
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            }},
         ]},
         {name: "TagSelectionUpdatesSearchQuery", tests: async (driver) => {
             // Search query
@@ -138,6 +169,12 @@ const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(untilElementsNotLocated(BySelectableTag(TEST_TAG_5)), DEFAULT_TIMEOUT_TIME);
             await applyTagFilter(driver, "");
             await driver.wait(until.elementsLocated(BySelectableTag(TEST_TAG_5)), DEFAULT_TIMEOUT_TIME);
+        }},
+        {name: "CtrlDoubleClickTagsAddsCtrlClickedTags", tests: {
+            priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
+            notice: BUG_NOTICES.MINOR,
+            impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
+            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
         }},
         {name: "OrGroupsWork", tests: [
             {name: "DoesOrGroupModalWork", tests: async (driver) => {
@@ -385,7 +422,13 @@ const FILE_SEARCH_PAGE_TESTS = [
                 await modifyTaggables(driver, {addTagsNoConfirm: [TEST_TAG_2]});
 
                 await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
-            }}
+            }},
+            {name: "DoesModifyingMultipleTaggablesWork", tests: {
+                priority: BUG_PRIORITIES.NEXT_WORK,
+                notice: BUG_NOTICES.ASSUMED_WORKING,
+                impact: BUG_IMPACTS.ASSUMED_WORKING,
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            }},
         ]},
         {name: "DoesTrashingTaggablesWork", tests: [
             {name: "DoesRemovingSingularTaggableWork", tests: async (driver) => {
@@ -395,7 +438,13 @@ const FILE_SEARCH_PAGE_TESTS = [
                 await trashTaggables(driver);
 
                 await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
-            }}
+            }},
+            {name: "DoesTrashingMultipleTaggablesWork", tests: {
+                priority: BUG_PRIORITIES.NEXT_WORK,
+                notice: BUG_NOTICES.ASSUMED_WORKING,
+                impact: BUG_IMPACTS.ASSUMED_WORKING,
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            }},
         ]},
         {name: "ResizingChangesThumbnailGalleryImageCount", tests: async (driver) => {
             const imageCount = (await findThumbnailGalleryImages(driver)).length;
@@ -443,11 +492,23 @@ const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(untilCountElementsLocated(xpathHelper({containsClass: ["metric-star", "hovered"]}), 7), DEFAULT_TIMEOUT_TIME);
             await driver.wait(untilCountElementsLocated(xpathHelper({containsClass: ["metric-star", "selected"]}), 4), DEFAULT_TIMEOUT_TIME);
             await closeModal(driver);
+        }},
+        {name: "BackButtonShouldNavigateBackwards", tests: {
+            priority: BUG_PRIORITIES.BACKLOGGED_FOR_LATER,
+            notice: BUG_NOTICES.MEDIUM,
+            impact: BUG_IMPACTS.COSMETIC,
+            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY
         }}
     ]},
 ]
 
 /** @type {TestSuite[]} */
 export const PAGES_TESTS = [
-    {name: "FileSearchPage", tests: FILE_SEARCH_PAGE_TESTS}
+    {name: "FileSearchPage", tests: FILE_SEARCH_PAGE_TESTS},
+    {name: "DuplicatesPage", tests: {
+        priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
+        notice: BUG_NOTICES.FATAL,
+        impact: BUG_IMPACTS.UNUSABLE,
+        expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_MONTH
+    }}
 ]

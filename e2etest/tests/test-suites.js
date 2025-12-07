@@ -8,11 +8,14 @@ import { FUNCTIONAL_TESTS } from "./test-functionality.js";
 import { BaseLogEntry } from "selenium-webdriver/bidi/logEntries.js";
 
 /** @typedef {(driver: ThenableWebDriver) => Promise<void>} TestFn */
+/** @import {UnimplementedTestInfo} from "../unimplemented-test-info.js" */
+
+
 
 /**
  * @typedef {Object} TestSuite
  * @property {string} name
- * @property {TestSuite[] | TestFn} tests
+ * @property {TestSuite[] | TestFn | UnimplementedTestInfo} tests
  * @property {boolean=} isSetup
  * @property {boolean=} isTeardown
  */
@@ -44,7 +47,12 @@ const DISABLED_TESTS = new Set([
 const HALT_ON_FAILURE = true;
 const HALT_AFTER = new Set([]);
 
+let testFailCount = 0;
+let testCount = 0;
 let testsHalted = false;
+
+/** @type {UnimplementedTestInfo[]} */
+const unimplementedTests = [];
 
 
 /**
@@ -71,16 +79,18 @@ async function executeTestSuite_(testSuite, previousContext, driver) {
     /** @type {TestSuite[]} */
     let teardowns = [];
     if (typeof testSuite.tests === "function") {
+        ++testCount;
         try {
             await testSuite.tests(driver);
         } catch (e) {
+            ++testFailCount;
             if (HALT_ON_FAILURE) {
                 testsHalted = true;
             }
             const err = e.stack ?? e;
             console.log(`Failed test: ${currentContext} with error ${err}`);
         }
-    } else {
+    } else if (testSuite.tests instanceof Array) {
         for (const test of testSuite.tests) {
             if (test.isTeardown ?? false) {
                 teardowns.push(test);
@@ -88,6 +98,11 @@ async function executeTestSuite_(testSuite, previousContext, driver) {
                 await executeTestSuite_(test, currentContext, driver);
             }
         }
+    } else {
+        unimplementedTests.push({
+            name: currentContext,
+            ...testSuite.tests
+        });
     }
 
     for (const teardown of teardowns) {
@@ -115,8 +130,22 @@ export async function executeTestSuite(driver, logs) {
     for (const log of badLogs) {
         console.log(log);
     }
-    if (badLogs.length === 0) {
+    if (badLogs.length === 0 && testFailCount === 0) {
         console.log("E2E testing passed");
+    } else {
+        console.log(`E2E testing failed, only ${testCount - testFailCount}/${testCount} tests passed`);
     }
+
+    const remainingItems = unimplementedTests.sort((a, b) => {
+        if (a.priority < b.priority) {
+            return -1;
+        } else if (a.priority > b.priority) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }).slice(0, 3).reverse();
+
+    console.log("Priority items remaining to work on: ", remainingItems);
     await killServer();
 }
