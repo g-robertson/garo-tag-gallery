@@ -59,11 +59,17 @@ export async function closePage(driver, pageNumber) {
     pageNumber ??= 0;
     const pages = await findPages(driver);
     const page = pages[pageNumber];
-    const pageCancel = await page.findElement(By.className("page-cancel"));
-    await pageCancel.click();
+    await page.findElement(By.className("page-cancel")).click();
 }
 
-export const BY_THUMBNAIL_GALLERY_IMAGE = xpathHelper({containsClass: "thumbnail-gallery-item", nthParent: 1});
+export const BY_THUMBNAIL_GALLERY_IMAGE = xpathHelper({attrContains: {"class": "thumbnail-gallery-item"}, nthParent: 1});
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function closeJobError(driver) {
+    await driver.findElement(By.className("job-error-cancel")).click();
+}
 
 /**
  * @param {ThenableWebDriver} driver 
@@ -87,9 +93,9 @@ export async function findThumbnailGalleryImage(driver, imageNumber) {
  * @param {string} tag 
  */
 export function BySearchTag(tag) {
-    return xpathHelper({containsClass: "tag-search-query", descendent: {
-        containsClass: "lazy-selector-selectable-item",
-        hasTitle: tag
+    return xpathHelper({attrContains: {"class": "tag-search-query"}, descendent: {
+        attrContains: {"class": "lazy-selector-selectable-item"},
+        attrEq: {"title": tag}
     }});
 }
 
@@ -97,16 +103,17 @@ export function BySearchTag(tag) {
  * @param {string} tag 
  */
 export function BySelectableTag(tag) {
-    return xpathHelper({containsClass: "local-tags-selector", descendent: {
-        containsClass: "lazy-selector-selectable-item",
-        hasTitle: tag ?? true
+    return xpathHelper({attrContains: {"class": "local-tags-selector"}, descendent: {
+        attrContains: {"class": "lazy-selector-selectable-item"},
+        attrEq: {"title": tag},
+        attrExists: ["title"],
     }});
 }
 
 export function BySelectedTag() {
-    return xpathHelper({containsClass: "local-tags-selector", descendent: {
-        containsClass: ["lazy-selector-selectable-item", "selected"],
-        hasTitle: true
+    return xpathHelper({attrContains: {"class": "local-tags-selector"}, descendent: {
+        attrContains: {"class": ["lazy-selector-selectable-item", "selected"]},
+        attrExists: ["title"],
     }});
 }
 
@@ -125,25 +132,26 @@ export function BySearchQueryTagService(tagServiceName) {
  */
 export function ByMultiSelectOption(multiSelectOption, options) {
     options ??= {};
-    return xpathHelper({containsClass: options.ancestorWithClass, descendent: {
-        containsClass: "multiselect-option",
+    return xpathHelper({attrContains: {"class": options.ancestorWithClass}, descendent: {
+        attrContains: {"class": "multiselect-option"},
         descendentContainsText: multiSelectOption,
     }});
 }
 
+export const CREATE_HYDRUS_JOB_TIMEOUT = 1000;
+export const FINISH_HYDRUS_JOB_TIMEOUT = 5000;
 export const UNTIL_JOB_BEGIN = until.elementLocated(By.className("job"));
 export const UNTIL_JOB_END = untilElementsNotLocated(By.className("job"));
+export const UNTIL_JOB_ERROR = until.elementLocated(By.className("job-error"));
 
 
 /**
  * @param {WebElement} localTagsSelector
  */
 export async function untilLocalTagsSelectorRefresh(localTagsSelector) {
-    const tagSelectableItem = await localTagsSelector.findElement(xpathHelper({containsClass: "lazy-selector-selectable-item"}));
+    const tagSelectableItem = await localTagsSelector.findElement(xpathHelper({attrContains: {"class": "lazy-selector-selectable-item"}}));
     const reactRef = await tagSelectableItem.getAttribute("data-react-ref");
-    return untilElementsNotLocated(xpathHelper({
-        dataContains: new Map([["data-react-ref", reactRef]])
-    }));
+    return untilElementsNotLocated(xpathHelper({attrContains: {"data-react-ref": reactRef}}));
 }
 
 /**
@@ -153,8 +161,8 @@ export async function untilLocalTagsSelectorRefresh(localTagsSelector) {
  */
 export async function findMetricVisualizer(driver, metricName, starCount) {
     const starIndex = starCount - 1;
-    const visualizers = await driver.findElements(xpathHelper({containsClass: "metric-visual-container", descendentContainsText: metricName, descendent: {
-        containsClass: "metric-star"
+    const visualizers = await driver.findElements(xpathHelper({attrContains: {"class": "metric-visual-container"}, descendentContainsText: metricName, descendent: {
+        attrContains: {"class": "metric-star"}
     }}));
 
     const visualizer = visualizers[starIndex];
@@ -173,26 +181,26 @@ export async function deleteDatabaseDefaults(driver) {
 }
 
 /**
- * @typedef {Object} XPathHelper
- * @property {string=} type
- * @property {string=} descendentContainsText
- * @property {string=} containsText
- * @property {string=} notContainsText
- * @property {(string | string[])=} containsClass
- * @property {Map<string, string>=} dataContains
- * @property {string=} hasClass
- * @property {string=} hasID
- * @property {string=} hasValue
- * @property {string=} valueContains
- * @property {(string | boolean)=} hasTitle
- * @property {string=} hasInputType
- * @property {boolean=} isDisabled
- * @property {number=} nthParent
- * @property {XPathHelper=} descendent
+ * @typedef {"title" | "value" | "type" | "class" | "text" | "name"} HTMLAttribute
  */
 
 /**
- * @param {XPathHelper} options 
+ * @typedef {Object} XPathHelper
+ * @property {string=} type
+ * @property {string=} descendentContainsText
+ * @property {Record<HTMLAttribute, string | string[]>} attrNotContains
+ * @property {Record<HTMLAttribute, string | string[]>} attrContains
+ * @property {Record<HTMLAttribute, string>} attrEq
+ * @property {HTMLAttribute[]} attrExists
+ * @property {boolean=} isDisabled
+ * @property {number=} nthParent
+ * @property {XPathHelper=} descendent
+ * @property {(XPathHelper[] | XPathHelper)=} or
+ */
+
+/**
+ * @param {XPathHelper} options
+ * @returns {string}
  */
 function xpathHelper_(options) {
     options ??= {};
@@ -203,47 +211,68 @@ function xpathHelper_(options) {
     if (options.descendentContainsText) {
         xpathSpecifiers.push(`contains(.,"${options.descendentContainsText}")`);
     }
-    if (options.containsText) {
-        xpathSpecifiers.push(`text()[contains(.,"${options.containsText}")]`);
-    }
-    if (options.notContainsText) {
-        xpathSpecifiers.push(`not(text()[contains(.,"${options.notContainsText}")])`);
-    }
-    if (options.hasClass) {
-        xpathSpecifiers.push(`@class="${options.hasClass}"`);
-    }
-    if (options.containsClass) {
-        if (!(options.containsClass instanceof Array)) {
-            options.containsClass = [options.containsClass];
-        }
-        for (const containsClass of options.containsClass) {
-            xpathSpecifiers.push(`contains(@class, "${containsClass}")`);
+
+    if (options.attrEq) {
+        for (const [attribute, value] of Object.entries(options.attrEq)) {
+            if (value === undefined) {
+                continue;
+            }
+
+            if (attribute === "text") {
+                xpathSpecifiers.push(`text()="${value}"`);
+            } else {
+                xpathSpecifiers.push(`@${attribute}="${value}"`);
+            }
         }
     }
-    if (options.hasID) {
-        xpathSpecifiers.push(`@id="${options.hasID}"`);
-    }
-    if (options.hasValue) {
-        xpathSpecifiers.push(`@value="${options.hasValue}"`);
-    }
-    if (options.valueContains) {
-        xpathSpecifiers.push(`contains(@value, "${options.valueContains}")`);
-    }
-    if (options.hasTitle) {
-        if (options.hasTitle === true) {
-            xpathSpecifiers.push(`boolean(@title)`);
-        } else {
-            xpathSpecifiers.push(`@title="${options.hasTitle}"`)
+
+    if (options.attrContains) {
+        for (let [attribute, values] of Object.entries(options.attrContains)) {
+            if (!(values instanceof Array)) {
+                values = [values];
+            }
+
+            for (const value of values) {
+                if (value === undefined) {
+                    continue;
+                }
+                
+                if (attribute === "text") {
+                    xpathSpecifiers.push(`text()[contains(.,"${value}")]`);
+                } else {
+                    xpathSpecifiers.push(`contains(@${attribute}, "${value}")`);
+                }
+            }
         }
     }
-    if (options.hasInputType) {
-        xpathSpecifiers.push(`@type="${options.hasInputType}"`);
-    }
-    if (options.dataContains) {
-        for (const [key, value] of options.dataContains) {
-            xpathSpecifiers.push(`contains(@${key}, "${value}")`);
+
+    
+    if (options.attrNotContains) {
+        for (let [attribute, values] of Object.entries(options.attrNotContains)) {
+            if (!(values instanceof Array)) {
+                values = [values];
+            }
+
+            for (const value of values) {
+                if (value === undefined) {
+                    continue;
+                }
+                
+                if (attribute === "text") {
+                    xpathSpecifiers.push(`not(text()[contains(.,"${value}")])`);
+                } else {
+                    xpathSpecifiers.push(`not(contains(@${attribute}, "${value}"))`);
+                }
+            }
         }
     }
+
+    if (options.attrExists) {
+        for (const attribute of options.attrExists) {
+            xpathSpecifiers.push(`boolean(@${attribute})`);
+        }
+    }
+    
     if (options.isDisabled) {
         xpathSpecifiers.push(`@disabled=${options.isDisabled}`);
     }
@@ -262,7 +291,15 @@ function xpathHelper_(options) {
         xpathSpecifier = `[${xpathSpecifiers.join(" and ")}]`;
     }
 
-    return xpath + xpathSpecifier + descendent + parent;
+    options.or ??= [];
+    if (!(options.or instanceof Array)) {
+        options.or = [options.or];
+    }
+
+    const self = xpath + xpathSpecifier + descendent + parent;
+    const allElements = [self, ...options.or.map(helperObj => xpathHelper_(helperObj))];
+
+    return allElements.join("|");
 }
 
 /**

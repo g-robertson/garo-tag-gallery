@@ -243,8 +243,10 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
         }
 
         const extractPath = path.join(partialUploadFolder, "export-path");
-        await extractWith7Z(leadFilePath, extractPath);
-    
+        const extractResult = await extractWith7Z(leadFilePath, extractPath);
+        if (!extractResult.success) {
+            return extractResult;
+        }
         yield {upcomingSubtasks: 1, upcomingTaskName: "Reading extracted ZIP file"};
         const allFileEntries = await getAllFileEntries(extractPath, {recursive: true});
         const EXTENSIONS = ["tags", "notes", "urls", "arctime", "modtime", "imptime", "deltime", "pimtime", "lavtime"].map(extension => ({

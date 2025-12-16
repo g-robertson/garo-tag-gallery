@@ -60,12 +60,12 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                     /** @type {(() => void)[]} */
                     const addToCleanup = [];
 
-                    const metricValuesMapRef = new State(new Map(realizedValue.Metrics.map(metric => [metric.Local_Metric_ID, metric])));
-                    const metricStarsHoveredRef = new State({localMetricID: -1, starsHovered: -1})
+                    const metricsValuesMapState = new State(new Map(realizedValue.Metrics.map(metric => [metric.Local_Metric_ID, metric])));
+                    const metricStarsHoveredState = new State({localMetricID: -1, starsHovered: -1})
 
                     const onMetricsChanged = () => {
-                        const metricValuesMap = metricValuesMapRef.get();
-                        const metricStarsHovered = metricStarsHoveredRef.get();
+                        const metricValuesMap = metricsValuesMapState.get();
+                        const metricStarsHovered = metricStarsHoveredState.get();
                         MetricsElement.dom.replaceChildren(...localMetricServicesState.get().map(
                             localMetricService => localMetricService.Local_Metrics
                         ).flat().map(localMetric => (<div dom className="metric-visual-container">
@@ -92,7 +92,7 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                                                       };
     
                                                       metricValuesMap.set(localMetric.Local_Metric_ID, newAppliedMetric);
-                                                      metricValuesMapRef.forceUpdate();
+                                                      metricsValuesMapState.forceUpdate();
                                                       setRealizedValue({
                                                         ...realizedValue,
                                                         Metrics: [
@@ -104,10 +104,10 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                                                       await applyMetricToTaggable(Number(realizedValue.Taggable_ID), localMetric.Local_Metric_ID, i);
                                                   }}
                                                   onMouseOver={() => {
-                                                    metricStarsHoveredRef.set({localMetricID: localMetric.Local_Metric_ID, starsHovered: i});
+                                                    metricStarsHoveredState.set({localMetricID: localMetric.Local_Metric_ID, starsHovered: i});
                                                   }}
                                                   onMouseLeave={() => {
-                                                    metricStarsHoveredRef.set({localMetricID: -1, starsHovered: -1});
+                                                    metricStarsHoveredState.set({localMetricID: -1, starsHovered: -1});
                                                   }}
                                             >★</span>
                                         );
@@ -121,8 +121,8 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                     onMetricsChanged();
                     
                     localMetricServicesState.addOnUpdateCallback(onMetricsChanged, addToCleanup);
-                    metricValuesMapRef.addOnUpdateCallback(onMetricsChanged, addToCleanup);
-                    metricStarsHoveredRef.addOnUpdateCallback(onMetricsChanged, addToCleanup);
+                    metricsValuesMapState.addOnUpdateCallback(onMetricsChanged, addToCleanup);
+                    metricStarsHoveredState.addOnUpdateCallback(onMetricsChanged, addToCleanup);
                     return () => executeFunctions(addToCleanup);
                 }}></div>)}
 

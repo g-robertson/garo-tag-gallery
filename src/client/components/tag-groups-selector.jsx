@@ -31,11 +31,11 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
     onTagGroupsSelected ??= () => {};
     const NAMESPACES_SELECTED = 0;
     const METRIC_RATINGS_SELECTED = 1;
-    const selectedTagGroupOptionsRef = new State(new Set([NAMESPACES_SELECTED, METRIC_RATINGS_SELECTED]));
+    const selectedTagGroupOptionsState = new State(new Set([NAMESPACES_SELECTED, METRIC_RATINGS_SELECTED]));
     /** @type {State<DBNamespace[]>} */
-    const namespacesRef = new State([]);
-    const tagGroupsConstState = State.tupleTransform([selectedTagGroupOptionsRef, namespacesRef], () => {
-        const selectedTagGroupOptions = selectedTagGroupOptionsRef.get();
+    const namespacesState = new State([]);
+    const tagGroupsConstState = State.tupleTransform([selectedTagGroupOptionsState, namespacesState], () => {
+        const selectedTagGroupOptions = selectedTagGroupOptionsState.get();
         /** @type {DisplayClientTagGroup[]} */
         let tagGroups = [];
         if (selectedTagGroupOptions.has(METRIC_RATINGS_SELECTED)) {
@@ -49,7 +49,7 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
             })));
         }
         if (selectedTagGroupOptions.has(NAMESPACES_SELECTED)) {
-            tagGroups = tagGroups.concat(namespacesRef.get().map(namespace => ({
+            tagGroups = tagGroups.concat(namespacesState.get().map(namespace => ({
                 type: "namespace",
                 displayName: `aggregate namespace:${namespace.Namespace_Name}`,
                 namespaceID: namespace.Namespace_ID,
@@ -66,7 +66,7 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
         return () => executeFunctions(addToCleanup);
     }
 
-    getNamespaces().then(namespaces => namespacesRef.set(namespaces));
+    getNamespaces().then(namespaces => namespacesState.set(namespaces));
 
     return (
         <div onAdd={onAdd} style={{flexDirection: "column", width: "100%"}}>
@@ -81,7 +81,7 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
                         value: METRIC_RATINGS_SELECTED,
                         displayName: "Metric ratings"
                     }
-                ])} selectedOptionsRef={selectedTagGroupOptionsRef} />
+                ])} selectedOptionsState={selectedTagGroupOptionsState} />
             </div>
             Select Tag Groups:
             <div>Tag group filter (unimpl): <input type="text" /></div>

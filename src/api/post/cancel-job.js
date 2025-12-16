@@ -7,7 +7,7 @@ import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
 
 export async function validate(dbs, req, res) {
-    const jobID = z.string().safeParse(req?.body?.jobID, {path: ["jobID"]});
+    const jobID = z.number().safeParse(req?.body?.jobID, {path: ["jobID"]});
     if (!jobID.success) return jobID.error.message;
 
     return {
@@ -27,5 +27,5 @@ export async function checkPermission(dbs, req, res) {
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
     dbs.jobManager.cancelJobOnRunner(req.user.id(), req.body.jobID);
-    res.status(200).send("Tag to metric done");
+    res.status(200).send("Cancelled job");
 }

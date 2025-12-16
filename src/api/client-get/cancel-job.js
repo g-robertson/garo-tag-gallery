@@ -1,5 +1,5 @@
 /**
- * @param {string} jobID
+ * @param {number} jobID
  */
 export default async function cancelJob(jobID) {
     await fetch("/api/post/cancel-job", {

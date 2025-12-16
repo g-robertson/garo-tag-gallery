@@ -6,7 +6,7 @@ import { xpathHelper } from "../helpers.js";
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToFileSearchPage(driver) {
-    await driver.findElement(xpathHelper({containsText: "Page", containsClass: "topbar-dropdown-title"})).click();
+    await driver.findElement(xpathHelper({attrContains: {"text": "Page", "class": "topbar-dropdown-title"}})).click();
     
-    await driver.findElement(xpathHelper({containsText: "New file search page", containsClass: "topbar-dropdown-option"})).click();
+    await driver.findElement(xpathHelper({attrContains: {"text": "New file search page", "class": "topbar-dropdown-option"}})).click();
 }

@@ -15,7 +15,7 @@ export async function createNewTagService(driver, name) {
     await realClear(serviceName);
     await serviceName.sendKeys(name);
 
-    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -29,13 +29,13 @@ export async function createNewTagService(driver, name) {
 export async function modifyTagService(driver, name, modifications) {
     await navigateToModifyTagServices(driver);
     await driver.findElement(By.name("localTagServiceID")).click();
-    await driver.findElement(xpathHelper({type: "option", containsText: name})).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": name}})).click();
 
     const serviceName = await driver.findElement(By.name("serviceName"));
     await realClear(serviceName);
     await serviceName.sendKeys(modifications.name);
 
-    await driver.findElement(xpathHelper({hasValue: "Modify selected tag service"})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Modify selected tag service"}})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -47,8 +47,8 @@ export async function deleteTagService(driver, name) {
     await navigateToModifyTagServices(driver);
     
     await driver.findElement(By.name("localTagServiceID")).click();
-    await driver.findElement(xpathHelper({type: "option", containsText: name})).click();
-    await driver.findElement(xpathHelper({hasValue: "Delete selected tag service"})).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": name}})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Delete selected tag service"}})).click();
     await driver.switchTo().alert().accept();
     
     await driver.wait(UNTIL_MODAL_CLOSE);

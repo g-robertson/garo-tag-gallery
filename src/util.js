@@ -42,12 +42,41 @@ export async function extractWith7Z(archiveName, outputDirectory) {
     }
 
     const ret = spawn(get7ZExecutableName(), ['x', archiveName, `-o${outputDirectory}`, '-y']);
-    await new Promise(resolve => {
-        ret.on("exit", () => {
-            resolve();
+    /**
+     * @type {{
+     *     success: boolean
+     *     error?: string
+     *     errorKnown?: boolean
+     * }}
+     **/
+    const result = await new Promise(resolve => {
+        ret.stderr.on("data", (err) => {
+            const errorStr = err.toString();
+            if (errorStr.includes("Unexpected end of archive")) {
+                resolve({
+                    success: false,
+                    error: "Unexpected end of archive",
+                    errorKnown: true
+                });
+            } else {
+                resolve({
+                    success: false,
+                    error: errorStr,
+                    errorKnown: false
+                });
+            }
         });
-    })
-    await writeFile(`${archiveName}.fin`, "");
+        ret.on("exit", () => {
+            resolve({
+                success: true
+            });
+        });
+    });
+    if (result.success) {
+        await writeFile(`${archiveName}.fin`, "");
+    }
+
+    return result;
 }
 
 function getFFMPEGExecutableName() {

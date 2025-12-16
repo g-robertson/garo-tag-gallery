@@ -6,9 +6,9 @@ import { xpathHelper } from "../helpers.js";
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToCreateTaggableService(driver) {
-    await driver.findElement(xpathHelper({containsText: "Taggables", containsClass: "topbar-dropdown-title"})).click();
+    await driver.findElement(xpathHelper({attrContains: {"text": "Taggables", "class": "topbar-dropdown-title"}})).click();
 
-    await driver.findElement(xpathHelper({containsText: "Create new taggable service", containsClass: "topbar-dropdown-option"})).click();
+    await driver.findElement(xpathHelper({attrContains: {"text": "Create new taggable service", "class": "topbar-dropdown-option"}})).click();
 }
 
 
@@ -16,7 +16,7 @@ export async function navigateToCreateTaggableService(driver) {
  * @param {ThenableWebDriver} driver 
  */
 export async function navigateToModifyTaggableServices(driver) {
-    await driver.findElement(xpathHelper({containsText: "Taggables", containsClass: "topbar-dropdown-title"})).click();
+    await driver.findElement(xpathHelper({attrContains: {"text": "Taggables", "class": "topbar-dropdown-title"}})).click();
 
-    await driver.findElement(xpathHelper({containsText: "Update/delete existing taggable service", containsClass: "topbar-dropdown-option"})).click();
+    await driver.findElement(xpathHelper({attrContains: {"text": "Update/delete existing taggable service", "class": "topbar-dropdown-option"}})).click();
 }

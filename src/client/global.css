@@ -18,6 +18,11 @@
 
     --accent-background-layered: #6e6b4a;
 
+    --error: #b00;
+    --accent-error: #900;
+    --cancel: #f44;
+    --accent-cancel: #d00;
+
     --navbar-height: 27px;
 
     --navbar-scroller-height: 100%;
@@ -108,20 +113,23 @@ div {
     color: var(--hover-accent-foreground);
 }
 
-.modal, .job {
+.modal, .job, .job-error {
     flex-direction: column;
     border: 2px solid var(--foreground);
 }
 
-.modal-topbar * {
+.modal-topbar, .modal-topbar *, .job-topbar, .job-topbar * {
     background-color: var(--accent-background-layered);
 }
-.modal-topbar {
-    justify-content:space-between;
-    background-color: var(--accent-background-layered);
+.job-error-topbar, .job-error-topbar * {
+    background-color: var(--accent-error)
+}
+
+.modal-topbar, .job-topbar, .job-error-topbar {
+    justify-content: space-between;
     border-bottom: 1px solid var(--foreground);
 }
-.modal, .modal-content, .job {
+.modal, .modal-content, .job, .job-error {
     background-color: var(--background-layered);
 }
 .modal-title {
@@ -143,17 +151,19 @@ div {
     cursor: pointer;
     font-weight: 1000;
 }
-.modal-cancel {
+
+.modal-cancel, .job-cancel, .job-error-cancel {
     margin: 4px 4px 2px -6px;
     padding: 2px 6px;
-    color: #f44;
+    color: var(--cancel);
+    -webkit-text-stroke: var(--foreground) 1px;
     float: right;
     text-align: right;
     cursor: pointer;
     font-weight: 1000;
 }
-.modal-cancel:hover {
-    color: #d00;
+.modal-cancel:hover, .job-cancel:hover, .job-error-cancel:hover {
+    color: var(--accent-cancel);
 }
 
 .page {

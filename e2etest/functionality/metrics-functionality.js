@@ -16,7 +16,7 @@ export async function createNewMetricService(driver, name) {
     await realClear(serviceName);
     await serviceName.sendKeys(name);
 
-    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -28,8 +28,8 @@ export async function deleteMetricService(driver, name) {
     await navigateToModifyMetricServices(driver);
 
     await driver.findElement(By.name("localMetricServiceID")).click();
-    await driver.findElement(xpathHelper({type: "option", containsText: name})).click();
-    await driver.findElement(xpathHelper({hasValue: "Delete selected metric service"})).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": name}})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Delete selected metric service"}})).click();
     await driver.switchTo().alert().accept();
 
     await driver.wait(UNTIL_MODAL_CLOSE);
@@ -60,7 +60,7 @@ export async function createNewMetric(driver, metric) {
     await navigateToCreateNewMetric(driver);
     
     await driver.findElement(By.name("localMetricServiceID")).click();
-    await driver.findElement(xpathHelper({type: "option", containsText: metric.metricServiceName})).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metric.metricServiceName}})).click();
 
     const metricName = await driver.findElement(By.name("metricName"));
     await realClear(metricName);
@@ -74,13 +74,13 @@ export async function createNewMetric(driver, metric) {
     await realClear(metricUpperBound);
     await metricUpperBound.sendKeys(metric.upperBound.toString());
 
-    const metricPrecision = await driver.findElement(xpathHelper({containsClass: "fake-precision-input"}));
+    const metricPrecision = await driver.findElement(xpathHelper({attrContains: {"class": "fake-precision-input"}}));
     await realClear(metricPrecision);
     await metricPrecision.sendKeys(metric.precision);
 
     await driver.findElement(By.name("metricType")).click();
-    await driver.findElement(xpathHelper({type: "option", containsText: metric.type})).click();
-    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metric.type}})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
 
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
@@ -100,9 +100,9 @@ export async function changeTagToMetric(driver, tag, localMetricServiceName, loc
     await selectTagFromLocalTagSelector(driver, tag, {parentHasClass: "change-tag-to-metric-modal"});
 
     await driver.findElement(By.name("localMetricServiceID")).click();
-    await driver.findElement(xpathHelper({type: "option", containsText: localMetricServiceName})).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": localMetricServiceName}})).click();
     await driver.findElement(By.name("localMetricID")).click();
-    await driver.findElement(xpathHelper({type: "option", containsText: localMetricName})).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": localMetricName}})).click();
 
     const metricValueInput = await driver.findElement(By.name("metricValue"));
     await realClear(metricValueInput);
@@ -112,7 +112,7 @@ export async function changeTagToMetric(driver, tag, localMetricServiceName, loc
         await driver.findElement(By.name("removeExistingTag")).click();
     }
 
-    await driver.findElement(xpathHelper({hasValue: "Submit"})).click();
-    await driver.wait(until.elementLocated(xpathHelper({containsText: "Successfully set tag "})), DEFAULT_TIMEOUT_TIME);
+    await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
+    await driver.wait(until.elementLocated(xpathHelper({attrContains: {"text": "Successfully set tag "}})), DEFAULT_TIMEOUT_TIME);
     await closeModal(driver);
 }

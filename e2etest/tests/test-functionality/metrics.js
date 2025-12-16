@@ -52,17 +52,16 @@ export const METRICS_TESTS = [
             await changeTagToMetric(driver, METRIC_TAG_TO_CONVERT, TEST_METRIC_SERVICE_1, TEST_METRIC_1_NAME, 5, false);
             const image0 = await findThumbnailGalleryImage(driver, 0);
             await doubleClick(driver, image0);
-            await driver.wait(untilCountElementsLocated(xpathHelper({containsClass: ["metric-star", "selected"]}), 5), DEFAULT_TIMEOUT_TIME);
+            await driver.wait(untilCountElementsLocated(xpathHelper({attrContains: {"class": ["metric-star", "selected"]}}), 5), DEFAULT_TIMEOUT_TIME);
             await closeModal(driver);
         }},
         {name: "ChangeTagToMetricTagServiceSelectorWorks", tests: async (driver) => {
             await navigateToChangeTagToMetric(driver);
 
-            const defaultLocalTagsElement = driver.findElement(ByMultiSelectOption("Default local tags", {ancestorWithClass: "change-tag-to-metric-modal"}));
-            await defaultLocalTagsElement.click();
-            await driver.wait(untilElementsNotLocated(xpathHelper({containsClass: "tag-to-metric-modal", descendent: {hasTitle: TEST_TAG}})), DEFAULT_TIMEOUT_TIME);
-            await defaultLocalTagsElement.click();
-            await driver.wait(until.elementLocated(xpathHelper({containsClass: "tag-to-metric-modal", descendent: {hasTitle: TEST_TAG}})), DEFAULT_TIMEOUT_TIME);
+            await driver.findElement(ByMultiSelectOption("Default local tags", {ancestorWithClass: "change-tag-to-metric-modal"})).click();
+            await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"class": "tag-to-metric-modal"}, descendent: {attrEq: {"title": TEST_TAG}}})), DEFAULT_TIMEOUT_TIME);
+            await driver.findElement(ByMultiSelectOption("Default local tags", {ancestorWithClass: "change-tag-to-metric-modal"})).click();
+            await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "tag-to-metric-modal"}, descendent: {attrEq: {"title": TEST_TAG}}})), DEFAULT_TIMEOUT_TIME);
             await closeModal(driver);
         }}
     ]}

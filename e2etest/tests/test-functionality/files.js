@@ -1,16 +1,23 @@
 import { until } from "selenium-webdriver";
 import { deleteBackupedFiles, killServer, spawnServer } from "../../server.js";
 import { authenticate } from "../authenticate.js";
-import { closeModal, DEFAULT_TIMEOUT_TIME, deleteDatabaseDefaults, readDownloadedFile, referenceDownloadedFile, UNTIL_JOB_BEGIN, UNTIL_JOB_END } from "../../helpers.js";
-import { createBackupAsFile, createBackupAsText, importMappingsFromBackupFile } from "../../functionality/file-functionality.js";
+import { closeJobError, closeModal, closePage, CREATE_HYDRUS_JOB_TIMEOUT, DEFAULT_TIMEOUT_TIME, deleteDatabaseDefaults, FINISH_HYDRUS_JOB_TIMEOUT, readDownloadedFile, referenceDownloadedFile, UNTIL_JOB_BEGIN, UNTIL_JOB_END, UNTIL_JOB_ERROR, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
+import { createBackupAsFile, createBackupAsText, importFilesFromHydrus, importMappingsFromBackupFile } from "../../functionality/file-functionality.js";
 import { BUG_PRIORITIES, BUG_NOTICES, BUG_IMPACTS, IMPLEMENTATION_DIFFICULTIES } from "../../unimplemented-test-info.js";
 import { createNewTagService, deleteTagService } from "../../functionality/tags-functionality.js";
 import { createNewTaggableService, deleteTaggableService } from "../../functionality/taggables-functionality.js";
+import { navigateToHydrusImport } from "../../navigation/file-navigation.js";
+import { navigateToFileSearchPage } from "../../navigation/pages-navigation.js";
 
 /** @import {TestSuite} from "../test-suites.js" */
 
 const TEST_TAG_SERVICE_NAME_1 = "TEST TAG SERVICE";
 const TEST_TAGGABLE_SERVICE_NAME_1 = "TEST TAGGABLE SERVICE";
+const TEST_HYDRUS_IMPORT_FILE_NAME = "./e2etest/data/hydrus-test-import.zip";
+const TEST_HYDRUS_BAD_THUMBNAIL_FILE_NAME = "./e2etest/data/hydrus-test-bad-thumbnail-import.zip"
+const TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_1 = "./e2etest/data/hydrus-test-multipart-import.zip.001";
+const TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_2 = "./e2etest/data/hydrus-test-multipart-import.zip.002";
+const TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_3 = "./e2etest/data/hydrus-test-multipart-import.zip.003";
 
 /** @type {TestSuite[]} */
 const IMPORT_FILES_FROM_HYDRUS_TESTS = [
@@ -23,13 +30,68 @@ const IMPORT_FILES_FROM_HYDRUS_TESTS = [
             await deleteTagService(driver, TEST_TAG_SERVICE_NAME_1);
             await deleteTaggableService(driver, TEST_TAGGABLE_SERVICE_NAME_1);
         }},
-        {name: "TestImportFilesFromHydrusWorks", tests: {
-            priority: BUG_PRIORITIES.CURRENT_WORK,
-            notice: BUG_NOTICES.ASSUMED_WORKING,
-            impact: BUG_IMPACTS.ASSUMED_WORKING,
-            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
-        }}
+        {name: "TestImportFilesFromHydrusWorks", tests: [
+            {name: "ImportingWorks", isSetup: true, tests: async (driver) => {
+                await importFilesFromHydrus(driver, {
+                    fileName: TEST_HYDRUS_IMPORT_FILE_NAME,
+                    taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1,
+                    tagServiceName: TEST_TAG_SERVICE_NAME_1
+                });
+                await driver.wait(UNTIL_JOB_BEGIN, CREATE_HYDRUS_JOB_TIMEOUT);
+                await driver.wait(UNTIL_JOB_END, FINISH_HYDRUS_JOB_TIMEOUT);
+            }},
+            {name: "EmptySubmitShouldGiveProperMessage", tests: async (driver) => {
+                await importFilesFromHydrus(driver, {
+                    fileNameGroups: [],
+                    taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1,
+                    tagServiceName: TEST_TAG_SERVICE_NAME_1
+                });
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"text": "Error"}})));
+            }},
+            {name: "IncompleteZIPShouldNotCrash", tests: async (driver) => {
+                await importFilesFromHydrus(driver, {
+                    fileNames: [TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_1, TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_2],
+                    taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1,
+                    tagServiceName: TEST_TAG_SERVICE_NAME_1
+                });
+                await driver.wait(UNTIL_JOB_ERROR, FINISH_HYDRUS_JOB_TIMEOUT);
+                await closeJobError(driver);
+            }},
+            {name: "UnthumbnailableFileShouldNotCrash", tests: async (driver) => {
+                await importFilesFromHydrus(driver, {
+                    fileName: TEST_HYDRUS_BAD_THUMBNAIL_FILE_NAME,
+                    taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1,
+                    tagServiceName: TEST_TAG_SERVICE_NAME_1
+                });
+                await driver.wait(UNTIL_JOB_ERROR, FINISH_HYDRUS_JOB_TIMEOUT);
+                await closeJobError(driver);
+            }},
+            {name: "NOT_PARTIALShouldNotAppear", tests: async (driver) => {
+                await navigateToHydrusImport(driver);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"value": "____NOT_PARTIAL____"}})));
+            }}
+        ]},
     ]},
+    {name: "TestMultipartZipHydrusImport", tests: [
+        {name: "Setup", isSetup: true, tests: async (driver) => {
+            await createNewTagService(driver, TEST_TAG_SERVICE_NAME_1);
+            await createNewTaggableService(driver, TEST_TAGGABLE_SERVICE_NAME_1);
+        }},
+        {name: "Teardown", isTeardown: true, tests: async (driver) => {
+            await deleteTagService(driver, TEST_TAG_SERVICE_NAME_1);
+            await deleteTaggableService(driver, TEST_TAGGABLE_SERVICE_NAME_1);
+        }},
+        { name: "TestMultipartZipHydrusImportWorks", tests: async (driver) => {
+            await importFilesFromHydrus(driver, {
+                partialUploadLocation: "TEST_HYDRUS_PARTIAL_UPLOAD_LOCATION",
+                fileNameGroups: [[TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_1], [TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_2, TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_3]],
+                taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1,
+                tagServiceName: TEST_TAG_SERVICE_NAME_1
+            });
+            await driver.wait(UNTIL_JOB_BEGIN, CREATE_HYDRUS_JOB_TIMEOUT);
+            await driver.wait(UNTIL_JOB_END, FINISH_HYDRUS_JOB_TIMEOUT);
+        }}
+    ]}
 ];
 
 /** @type {TestSuite[]} */

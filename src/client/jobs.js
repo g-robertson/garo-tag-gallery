@@ -2,6 +2,7 @@
 /** @import {ClientJob} from "../db/job-manager.js" */
 
 import getActiveJobs from "../api/client-get/active-jobs.js";
+import addressJobErrorIndex from "../api/client-get/address-job-error-index.js";
 import cancelJob from "../api/client-get/cancel-job.js";
 import { User } from "./js/user.js";
 
@@ -37,7 +38,7 @@ export class Jobs {
     }
 
     get nonMinimizedJobs() {
-        return this.#jobs.filter(job => !this.#minimizedJobIDs.has(job.jobID));
+        return this.#jobs.filter(job => !this.#minimizedJobIDs.has(job.jobID) && !job.done);
     }
 
     #onJobsUpdate() {
@@ -102,12 +103,35 @@ export class Jobs {
     }
 
     /**
+     * @param {ClientJob} jobToRemove
+     */
+    #removeJobIfDone(jobToRemove) {
+        if (jobToRemove.done && jobToRemove.errors.filter(jobError => !jobError.addressed).length === 0) {
+            this.#jobs = this.#jobs.filter(job => job.jobID !== jobToRemove.jobID);
+            this.#minimizedJobIDs.delete(jobToRemove.jobID);
+        }
+    }
+
+    /**
+     * @param {ClientJob} jobToAddress
+     * @param {number} jobErrorIndex
+     */
+    async addressJobErrorIndex(jobToAddress, jobErrorIndex) {
+        await addressJobErrorIndex(jobToAddress.jobID, jobErrorIndex);
+        jobToAddress.errors[jobErrorIndex].addressed = true;
+        this.#removeJobIfDone(jobToAddress);
+
+        this.#onJobsUpdate();
+    }
+
+    /**
      * @param {ClientJob} jobToCancel
      */
     async cancelJob(jobToCancel) {
         await cancelJob(jobToCancel.jobID);
-        this.#jobs = this.#jobs.filter(job => job.jobID !== jobToCancel.jobID);
-        this.#minimizedJobIDs.delete(jobToCancel.jobID);
+        jobToCancel.done = true;
+        this.#removeJobIfDone(jobToAddress);
+
         this.#onJobsUpdate();
     }
 }

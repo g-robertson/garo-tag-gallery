@@ -1,5 +1,5 @@
 import { Key, until } from "selenium-webdriver";
-import { BY_THUMBNAIL_GALLERY_IMAGE, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, modClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
+import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, modClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
 import { addAggregateTag, AGGREGATE_CONDITION_TYPES, AGGREGATE_TAG_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, enterTagFilter, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveModifyTaggablesChanges, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../functionality/pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../functionality/metrics-functionality.js";
@@ -48,37 +48,43 @@ const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(untilElementsNotLocated(BySearchQueryTagService(TEST_TAG_SERVICE_RENAME_1)), DEFAULT_TIMEOUT_TIME);
         }}
     ]},
+    {name: "ToggleTagServiceTogglesTags", tests: async (driver) => {
+        await driver.findElement(ByMultiSelectOption("Default local tags")).click();
+        await driver.wait(untilElementsNotLocated(BySelectableTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
+        await driver.findElement(ByMultiSelectOption("Default local tags")).click();
+        await driver.wait(until.elementsLocated(BySelectableTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
+    }},
     {name: "RightClosePageButtonShouldWork", tests: async (driver) => {
         await createNewFileSearchPage(driver);
-        await driver.findElement(xpathHelper({hasClass: "page-topbar-right", descendent: {hasClass: "page-cancel"}})).click();
+        await driver.findElement(xpathHelper({attrEq: {"class": "page-topbar-right"}, descendent: {attrEq: {"class": "page-cancel"}}})).click();
         await driver.wait(untilCountElementsLocated(ByPage, 1), DEFAULT_TIMEOUT_TIME);  
     }},
     {name: "TagSearch", tests: [
         {name: "Navigation", tests: [
             {name: "ArrowKeyNavigationWorks", tests: async (driver) => {
-                await driver.findElement(xpathHelper({hasTitle: TEST_TAG_1})).click();
+                await driver.findElement(xpathHelper({attrEq: {"title": TEST_TAG_1}})).click();
 
-                await driver.wait(until.elementLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
                 await sendKeys(driver, Key.ARROW_DOWN);
-                await driver.wait(untilElementsNotLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
                 await sendKeys(driver, Key.ARROW_UP);
-                await driver.wait(until.elementLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
                 await sendKeys(driver, Key.ARROW_RIGHT);
-                await driver.wait(untilElementsNotLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
                 await sendKeys(driver, Key.ARROW_LEFT);
-                await driver.wait(until.elementLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "ArrowKeyNavigationJumpsToItemPosition", tests: async (driver) => {
-                await driver.findElement(xpathHelper({hasTitle: TEST_TAG_1})).click();
+                await driver.findElement(xpathHelper({attrEq: {"title": TEST_TAG_1}})).click();
                 
-                const selectableContents = await driver.findElement(xpathHelper({hasClass: "local-tags-selector", descendent: {hasClass: "lazy-selector-selectable-contents"}}));
+                const selectableContents = await driver.findElement(xpathHelper({attrEq: {class: "local-tags-selector"}, descendent: {attrEq: {"class": "lazy-selector-selectable-contents"}}}));
                 await scroll(driver, selectableContents, 10, 100);
                 await sendKeys(driver, Key.ARROW_DOWN);
                 await sendKeys(driver, Key.ARROW_UP);
-                await driver.wait(until.elementLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "RemovingFromBottomUpdatesTagPosition", tests: async (driver) => {
-                const scrollCursor = await driver.findElement(xpathHelper({containsClass: "local-tags-selector", descendent: {containsClass: "scroll-cursor"}}));
+                const scrollCursor = await driver.findElement(xpathHelper({attrContains: {"class": "local-tags-selector"}, descendent: {attrContains: {"class": "scroll-cursor"}}}));
                 await drag(driver, scrollCursor, {x: 0, y: 990});
                 const tagElement = await driver.findElement(BySelectableTag());
                 const tagTitle = await tagElement.getAttribute("title");
@@ -95,12 +101,12 @@ const FILE_SEARCH_PAGE_TESTS = [
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
             }},
             {name: "ScrollingShouldNotClearVisibleSelection", tests: async (driver) => {
-                await driver.findElement(xpathHelper({hasTitle: TEST_TAG_1})).click();
+                await driver.findElement(xpathHelper({attrEq: {"title": TEST_TAG_1}})).click();
                 
-                const selectableContents = await driver.findElement(xpathHelper({hasClass: "local-tags-selector", descendent: {hasClass: "lazy-selector-selectable-contents"}}));
+                const selectableContents = await driver.findElement(xpathHelper({attrEq: {"class": "local-tags-selector"}, descendent: {attrEq: {"class": "lazy-selector-selectable-contents"}}}));
                 await scroll(driver, selectableContents, 10, 1);
                 await scroll(driver, selectableContents, -10, 1);
-                await driver.wait(until.elementLocated(xpathHelper({containsClass: "selected", hasTitle: TEST_TAG_1})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "ShiftClickTagsWorksCorrectly", tests: async (driver) => {
                 await applyTagFilter(driver, "CLEAR SELECTION");
@@ -157,7 +163,7 @@ const FILE_SEARCH_PAGE_TESTS = [
             await selectPage(driver, 0);
             await driver.sleep(DEFAULT_SLEEP_TIME);
             // checkbox should still show as checked
-            const checkbox = await driver.wait(until.elementLocated(xpathHelper({containsClass: "exclude-checkbox"})), DEFAULT_TIMEOUT_TIME);
+            const checkbox = await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "exclude-checkbox"}})), DEFAULT_TIMEOUT_TIME);
             const checked = await checkbox.getAttribute("checked");
             if (!checked) {
                 throw "Checkbox was not still checked upon reload of page";
@@ -433,7 +439,7 @@ const FILE_SEARCH_PAGE_TESTS = [
                 const image0Title = await image0.getAttribute("title");
                 await modifyTaggables(driver, {removeTagsNoConfirm: [TEST_TAG_1]});
 
-                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrEq: {"title": image0Title}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "DoesAddingTagWork", tests: async (driver) => {
                 const image0 = await findThumbnailGalleryImage(driver, 0);
@@ -441,7 +447,7 @@ const FILE_SEARCH_PAGE_TESTS = [
                 const image0Title = await image0.getAttribute("title");
                 await modifyTaggables(driver, {addTagsNoConfirm: [TEST_TAG_2]});
 
-                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrEq: {"title": image0Title}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "DoesModifyingMultipleTaggablesWork", tests: async (driver) => {
                 const image0 = await findThumbnailGalleryImage(driver, 0);
@@ -452,8 +458,8 @@ const FILE_SEARCH_PAGE_TESTS = [
                 const image1Title = await image1.getAttribute("title");
                 await modifyTaggables(driver, {addTagsNoConfirm: [TEST_TAG_2]});
 
-                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
-                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image1Title})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrEq: {"title": image0Title}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrEq: {"title": image1Title}})), DEFAULT_TIMEOUT_TIME);
             }},
         ]},
         {name: "DoesTrashingTaggablesWork", tests: [
@@ -463,7 +469,7 @@ const FILE_SEARCH_PAGE_TESTS = [
                 const image0Title = await image0.getAttribute("title");
                 await trashTaggables(driver);
 
-                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrEq: {"title": image0Title}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "DoesTrashingMultipleTaggablesWork", tests: async (driver) => {
                 const image0 = await findThumbnailGalleryImage(driver, 0);
@@ -474,8 +480,8 @@ const FILE_SEARCH_PAGE_TESTS = [
                 const image1Title = await image1.getAttribute("title");
                 await trashTaggables(driver);
 
-                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image0Title})), DEFAULT_TIMEOUT_TIME);
-                await driver.wait(untilElementsNotLocated(xpathHelper({hasTitle: image1Title})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrEq: {"title": image0Title}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrEq: {"title": image1Title}})), DEFAULT_TIMEOUT_TIME);
             }}
         ]},
         {name: "ResizingChangesThumbnailGalleryImageCount", tests: async (driver) => {
@@ -517,12 +523,12 @@ const FILE_SEARCH_PAGE_TESTS = [
             await doubleClick(driver, image0);
             await driver.wait(UNTIL_GALLERY_OPEN, DEFAULT_TIMEOUT_TIME);
             await hoverMetricStar(driver, TEST_METRIC_1_NAME, 5);
-            await driver.wait(untilCountElementsLocated(xpathHelper({containsClass: ["metric-star", "hovered"]}), 5), DEFAULT_TIMEOUT_TIME);
+            await driver.wait(untilCountElementsLocated(xpathHelper({attrContains: {"class": ["metric-star", "hovered"]}}), 5), DEFAULT_TIMEOUT_TIME);
             await assignMetricStar(driver, TEST_METRIC_2_NAME, 4);
-            await driver.wait(untilCountElementsLocated(xpathHelper({containsClass: ["metric-star", "selected", "hovered"]}), 4), DEFAULT_TIMEOUT_TIME);
+            await driver.wait(untilCountElementsLocated(xpathHelper({attrContains: {"class": ["metric-star", "selected", "hovered"]}}), 4), DEFAULT_TIMEOUT_TIME);
             await hoverMetricStar(driver, TEST_METRIC_1_NAME, 7);
-            await driver.wait(untilCountElementsLocated(xpathHelper({containsClass: ["metric-star", "hovered"]}), 7), DEFAULT_TIMEOUT_TIME);
-            await driver.wait(untilCountElementsLocated(xpathHelper({containsClass: ["metric-star", "selected"]}), 4), DEFAULT_TIMEOUT_TIME);
+            await driver.wait(untilCountElementsLocated(xpathHelper({attrContains: {"class": ["metric-star", "hovered"]}}), 7), DEFAULT_TIMEOUT_TIME);
+            await driver.wait(untilCountElementsLocated(xpathHelper({attrContains: {"class": ["metric-star", "selected"]}}), 4), DEFAULT_TIMEOUT_TIME);
             await closeModal(driver);
         }},
         {name: "BackButtonShouldNavigateBackwards", tests: {

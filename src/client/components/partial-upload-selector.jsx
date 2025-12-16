@@ -15,13 +15,20 @@ function sanitizePartialUploadSelection(activePartialUploadSelection) {
  * 
  * @param {{
  *  text: string
- *  onSubmit: () => void
- *  onFinish: () => void
- *  onError: (err: string) => void
+ *  onSubmitClick?: () => void
+ *  onPartialUploadFinished?: () => void
+ *  onPartialUploadError?: (err: string) => void
+ *  onFormSubmitFinished?: () => void
+ *  onFormSubmitError?: (err: string) => void
  * }} param0
  * @returns 
  */
-const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
+const PartialUploadSelector = ({text, onSubmitClick, onPartialUploadFinished, onPartialUploadError, onFormSubmitFinished, onFormSubmitError}) => {
+    onSubmitClick ??= () => {};
+    onPartialUploadFinished ??= () => {};
+    onPartialUploadError ??= () => {};
+    onFormSubmitFinished ??= () => {};
+    onFormSubmitError ??= () => {};
     /** @type {(() => void)[]} */
     const addToCleanup = [];
     const RemainingPartialPiecesFinishedReal = ReferenceableReact();
@@ -135,7 +142,7 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                     }
 
                     uploading = true;
-                    onSubmit();
+                    onSubmitClick();
                     
                     const filesSelected = FilesSelected.dom.files;
                     for (const file of filesSelected) {
@@ -146,7 +153,17 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                             body: formData,
                             method: "POST"
                         });
-                        await res.text();
+                        const text = await res.text();
+                        if (res.status !== 200) {
+                            onPartialUploadError(text);
+                            return;
+                        }
+                    }
+
+
+                    if (remainingPartialPiecesFinishedState.get() === false) {
+                        onPartialUploadFinished();
+                        return;
                     }
 
                     /** @type {HTMLFormElement} */
@@ -162,11 +179,11 @@ const PartialUploadSelector = ({text, onSubmit, onFinish, onError}) => {
                         method: outerForm.method
                     });
 
-                    const response = await outerFormRes.text();
+                    const text = await outerFormRes.text();
                     if (outerFormRes.status === 200) {
-                        onFinish();
+                        onFormSubmitFinished();
                     } else {
-                        onError(response);
+                        onFormSubmitError(text);
                     }
                     uploading = false;
                 }}/>

@@ -16,13 +16,21 @@ import { Jobs } from '../../jobs.js';
 export default function ImportFilesFromHydrus({ extraProperties, modalResolve }) {
     const FinishedImporting = ReferenceableReact();
 
-    const {PartialSelector, PartialSubmitButton} = PartialUploadSelector({text: "Select hydrus ZIP file (parts) you wish to import:", onSubmit: () => {
+    const {PartialSelector, PartialSubmitButton} = PartialUploadSelector({text: "Select hydrus ZIP file (parts) you wish to import:", onSubmitClick: () => {
         FinishedImporting.dom.textContent = "";
-    }, onFinish: async () => {
+    }, onPartialUploadFinished: () => {
+        FinishedImporting.dom.textContent = "Finished uploading specified files. Continue by uploading either more partial parts or finishing the upload by selecting the all remaining pieces checkbox and submitting";
+    }, onPartialUploadError: (err) => {
+        FinishedImporting.dom.textContent = `Error occured while uploading partial files: ${err}`;
+    }, onFormSubmitFinished: async () => {
         await Jobs.refreshGlobal();
-        FinishedImporting.dom.textContent = "Finished importing from hydrus";
-    }, onError: (err) => {
-        FinishedImporting.dom.textContent = `Error occured while importing from hydrus: ${err}`;
+        FinishedImporting.dom.textContent = "Began job to import from Hydrus";
+    }, onFormSubmitError: (err) => {
+        if (err.includes("No directory found with partialUploadPath")) {
+            FinishedImporting.dom.textContent = "No uploaded files were found under this partial upload path, try making sure you have your files selected and re-try the operation";
+        } else {
+            FinishedImporting.dom.textContent = `Error occured while creating import job: ${err}`;
+        }
     }});
 
     return {

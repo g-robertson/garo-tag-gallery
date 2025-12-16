@@ -118,9 +118,9 @@ export const NAVIGATE_METRICS_MENU_TESTS = [
 /** @type {TestSuite[]} */
 export const NAVIGATE_PARSERS_MENU_TESTS = [
     {name: "NavigateToCreateNewURLGeneratorService", tests: async (driver) => {
-        await driver.findElement(xpathHelper({containsText: "Parsers", containsClass: "topbar-dropdown-title"})).click();
+        await driver.findElement(xpathHelper({attrContains: {"text": "Parsers", "class": "topbar-dropdown-title"}})).click();
 
-        await driver.findElement(xpathHelper({containsText: "Create new URL generator service", containsClass: "topbar-dropdown-option"})).click();
+        await driver.findElement(xpathHelper({attrContains: {"text": "Create new URL generator service", "class": "topbar-dropdown-option"}})).click();
         if ((await findModals(driver)).length === 0) {
             throw "Modal not visible after navigating to create new URL generator service";
         }

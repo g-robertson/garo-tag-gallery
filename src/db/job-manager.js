@@ -6,6 +6,17 @@
  */
 
 /**
+ * @typedef {Object} ErrorDetails
+ * @property {string} error
+ * @property {boolean} errorKnown
+ * @property {boolean} addressed
+ */
+
+/**
+ * @typedef {TaskDetails & ErrorDetails} JobDetails
+ */
+
+/**
  * @typedef {Object} ClientJob
  * @property {string} jobID
  * @property {string} jobName
@@ -13,11 +24,18 @@
  * @property {string} taskName
  * @property {number} finishedSubtaskCount
  * @property {number} totalEstimatedSubtasks
+ * @property {ErrorDetails[]} errors
  * @property {boolean} done
  */
 
-import { randomBytes } from "crypto";
-import { mapNullCoalesce, randomID } from "../client/js/client-util.js";
+const getJobID = (() => {
+    let currentJobID = 0;
+    return () => {
+        return ++currentJobID;
+    };
+})();
+
+import { mapNullCoalesce } from "../client/js/client-util.js";
 
 export class Job {
     #jobID;
@@ -26,6 +44,8 @@ export class Job {
     #generator;
     #durationBetweenTasks;
     #totalEstimatedSubtasks;
+    /** @type {ErrorDetails[]} */
+    #errors = [];
     #finishedSubtaskCount = 0;
     #currentTaskName;
     #done = false;
@@ -39,7 +59,7 @@ export class Job {
      *     durationBetweenTasks?: number
      *     totalEstimatedSubtasks?: number
      * }} param0
-     * @param {() => AsyncGenerator<TaskDetails, TaskDetails>} generator 
+     * @param {() => AsyncGenerator<JobDetails, JobDetails>} generator 
 
      */
     constructor({
@@ -53,7 +73,7 @@ export class Job {
         totalEstimatedSubtasks ??= Job.UNKNOWN_SUBTASK_ESTIMATE;
 
         this.#generator = generator();
-        this.#jobID = randomBytes(16).toString("hex");
+        this.#jobID = getJobID();
         this.#jobName = jobName;
         this.#jobType = jobType;
         this.#durationBetweenTasks = durationBetweenTasks;
@@ -73,6 +93,13 @@ export class Job {
         do {
             let {value, done} = (await this.#generator.next());
             this.#finishedSubtaskCount += upcomingSubtasks;
+            if (value?.error !== undefined) {
+                this.#errors.push({
+                    error: value.error,
+                    errorKnown: value.errorKnown,
+                    addressed: false
+                });
+            }
             if (done || this.#done) {
                 break;
             }
@@ -106,11 +133,31 @@ export class Job {
         this.#done = true;
     }
 
+    isDone() {
+        return this.#done;
+    }
+
     /**
      * @param {(job: Job) => void} onFinish 
      */
     addOnFinishCallback(onFinish) {
         this.#onFinishCallbacks.push(onFinish);
+    }
+
+    /**
+     * @param {number} errorIndex
+     */
+    addressErrorIndex(errorIndex) {
+        const error = this.#errors[errorIndex];
+        if (error === undefined) {
+            console.log(`Error index ${errorIndex} on job ${this.#jobID} was not found`);
+            return;
+        }
+        error.addressed = true;
+    }
+
+    unaddressedErrors() {
+        return this.#errors.filter(error => !error.addressed);
     }
 
     static UNKNOWN_SUBTASK_ESTIMATE = Infinity;
@@ -123,6 +170,7 @@ export class Job {
             taskName: this.#currentTaskName,
             finishedSubtaskCount: this.#finishedSubtaskCount,
             totalEstimatedSubtasks: this.#totalEstimatedSubtasks,
+            errors: this.#errors,
             done: this.#done
         };
     }
@@ -139,9 +187,8 @@ export class JobManager {
      */
     addJobToRunner(runner, job) {
         const runnerJobs = mapNullCoalesce(this.#runnersJobs, runner, new Map());
-
         job.addOnFinishCallback(job => {
-            runnerJobs.delete(job.jobID());
+            this.#removeJobIfDone(runner, job);
         });
 
         runnerJobs.set(job.jobID(), job);
@@ -149,8 +196,19 @@ export class JobManager {
     }
 
     /**
+     * @param {T} runner 
+     * @param {Job} job 
+     */
+    #removeJobIfDone(runner, job) {
+        const runnerJobs = mapNullCoalesce(this.#runnersJobs, runner, new Map());
+        if (job.isDone() && job.unaddressedErrors().length === 0) {
+            runnerJobs.delete(job.jobID());
+        }
+    }
+
+    /**
      * @param {T} runner
-     * @param {string} jobID
+     * @param {number} jobID
      */
     cancelJobOnRunner(runner, jobID) {
         const runnerJobs = this.#runnersJobs.get(runner);
@@ -160,6 +218,22 @@ export class JobManager {
 
         const job = runnerJobs.get(jobID);
         job.cancel();
+    }
+
+    /**
+     * @param {T} runner
+     * @param {number} jobID
+     * @param {number} errorIndex
+     */
+    addressErrorOnRunner(runner, jobID, errorIndex) {
+        const runnerJobs = this.#runnersJobs.get(runner);
+        if (runnerJobs === undefined) {
+            return;
+        }
+
+        const job = runnerJobs.get(jobID);
+        job.addressErrorIndex(errorIndex);
+        this.#removeJobIfDone(runner, job);
     }
 
     /**
