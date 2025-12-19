@@ -1,15 +1,10 @@
 import '../global.css';
-import getPartialUploadSelections, { NOT_A_PARTIAL_UPLOAD } from '../../api/client-get/partial-upload-selections.js';
+import getPartialUploadSelections from '../../api/client-get/partial-upload-selections.js';
 import getPartialUploadSelectionFragments from '../../api/client-get/partial-upload-selection-fragments.js';
-import { executeFunctions, randomID, ReferenceableReact } from '../js/client-util.js';
+import { executeFunctions, ReferenceableReact } from '../js/client-util.js';
 import { State } from '../page/pages.js';
-
-function sanitizePartialUploadSelection(activePartialUploadSelection) {
-    if (activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
-        return `____NOT_PARTIAL____${randomID(16).toString("hex")}`;
-    }
-    return activePartialUploadSelection;
-}
+import postPartialFile from '../../api/client-get/partial-file.js';
+import getNonPartialUploadCursor, { NOT_A_PARTIAL_UPLOAD } from '../../api/client-get/non-partial-upload-cursor.js';
 
 /**
  * 
@@ -34,9 +29,9 @@ const PartialUploadSelector = ({text, onSubmitClick, onPartialUploadFinished, on
     const RemainingPartialPiecesFinishedReal = ReferenceableReact();
     const RemainingPartialPiecesFinishedFaker = ReferenceableReact();
     const ActivePartialUploadSelectionFragments = ReferenceableReact();
-    const PartialUploadSelectionFaker = ReferenceableReact();
-    const PartialUploadSelectionReal = ReferenceableReact();
+    const PartialUploadSelection = ReferenceableReact();
     const NewPartialUploadLocation = ReferenceableReact();
+    const PathCursorID = ReferenceableReact();
     const SubmitButton = ReferenceableReact();
     const FilesSelected = ReferenceableReact();
 
@@ -45,10 +40,17 @@ const PartialUploadSelector = ({text, onSubmitClick, onPartialUploadFinished, on
     const activePartialUploadSelectionFragmentsState = new State([]);
     const remainingPartialPiecesFinishedState = new State(true);
     
+    const onPartialPartsChanged = () => {
+        const activePartialUploadSelection = activePartialUploadSelectionState.get();
+        getPartialUploadSelectionFragments(activePartialUploadSelection).then(activePartialUploadSelectionFragments => {
+            activePartialUploadSelectionFragmentsState.set(activePartialUploadSelectionFragments);
+        });
+    }
+
     const onAdd = () => {
         const onPartialUploadSelectionsChanged = () => {
             const partialUploadSelections = [...partialUploadSelectionsState.get()];
-            PartialUploadSelectionFaker.dom.replaceChildren(...(partialUploadSelections.map(partialUploadSelection => (
+            PartialUploadSelection.dom.replaceChildren(...(partialUploadSelections.map(partialUploadSelection => (
                 <option dom value={partialUploadSelection}>{partialUploadSelection}</option>
             ))));
         };
@@ -56,16 +58,18 @@ const PartialUploadSelector = ({text, onSubmitClick, onPartialUploadFinished, on
 
         const onActivePartialUploadSelectionChanged = () => {
             const activePartialUploadSelection = activePartialUploadSelectionState.get();
-            getPartialUploadSelectionFragments(activePartialUploadSelection).then(activePartialUploadSelectionFragments => {
-                activePartialUploadSelectionFragmentsState.set(activePartialUploadSelectionFragments);
-            });
+            onPartialPartsChanged();
 
             RemainingPartialPiecesFinishedFaker.dom.disabled = activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD;
             if (activePartialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
                 remainingPartialPiecesFinishedState.set(true);
             }
 
-            PartialUploadSelectionReal.dom.value = sanitizePartialUploadSelection(activePartialUploadSelection);
+            for (const option of PartialUploadSelection.dom.children) {
+                if (option.value === activePartialUploadSelection) {
+                    option.selected = true;
+                }
+            }
         }
         onActivePartialUploadSelectionChanged();
 
@@ -98,18 +102,18 @@ const PartialUploadSelector = ({text, onSubmitClick, onPartialUploadFinished, on
             <div onAdd={onAdd} style={{marginLeft: "8px", flexDirection: "column"}}>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Partial upload location: </span>
-                    {PartialUploadSelectionReal.react(<input type="text" name="partialUploadSelection" style={{display: "none"}} />)}
-                    {PartialUploadSelectionFaker.react(
-                        <select style={{display: "inline-block"}} name="partialUploadSelectionFake" onChange={(e) => {
+                    {PartialUploadSelection.react(
+                        <select style={{display: "inline-block"}} name="partialUploadSelection" onChange={(e) => {
                             activePartialUploadSelectionState.set(e.target.options[e.target.selectedIndex].value)
                         }}></select>
                     )}
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
                     <span>Create a new partial upload location to upload to: </span>
-                    {NewPartialUploadLocation.react(<input style={{display: "inline-block"}} type="text" placeholder="New Partial Upload Location" />)}
+                    {NewPartialUploadLocation.react(<input style={{display: "inline-block"}} class="partial-upload-location-text" type="text" placeholder="New Partial Upload Location" />)}
                     <input style={{display: "inline-block", marginLeft: "4px"}} type="button" value="Create" onClick={() => {
                         partialUploadSelectionsState.set(new Set([...partialUploadSelectionsState.get(), NewPartialUploadLocation.dom.value]));
+                        activePartialUploadSelectionState.set(NewPartialUploadLocation.dom.value);
                     }} />
                 </div>
                 <div style={{margin: "2px 0 2px 0"}}>
@@ -132,6 +136,7 @@ const PartialUploadSelector = ({text, onSubmitClick, onPartialUploadFinished, on
                         }}
                     />)}
                 </div>
+                {PathCursorID.react(<input type="text" name="pathCursorID" style={{display: "none"}} />)}
             </div>
         ),
         PartialSubmitButton: (
@@ -143,26 +148,31 @@ const PartialUploadSelector = ({text, onSubmitClick, onPartialUploadFinished, on
 
                     uploading = true;
                     onSubmitClick();
-                    
+
+                    const partialUploadSelection = PartialUploadSelection.dom.value;
+                    let pathCursorID;
+                    if (partialUploadSelection === NOT_A_PARTIAL_UPLOAD) {
+                        pathCursorID = await getNonPartialUploadCursor();
+                        PathCursorID.dom.value = pathCursorID;
+                    }
+
                     const filesSelected = FilesSelected.dom.files;
                     for (const file of filesSelected) {
-                        const formData = new FormData();
-                        formData.append("partialUploadSelection", PartialUploadSelectionReal.dom.value);
-                        formData.append("file", file, file.name);
-                        const res = await fetch("/api/post/partial-file", {
-                            body: formData,
-                            method: "POST"
-                        });
+                        const res = await postPartialFile(partialUploadSelection, file, pathCursorID);
                         const text = await res.text();
                         if (res.status !== 200) {
                             onPartialUploadError(text);
+                            uploading = false;
                             return;
+                        } else {
+                            onPartialPartsChanged();
                         }
                     }
 
 
                     if (remainingPartialPiecesFinishedState.get() === false) {
                         onPartialUploadFinished();
+                        uploading = false;
                         return;
                     }
 

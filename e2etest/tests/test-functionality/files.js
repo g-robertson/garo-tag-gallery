@@ -9,6 +9,8 @@ import { createNewTaggableService, deleteTaggableService } from "../../functiona
 import { navigateToHydrusImport } from "../../navigation/file-navigation.js";
 import { navigateToFileSearchPage } from "../../navigation/pages-navigation.js";
 
+import path from "path";
+
 /** @import {TestSuite} from "../test-suites.js" */
 
 const TEST_TAG_SERVICE_NAME_1 = "TEST TAG SERVICE";
@@ -63,12 +65,13 @@ const IMPORT_FILES_FROM_HYDRUS_TESTS = [
                     taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1,
                     tagServiceName: TEST_TAG_SERVICE_NAME_1
                 });
-                await driver.wait(UNTIL_JOB_ERROR, FINISH_HYDRUS_JOB_TIMEOUT);
-                await closeJobError(driver);
+                await driver.wait(UNTIL_JOB_BEGIN, CREATE_HYDRUS_JOB_TIMEOUT);
+                await driver.wait(UNTIL_JOB_END, FINISH_HYDRUS_JOB_TIMEOUT);
             }},
             {name: "NOT_PARTIALShouldNotAppear", tests: async (driver) => {
                 await navigateToHydrusImport(driver);
-                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"value": "____NOT_PARTIAL____"}})));
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"value": "__NOT_PARTIAL__"}})), DEFAULT_TIMEOUT_TIME);
+                await closeModal(driver);
             }}
         ]},
     ]},
@@ -81,7 +84,7 @@ const IMPORT_FILES_FROM_HYDRUS_TESTS = [
             await deleteTagService(driver, TEST_TAG_SERVICE_NAME_1);
             await deleteTaggableService(driver, TEST_TAGGABLE_SERVICE_NAME_1);
         }},
-        { name: "TestMultipartZipHydrusImportWorks", tests: async (driver) => {
+        {name: "TestMultipartZipHydrusImportWorks", tests: async (driver) => {
             await importFilesFromHydrus(driver, {
                 partialUploadLocation: "TEST_HYDRUS_PARTIAL_UPLOAD_LOCATION",
                 fileNameGroups: [[TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_1], [TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_2, TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_3]],
@@ -90,6 +93,18 @@ const IMPORT_FILES_FROM_HYDRUS_TESTS = [
             });
             await driver.wait(UNTIL_JOB_BEGIN, CREATE_HYDRUS_JOB_TIMEOUT);
             await driver.wait(UNTIL_JOB_END, FINISH_HYDRUS_JOB_TIMEOUT);
+        }},
+        {name: "TestPartsAppearDuringImport", tests: async (driver) => {
+            await importFilesFromHydrus(driver, {
+                partialUploadLocation: "TEST_HYDRUS_PARTIAL_UPLOAD_LOCATION_2",
+                fileNameGroups: [[TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_1, TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_2]],
+                taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1,
+                tagServiceName: TEST_TAG_SERVICE_NAME_1,
+                finish: false
+            });
+            await driver.wait(until.elementsLocated(xpathHelper({type: "option", attrContains: {text: path.basename(TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_1)}})), DEFAULT_TIMEOUT_TIME);
+            await driver.wait(until.elementsLocated(xpathHelper({type: "option", attrContains: {text: path.basename(TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_2)}})), DEFAULT_TIMEOUT_TIME);
+            await closeModal(driver);
         }}
     ]}
 ];

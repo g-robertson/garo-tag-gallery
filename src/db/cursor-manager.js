@@ -32,7 +32,7 @@ export class Cursor {
         cursorTimeout
     }) {
         cursorTimeout ??= 10 * T_MINUTE;
-        this.#id = randomBytes(16).toString('hex');
+        this.#id = randomBytes(32).toString('hex');
         this.#cursorType = cursorType;
         this.#cursorValue = cursorValue;
         this.#cursorTimeout = cursorTimeout;
@@ -97,8 +97,9 @@ export class Cursor {
     }
 }
 
+/** @import {PathCursor} from "../api/get/non-partial-upload-cursor.js" */
 /** @import {DBFileCursor, DBTaggableCursor} from "../api/post/search-taggables.js" */
-/** @typedef {DBFileCursor | DBTaggableCursor} UsedCursor */
+/** @typedef {DBFileCursor | DBTaggableCursor | PathCursor} UsedCursor */
 
 export class CursorManager {
     /** @type {Map<number, Map<string, UsedCursor>>} */
@@ -221,6 +222,19 @@ export function getCursorAsFileWantedFields(cursor, wantedFields) {
         } else {
             return cursor.value.map(file => file[wantedFields]);
         }
+    } else {
+        return undefined;
+    }
+}
+
+/**
+ * @param {UsedCursor} cursor 
+ */
+export function getCursorAsPath(cursor) {
+    if (cursor === undefined) return undefined;
+
+    if (cursor.type === "Path") {
+        return cursor.value;
     } else {
         return undefined;
     }

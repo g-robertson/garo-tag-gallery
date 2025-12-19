@@ -26,7 +26,7 @@ export default function ImportFilesFromHydrus({ extraProperties, modalResolve })
         await Jobs.refreshGlobal();
         FinishedImporting.dom.textContent = "Began job to import from Hydrus";
     }, onFormSubmitError: (err) => {
-        if (err.includes("No directory found with partialUploadPath")) {
+        if (err.includes("No directory found with uploadPath")) {
             FinishedImporting.dom.textContent = "No uploaded files were found under this partial upload path, try making sure you have your files selected and re-try the operation";
         } else {
             FinishedImporting.dom.textContent = `Error occured while creating import job: ${err}`;

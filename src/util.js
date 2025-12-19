@@ -14,12 +14,12 @@ export function rootedPath(rootPath, testPath) {
     if (path.relative(rootPath, testPath).startsWith("../")) {
         return {
             isRooted: false,
-            safePath: rootPath
+            safePath: path.resolve(rootPath)
         };
     } else {
         return {
             isRooted: true,
-            safePath: testPath
+            safePath: path.resolve(testPath)
         }
     }
 }

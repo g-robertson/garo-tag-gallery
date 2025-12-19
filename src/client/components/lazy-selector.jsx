@@ -294,7 +294,6 @@ function LazySelector({
             selectedIndicesState.set(new Set());
             lastClickedIndexState.set(null);
             valuesRealizationSyncState.set(valuesRealizationSyncState.get() + 1);
-
             onRealizationUpdateNeeded(new RealizationMap());
         };
         onValuesChange();

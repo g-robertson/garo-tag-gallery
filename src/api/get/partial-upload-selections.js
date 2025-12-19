@@ -4,8 +4,8 @@
 
 import { PERMISSIONS } from "../../client/js/user.js";
 import { PARTIAL_ZIPS_FOLDER } from "../../db/db-util.js";
-import { NOT_A_PARTIAL_UPLOAD } from "../client-get/partial-upload-selections.js";
 import { readdir } from "fs/promises";
+import { NOT_A_PARTIAL_UPLOAD } from "../client-get/non-partial-upload-cursor.js";
 
 export async function validate(dbs, req, res) {}
 

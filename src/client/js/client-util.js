@@ -581,6 +581,8 @@ export function invertMap(map, valueMappingFunction) {
 
 export const T_SECOND = 1000;
 export const T_MINUTE = T_SECOND * 60;
+export const T_HOUR = T_MINUTE * 60;
+export const T_DAY = T_HOUR * 24;
 
 export function concatCallback(callback, callback2) {
     return () => {

@@ -9,10 +9,10 @@ import { LocalTaggableServices } from "../../db/taggables.js";
 import { LocalTagServices } from "../../db/tags.js";
 
 export async function validate(dbs, req, res) {
-    const partialUploadPath = z.string().nonempty().max(120).safeParse(req.partialUploadPath, {path: ["partialUploadPath"]});
-    if (!partialUploadPath.success) return partialUploadPath.error.message;
-    const partialFilePaths = z.array(z.string().nonempty().max(120)).safeParse(req.partialFilePaths, ["partialFilePaths"]);
-    if (!partialFilePaths.success) return partialFilePaths.error.message;
+    const uploadPath = z.string().nonempty().max(255).safeParse(req.uploadPath, {path: ["uploadPath"]});
+    if (!uploadPath.success) return uploadPath.error.message;
+    const filePaths = z.array(z.string().nonempty().max(255)).safeParse(req.filePaths, ["filePaths"]);
+    if (!filePaths.success) return filePaths.error.message;
 
     const localTagServiceID = z.coerce.number().nonnegative().int().safeParse(req?.body?.localTagServiceID, {path: ["localTagServiceID"]});
     if (!localTagServiceID.success) return localTagServiceID.error.message;
@@ -21,8 +21,8 @@ export async function validate(dbs, req, res) {
     if (!localTaggableServiceID.success) return localTaggableServiceID.error.message;
 
     return {
-        partialUploadPath: partialUploadPath.data,
-        partialFilePaths: partialFilePaths.data,
+        uploadPath: uploadPath.data,
+        filePaths: filePaths.data,
         localTagServiceID: localTagServiceID.data,
         localTaggableServiceID: localTaggableServiceID.data
     };
@@ -46,8 +46,8 @@ export async function checkPermission(dbs, req, res) {
 export default async function post(dbs, req, res) {
     dbs.jobManager.addJobToRunner(req.user.id(), importFilesFromHydrusJob(
         dbs,
-        req.body.partialUploadPath,
-        req.body.partialFilePaths,
+        req.body.uploadPath,
+        req.body.filePaths,
         req.body.localTagServiceID,
         req.body.localTaggableServiceID
     ));

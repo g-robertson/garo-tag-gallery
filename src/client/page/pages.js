@@ -18,7 +18,7 @@ import { clamp, unusedID } from "../js/client-util.js";
 
 /**
  * @template T
- * @typedef {(previousValue: T, currentValue: T) => void} StateCallback
+ * @typedef {(currentValue: T, previousValue: T) => void} StateCallback
  */
 
 /**
@@ -84,17 +84,17 @@ export class State {
     }
 
     /**
-     * @param {T} previousValue 
      * @param {T} value 
+     * @param {T} previousValue 
      */
-    #onUpdate(previousValue, value) {
+    #onUpdate(value, previousValue) {
         for (const callbackInfo of this.#callbackInfos) {
             if (callbackInfo.options.requireChangeForUpdate === true) {
                 if (previousValue !== value) {
-                    callbackInfo.callback(previousValue, value);
+                    callbackInfo.callback(value, previousValue);
                 }
             } else {
-                callbackInfo.callback(previousValue, value);
+                callbackInfo.callback(value, previousValue);
             }
         }
     }
@@ -102,7 +102,7 @@ export class State {
     set(value) {
         const previousValue = this.#valueRef.ref;
         this.#valueRef.ref = value;
-        this.#onUpdate(previousValue, this.#valueRef.ref);
+        this.#onUpdate(this.#valueRef.ref, previousValue);
     }
 
     /** @type {State<T>} */
@@ -128,7 +128,7 @@ export class State {
         }
         
         for (const callback of otherStateCallbacks) {
-            callback.callback(otherStateValueRef.ref, this.#valueRef.ref);
+            callback.callback(this.#valueRef.ref, otherStateValueRef.ref);
         }
     }
 
@@ -158,7 +158,7 @@ export class State {
         options ??= {};
         const state = new State();
 
-        this.addOnUpdateCallback((_, currentValue) => {
+        this.addOnUpdateCallback(currentValue => {
             state.set(transform(currentValue))
         }, addToCleanup);
         state.set(transform(this.#valueRef.ref));
@@ -199,7 +199,7 @@ export class State {
         options ??= {};
         const states = transforms.map(() => new State());
 
-        this.addOnUpdateCallback((_, currentValue) => {
+        this.addOnUpdateCallback(currentValue => {
             for (let i = 0; i < transforms.length; ++i) {
                 states[i].#valueRef.ref = transforms[i](currentValue);
             }

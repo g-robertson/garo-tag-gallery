@@ -14,11 +14,11 @@ import { executeFunctions, randomID, ReferenceableReact, unusedID } from '../js/
  * @template T
  * @param {{
  *  optionsConstState: ConstState<MultiSelectOption<T>[]>
- *  selectedOptionsRef: State<Set<T>>
+ *  selectedOptionsState: State<Set<T>>
  * }} param0
  * @returns
  */
-const MultiSelect = ({optionsConstState, selectedOptionsRef}) => {
+const MultiSelect = ({optionsConstState, selectedOptionsState}) => {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
@@ -27,7 +27,7 @@ const MultiSelect = ({optionsConstState, selectedOptionsRef}) => {
     
     const onAdd = () => {
         const onSelectedOptionsChanged = () => {
-            AllSelectedCheckbox.dom.checked = optionsConstState.get().length === selectedOptionsRef.get().size;
+            AllSelectedCheckbox.dom.checked = optionsConstState.get().length === selectedOptionsState.get().size;
         };
         onSelectedOptionsChanged();
 
@@ -36,13 +36,13 @@ const MultiSelect = ({optionsConstState, selectedOptionsRef}) => {
                 const checkboxID = unusedID() + "-labelled-checkbox";
                 return (
                     <div dom className="multiselect-option">
-                        <input type="checkbox" id={checkboxID} checked={selectedOptionsRef.get().has(option.value)} className="multiselect-checkbox" onChange={(e) => {
+                        <input type="checkbox" id={checkboxID} checked={selectedOptionsState.get().has(option.value)} className="multiselect-checkbox" onChange={(e) => {
                             if (e.currentTarget.checked) {
-                                selectedOptionsRef.get().add(option.value)
-                                selectedOptionsRef.forceUpdate();
+                                selectedOptionsState.get().add(option.value)
+                                selectedOptionsState.forceUpdate();
                             } else {
-                                selectedOptionsRef.get().delete(option.value)
-                                selectedOptionsRef.forceUpdate();
+                                selectedOptionsState.get().delete(option.value)
+                                selectedOptionsState.forceUpdate();
                             }
                         }}/><label for={checkboxID}>{option.displayName}</label>
                     </div>
@@ -52,19 +52,19 @@ const MultiSelect = ({optionsConstState, selectedOptionsRef}) => {
             // Remove invalid options from selected options when options are changed
             const validOptions = new Set();
             for (const option of optionsConstState.get()) {
-                if (selectedOptionsRef.get().has(option.value)) {
+                if (selectedOptionsState.get().has(option.value)) {
                     validOptions.add(option.value);
                 }
             }
 
-            if (validOptions.size !== selectedOptionsRef.get().size) {
-                selectedOptionsRef.set(validOptions);
+            if (validOptions.size !== selectedOptionsState.get().size) {
+                selectedOptionsState.set(validOptions);
             }
         };
         onOptionsChanged();
 
         optionsConstState.addOnUpdateCallback(onOptionsChanged, addToCleanup);
-        selectedOptionsRef.addOnUpdateCallback(onSelectedOptionsChanged, addToCleanup);
+        selectedOptionsState.addOnUpdateCallback(onSelectedOptionsChanged, addToCleanup);
 
         return () => executeFunctions(addToCleanup);
     };
@@ -74,7 +74,7 @@ const MultiSelect = ({optionsConstState, selectedOptionsRef}) => {
             <div>
                 {AllSelectedCheckbox.react(<input type="checkbox" onClick={(e) => {
                     // Set selected options to options if set, set to nothing if unset
-                    selectedOptionsRef.set(new Set(e.currentTarget.checked ? optionsConstState.get().map(option => option.value) : []));
+                    selectedOptionsState.set(new Set(e.currentTarget.checked ? optionsConstState.get().map(option => option.value) : []));
                     for (const child of OptionsContainer.dom.querySelectorAll("input")) {
                         child.checked = e.currentTarget.checked;
                     }

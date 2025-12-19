@@ -48,9 +48,12 @@ export async function importMappingsFromBackupFile(driver, backupFileName) {
  *     fileNameGroups?: string[][]
  *     taggableServiceName?: string
  *     tagServiceName?: string
+ *     finish?: boolean
  * }} importOptions
  */
 export async function importFilesFromHydrus(driver, importOptions) {
+    importOptions.finish ??= true;
+
     /** @type {string[][]} */
     let fileNameGroups = [];
     if (importOptions.fileName) {
@@ -78,25 +81,30 @@ export async function importFilesFromHydrus(driver, importOptions) {
     }
     for (let i = 0; i < fileNameGroups.length; ++i) {
         const fileNames = fileNameGroups[i];
+        await driver.findElement(By.name("partialFiles")).clear();
         await driver.findElement(By.name("partialFiles")).sendKeys(
             fileNames.map(fileName => path.resolve(fileName)).join("\n")
         );
 
-        if (i === fileNameGroups.length - 1 && importOptions.partialUploadLocation) {
-            await driver.findElement(By.name("remainingPartialPiecesFinishedFake")).click();
-        }
         if (i !== fileNameGroups.length - 1) {
             await driver.findElement(xpathHelper({type: "input", attrEq: {"value": "Submit"}})).click();
             await driver.wait(until.elementLocated(xpathHelper({attrContains: {"text": "Finished uploading specified files"}})), DEFAULT_TIMEOUT_TIME);
         }
     }
 
+    if (importOptions.finish) {
+        await driver.findElement(By.name("remainingPartialPiecesFinishedFake")).click();
+    }
     await driver.findElement(xpathHelper({type: "input", attrEq: {"value": "Submit"}})).click();
     await driver.wait(until.elementLocated(xpathHelper({
         attrContains: {"text": "Began job"},
         or: [
-            {attrContains: {"text": "No uploaded files were found"}}
-        ]})), DEFAULT_TIMEOUT_TIME);
+            {attrContains: {"text": "No uploaded files were found"}},
+            {attrContains: {"text": "Finished uploading specified files"}}
+        ]
+    })), DEFAULT_TIMEOUT_TIME);
 
-    await closeModal(driver);
+    if (importOptions.finish) {
+        await closeModal(driver);
+    }
 }

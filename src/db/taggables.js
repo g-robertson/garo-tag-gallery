@@ -761,31 +761,12 @@ export class Files {
         for (let i = 0; i < files.length; ++i) {
             thumbnailPromises.push((async () => {
                 const file = files[i];
-                const SHARP_IMAGE_EXTENSIONS = [".jpg", ".png", ".webp", ".gif", ".avif", ".tiff"];
-
-                const fileExtension = file.File_Extension;
-                if (fileExtension === undefined) {
-                    throw "File extension was undefined";
-                }
 
                 const sourceLocation = fileToSourceLocationMap.get(file.File_Hash.toString("hex"));
                 let sourceBaseName = path.basename(sourceLocation);
-                /** @type {string} */
-                let sharpSourceLocation;
-                let preThumbnailLocation;
                 const sharpOutputLocation = path.join(TMP_FOLDER, `${sourceBaseName}.thumb.jpg`);
-                if (SHARP_IMAGE_EXTENSIONS.indexOf(fileExtension.toLowerCase()) !== -1) {
-                    sharpSourceLocation = sourceLocation;
-                } else {
-                    preThumbnailLocation = path.join(TMP_FOLDER, `/${sourceBaseName}.prethumb.jpg`);
-                    const success = await extractNthSecondWithFFMPEG(sourceLocation, 0, preThumbnailLocation);
-                    if (success) {
-                        prethumbnailHashes[i] = sha256(await readFile(preThumbnailLocation));
-                        sharpSourceLocation = preThumbnailLocation;
-                    }
-                }
 
-                if (sharpSourceLocation !== undefined) {
+                const createThumbnail = async (sharpSourceLocation) => {
                     await sharp(sharpSourceLocation)
                     .resize(300, 200, {fit: "inside"})
                     .jpeg({force: true})
@@ -796,10 +777,19 @@ export class Files {
                         fileLocation: sharpOutputLocation,
                         hash: sha256(fileContents)
                     };
-                }
+                };
 
-                if (preThumbnailLocation !== undefined) {
-                    await rm(preThumbnailLocation, {force: true});
+                try {
+                    await createThumbnail(sourceLocation);
+                } catch {
+                    const preThumbnailLocation = path.join(TMP_FOLDER, `/${sourceBaseName}.prethumb.jpg`);
+                    const success = await extractNthSecondWithFFMPEG(sourceLocation, 0, preThumbnailLocation);
+                    if (success) {
+                        prethumbnailHashes[i] = sha256(await readFile(preThumbnailLocation));
+                        // no try block, cause this should not fail, if it does fail I want a crash
+                        await createThumbnail(preThumbnailLocation);
+                        await rm(preThumbnailLocation, {force: true});
+                    }
                 }
             })());
         }

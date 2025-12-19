@@ -177,7 +177,7 @@ const LocalTagsSelector = ({
                         value: localTagService.Local_Tag_Service_ID,
                         displayName: localTagService.Service_Name
                     })), addToCleanup)}
-                    selectedOptionsRef={selectedLocalTagServiceIDsState}
+                    selectedOptionsState={selectedLocalTagServiceIDsState}
                 />
             </div>
             {tagSelectionTitle}:
