@@ -3,8 +3,9 @@ import selectFiles from "../../api/client-get/select-files.js";
 import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
 import { State, ConstState } from "../page/pages.js";
 import { RealizationMap } from "./client-util.js";
+import { User } from "./user.js";
 
-/** @typedef {"tags" | "taggables" | "files"} ResettableCacheType */
+/** @typedef {"tags" | "taggables" | "files" | "user"} ResettableCacheType */
 /**
  * @typedef {Object} FetchCacheOptions
  * @property {any} initialValue
@@ -49,6 +50,11 @@ export class FetchCache {
      * @param {ResettableCacheType} cacheType 
      */
     resetCacheType(cacheType) {
+        if (cacheType === "user") {
+            User.refreshGlobal();
+            return;
+        }
+
         for (const [cacheName, cache] of this.#cache) {
             if (CacheProperties.get(cacheName).resetsWith.has(cacheType)) {
                 cache.values.clear();

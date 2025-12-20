@@ -29,19 +29,20 @@ const JobsElement = () => {
                         <div style={{margin: 4}}>Subtasks completed: {job.finishedSubtaskCount ?? 0}/{job.totalEstimatedSubtasks ?? "?"}</div>
                     </div>
                 </div>
-            ))).concat(Jobs.Global().jobs.flatMap(job => job.errors.filter(jobError => !jobError.addressed).map((jobError, index) =>
+            ))).concat(Jobs.Global().jobs.flatMap(
+                job => job.addressableItems.filter(item => item.type === "error" && !item.addressed).map((jobError, index) =>
                 <div dom className="job-error" style={{flexDirection: "column", width: "20vw"}}>
                     <div className="job-error-topbar">
                         <div className="modal-title">{job.jobName}</div>
                         <div>
                             <div className="job-error-cancel" onClick={async () => {
-                                await Jobs.Global().addressJobErrorIndex(job, index);
+                                await Jobs.Global().addressJobItemIndex(job, index);
                             }}>X</div>
                         </div>
                     </div>
                     <div className="modal-content" style={{flexDirection: "column"}}>
                         <div style={{margin: 4}}>Error occurred within job task: {job.taskName}</div>
-                        <div style={{margin: 4}}>{jobError.error}</div>
+                        <div style={{margin: 4}}>{jobError.item.error}</div>
                     </div>
                 </div>
             ))));

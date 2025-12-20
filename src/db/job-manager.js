@@ -1,20 +1,34 @@
+import { createIncrementer, mapNullCoalesce } from "../client/js/client-util.js";
+
+/** @import {ResettableCacheType} from "../client/js/fetch-cache.js" */
+
 /**
  * @typedef {Object} TaskDetails
  * @property {number=} upcomingSubtasks
  * @property {string=} upcomingTaskName
  * @property {number=} remainingSubtasks
+ * @property {ResettableCacheType[]} resetCachesAfter
  */
 
 /**
  * @typedef {Object} ErrorDetails
  * @property {string} error
  * @property {boolean} errorKnown
- * @property {boolean} addressed
  */
 
 /**
  * @typedef {TaskDetails & ErrorDetails} JobDetails
  */
+
+/**
+ * @template TypeName, ItemType
+ * @typedef {Object} AddressableItem
+ * @property {TypeName} type
+ * @property {ItemType} item
+ * @property {boolean} addressed
+ */
+
+/** @typedef {AddressableItem<"error", ErrorDetails> | AddressableItem<"cacheReset", ResettableCacheType>} AddressableJobItem */
 
 /**
  * @typedef {Object} ClientJob
@@ -24,18 +38,12 @@
  * @property {string} taskName
  * @property {number} finishedSubtaskCount
  * @property {number} totalEstimatedSubtasks
- * @property {ErrorDetails[]} errors
+ * @property {AddressableJobItem[]} addressableItems
+ * 
  * @property {boolean} done
  */
 
-const getJobID = (() => {
-    let currentJobID = 0;
-    return () => {
-        return ++currentJobID;
-    };
-})();
-
-import { mapNullCoalesce } from "../client/js/client-util.js";
+const getJobID = createIncrementer();
 
 export class Job {
     #jobID;
@@ -44,8 +52,8 @@ export class Job {
     #generator;
     #durationBetweenTasks;
     #totalEstimatedSubtasks;
-    /** @type {ErrorDetails[]} */
-    #errors = [];
+    /** @type {AddressableJobItem[]} */
+    #addressableItems = [];
     #finishedSubtaskCount = 0;
     #currentTaskName;
     #done = false;
@@ -90,13 +98,25 @@ export class Job {
 
     async execute() {
         let upcomingSubtasks = 0;
+        let resetCachesAfter = [];
         do {
             let {value, done} = (await this.#generator.next());
+
+            for (const resetCacheAfter of resetCachesAfter) {
+                this.#addressableItems.push({
+                    type: "cacheReset",
+                    item: resetCacheAfter,
+                    addressed: false
+                });
+            }
             this.#finishedSubtaskCount += upcomingSubtasks;
             if (value?.error !== undefined) {
-                this.#errors.push({
-                    error: value.error,
-                    errorKnown: value.errorKnown,
+                this.#addressableItems.push({
+                    type: "error",
+                    item: {
+                        error: value.error,
+                        errorKnown: value.errorKnown
+                    },
                     addressed: false
                 });
             }
@@ -104,6 +124,7 @@ export class Job {
                 break;
             }
 
+            resetCachesAfter = value.resetCachesAfter ?? [];
             if (value.remainingSubtasks !== undefined) {
                 this.#totalEstimatedSubtasks = this.#finishedSubtaskCount + value.remainingSubtasks;
             }
@@ -145,19 +166,19 @@ export class Job {
     }
 
     /**
-     * @param {number} errorIndex
+     * @param {number} itemIndex
      */
-    addressErrorIndex(errorIndex) {
-        const error = this.#errors[errorIndex];
-        if (error === undefined) {
-            console.log(`Error index ${errorIndex} on job ${this.#jobID} was not found`);
+    addressItemIndex(itemIndex) {
+        const addressableItem = this.#addressableItems[itemIndex];
+        if (addressableItem === undefined) {
+            console.log(`Addressable item index ${itemIndex} on job ${this.#jobID} was not found`);
             return;
         }
-        error.addressed = true;
+        addressableItem.addressed = true;
     }
 
-    unaddressedErrors() {
-        return this.#errors.filter(error => !error.addressed);
+    unaddressedItems() {
+        return this.#addressableItems.filter(item => !item.addressed);
     }
 
     static UNKNOWN_SUBTASK_ESTIMATE = Infinity;
@@ -170,7 +191,7 @@ export class Job {
             taskName: this.#currentTaskName,
             finishedSubtaskCount: this.#finishedSubtaskCount,
             totalEstimatedSubtasks: this.#totalEstimatedSubtasks,
-            errors: this.#errors,
+            addressableItems: this.#addressableItems,
             done: this.#done
         };
     }
@@ -201,7 +222,7 @@ export class JobManager {
      */
     #removeJobIfDone(runner, job) {
         const runnerJobs = mapNullCoalesce(this.#runnersJobs, runner, new Map());
-        if (job.isDone() && job.unaddressedErrors().length === 0) {
+        if (job.isDone() && job.unaddressedItems().length === 0) {
             runnerJobs.delete(job.jobID());
         }
     }
@@ -223,16 +244,18 @@ export class JobManager {
     /**
      * @param {T} runner
      * @param {number} jobID
-     * @param {number} errorIndex
+     * @param {number[]} itemIndices
      */
-    addressErrorOnRunner(runner, jobID, errorIndex) {
+    addressItemsOnRunner(runner, jobID, itemIndices) {
         const runnerJobs = this.#runnersJobs.get(runner);
         if (runnerJobs === undefined) {
             return;
         }
 
         const job = runnerJobs.get(jobID);
-        job.addressErrorIndex(errorIndex);
+        for (const itemIndex of itemIndices) {
+            job.addressItemIndex(itemIndex);
+        }
         this.#removeJobIfDone(runner, job);
     }
 

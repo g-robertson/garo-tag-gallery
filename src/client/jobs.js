@@ -1,10 +1,12 @@
 
 /** @import {ClientJob} from "../db/job-manager.js" */
+/** @import {ResettableCacheType} from "./js/fetch-cache.js" */
+/** @import {JobsItemsIndices} from "../api/post/address-jobs-item-indices.js" */
 
 import getActiveJobs from "../api/client-get/active-jobs.js";
-import addressJobErrorIndex from "../api/client-get/address-job-error-index.js";
+import addressJobsItemIndices from "../api/client-get/address-jobs-item-indices.js";
 import cancelJob from "../api/client-get/cancel-job.js";
-import { User } from "./js/user.js";
+import { FetchCache } from "./js/fetch-cache.js";
 
 export class Jobs {
     /** @type {ClientJob[]} */
@@ -16,7 +18,7 @@ export class Jobs {
     /** @type {(() => void)[]} */
     #onJobsMinimizedUpdateCallbacks = [];
     /** @type {NodeJS.Timeout} */
-    #pingJobsInterval;
+    #pingJobsTimeout;
 
     static #Gl_Jobs = new Jobs();
 
@@ -46,15 +48,42 @@ export class Jobs {
             callback();
         }
 
-        if (this.#jobs.length === 0) {
-            clearInterval(this.#pingJobsInterval);
-            this.#pingJobsInterval = undefined;
-        } else if (this.#pingJobsInterval === undefined) {
-            this.#pingJobsInterval = setInterval(async () => {
-                await User.refreshGlobal();
-                await this.refresh();
-            }, 1000);
+        /** @type {Set<ResettableCacheType>} */
+        const cacheResets = new Set();
+        /** @type {JobsItemsIndices} */
+        const jobsItemsIndicesAddressed = [];
+        for (const job of this.#jobs) {
+            /** @type {number[]} */
+            const jobItemIndicesAddressed = [];
+            for (let i = 0; i < job.addressableItems.length; ++i) {
+                const addressableItem = job.addressableItems[i];
+                if (addressableItem.type === "cacheReset" && !addressableItem.addressed) {
+                    cacheResets.add(addressableItem.item);
+                    jobItemIndicesAddressed.push(i);
+                }
+            }
+
+            jobsItemsIndicesAddressed.push({
+                jobID: job.jobID,
+                jobItemIndices: jobItemIndicesAddressed
+            });
         }
+
+        for (const cacheReset of cacheResets) {
+            FetchCache.Global().resetCacheType(cacheReset);
+        }
+
+        this.addressJobsItemsIndices(jobsItemsIndicesAddressed).then(() => {
+            if (this.#jobs.length === 0) {
+                clearTimeout(this.#pingJobsTimeout);
+                this.#pingJobsTimeout = undefined;
+            } else if (this.#pingJobsTimeout === undefined) {
+                this.#pingJobsTimeout = setTimeout(async () => {
+                    this.#pingJobsTimeout = undefined;
+                    await this.refresh();
+                }, 1000);
+            }
+        });
     }
     
     /**
@@ -106,22 +135,52 @@ export class Jobs {
      * @param {ClientJob} jobToRemove
      */
     #removeJobIfDone(jobToRemove) {
-        if (jobToRemove.done && jobToRemove.errors.filter(jobError => !jobError.addressed).length === 0) {
+        if (jobToRemove.done && jobToRemove.addressableItems.filter(jobError => !jobError.addressed).length === 0) {
             this.#jobs = this.#jobs.filter(job => job.jobID !== jobToRemove.jobID);
             this.#minimizedJobIDs.delete(jobToRemove.jobID);
+            return true;
         }
+
+        return false;
+    }
+    
+    /**
+     * @param {ClientJob} jobToAddress
+     * @param {number} jobItemIndex
+     */
+    async addressJobItemIndex(jobToAddress, jobItemIndex) {
+        await this.addressJobItemIndices(jobToAddress, [jobItemIndex]);
     }
 
     /**
      * @param {ClientJob} jobToAddress
-     * @param {number} jobErrorIndex
+     * @param {number[] | number} jobItemIndices
      */
-    async addressJobErrorIndex(jobToAddress, jobErrorIndex) {
-        await addressJobErrorIndex(jobToAddress.jobID, jobErrorIndex);
-        jobToAddress.errors[jobErrorIndex].addressed = true;
-        this.#removeJobIfDone(jobToAddress);
+    async addressJobItemIndices(jobToAddress, jobItemIndices) {
+        await this.addressJobsItemsIndices([{jobID: jobToAddress.jobID, jobItemIndices}]);
+    }
 
-        this.#onJobsUpdate();
+    /**
+     * @param {JobsItemsIndices} jobsItemsIndices
+     */
+    async addressJobsItemsIndices(jobsItemsIndices) {
+        let jobsUpdated = false;
+
+        await addressJobsItemIndices(jobsItemsIndices);
+        for (const {jobID, jobItemIndices} of jobsItemsIndices) {
+            const job = this.#jobs.find(job => job.jobID === jobID);
+            for (const jobItemIndex of jobItemIndices) {
+                job.addressableItems[jobItemIndex].addressed = true;
+            }
+
+            if (this.#removeJobIfDone(job)) {
+                jobsUpdated = true;
+            }
+        }
+        
+        if (jobsUpdated) {
+            this.#onJobsUpdate();
+        }
     }
 
     /**
@@ -130,8 +189,9 @@ export class Jobs {
     async cancelJob(jobToCancel) {
         await cancelJob(jobToCancel.jobID);
         jobToCancel.done = true;
-        this.#removeJobIfDone(jobToAddress);
 
-        this.#onJobsUpdate();
+        if (this.#removeJobIfDone(jobToAddress)) {
+            this.#onJobsUpdate();
+        }
     }
 }

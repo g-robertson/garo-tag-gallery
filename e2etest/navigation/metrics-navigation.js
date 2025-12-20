@@ -38,7 +38,7 @@ export async function navigateToCreateNewMetric(driver) {
 export async function navigateToModifyMetric(driver) {
     await driver.findElement(xpathHelper({attrContains: {"text": "Metrics", "class": "topbar-dropdown-title"}})).click();
 
-    await driver.findElement(xpathHelper({attrContains: {"text": "Update/delete existing metric", "class": "topbar-dropdown-option"}})).click();
+    await driver.findElement(xpathHelper({attrNotContains: {"text": "Update/delete existing metric service"}, attrContains: {"text": "Update/delete existing metric", "class": "topbar-dropdown-option"}})).click();
 }
 
 /**

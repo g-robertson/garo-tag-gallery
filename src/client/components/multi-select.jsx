@@ -21,6 +21,7 @@ import { executeFunctions, randomID, ReferenceableReact, unusedID } from '../js/
 const MultiSelect = ({optionsConstState, selectedOptionsState}) => {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
+    const allCheckboxID = unusedID();
 
     const AllSelectedCheckbox = ReferenceableReact();
     const OptionsContainer = ReferenceableReact();
@@ -71,15 +72,15 @@ const MultiSelect = ({optionsConstState, selectedOptionsState}) => {
     
     return (
         <div style={{flexDirection: "column"}} className="multiselect" onAdd={onAdd}>
-            <div>
-                {AllSelectedCheckbox.react(<input type="checkbox" onClick={(e) => {
+            <div className="multiselect-option">
+                {AllSelectedCheckbox.react(<input type="checkbox" id={allCheckboxID} onClick={(e) => {
                     // Set selected options to options if set, set to nothing if unset
                     selectedOptionsState.set(new Set(e.currentTarget.checked ? optionsConstState.get().map(option => option.value) : []));
                     for (const child of OptionsContainer.dom.querySelectorAll("input")) {
                         child.checked = e.currentTarget.checked;
                     }
                 }}/>)}
-                All
+                <label for={allCheckboxID}>All</label>
             </div>
             {OptionsContainer.react(<div style={{flexDirection: "column"}}></div>)}
         </div>

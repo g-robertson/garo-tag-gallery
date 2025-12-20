@@ -1,5 +1,5 @@
 import '../global.css';
-import { clamp, executeFunctions, RealizationMap, ReferenceableReact } from '../js/client-util.js';
+import { clamp, executeFunctions, RealizationMap, ReferenceableReact, setToggle } from '../js/client-util.js';
 import { State } from '../page/pages.js';
 import Scrollbar from './scrollbar.jsx';
 
@@ -438,11 +438,7 @@ function LazySelector({
                                         } else if (e.ctrlKey) {
                                             lastClickedIndexState.set(itemIndex);
                                             newSelectedIndices = selectedIndices;
-                                            if (newSelectedIndices.has(itemIndex)) {
-                                                newSelectedIndices.delete(itemIndex);
-                                            } else {
-                                                newSelectedIndices.add(itemIndex);
-                                            }
+                                            setToggle(newSelectedIndices, itemIndex);
                                         } else if (!selectedIndices.has(itemIndex)) {
                                             lastClickedIndexState.set(itemIndex);
                                             newSelectedIndices = new Set([itemIndex]);
@@ -453,6 +449,11 @@ function LazySelector({
                                         }
                                     }}
                                     onDoubleClick={async (e) => {
+                                        if (e.ctrlKey) {
+                                            setToggle(selectedIndicesState.get(), itemIndex);
+                                            selectedIndicesState.forceUpdate();
+                                        }
+                                        
                                         if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
                                             return;
                                         }

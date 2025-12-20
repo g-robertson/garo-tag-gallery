@@ -1,5 +1,5 @@
 import { Key, until } from "selenium-webdriver";
-import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, modClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
+import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, modClick, modDoubleClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
 import { addAggregateTag, AGGREGATE_CONDITION_TYPES, AGGREGATE_TAG_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, enterTagFilter, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveModifyTaggablesChanges, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../functionality/pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../functionality/metrics-functionality.js";
@@ -94,11 +94,14 @@ const FILE_SEARCH_PAGE_TESTS = [
 
                 await selectTagFromTagSearchQuery(driver, tagTitle);
             }},
-            {name: "ScrollingTagsFunctions", tests: {
-                priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
-                notice: BUG_NOTICES.ASSUMED_WORKING,
-                impact: BUG_IMPACTS.ASSUMED_WORKING,
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
+            {name: "ScrollingTagsFunctions", tests: async (driver) => {
+                await driver.wait(until.elementLocated(BySelectableTag(TEST_TAG_1)));
+
+                const selectableContents = await driver.findElement(xpathHelper({attrEq: {"class": "local-tags-selector"}, descendent: {attrEq: {"class": "lazy-selector-selectable-contents"}}}));
+                await scroll(driver, selectableContents, 10, 10);
+                await driver.wait(untilElementsNotLocated(BySelectableTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
+                await scroll(driver, selectableContents, -10, 10);
+                await driver.wait(until.elementLocated(BySelectableTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "ScrollingShouldNotClearVisibleSelection", tests: async (driver) => {
                 await driver.findElement(xpathHelper({attrEq: {"title": TEST_TAG_1}})).click();
@@ -143,7 +146,6 @@ const FILE_SEARCH_PAGE_TESTS = [
 
             // Search query
             await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
-            // implement limit tag, then finish search query testing by checking if all images have tag here
             await selectTagFromLocalTagSelector(driver, TEST_TAG_2);
             await selectTagFromLocalTagSelector(driver, TEST_TAG_3);
             await driver.wait(until.elementLocated(BySearchTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
@@ -155,6 +157,17 @@ const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(untilElementsNotLocated(BySearchTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
             await driver.wait(untilElementsNotLocated(BySearchTag(TEST_TAG_2)), DEFAULT_TIMEOUT_TIME);
             await driver.wait(untilElementsNotLocated(BySearchTag(TEST_TAG_3)), DEFAULT_TIMEOUT_TIME);
+        }},
+        {name: "CtrlDoubleClickTagsAddsCtrlClickedTags", tests: async (driver) => {
+            await applyTagFilter(driver, "CLEAR SELECTION");
+            await applyTagFilter(driver, "");
+
+            await driver.findElement(BySelectableTag(TEST_TAG_1)).click();
+            await modDoubleClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_3)), {ctrl: true});
+            await driver.wait(untilCountElementsLocated(BySearchTag(), 2), DEFAULT_TIMEOUT_TIME);
+
+            await selectTagFromTagSearchQuery(driver, TEST_TAG_1);
+            await selectTagFromTagSearchQuery(driver, TEST_TAG_3);
         }},
         {name: "ExclusionCheckboxShowsOnRefresh", tests: async (driver) => {
             await toggleExcludeCheckbox(driver);
@@ -195,12 +208,6 @@ const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(untilElementsNotLocated(BySelectableTag(TEST_TAG_5)), DEFAULT_TIMEOUT_TIME);
             await applyTagFilter(driver, "");
             await driver.wait(until.elementsLocated(BySelectableTag(TEST_TAG_5)), DEFAULT_TIMEOUT_TIME);
-        }},
-        {name: "CtrlDoubleClickTagsAddsCtrlClickedTags", tests: {
-            priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
-            notice: BUG_NOTICES.MINOR,
-            impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
-            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
         }},
         {name: "OrGroupsWork", tests: [
             {name: "DoesOrGroupModalWork", tests: async (driver) => {

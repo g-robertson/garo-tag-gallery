@@ -367,7 +367,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
             importables.push(importable);
 
             if (importables.length >= CHUNK_SIZE) {
-                yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Importing ${importables.length} files`};
+                yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Importing ${importables.length} files`, resetCachesAfter: ["files", "taggables", "tags", "metrics"]};
                 entriesHandled = 0;
                 await importChunks(dbs, importables);
                 importables = [];
@@ -375,7 +375,7 @@ export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePa
         }
 
         if (entriesHandled > 0) {
-            yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Importing ${importables.length} files`};
+            yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Importing ${importables.length} files`, resetCachesAfter: ["files", "taggables", "tags", "metrics"]};
             entriesHandled = 0;
             await importChunks(dbs, importables);
         }
@@ -407,22 +407,22 @@ export function importMappingsFromBackupJob(dbs, backupMappings, userID) {
 
         for (const backupItem of backupMappings) {
             if (backupItem.Type === IMPORTABLE_TYPES.LOCAL_TAGGABLE_SERVICE) {
-                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local taggable service: ${backupItem.Service_Name}`};
+                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local taggable service: ${backupItem.Service_Name}`, resetCachesAfter: ["user"]};
                 const localTaggableServiceID = await LocalTaggableServices.userInsert(dbs, userID, backupItem.Service_Name);
                 taggableServiceIDToTaggableService.set(
                     backupItem.Local_Taggable_Service_ID,
                     await LocalTaggableServices.tagMap(dbs, await LocalTaggableServices.selectByID(dbs, localTaggableServiceID))
                 );
             } else if (backupItem.Type === IMPORTABLE_TYPES.LOCAL_TAG_SERVICE) {
-                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local tag service: ${backupItem.Service_Name}`};
+                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local tag service: ${backupItem.Service_Name}`, resetCachesAfter: ["user"]};
                 const localTagServiceID = await LocalTagServices.userInsert(dbs, userID, backupItem.Service_Name);
                 tagServiceIDToTagService.set(backupItem.Local_Tag_Service_ID, await LocalTagServices.selectByID(dbs, localTagServiceID));
             } else if (backupItem.Type === IMPORTABLE_TYPES.LOCAL_METRIC_SERVICE) {
-                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local metric service: ${backupItem.Service_Name}`};
+                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local metric service: ${backupItem.Service_Name}`, resetCachesAfter: ["user"]};
                 const localMetricServiceID = await LocalMetricServices.userInsert(dbs, userID, backupItem.Service_Name);
                 metricServiceIDToMetricService.set(backupItem.Local_Metric_Service_ID, await LocalMetricServices.selectByID(dbs, localMetricServiceID));
             } else if (backupItem.Type === IMPORTABLE_TYPES.LOCAL_METRIC) {
-                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local metric: ${backupItem.Local_Metric_Name}`};
+                yield {upcomingSubtasks: 1, upcomingTaskName: `Inserting local metric: ${backupItem.Local_Metric_Name}`, resetCachesAfter: ["user"]};
                 const localMetricID = await LocalMetrics.insert(dbs, {
                     Local_Metric_Name: backupItem.Local_Metric_Name,
                     Local_Metric_Lower_Bound: backupItem.Local_Metric_Lower_Bound,
@@ -466,14 +466,14 @@ export function importMappingsFromBackupJob(dbs, backupMappings, userID) {
             }
 
             if (importables.length >= 100) {
-                yield {upcomingSubtasks: importables.length, upcomingTaskName: `Importing ${importables.length} local files`};
+                yield {upcomingSubtasks: importables.length, upcomingTaskName: `Importing ${importables.length} local files`, resetCachesAfter: ["files", "taggables", "tags", "metrics"]};
                 await importChunks(dbs, importables);
                 importables = [];
             }
         }
 
         if (importables.length > 0) {
-            yield {upcomingSubtasks: importables.length, upcomingTaskName: `Importing ${importables.length} local files`};
+            yield {upcomingSubtasks: importables.length, upcomingTaskName: `Importing ${importables.length} local files`, resetCachesAfter: ["files", "taggables", "tags", "metrics"]};
             await importChunks(dbs, importables);
             importables = [];
         }

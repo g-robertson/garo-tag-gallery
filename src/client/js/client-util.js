@@ -406,33 +406,15 @@ export function mapUnion(maps) {
 }
 
 /**
- * @template K, V
+ * @template T
+ * @param {Set<T>} set 
+ * @param {T} item 
  */
-class DoublyLinkedMap {
-    /** @type {Map<K, V>} */
-    #map = new Map();
-    /** @type {Map<V, Set<K>>} */
-    #inverseMap = new Map();
-
-    constructor() {}
-
-    set(key, value) {
-        mapNullCoalesce(this.#inverseMap, this.#map.get(key), new Set()).delete(key);
-        this.#map.set(key, value);
-        mapNullCoalesce(this.#inverseMap, value, new Set()).add(key);
-    }
-
-    delete(key) {
-        mapNullCoalesce(this.#inverseMap, this.#map.get(key), new Set()).delete(key);
-        this.#map.delete(key);
-    }
-
-    get(key) {
-        return this.#map.get(key);
-    }
-
-    getValue(value) {
-        return this.#inverseMap.get(value);
+export function setToggle(set, item) {
+    if (set.has(item)) {
+        set.delete(item);
+    } else {
+        set.add(item);
     }
 }
 
@@ -577,6 +559,13 @@ export function invertMap(map, valueMappingFunction) {
     }
 
     return invertedMap;
+}
+
+export function createIncrementer() {
+    let acc = 0;
+    return () => {
+        return ++acc;
+    };
 }
 
 export const T_SECOND = 1000;

@@ -95,7 +95,8 @@ export async function findThumbnailGalleryImage(driver, imageNumber) {
 export function BySearchTag(tag) {
     return xpathHelper({attrContains: {"class": "tag-search-query"}, descendent: {
         attrContains: {"class": "lazy-selector-selectable-item"},
-        attrEq: {"title": tag}
+        attrEq: {"title": tag},
+        attrExists: ["title"]
     }});
 }
 
@@ -135,6 +136,9 @@ export function ByMultiSelectOption(multiSelectOption, options) {
     return xpathHelper({attrContains: {"class": options.ancestorWithClass}, descendent: {
         attrContains: {"class": "multiselect-option"},
         descendentContainsText: multiSelectOption,
+        descendent: {
+            type: "input"
+        }
     }});
 }
 
@@ -460,6 +464,28 @@ export async function modClick(driver, element, options) {
     `, element, options.ctrl, options.shift);
 }
 
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {WebElement} element 
+ * @param {{
+ *     shift?: boolean
+ *     ctrl?: boolean
+ * }} options 
+ */
+export async function modDoubleClick(driver, element, options) {
+    options.ctrl ??= false;
+    options.shift ??= false;
+
+    await driver.executeAsyncScript(`
+        const element = arguments[0];
+        const ctrlKey = arguments[1];
+        const shiftKey = arguments[2];
+        
+        element.dispatchEvent(new MouseEvent('dblclick', {view: window, bubbles: true, ctrlKey, shiftKey}));
+        arguments[arguments.length - 1]();
+    `, element, options.ctrl, options.shift);
+}
 /**
  * @param {ThenableWebDriver} driver
  * @param {WebElement} element 

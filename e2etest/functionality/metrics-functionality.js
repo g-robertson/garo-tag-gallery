@@ -1,5 +1,5 @@
 import { closeModal, DEFAULT_TIMEOUT_TIME, realClear, UNTIL_MODAL_CLOSE, xpathHelper } from "../helpers.js";
-import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
+import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
 import {By, Key, until} from "selenium-webdriver"
 import { applyTagFilter, selectTagFromLocalTagSelector } from "./pages-functionality.js";
 
@@ -17,6 +17,26 @@ export async function createNewMetricService(driver, name) {
     await serviceName.sendKeys(name);
 
     await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
+    await driver.wait(UNTIL_MODAL_CLOSE);
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {string} name
+ * @param {{
+ *   name: string
+ * }} modifications
+ */
+export async function modifyMetricService(driver, name, modifications) {
+    await navigateToModifyMetricServices(driver);
+    await driver.findElement(By.name("localMetricServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": name}})).click();
+
+    const serviceName = await driver.findElement(By.name("serviceName"));
+    await realClear(serviceName);
+    await serviceName.sendKeys(modifications.name);
+
+    await driver.findElement(xpathHelper({attrEq: {"value": "Modify selected metric service"}})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -66,7 +86,10 @@ export async function createNewMetric(driver, metric) {
     await realClear(metricName);
     await metricName.sendKeys(metric.metricName);
 
-    let metricLowerBound = await driver.findElement(By.name("lowerBound"));
+    await driver.findElement(By.name("metricType")).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": METRIC_TYPES.NUMERIC}})).click();
+
+    const metricLowerBound = await driver.findElement(By.name("lowerBound"));
     await realClear(metricLowerBound);
     await metricLowerBound.sendKeys(metric.lowerBound);
 
@@ -80,7 +103,81 @@ export async function createNewMetric(driver, metric) {
 
     await driver.findElement(By.name("metricType")).click();
     await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metric.type}})).click();
+
     await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
+    await driver.wait(UNTIL_MODAL_CLOSE);
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ * @param {string} metricServiceName 
+ * @param {string} metricName
+ * @param {{
+ *   metricName?: string,
+ *   lowerBound?: number,
+ *   upperBound?: number,
+ *   precision?: number,
+ *   type?: MetricType
+ * }} metricModifications
+ */
+export async function modifyMetric(driver, metricServiceName, metricName, metricModifications) {
+    await navigateToModifyMetric(driver);
+    
+    await driver.findElement(By.name("localMetricServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metricServiceName}})).click();
+    
+    await driver.findElement(By.name("localMetricID")).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metricName}})).click();
+    
+    if (metricModifications.metricName !== undefined) {
+        const metricName = await driver.findElement(By.name("metricName"));
+        await realClear(metricName);
+        await metricName.sendKeys(metricModifications.metricName);
+    }
+
+    if (metricModifications.type !== undefined) {
+        await driver.findElement(By.name("metricType")).click();
+        await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metricModifications.type}})).click();
+    }
+    
+    if (metricModifications.lowerBound !== undefined) {
+        const metricLowerBound = await driver.findElement(By.name("lowerBound"));
+        await realClear(metricLowerBound);
+        await metricLowerBound.sendKeys(metricModifications.lowerBound);
+    }
+    
+    if (metricModifications.upperBound !== undefined) {    
+        const metricUpperBound = await driver.findElement(By.name("upperBound"));
+        await realClear(metricUpperBound);
+        await metricUpperBound.sendKeys(metricModifications.upperBound.toString());
+    }
+    
+    if (metricModifications.precision !== undefined) {
+        const metricPrecision = await driver.findElement(xpathHelper({attrContains: {"class": "fake-precision-input"}}));
+        await realClear(metricPrecision);
+        await metricPrecision.sendKeys(metricModifications.precision);
+    }
+    
+    await driver.findElement(xpathHelper({attrEq: {"value": "Modify selected metric"}})).click();
+    await driver.wait(UNTIL_MODAL_CLOSE);
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ * @param {string} metricServiceName 
+ * @param {string} metricName 
+ */
+export async function deleteMetric(driver, metricServiceName, metricName) {
+    await navigateToModifyMetric(driver);
+    
+    await driver.findElement(By.name("localMetricServiceID")).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metricServiceName}})).click();
+    
+    await driver.findElement(By.name("localMetricID")).click();
+    await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metricName}})).click();
+    
+    await driver.findElement(xpathHelper({attrEq: {"value": "Delete selected metric"}})).click();
+    await driver.switchTo().alert().accept();
 
     await driver.wait(UNTIL_MODAL_CLOSE);
 }

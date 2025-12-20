@@ -38,7 +38,9 @@ function get7ZExecutableName() {
  */
 export async function extractWith7Z(archiveName, outputDirectory) {
     if (existsSync(`${archiveName}.fin`)) {
-        return;
+        return {
+            success: true
+        };
     }
 
     const ret = spawn(get7ZExecutableName(), ['x', archiveName, `-o${outputDirectory}`, '-y']);
