@@ -6,7 +6,7 @@ export const BUG_PRIORITIES = /** @type {const} */ ({
     BACKLOGGED_FOR_LATER: "5 - Backlogged",
     UNSCHEDULED: "6 - Unscheduled"
 });
-/** @typedef {(typeof BUG_PRIORITIES)[keyof typeof BUG_PRIORITIES]} BugPriorities */
+/** @typedef {(typeof BUG_PRIORITIES)[keyof typeof BUG_PRIORITIES]} BugPriority */
 
 export const BUG_NOTICES = /** @type {const} */ ({
     ASSUMED_WORKING: "0 - Assumed Working",
@@ -19,7 +19,7 @@ export const BUG_NOTICES = /** @type {const} */ ({
     // Will be noticed by many users of the application and has no intuitive workaround or possibly no workaround at all
     FATAL: "4 - Fatal"
 });
-/** @typedef {(typeof BUG_NOTICES)[keyof typeof BUG_NOTICES]} BugSeverity */
+/** @typedef {(typeof BUG_NOTICES)[keyof typeof BUG_NOTICES]} BugNoticeability */
 
 export const BUG_IMPACTS = /** @type {const} */ ({
     ASSUMED_WORKING: "0 - Assumed Working",
@@ -36,7 +36,7 @@ export const BUG_IMPACTS = /** @type {const} */ ({
     // This bug makes a certain part of the application corrupt user input data in an unpredictable or unfixable way
     CORRUPTS_DATA: "6 - Corrupts Data",
 });
-/** @typedef {(typeof BUG_IMPACTS)[keyof typeof BUG_IMPACTS]} BugVariety */
+/** @typedef {(typeof BUG_IMPACTS)[keyof typeof BUG_IMPACTS]} BugImpact */
 
 export const IMPLEMENTATION_DIFFICULTIES = /** @type {const} */ ({
     UNDER_AN_HOUR: "0 - Under an hour",
@@ -50,7 +50,7 @@ export const IMPLEMENTATION_DIFFICULTIES = /** @type {const} */ ({
 /**
  * @typedef {Object} UnimplementedTestInfo
  * @property {BugPriority} priority
- * @property {BugSeverity} severity
- * @property {BugVariety} variety
+ * @property {BugNoticeability} noticeability
+ * @property {BugImpact} impact
  * @property {ImplementationDifficulty} expectedDifficulty
  */

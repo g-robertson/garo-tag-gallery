@@ -282,10 +282,11 @@ export class ConstState {
 
     /**
      * @param {StateCallback<T>} callback 
+     * @param {(() => void)[]} addToCleanup
      * @param {StateCallbackOptions} options 
      */
-    addOnUpdateCallback(callback, options) {
-        this.#state.addOnUpdateCallback(callback, options);
+    addOnUpdateCallback(callback, addToCleanup, options) {
+        this.#state.addOnUpdateCallback(callback, addToCleanup, options);
     }
 
     get() {
@@ -303,11 +304,12 @@ export class ConstState {
     /**
      * @template T2
      * @param {(currentValue: T) => T2} transform
+     * @param {(() => void)[]} addToCleanup
      * @param {StateTransformOptions<T2>=} options
      */
-    asTransform(transform, options) {
+    asTransform(transform, addToCleanup, options) {
         options ??= {};
-        return this.#state.asTransform(transform, options);
+        return this.#state.asTransform(transform, addToCleanup, options);
     }
     
     /**
@@ -347,8 +349,23 @@ export class PersistentState {
         this.#priorState = priorState ?? {};
     }
 
+    clear() {
+        this.#priorState = {};
+        this.#states = new Map();
+    }
+
+    /**
+     * @param {PriorPersistentState} priorState 
+     */
     set(priorState) {
         this.#priorState = priorState;
+    }
+
+    /**
+     * @param {string} key 
+     */
+    get(key) {
+        return this.#states.get(key);
     }
     
     toJSON() {

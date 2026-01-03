@@ -1,5 +1,5 @@
 import { DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, findMetricVisualizer, mouseOver, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
-import { navigateToFileSearchPage } from "../navigation/pages-navigation.js";
+import { navigateToDuplicatesProcessingPage, navigateToFileSearchPage } from "../navigation/pages-navigation.js";
 import {By, Condition, Key, until} from "selenium-webdriver"
 
 /** @import {ThenableWebDriver} from "selenium-webdriver" */
@@ -10,6 +10,14 @@ import {By, Condition, Key, until} from "selenium-webdriver"
  */
 export async function createNewFileSearchPage(driver) {
     await navigateToFileSearchPage(driver);
+}
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {string} name
+ */
+export async function createNewDuplicatesProcessingPage(driver) {
+    await navigateToDuplicatesProcessingPage(driver);
 }
 
 /**
@@ -347,4 +355,44 @@ export async function hoverMetricStar(driver, metricName, starCount) {
 export async function assignMetricStar(driver, metricName, starCount) {
     const metricStar = await findMetricVisualizer(driver, metricName, starCount);
     await metricStar.click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function beginDatabaseProcessingFiles(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Begin database processing files"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function beginFilteringPotentialDuplicates(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Begin filtering potential duplicates"}})).click();
+    await driver.wait(until.elementLocated(xpathHelper({type: "input", attrEq: {value: "Skip"}, or: {type: "input", attrEq: {value: "Discard"}}})), DEFAULT_TIMEOUT_TIME);
+}
+
+export async function duplicateDiscardUncommitted(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Discard"}})).click();
+    await driver.wait(until.elementLocated(xpathHelper({type: "input", attrEq: {value: "Skip"}})), DEFAULT_TIMEOUT_TIME);
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateSkip(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Skip"}})).click();
+}
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateGoBack(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Go back"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function commitDuplicates(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Commit"}})).click();
 }

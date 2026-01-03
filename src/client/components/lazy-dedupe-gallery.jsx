@@ -1,12 +1,19 @@
-import { preload } from 'react-dom';
 import '../global.css';
-import { randomID } from '../js/client-util.js';
+import { executeFunctions, ImagePreloader, preloadImg, ReferenceableReact, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
-import { useEffect, useRef, useState } from 'react';
 import selectFiles from '../../api/client-get/select-files.js';
-import { PersistentState } from "../page/pages.js";
+import { ConstState, PersistentState, State } from "../page/pages.js";
+import { Modals } from '../modal/modals.js';
 
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
+/** @import {DBFile} from "../../db/taggables.js" */
+
+/**
+ * @typedef {{
+ *     File_1: DBFile
+ *     File_2: DBFile
+ * } & DBFileComparison} LazyDedupeGalleryRealizedValue
+ **/
 
 /**
  * @param {{
@@ -16,226 +23,221 @@ import { PersistentState } from "../page/pages.js";
  * }} param0
  */
 const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persistentState}) => {
-    const galleryID = useRef(randomID(32));
-    initialFileComparisonIndex ??= persistentState.get("visibleIndex") ?? 0;
-    if (initialFileComparisonIndex === -1) {
-        initialFileComparisonIndex = 0;
-    }
-    const [visibleIndex, setVisibleIndex] = useState(initialFileComparisonIndex);
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
 
-    fileComparisons ??= persistentState.get("fileComparisons");
-    persistentState.update("fileComparisons", fileComparisons);
+    const ActiveFile = ReferenceableReact();
+    const imagePreloader = new ImagePreloader();
 
-    const fileComparisonsEvaluated = useRef(persistentState?.fileComparisonsEvaluated ?? {});
-    const updateFileComparisonsEvaluated = (newFileComparisonsEvaluated) => {
-        fileComparisonsEvaluated.current = newFileComparisonsEvaluated;
-        persistentState.update("fileComparisonsEvaluated", fileComparisonsEvaluated.current);
-    }
+    const visibleIndexState = persistentState.registerState("visibleIndex", new State(initialFileComparisonIndex ?? 0), {isSaved: true, addToCleanup})
+    const fileComparisonsEvaluatedState = persistentState.registerState("fileComparisonsEvaluated", new State({}), {isSaved: true, addToCleanup});
 
-    /** @type {{out: (increment: number) => void}} */
-    const incrementIndex = {};
+    const selectorIncrementerState = new State(0);
+    /** @type {State<LazyDedupeGalleryRealizedValue>} */
+    const realizedValueState = new State(null);
 
-    /** @type {["File_1" | "File_2", (file: "File_1" | "File_2") => void]} */
-    const [activeFile, setActiveFile] = useState("File_1");
-    const VIDEO_ID = `video-${galleryID}`;
+    /** @type {State<"File_1" | "File_2">} */
+    const activeFileState = new State("File_1");
 
-    useEffect(() => {
-        persistentState.update("visibleIndex", visibleIndex);
+    const onAdd = () => {
+        const onActiveFileChanged = () => {
+            const activeFile = realizedValueState.get()?.[activeFileState.get()];
+            const src = `images-database/${activeFile.File_Hash.slice(0, 2)}/${activeFile.File_Hash.slice(2, 4)}/${activeFile.File_Hash}${activeFile.File_Extension}`;
+            if (activeFile === undefined || ActiveFile.dom === null) {
+                return;
+            }
 
-        let vid = document.getElementById(VIDEO_ID);
-        if (vid !== null) {
-            vid.load();
+            ActiveFile.dom.replaceChildren(
+                VIDEO_FILE_EXTENSIONS.has(activeFile.File_Extension)
+                ? <video dom className="gallery-content" controls={true}>
+                    <source src={src}></source>
+                </video>
+                : <img dom className="gallery-content" src={src} />
+            );
+        };
+
+        activeFileState.addOnUpdateCallback(onActiveFileChanged, addToCleanup);
+        realizedValueState.addOnUpdateCallback(onActiveFileChanged, addToCleanup);
+
+        const toggleActiveFile = () => {
+            if (activeFileState.get() === "File_1") {
+                activeFileState.set("File_2");
+            } else {
+                activeFileState.set("File_1");
+            }
         }
-    }, [visibleIndex]);
 
-    useEffect(() => {
         const onKeyDown = (e) => {
             if (e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "ArrowDown" || e.key === "ArrowRight") {
-                if (activeFile === "File_1") {
-                    setActiveFile("File_2");
-                } else {
-                    setActiveFile("File_1");
-                }
+                toggleActiveFile();
             }
         }
         const onWheel = (e) => {
-            if (activeFile === "File_1") {
-                setActiveFile("File_2");
-            } else {
-                setActiveFile("File_1");
-            }
+            toggleActiveFile();
         }
 
         window.addEventListener("keydown", onKeyDown);
         window.addEventListener("wheel", onWheel);
 
-        return () => {
+        addToCleanup.push(() => {
             window.removeEventListener("keydown", onKeyDown);
             window.removeEventListener("wheel", onWheel);
-        }
-    }, [activeFile]);
+        });
 
-    return <LazySelector
-        valuesConstState={fileComparisons}
-        realizeSelectedValues={false}
-        valuesRealizer={async (values) => {
-            /** @type {Set<number>} */
-            const filesSet = new Set();
-            for (const value of values) {
-                filesSet.add(value.File_ID_1);
-                filesSet.add(value.File_ID_2);
-            }
-            const fileMap = new Map((await selectFiles([...filesSet])).map(file => [
-                file.File_ID,
-                file
-            ]));
+        return () => executeFunctions(addToCleanup);
+    };
+
+    return <div onAdd={onAdd} style={{width: "100%", height: "100%"}}>
+        {imagePreloader.reactElement()}
+        <LazySelector
+            valuesConstState={ConstState.instance(fileComparisons)}
+            realizeSelectedValues={false}
+            valuesRealizer={async (values) => {
+                /** @type {Set<number>} */
+                const filesSet = new Set();
+                for (const value of values) {
+                    filesSet.add(value.File_ID_1);
+                    filesSet.add(value.File_ID_2);
+                }
+                const fileMap = new Map((await selectFiles([...filesSet])).map(file => [
+                    file.File_ID,
+                    file
+                ]));
             
-            for (const file of fileMap.values()) {
-                preload(`images-database/${file.File_Hash.slice(0, 2)}/${file.File_Hash.slice(2, 4)}/${file.File_Hash}.thumb.jpg`, {
-                    "fetchPriority": "high",
-                    "as": "image"
-                });
-            }
+                return values.map(value => ({
+                    ...value,
+                    File_1: fileMap.get(value.File_ID_1),
+                    File_2: fileMap.get(value.File_ID_2)
+                }));
+            }}
+            onValuesRangeRealized={async (realizedValues) => {
+                const preloadImages = [];
+                for (const {File_1, File_2} of realizedValues) {
+                    preloadImages.push(`images-database/${File_1.File_Hash.slice(0, 2)}/${File_1.File_Hash.slice(2, 4)}/${File_1.File_Hash}${File_1.File_Extension}`);
+                    preloadImages.push(`images-database/${File_2.File_Hash.slice(0, 2)}/${File_2.File_Hash.slice(2, 4)}/${File_2.File_Hash}${File_2.File_Extension}`);
+                }
 
-            return values.map(value => ({
-                ...value,
-                File_1: fileMap.get(value.File_ID_1),
-                File_2: fileMap.get(value.File_ID_2)
-            }));
-        }}
-        customItemComponent={({realizedValue, index}) => {
-            if (visibleIndex !== index) {
-                setVisibleIndex(index);
-            }
-            const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];
-            const src = `images-database/${realizedValue[activeFile].File_Hash.slice(0, 2)}/${realizedValue[activeFile].File_Hash.slice(2, 4)}/${realizedValue[activeFile].File_Hash}${realizedValue[activeFile].File_Extension}`;
-
-            return <div style={{width: "100%", height: "100%", justifyContent: "center"}}>
-                <div style={{position: "absolute", bottom: "20px", left: "4px"}}>
-                    {visibleIndex + 1} / {fileComparisons.length}
-                </div>
-                <div style={{position: "absolute", bottom: "4px", left: "4px"}}>
-                    Comparisons made: {visibleIndex + 1} / {fileComparisons.length}
-                </div>
-                <div style={{position: "absolute", top: "3vh", right: "4px", flexDirection: "column"}}>
-                    <input type="button" value="Current is better, trash other" onClick={() => {
-                        updateFileComparisonsEvaluated({
-                            ...fileComparisonsEvaluated.current,
-                            [visibleIndex]: {
+                imagePreloader.setPreload(preloadImages);
+            }}
+            customItemComponent={({realizedValue, index}) => {
+                visibleIndexState.set(index);
+                const fileComparisonsEvaluated = fileComparisonsEvaluatedState.get();
+            
+                return <div onAdd={() => {
+                    realizedValueState.set(realizedValue);
+                }} style={{width: "100%", height: "100%", justifyContent: "center"}}>
+                    <div style={{position: "absolute", bottom: "20px", left: "4px"}}>
+                        <span className="dedupe-gallery-current-file-index">{index + 1}</span> / {fileComparisons.length}
+                    </div>
+                    <div style={{position: "absolute", bottom: "4px", left: "4px"}}>
+                        Comparisons made: {Object.keys(fileComparisonsEvaluated).length} / <span className="dedupe-gallery-total-file-comparisons">{fileComparisons.length}</span>
+                    </div>
+                    <div style={{position: "absolute", top: "3vh", right: "4px", flexDirection: "column"}}>
+                        <input type="button" value="Current is better, trash other" onClick={() => {
+                            fileComparisonsEvaluated[index] = {
                                 type: "duplicates",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2,
-                                Better_File_ID: realizedValue[activeFile].File_ID,
+                                Better_File_ID: realizedValue[activeFileState.get()].File_ID,
                                 trashWorse: true
-                            }
-                        });
-                        incrementIndex.out(1);
-                        setActiveFile("File_1");
-                    }} />
-                    <input type="button" value="Current is better" onClick={() => {
-                        updateFileComparisonsEvaluated({
-                            ...fileComparisonsEvaluated.current,
-                            [visibleIndex]: {
+                            };
+                            fileComparisonsEvaluatedState.forceUpdate();
+                            selectorIncrementerState.set(1);
+                            activeFileState.set("File_1");
+                        }} />
+                        <input type="button" value="Current is better" onClick={() => {
+                            fileComparisonsEvaluated[index] = {
                                 type: "duplicates",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2,
-                                Better_File_ID: realizedValue[activeFile].File_ID,
+                                Better_File_ID: realizedValue[activeFileState.get()].File_ID,
                                 trashWorse: false
-                            }
-                        });
-                        incrementIndex.out(1);
-                        setActiveFile("File_1");
-                    }} />
-                    <input type="button" value="Same quality, trash larger" onClick={() => {
-                        updateFileComparisonsEvaluated({
-                            ...fileComparisonsEvaluated.current,
-                            [visibleIndex]: {
+                            };
+                            fileComparisonsEvaluatedState.forceUpdate();
+                            selectorIncrementerState.set(1);
+                            activeFileState.set("File_1");
+                        }} />
+                        <input type="button" value="Same quality, trash larger" onClick={() => {
+                            fileComparisonsEvaluated[index] = {
                                 type: "duplicates",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2,
                                 Better_File_ID: null,
                                 trashWorse: true
-                            }
-                        });
-                        incrementIndex.out(1);
-                        setActiveFile("File_1");
-                    }} />
-                    <input type="button" value="Same quality" onClick={() => {
-                        updateFileComparisonsEvaluated({
-                            ...fileComparisonsEvaluated.current,
-                            [visibleIndex]: {
+                            };
+                            fileComparisonsEvaluatedState.forceUpdate();
+                            selectorIncrementerState.set(1);
+                            activeFileState.set("File_1");
+                        }} />
+                        <input type="button" value="Same quality" onClick={() => {
+                            fileComparisonsEvaluated[index] = {
                                 type: "duplicates",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2,
                                 Better_File_ID: null,
                                 trashWorse: false
-                            }
-                        });
-                        incrementIndex.out(1);
-                        setActiveFile("File_1");
-                    }} />
-                    <input type="button" value="Alternates" onClick={() => {
-                        updateFileComparisonsEvaluated({
-                            ...fileComparisonsEvaluated.current,
-                            [visibleIndex]: {
+                            };
+                            fileComparisonsEvaluatedState.forceUpdate();
+                            selectorIncrementerState.set(1);
+                            activeFileState.set("File_1");
+                        }} />
+                        <input type="button" value="Alternates" onClick={() => {
+                            fileComparisonsEvaluatedState[index] = {
                                 type: "alternates",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2
-                            }
-                        });
-                        incrementIndex.out(1);
-                        setActiveFile("File_1");
-                    }} />
-                    <input type="button" value="False positives" onClick={() => {
-                        updateFileComparisonsEvaluated({
-                            ...fileComparisonsEvaluated.current,
-                            [visibleIndex]: {
+                            };
+                            fileComparisonsEvaluatedState.forceUpdate();
+                            selectorIncrementerState.set(1);
+                            activeFileState.set("File_1");
+                        }} />
+                        <input type="button" value="False positives" onClick={() => {
+                            fileComparisonsEvaluatedState[index] = {
                                 type: "false-positive",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2
-                            }
-                        });
-                        incrementIndex.out(1);
-                        setActiveFile("File_1");
-                    }} />
-                    <input type="button" value="Skip" onClick={() => {
-                        incrementIndex.out(1);
-                        setActiveFile("File_1");
-                    }} />
-                    <input type="button" value="Go back" onClick={() => {
-                        incrementIndex.out(-1);
-                        setActiveFile("File_1");
-                    }} />
+                            };
+                            fileComparisonsEvaluatedState.forceUpdate();
+                            selectorIncrementerState.set(1);
+                            activeFileState.set("File_1");
+                        }} />
+                        <input type="button" value="Skip" onClick={() => {
+                            selectorIncrementerState.set(1);
+                            activeFileState.set("File_1");
+                        }} />
+                        <input type="button" value="Go back" onClick={() => {
+                            selectorIncrementerState.set(-1);
+                            activeFileState.set("File_1");
+                        }} />
+                    </div>
+                    
+                    {ActiveFile.react(<div></div>)}
                 </div>
-                <div style={{position: "absolute", bottom: "4px", right: "4px", flexDirection: "column"}}>
-                    <input type="button" value="Commit" onClick={() => {
-                        console.log(persistentState);
-                    }} />
-                </div>
-
-                {(VIDEO_FILE_EXTENSIONS.indexOf(realizedValue[activeFile].File_Extension) !== -1)
-                ? <video id={VIDEO_ID} className="gallery-content" controls={true}>
-                    <source src={src}></source>
-                </video>
-                : <img className="gallery-content" src={src} />
-                }
-            </div>
-        }}
-        customTitleRealizer={() => ""}
-        valueRealizationDelay={50}
-        valueRealizationRange={5}
-        incrementIndexOut={incrementIndex}
-        itemProperties={{
-            width: "100%",
-            height: "100%",
-        }}
-        scrollbarIncrement={1}
-        scrollbarWidth={0}
-        initialLastClickedIndex={initialFileComparisonIndex}
-        elementsSelectable={false}
-        allowScrollInput={false}
-        allowKeyboardInput={false}
-    />
+            }}
+            customTitleRealizer={() => ""}
+            valueRealizationDelay={50}
+            valueRealizationRange={3}
+            externalIncrementerConstState={selectorIncrementerState.asConst()}
+            itemProperties={{
+                width: "100%",
+                height: "100%",
+            }}
+            scrollbarIncrement={1}
+            scrollbarWidth={0}
+            initialLastClickedIndex={visibleIndexState.get()}
+            elementsSelectable={false}
+            allowScrollInput={false}
+            allowKeyboardInput={false}
+        />
+    
+        <div style={{position: "absolute", bottom: "4px", right: "4px", flexDirection: "column"}}>
+            <input type="button" value="Commit" onClick={() => {
+                console.log(persistentState);
+                persistentState.clear();
+                Modals.Global().popModal();
+            }} />
+        </div>
+    </div>
 };
 
 export default LazyDedupeGallery;

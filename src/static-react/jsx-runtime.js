@@ -185,7 +185,7 @@ window.addEventListener("load", () => {
     observationFunction();
 })
 
-const stringNumbers = new Set(["flex", "flexGrow", "zIndex"]);
+const stringNumbers = new Set(["flex", "flexGrow", "zIndex", "opacity"]);
 
 function styleKeyValueMapper(key, value) {
     if (typeof value === "number") {

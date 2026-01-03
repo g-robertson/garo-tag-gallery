@@ -16,7 +16,7 @@ export const FUNCTIONAL_TESTS = [
     {name: "Metrics", tests: METRICS_TESTS},
     {name: "Parsers", tests: {
         priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
-        notice: BUG_NOTICES.ASSUMED_WORKING,
+        noticeability: BUG_NOTICES.ASSUMED_WORKING,
         impact: BUG_IMPACTS.ASSUMED_WORKING,
         expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
     }},

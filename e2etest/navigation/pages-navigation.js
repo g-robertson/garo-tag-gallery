@@ -10,3 +10,12 @@ export async function navigateToFileSearchPage(driver) {
     
     await driver.findElement(xpathHelper({attrContains: {"text": "New file search page", "class": "topbar-dropdown-option"}})).click();
 }
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function navigateToDuplicatesProcessingPage(driver) {
+    await driver.findElement(xpathHelper({attrContains: {"text": "Page", "class": "topbar-dropdown-title"}})).click();
+    
+    await driver.findElement(xpathHelper({attrContains: {"text": "New duplicates processing page", "class": "topbar-dropdown-option"}})).click();
+}

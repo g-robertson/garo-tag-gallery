@@ -1,7 +1,7 @@
-import { preload } from 'react-dom';
 import '../global.css';
 import LazySelector from './lazy-selector.jsx';
 import selectFiles from '../../api/client-get/select-files.js';
+import { preloadImg, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
 
 const THUMB_ORIGINAL_WIDTH = 300;
 const THUMB_ORIGINAL_HEIGHT = 200;
@@ -15,15 +15,15 @@ const DISTANCE_HEIGHT = 0;
 
 /**
  * @param {{
- *  fileComparisonPairs: DBFileComparison[]
+ *  fileComparisonPairsConstState: ConstState<DBFileComparison[]>
  *  onValuesDoubleClicked?: (valuesSelected: any, indices: number[], indexClicked: number) => void
  * }} param0
  */
-const LazyDedupePreviewGallery = ({fileComparisonPairs, onValuesDoubleClicked}) => {
+const LazyDedupePreviewGallery = ({fileComparisonPairsConstState, onValuesDoubleClicked}) => {
     onValuesDoubleClicked ??= () => {};
 
     return <LazySelector
-        valuesConstState={fileComparisonPairs}
+        valuesConstState={fileComparisonPairsConstState}
         realizeSelectedValues={false}
         valuesRealizer={async (values) => {
             /** @type {Set<number>} */
@@ -38,7 +38,7 @@ const LazyDedupePreviewGallery = ({fileComparisonPairs, onValuesDoubleClicked}) 
             ]));
             
             for (const file of fileMap.values()) {
-                preload(`images-database/${file.File_Hash.slice(0, 2)}/${file.File_Hash.slice(2, 4)}/${file.File_Hash}.thumb.jpg`, {
+                preloadImg(`images-database/${file.File_Hash.slice(0, 2)}/${file.File_Hash.slice(2, 4)}/${file.File_Hash}.thumb.jpg`, {
                     "fetchPriority": "high",
                     "as": "image"
                 });
@@ -50,11 +50,10 @@ const LazyDedupePreviewGallery = ({fileComparisonPairs, onValuesDoubleClicked}) 
             }));
         }}
         customItemComponent={({realizedValue}) => {
-            const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];
-            return <div className="lazy-selector-selectable-item-portion" style={{width: "100%", height: "100%", flexDirection: "column"}}>
+            return <div className="dedupe-preview-gallery-item lazy-selector-selectable-item-portion" style={{width: "100%", height: "100%", flexDirection: "column"}}>
                 <div className="lazy-selector-selectable-item-portion" style={{height: THUMB_HEIGHT}}>
                     <div className="lazy-selector-selectable-item-portion" style={{width: "50%", justifyContent: "center"}}>
-                        {VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_1.File_Extension) !== -1
+                        {VIDEO_FILE_EXTENSIONS.has(realizedValue.File_1.File_Extension)
                          ? <img className="lazy-selector-selectable-item-portion"
                                  src="assets/video.png"
                                  style={{position: "absolute", width: THUMB_WIDTH, height: THUMB_HEIGHT, opacity: .7}}
@@ -66,7 +65,7 @@ const LazyDedupePreviewGallery = ({fileComparisonPairs, onValuesDoubleClicked}) 
                         />
                     </div>
                     <div className="lazy-selector-selectable-item-portion" style={{width: "50%", justifyContent: "center"}}>
-                        {VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_2.File_Extension) !== -1
+                        {VIDEO_FILE_EXTENSIONS.has(realizedValue.File_2.File_Extension)
                          ? <img className="lazy-selector-selectable-item-portion"
                                  src="assets/video.png"
                                  style={{position: "absolute", width: THUMB_WIDTH, height: THUMB_HEIGHT, opacity: .7}}

@@ -1,6 +1,5 @@
-import { preload } from 'react-dom';
 import '../global.css';
-import { executeFunctions, fbjsonParse, ReferenceableReact } from '../js/client-util.js';
+import { executeFunctions, fbjsonParse, preloadImg, ReferenceableReact, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 import { METRIC_TYPES } from '../js/metrics.js';
 import applyMetricToTaggable from '../../api/client-get/apply-metric-to-taggable.js';
@@ -41,7 +40,7 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
             const taggablesResponse = await fbjsonParse(response);
             const taggablesResponseMap = new Map(taggablesResponse.map(taggable => [Number(taggable.Taggable_ID), taggable]));
             for (const taggableResponse of taggablesResponse) {
-                preload(`images-database/${taggableResponse.File_Hash.slice(0, 2)}/${taggableResponse.File_Hash.slice(2, 4)}/${taggableResponse.File_Hash}${taggableResponse.File_Extension}`, {
+                preloadImg(`images-database/${taggableResponse.File_Hash.slice(0, 2)}/${taggableResponse.File_Hash.slice(2, 4)}/${taggableResponse.File_Hash}${taggableResponse.File_Extension}`, {
                     "fetchPriority": "high",
                     "as": "image"
                 });
@@ -49,7 +48,6 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
             return values.map(taggableID => taggablesResponseMap.get(taggableID));
         }}
         customItemComponent={({realizedValue, index, setRealizedValue}) => {
-            const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];
             const src = `images-database/${realizedValue.File_Hash.slice(0, 2)}/${realizedValue.File_Hash.slice(2, 4)}/${realizedValue.File_Hash}${realizedValue.File_Extension}`;
 
             return <div className="gallery-item" style={{width: "100%", height: "100%", justifyContent: "center"}}>
@@ -126,23 +124,17 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                     return () => executeFunctions(addToCleanup);
                 }}></div>)}
 
-                {(VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_Extension) !== -1)
-                ? 
-                (() => {
-                    const Video = ReferenceableReact();
-                    return Video.react(<video className="gallery-content" controls={true} onAdd={() => {
-                        Video.dom.load();
-                    }}>
+                {VIDEO_FILE_EXTENSIONS.has(realizedValue.File_Extension)
+                ? <video className="gallery-content" controls={true}>
                         <source src={src}></source>
-                    </video>);
-                })()
+                </video>
                 : <img className="gallery-content" src={src} />
                 }
             </div>
         }}
         customTitleRealizer={() => ""}
         valueRealizationDelay={50}
-        valueRealizationRange={5}
+        valueRealizationRange={3}
         itemProperties={{
             width: "100%",
             height: "100%"

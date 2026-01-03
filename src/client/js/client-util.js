@@ -338,6 +338,16 @@ export class RealizationMap {
         }
     }
 
+    getOrThrow(key) {
+        const keyState = this.#state.get(key);
+        if (keyState?.status === "filled") {
+            return keyState.value;
+        } else {
+            throw `Key ${key} in RealizationMap must be defined at this point, something has gone wrong`;
+        }
+        
+    }
+
     /**
      * @param {K} key 
      */
@@ -573,10 +583,67 @@ export const T_MINUTE = T_SECOND * 60;
 export const T_HOUR = T_MINUTE * 60;
 export const T_DAY = T_HOUR * 24;
 
+export const VIDEO_FILE_EXTENSIONS = new Set(".mp4", ".webm");
+
+export const preloadImg = (image) => {
+    console.log(image);
+    const preloadElem = document.createElement("link");
+    preloadElem.rel = "preload";
+    preloadElem.href = image;
+    preloadElem.as = "image";
+    document.head.appendChild(preloadElem);
+}
+
 export function concatCallback(callback, callback2) {
     return () => {
         callback();
         callback2();
+    }
+}
+
+export class ImagePreloader {
+    #referenceableReact;
+    #reactElement;
+
+    /** @type {Map<string, HTMLImageElement} */
+    #preloadedImages = new Map();
+
+    constructor() {
+        this.#referenceableReact = ReferenceableReact();
+        this.#reactElement = this.#referenceableReact.react(<div style={{position: "absolute", zIndex: -1000, opacity:0.01}}></div>);
+    }
+
+    reactElement() {
+        return this.#reactElement;
+    }
+
+    /**
+     * @param {string[]} images 
+     */
+    setPreload(images) {
+        const imagesSet = new Set(images);
+        for (const [image, element] of this.#preloadedImages) {
+            if (!imagesSet.has(image)) {
+                console.log("Removing child", element);
+                this.#referenceableReact.dom.removeChild(element);
+                this.#preloadedImages.delete(image);
+            }
+        }
+
+        for (const image of imagesSet) {
+            if (this.#preloadedImages.has(image)) {
+                continue;
+            }
+
+            const element = document.createElement("img");
+            element.src = image;
+            element.style.position = "absolute";
+            element.style.width = "100vw";
+            element.style.height = "100vh";
+            this.#referenceableReact.dom.appendChild(element);
+            this.#preloadedImages.set(image, element);
+        }
+
     }
 }
 

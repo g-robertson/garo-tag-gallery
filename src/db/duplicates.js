@@ -1,5 +1,5 @@
 import { mapNullCoalesce } from "../client/js/client-util.js";
-import { COMPARE_FILES_FOR_DUPLICATE_JOB_TYPE, CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE } from "../client/js/duplicates.js";
+import { CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE } from "../client/js/duplicates.js";
 import { closeHash, closeHashDistances, exactDuplicateHash } from "../server/duplicates.js";
 import { dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
 import { Job } from "./job-manager.js";
@@ -116,8 +116,7 @@ export class FileComparisons {
     static compareFilesForDuplicatesJob(dbs, fileIDs) {
         return new Job({
             durationBetweenTasks: 250,
-            jobName: "Comparing files for duplicates",
-            jobType: COMPARE_FILES_FOR_DUPLICATE_JOB_TYPE
+            jobName: "Comparing files for duplicates"
         }, async function*() {
             // Get all already hashed files
             const existingPHashedFiles = await Files.selectAllWithPerceptualHashVersion(dbs, CURRENT_PERCEPTUAL_HASH_VERSION);
@@ -154,7 +153,7 @@ export class FileComparisons {
                 fileComparisonChunk.push(file);
 
                 if (fileComparisonChunk.length >= COMPARE_FILES_CHUNK_SIZE) {
-                    yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Comparing ${fileComparisonChunk.length} additional files`};
+                    yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Comparing ${fileComparisonChunk.length} additional files`, resetCachesAfter: ["files"]};
                     entriesHandled = 0;
                     await compareFiles(dbs, existingPHashedFilesExactBitmapHashMap, existingPHashedFiles, fileComparisonChunk);
                     fileComparisonChunk = [];
@@ -163,7 +162,7 @@ export class FileComparisons {
 
             
             if (entriesHandled > 0) {
-                yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Comparing ${fileComparisonChunk.length} additional files`};
+                yield {upcomingSubtasks: entriesHandled, upcomingTaskName: `Comparing ${fileComparisonChunk.length} additional files`, resetCachesAfter: ["files"]};
                 entriesHandled = 0;
                 
                 if (fileComparisonChunk.length > 0) {

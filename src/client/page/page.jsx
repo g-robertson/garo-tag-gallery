@@ -42,7 +42,7 @@ const PageElement = () => {
                         if (page.pageType === FILE_SEARCH_PAGE_NAME) {
                             return <FileSearchPage page={page} />
                         } else if (page.pageType === DUPLICATES_PROCESSING_PAGE_NAME) {
-                            return <DuplicatesProcessingPage persistentState={page.persistentState} />
+                            return <DuplicatesProcessingPage page={page} />
                         }
                     })()}
                 </div>

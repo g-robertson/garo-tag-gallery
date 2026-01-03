@@ -2,7 +2,7 @@ import { createNewFileSearchPage } from "../functionality/pages-functionality.js
 import { closeModal, closePage, findModals, findPages, rmDownloadedFile, selectPage, xpathHelper } from "../helpers.js";
 import { navigateToBackup, navigateToHydrusImport, navigateToImportMappingsFromBackup } from "../navigation/file-navigation.js";
 import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
-import { navigateToFileSearchPage } from "../navigation/pages-navigation.js";
+import { navigateToDuplicatesProcessingPage, navigateToFileSearchPage } from "../navigation/pages-navigation.js";
 import { navigateToCreateTaggableService, navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
 import { navigateToCreateTagService, navigateToModifyTagServices } from "../navigation/tags-navigation.js";
 
@@ -38,6 +38,10 @@ export const NAVIGATE_PAGES_MENU_TESTS = [
         await navigateToFileSearchPage(driver);
         await closePage(driver);
     }},
+    {name: "NavigateToDuplicatesProcessingPage", tests: async (driver) => {
+        await navigateToDuplicatesProcessingPage(driver);
+        await closePage(driver);
+    }}
 ];
 
 /** @type {TestSuite[]} */

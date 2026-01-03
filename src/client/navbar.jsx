@@ -67,16 +67,12 @@ const Navbar = () => {
                         Pages.Global().addPage(page);
                         setMenuOpened(null);
                     }}>New file search page</div>
-                    {/* Duplicates processing needs further implementation
+                    {
                     <div className="topbar-dropdown-option" onClick={() => {
-                        Pages.Global().addPage({
-                            pageName: DUPLICATES_PROCESSING_PAGE_NAME,
-                            pageDisplayName: DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME,
-                            pageID: unusedID()
-                        });
-
+                        const page = new Page(DUPLICATES_PROCESSING_PAGE_NAME, DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME);
+                        Pages.Global().addPage(page);
                         setMenuOpened(null);
-                    }}>New duplicates processing page</div>*/}
+                    }}>New duplicates processing page</div>}
                 </div>)}
             </div>
             <div className="topbar-dropdown">

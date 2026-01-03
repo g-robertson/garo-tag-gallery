@@ -1,6 +1,5 @@
-import { preload } from 'react-dom';
 import '../global.css';
-import { fbjsonParse } from '../js/client-util.js';
+import { fbjsonParse, preloadImg, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 
 const THUMB_ORIGINAL_WIDTH = 300;
@@ -41,7 +40,7 @@ const LazyThumbnailGallery = ({taggableIDsConstState, onValuesSelected, onValues
             const taggablesResponse = await fbjsonParse(response);
             const taggablesResponseMap = new Map(taggablesResponse.map(taggable => [Number(taggable.Taggable_ID), taggable]));
             for (const taggableResponse of taggablesResponse) {
-                preload(`images-database/${taggableResponse.File_Hash.slice(0, 2)}/${taggableResponse.File_Hash.slice(2, 4)}/${taggableResponse.File_Hash}.thumb.jpg`, {
+                preloadImg(`images-database/${taggableResponse.File_Hash.slice(0, 2)}/${taggableResponse.File_Hash.slice(2, 4)}/${taggableResponse.File_Hash}.thumb.jpg`, {
                     "fetchPriority": "high",
                     "as": "image"
                 });
@@ -49,10 +48,8 @@ const LazyThumbnailGallery = ({taggableIDsConstState, onValuesSelected, onValues
             return values.map(taggableID => taggablesResponseMap.get(taggableID));
         }}
         customItemComponent={({realizedValue}) => {
-            const VIDEO_FILE_EXTENSIONS = [".mp4", ".webm"];
-
             return <div className="thumbnail-gallery-item lazy-selector-selectable-item-portion" style={{width: "100%", height: "100%", justifyContent: "center"}}>
-                {VIDEO_FILE_EXTENSIONS.indexOf(realizedValue.File_Extension) !== -1
+                {VIDEO_FILE_EXTENSIONS.has(realizedValue.File_Extension)
                  ? <img className="lazy-selector-selectable-item-portion"
                          src="assets/video.png"
                          style={{position: "absolute", width: THUMB_WIDTH, height: THUMB_HEIGHT, opacity: .7}}

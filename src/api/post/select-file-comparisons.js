@@ -4,7 +4,6 @@
 
 import { z } from "zod";
 import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import PerfTags from "../../perf-tags-binding/perf-tags.js";
 import { getCursorAsFileIDs } from "../../db/cursor-manager.js";
 import { FileComparisons } from "../../db/duplicates.js";
 import { USER_PERCEPTUAL_HASH_MULTIPLIER } from "../../client/js/duplicates.js";

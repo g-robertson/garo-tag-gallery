@@ -1,4 +1,6 @@
+import reselectFiles from "../../api/client-get/reselect-files.js";
 import { searchTaggables } from "../../api/client-get/search-taggables.js";
+import selectFileComparisons from "../../api/client-get/select-file-comparisons.js";
 import selectFiles from "../../api/client-get/select-files.js";
 import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
 import { State, ConstState } from "../page/pages.js";
@@ -24,8 +26,9 @@ function CacheProperty(options) {
 const CachePropertiesArray = /** @type {const} */ ([
     ["getTagsFromLocalTagServiceIDs", CacheProperty({resetsWith: new Set(["tags", "taggables"])})],
     ["searchTaggables", CacheProperty({resetsWith: new Set(["taggables"])})],
+    ["select-files", CacheProperty({resetsWith: new Set(["taggables"])})],
+    ["reselect-files", CacheProperty({resetsWith: new Set(["files"])})],
     ["select-file-comparisons", CacheProperty({resetsWith: new Set(["files"])})],
-    ["selectFiles", CacheProperty({resetsWith: new Set(["taggables"])})],
 ]);
 const CacheProperties = new Map(CachePropertiesArray);
 
@@ -121,6 +124,8 @@ export class FetchCache {
         );
     }
     
+    /** @import {WantedCursor, SearchWantedField} from "../../api/post/search-taggables.js" */
+
     /**
      * @param {ClientSearchQuery} clientSearchQuery
      * @param {WantedCursor} wantedCursor
@@ -170,7 +175,7 @@ export class FetchCache {
     selectFilesConstState(fileIDsConstState, addToCleanup, options) {
         return this.#apiCallConstState(
             [fileIDsConstState],
-            "selectFiles",
+            "select-files",
             FetchCache.#selectFilesHash,
             selectFiles,
             addToCleanup,
@@ -179,5 +184,61 @@ export class FetchCache {
                 ...options
             }
         );
+    }
+
+    /**
+     * @param {string} fileCursor
+     * @param {SearchWantedField | SearchWantedField[]} wantedFields
+     */
+    static #reselectFilesHash(fileCursor, wantedFields) {
+        return `${fileCursor}\x02${JSON.stringify(wantedFields)}`;
+
+    }
+    /**
+     * @param {ConstState<string>} fileCursorConstState
+     * @param {ConstState<SearchWantedField | SearchWantedField[]>} wantedFieldsConstState
+     * @param {(() => void)[]} addToCleanup
+     * @param {FetchCacheOptions} options
+     */
+    reselectFilesConstState(fileCursorConstState, wantedFieldsConstState, addToCleanup, options) {
+        return this.#apiCallConstState(
+            [fileCursorConstState, wantedFieldsConstState],
+            "reselect-files",
+            FetchCache.#reselectFilesHash,
+            reselectFiles,
+            addToCleanup,
+            {
+                initialValue: [],
+                ...options
+            }
+        )
+    }
+
+    /**
+     * @param {string=} fileCursor
+     * @param {number} maxSearchDistance
+     */
+    static #selectFileComparisonsHash(fileCursor, maxSearchDistance) {
+        return `${fileCursor}\x02${maxSearchDistance}`;
+    }
+
+    /**
+     * @param {ConstState<string>} fileCursorConstState
+     * @param {ConstState<number>} maxSearchDistanceConstState
+     * @param {(() => void)[]} addToCleanup
+     * @param {FetchCacheOptions} options
+     */
+    selectFileComparisonsConstState(fileCursorConstState, maxSearchDistanceConstState, addToCleanup, options) {
+        return this.#apiCallConstState(
+            [fileCursorConstState, maxSearchDistanceConstState],
+            "select-file-comparisons",
+            FetchCache.#selectFileComparisonsHash,
+            selectFileComparisons,
+            addToCleanup,
+            {
+                initialValue: [],
+                ...options
+            }
+        )
     }
 }

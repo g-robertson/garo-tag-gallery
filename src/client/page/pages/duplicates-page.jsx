@@ -1,21 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
 import TagsSelector from '../../components/tags-selector.jsx';
 import '../../global.css';
 
-import { searchTaggables } from '../../../api/client-get/search-taggables.js';
 import NumericInput from '../../components/numeric-input.jsx';
 import HoverInfo from '../../components/hover-info.jsx';
-import { ALT_LIKELY_PERCEPTUAL_HASH_DISTANCE, COMPARE_FILES_FOR_DUPLICATE_JOB_TYPE, CURRENT_PERCEPTUAL_HASH_VERSION, DUP_LIKELY_PERCEPTUAL_HASH_DISTANCE, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE, REASONABLE_PERCEPTUAL_HASH_DISTANCE, USER_PERCEPTUAL_HASH_MULTIPLIER } from '../../js/duplicates.js';
-import selectFileComparisons from '../../../api/client-get/select-file-comparisons.js';
+import { ALT_LIKELY_PERCEPTUAL_HASH_DISTANCE, CURRENT_PERCEPTUAL_HASH_VERSION, DUP_LIKELY_PERCEPTUAL_HASH_DISTANCE, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE, REASONABLE_PERCEPTUAL_HASH_DISTANCE, USER_PERCEPTUAL_HASH_MULTIPLIER } from '../../js/duplicates.js';
 import compareFilesForDuplicates from '../../../api/client-get/compare-files-for-duplicates.js';
-import reselectFiles from '../../../api/client-get/reselect-files.js';
 import LazyDedupePreviewGallery from '../../components/lazy-dedupe-preview-gallery.jsx';
 import DedupeGalleryModal from '../../modal/modals/dedupe-gallery.jsx';
 import DialogBox from '../../modal/modals/dialog-box.jsx';
-import { mergeGroups } from '../../js/client-util.js';
-import { PersistentState } from '../page/pages.js';
+import { executeFunctions, mergeGroups, ReferenceableReact } from '../../js/client-util.js';
 import { Modals } from '../../modal/modals.js';
 import { Jobs } from '../../jobs.js';
+import { ConstState, Page, PersistentState, State } from '../pages.js';
+import { FetchCache } from '../../js/fetch-cache.js';
 
 /** @import {DBFileComparison} from "../../../db/duplicates.js" */
 /** @import {SearchObject} from "../../components/tags-selector.jsx" */
@@ -47,107 +44,136 @@ function mapToFiles(searchResult) {
 
 /** 
  * @param {{
- *  persistentState: PersistentState
+ *  page: Page
  * }}
 */
-const DuplicatesProcessingPage = ({persistentState}) => {
-    const tagsSelectorState = persistentState.getInnerState("tagsSelector");
-    const dedupeGalleryState = persistentState.getInnerState("dedupeGallery");
+const DuplicatesProcessingPage = ({page}) => {
+    /** @type {(() => void)[]} */
+    const addToCleanup = [];
 
-    const defaultMaxSearchDistance = persistentState?.maxSearchDistance ?? (REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER);
-    /** @type {[number, (maxSearchDistance: number) => void]} */
-    const [maxSearchDistance, setMaxSearchDistance] = useState(defaultMaxSearchDistance);
-    useEffect(() => {persistentState.update("maxSearchDistance", maxSearchDistance);}, [maxSearchDistance]);
-    const [fileCursor, setFileCursor] = useState();
-    /** @type {[ClientFile[], (files: ClientFile[]) => void]} */
-    const [files, setFiles] = useState([]);
-    const filesMap = new Map(files.map(file => [file.fileID, file]));
-    /** @type {[DBFileComparison[], (potentialDuplicateFileComparisons: DBFileComparison[]) => void]} */
-    const [potentialDuplicateFileComparisons, setPotentialDuplicateFileComparisons] = useState([]);
-    const alreadyProcessedFiles = files.filter(file => file.perceptualHashComparisonVersion === CURRENT_PERCEPTUAL_HASH_VERSION);
-    const taggableIDs = files.flatMap(file => file.taggableIDs);
+    const TaggablesIncludedInDisplayCount = ReferenceableReact();
+    const AlreadyProcessedFileCount = ReferenceableReact();
+    const TotalFileCount = ReferenceableReact();
+    const ExactDuplicateComparisonsMadeCount = ReferenceableReact();
+    const ExactDuplicateFileCount = ReferenceableReact();
+    const PotentialDuplicateComparisonsMadeCount = ReferenceableReact();
+    const PotentialDuplicateFileCount = ReferenceableReact();
 
-    const exactDuplicateFileComparisons = potentialDuplicateFileComparisons.filter(fileComparison => fileComparison.Perceptual_Hash_Distance === IS_EXACT_DUPLICATE_DISTANCE);
-    const exactDuplicateFileComparisonsPending = exactDuplicateFileComparisons.filter(fileComparison => !fileComparison.Comparison_Is_Checked);
-    const exactDuplicateFileComparisonsMade = exactDuplicateFileComparisons.filter(fileComparison => fileComparison.Comparison_Is_Checked);
-    const potentialDuplicateFileComparisonsPending = potentialDuplicateFileComparisons.filter(fileComparison => !fileComparison.Comparison_Is_Checked).sort((a, b) => a.Perceptual_Hash_Distance - b.Perceptual_Hash_Distance);
-    const potentialDuplicateFileComparisonsMade = potentialDuplicateFileComparisons.filter(fileComparison => fileComparison.Comparison_Is_Checked);
+    const dedupeGalleryState = page.persistentState.registerState("dedupeGallery", new PersistentState());
+    
+    const maxSearchDistanceState = page.persistentState.registerState("maxSearchDistance", new State(REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER), {isSaved: true, addToCleanup});
+    
+    const clientSearchQueryState = new State(null);
+    const localTagServiceIDsState = new State([]);
+    const searchTaggablesResultConstState = page.persistentState.registerState("searchTaggablesResult", FetchCache.Global().searchTaggablesConstState(
+        clientSearchQueryState,
+        ConstState.instance("File"),
+        ConstState.instance([]),
+        localTagServiceIDsState,
+        addToCleanup,
+        {waitForSet: true}
+    ), {addToCleanup});
+    const fileCursorConstState = searchTaggablesResultConstState.asTransform(taggablesResult => taggablesResult.cursor, addToCleanup);
+    const filesConstState = page.persistentState.registerState("files", FetchCache.Global().reselectFilesConstState(
+        fileCursorConstState,
+        ConstState.instance(["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"]),
+        addToCleanup,
+        {waitForSet: true}
+    ).asTransform(mapToFiles, addToCleanup), {addToCleanup});
 
-    const potentialDuplicateFileComparisonsPendingMergedGroups = mergeGroups(potentialDuplicateFileComparisonsPending, fileComparisonPending => [fileComparisonPending.File_ID_1, fileComparisonPending.File_ID_2]);
-    const MAX_SUBGROUP_SIZE = 5;
-    const potentialDuplicateFileComparisonsPendingSubgroups = potentialDuplicateFileComparisonsPendingMergedGroups.flatMap(group => {
-        /** @type {{constituents: DBFileComparison[], fileIDs: Set<number>}[]} */
-        const subgroups = [];
-        let currentSubgroup = [];
-        let currentSubgroupFileIDs = new Set();
-        for (const constituent of group.constituents) {
-            if (!currentSubgroupFileIDs.has(constituent.File_ID_1) || !currentSubgroupFileIDs.has(constituent.File_ID_2)) {
-                currentSubgroup.push(constituent);
-                currentSubgroupFileIDs.add(constituent.File_ID_1);
-                currentSubgroupFileIDs.add(constituent.File_ID_2);
+    const potentialDuplicateFileComparisonsConstState = FetchCache.Global().selectFileComparisonsConstState(
+        fileCursorConstState,
+        maxSearchDistanceState,
+        addToCleanup,
+        {waitForSet: true}
+    );
 
-                if (currentSubgroupFileIDs.size >= MAX_SUBGROUP_SIZE) {
-                    subgroups.push({
-                        constituents: currentSubgroup,
-                        fileIDs: currentSubgroupFileIDs
-                    });
+    const potentialDuplicateFileComparisonsPendingConstState = potentialDuplicateFileComparisonsConstState.asTransform(potentialDuplicateFileComparisons => (
+        potentialDuplicateFileComparisons
+        .filter(fileComparison => !fileComparison.Comparison_Is_Checked)
+        .sort((a, b) => a.Perceptual_Hash_Distance - b.Perceptual_Hash_Distance)
+    ), addToCleanup);
+    // const potentialDuplicateFileComparisonsPendingMergedGroups = mergeGroups(potentialDuplicateFileComparisonsPending, fileComparisonPending => [fileComparisonPending.File_ID_1, fileComparisonPending.File_ID_2]);
+    // const MAX_SUBGROUP_SIZE = 5;
+    // const potentialDuplicateFileComparisonsPendingSubgroups = potentialDuplicateFileComparisonsPendingMergedGroups.flatMap(group => {
+    //     /** @type {{constituents: DBFileComparison[], fileIDs: Set<number>}[]} */
+    //     const subgroups = [];
+    //     let currentSubgroup = [];
+    //     let currentSubgroupFileIDs = new Set();
+    //     for (const constituent of group.constituents) {
+    //         if (!currentSubgroupFileIDs.has(constituent.File_ID_1) || !currentSubgroupFileIDs.has(constituent.File_ID_2)) {
+    //             currentSubgroup.push(constituent);
+    //             currentSubgroupFileIDs.add(constituent.File_ID_1);
+    //             currentSubgroupFileIDs.add(constituent.File_ID_2);
+// 
+    //             if (currentSubgroupFileIDs.size >= MAX_SUBGROUP_SIZE) {
+    //                 subgroups.push({
+    //                     constituents: currentSubgroup,
+    //                     fileIDs: currentSubgroupFileIDs
+    //                 });
+    //             }
+    //         }
+    //     }
+    // })
+
+    const onAdd = () => {
+        const onFilesUpdated = () => {
+            const files = filesConstState.get();
+
+            /** @type {Set<number>} */
+            const taggableIDs = new Set();
+            let alreadyProcessedFileCount = 0;
+            for (const file of files) {
+                
+                if (file.perceptualHashComparisonVersion === CURRENT_PERCEPTUAL_HASH_VERSION) {
+                    ++alreadyProcessedFileCount;
+                }
+                for (const taggableID of file.taggableIDs) {
+                    taggableIDs.add(taggableID);
                 }
             }
-        }
-    })
-    const previousSearch = useRef(null);
 
-    const activeDedupingInterval = useRef(null);
-    const refreshFileComparisons = useRef(() => {});
-    refreshFileComparisons.current = async () => {
-        reselectFiles(fileCursor, ["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"]).then(files => setFiles(mapToFiles(files)));
-        selectFileComparisons(fileCursor, maxSearchDistance, true).then(fileComparisons => setPotentialDuplicateFileComparisons(fileComparisons));
-    }
-    useEffect(() => {
-        let dedupingJobExists = false;
-        for (const job of Jobs.Global().jobs) {
-            if (job.jobType === COMPARE_FILES_FOR_DUPLICATE_JOB_TYPE) {
-                dedupingJobExists = true;
+            TaggablesIncludedInDisplayCount.dom.textContent = taggableIDs.size;
+            AlreadyProcessedFileCount.dom.textContent = alreadyProcessedFileCount;
+            TotalFileCount.dom.textContent = files.length;
+        };
+
+        const onPotentialDuplicatesUpdated = () => {
+            let exactDuplicateFileCount = 0;
+            let exactDuplicateComparisonsMade = 0;
+            let potentialDuplicateComparisonsMadeCount = 0;
+            let potentialDuplicateFileCount = 0;
+
+            for (const fileComparison of potentialDuplicateFileComparisonsConstState.get()) {
+                ++potentialDuplicateFileCount;
+                if (fileComparison.Comparison_Is_Checked) {
+                    ++potentialDuplicateComparisonsMadeCount;
+                }
+                if (fileComparison.Perceptual_Hash_Distance === IS_EXACT_DUPLICATE_DISTANCE) {
+                    ++exactDuplicateFileCount;
+                    if (fileComparison.Comparison_Is_Checked) {
+                        ++exactDuplicateComparisonsMade;
+                    }
+                }
             }
-        }
 
-        if (!dedupingJobExists) {
-            clearInterval(activeDedupingInterval.current);
-            activeDedupingInterval.current = null;
-        } else if (activeDedupingInterval.current === null) {
-            activeDedupingInterval.current = setInterval(() => {
-                refreshFileComparisons.current();
-            }, 1000);
-        }
-    }, [Jobs.Global().jobs, fileCursor]);
+            ExactDuplicateFileCount.dom.textContent = exactDuplicateFileCount;
+            ExactDuplicateComparisonsMadeCount.dom.textContent = exactDuplicateComparisonsMade;
+            PotentialDuplicateFileCount.dom.textContent = potentialDuplicateFileCount;
+            PotentialDuplicateComparisonsMadeCount.dom.textContent = potentialDuplicateComparisonsMadeCount;
+        };
 
-    useEffect(() => {
-        if (fileCursor === undefined) {
-            return;
-        }
+        filesConstState.addOnUpdateCallback(onFilesUpdated, addToCleanup);
+        potentialDuplicateFileComparisonsConstState.addOnUpdateCallback(onPotentialDuplicatesUpdated, addToCleanup);
 
-        refreshFileComparisons.current();
-    }, [fileCursor, maxSearchDistance]);
+        return () => executeFunctions(addToCleanup);
+    };
 
-    const makeSearch = async (forceNoCache) => {
-        forceNoCache ??= false;
-
-        const result = await searchTaggables(
-            previousSearch.current.clientSearchQuery,
-            "File",
-            ["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"],
-            previousSearch.current.localTagServiceIDs,
-            forceNoCache
-        );
-        setFileCursor(result.cursor);
-        setFiles(mapToFiles(result.result));
-
-        return result.cursor;
-    }
-
-    const openNewDedupeGallery = useRef(async (fileComparisons, initialFileComparisonIndex) => {});
-    openNewDedupeGallery.current = async (fileComparisons, initialFileComparisonIndex) => {
-        if (dedupeGalleryState.state.fileComparisonsEvaluated !== undefined) {
+    /**
+     * @param {DBFileComparison[]} fileComparisonsEvaluated
+     */
+    const openNewDedupeGallery = async (fileComparisons) => {
+        if (dedupeGalleryState.get("fileComparisonsEvaluated") !== undefined) {
             const REOPEN_BUTTON = 0;
             const COMMIT_BUTTON = 1;
             const DISCARD_BUTTON = 2;
@@ -186,27 +212,22 @@ const DuplicatesProcessingPage = ({persistentState}) => {
         }
         Modals.Global().pushModal(DedupeGalleryModal, {
             fileComparisons,
-            initialFileComparisonIndex,
             persistentState: dedupeGalleryState
         });
     };
 
     return (
-        <div style={{width: "100%", height: "100%"}}>
+        <div onAdd={onAdd} style={{width: "100%", height: "100%"}}>
             <div style={{flexDirection: "column", height: "100%"}}>
                 <div style={{marginRight: 16}}>Limit the files you will process duplicates of:</div>
                 <div style={{height: "97%"}}>
                     <TagsSelector
-                        taggableCursor={fileCursor}
-                        onSearchChanged={async (clientSearchQuery, localTagServiceIDs) => {
-                            previousSearch.current = {
-                                clientSearchQuery,
-                                localTagServiceIDs
-                            };
-                            makeSearch();
+                        taggableCursorConstState={fileCursorConstState}
+                        onSearchChanged={(clientSearchQuery, localTagServiceIDs) => {
+                            clientSearchQueryState.set(clientSearchQuery);
+                            localTagServiceIDsState.set(localTagServiceIDs);
                         }}
-
-                        persistentState={tagsSelectorState}
+                        persistentState={page.persistentState.registerState("tagsSelector", new PersistentState())}
                     />
                 </div>
             </div>
@@ -223,43 +244,37 @@ const DuplicatesProcessingPage = ({persistentState}) => {
                                                 + " will almost always be just false positives\n"
                                                 + `Maximum value allowed for input is ${MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} as higher values would just cause lower performance for no more similar images`
                     }>search distance</HoverInfo> of pairs:
-                    <div style={{marginLeft: 4}}><NumericInput  minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} value={defaultMaxSearchDistance} onChange={(num) => {
-                        setMaxSearchDistance(num);
-                    }} /></div></div>
-                <div style={{marginTop: 4}}>Taggables included in query: {taggableIDs.length}</div>
+                    <div style={{marginLeft: 4}}>
+                        <NumericInput selectedNumberState={maxSearchDistanceState} minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} />
+                    </div>
+                </div>
+                <div style={{marginTop: 4}}>Taggables included in query: {TaggablesIncludedInDisplayCount.react(<span></span>)}</div>
                 <div style={{marginTop: 4}}>
-                    Files from taggables that have been processed: {alreadyProcessedFiles.length}/{files.length}
+                    Files from taggables that have been processed: {AlreadyProcessedFileCount.react(<span></span>)}/{TotalFileCount.react(<span></span>)}
                     <input type="button" value="Begin database processing files" style={{marginTop: -2}} onClick={async () => {
-                        let createdJob = await compareFilesForDuplicates(fileCursor);
-                        if (!createdJob) {
-                            const newFileCursor = await makeSearch(true);
-                            createdJob = await compareFilesForDuplicates(newFileCursor);
-                        }
-
-                        if (createdJob) {
-                            await Jobs.refreshGlobal();
-                        }
+                        await compareFilesForDuplicates(fileCursorConstState.get());
+                        await Jobs.refreshGlobal();
                     }} />
                 </div>
                 <div style={{marginTop: 4}}>
-                    Exact pixel duplicates processed: {exactDuplicateFileComparisonsMade.length}/{exactDuplicateFileComparisons.length}
+                    Exact pixel duplicates processed: {ExactDuplicateComparisonsMadeCount.react(<span></span>)}/{ExactDuplicateFileCount.react(<span></span>)}
                     <input type="button" value="Set all smaller exact pixel duplicates as better" style={{marginLeft: 4, marginTop: -2}} />
                 </div>
                 <div style={{marginTop: 4}}>
-                    Potential duplicate pairs processed: {potentialDuplicateFileComparisonsMade.length}/{potentialDuplicateFileComparisons.length}
+                    Potential duplicate pairs processed: {PotentialDuplicateComparisonsMadeCount.react(<span></span>)}/{PotentialDuplicateFileCount.react(<span></span>)}
                     <input type="button" value="Begin filtering potential duplicates" style={{marginLeft: 4, marginTop: -2}} onClick={() => {
-                        openNewDedupeGallery.current(potentialDuplicateFileComparisonsPending, 0);
+                        openNewDedupeGallery(potentialDuplicateFileComparisonsPendingConstState.get());
                     }} />
                 </div>
                 <div style={{marginTop: 4}}>Preview of file pairs to dedupe:</div>
                 <div style={{flex: 1}}>
                     <LazyDedupePreviewGallery
-                        fileComparisonPairs={potentialDuplicateFileComparisonsPendingGroups.flatMap(group => group.constituents.sort((a, b) => a.Perceptual_Hash_Distance - b.Perceptual_Hash_Distance))}
-                        onValuesDoubleClicked={(_, indices, indexClicked) => {
+                        fileComparisonPairsConstState={potentialDuplicateFileComparisonsPendingConstState}
+                        onValuesDoubleClicked={(_, indices) => {
                             if (indices.length > 1) {
-                                openNewDedupeGallery.current(indices.map(index => potentialDuplicateFileComparisonsPending[index]), 0);
+                                openNewDedupeGallery(indices.map(index => potentialDuplicateFileComparisonsPendingConstState.get()[index]));
                             } else if (indices.length === 1) {
-                                openNewDedupeGallery.current(potentialDuplicateFileComparisonsPending, indexClicked);
+                                openNewDedupeGallery(potentialDuplicateFileComparisonsPendingConstState.get());
                             }
                         }}
                     />

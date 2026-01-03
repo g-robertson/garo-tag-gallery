@@ -51,6 +51,7 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[], indices: number[]) => void
  *  onValuesDoubleClicked?: (realizedValuesSelected: Awaited<R>[], indices: number[], indexClicked: number) => void
  *  valuesRealizer: ((values: T[]) => Promise<R[]>) | ((values: T[]) => R[])
+ *  onValuesRangeRealized: (realizedValues: R[]) => void
  *  realizeSelectedValues?: boolean
  *  valueRealizationRange?: number
  *  valueRealizationDelay?: number
@@ -65,6 +66,7 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  *  multiSelect?: boolean
  *  allowScrollInput?: boolean
  *  allowKeyboardInput?: boolean
+ *  externalIncrementerConstState?: ConstState<number>
  * }} param0
  */
 function LazySelector({
@@ -72,6 +74,7 @@ function LazySelector({
     onValuesSelected,
     onValuesDoubleClicked,
     valuesRealizer,
+    onValuesRangeRealized,
     realizeSelectedValues,
     valueRealizationRange,
     valueRealizationDelay,
@@ -85,7 +88,8 @@ function LazySelector({
     multiSelect,
     elementsSelectable,
     allowScrollInput,
-    allowKeyboardInput
+    allowKeyboardInput,
+    externalIncrementerConstState
 }) {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
@@ -93,6 +97,7 @@ function LazySelector({
     onValuesDoubleClicked ??= () => {};
     onValuesSelected ??= () => {};
     realizeSelectedValues ??= true;
+    onValuesRangeRealized ??= () => {};
     valueRealizationRange ??= 5;
     valueRealizationDelay ??= 200;
     realizeMinimumCount ??= 0;
@@ -107,6 +112,7 @@ function LazySelector({
     elementsSelectable ??= true;
     allowScrollInput ??= true;
     allowKeyboardInput ??= true;
+    externalIncrementerConstState ??= new State(0);
 
     const RootElement = ReferenceableReact();
     const SelectableContents = ReferenceableReact();
@@ -265,6 +271,7 @@ function LazySelector({
             allIndices.add(i);
         }
         await setToRealize(forcedIndices, allIndices, realizedValues);
+        onValuesRangeRealized([...allIndices].map(index => realizedValues.getOrThrow(index)));
     };
 
     const onAdd = () => {
@@ -536,36 +543,38 @@ function LazySelector({
         window.addEventListener("click", onClickFocusOutListener);
         addToCleanup.push(() => window.removeEventListener("click", onClickFocusOutListener));
 
+        /**
+         * @param {number} changeAmount 
+         */
+        const lastClickedIndexIncrement = (changeAmount) => {
+            const newIndex = clamp(lastClickedIndexState.get() + changeAmount, 0, valuesConstState.get().length - 1);
+            if (newIndex !== lastClickedIndexState.get()) {
+                lastClickedIndexState.set(newIndex);
+                const selectedIndices = selectedIndicesState.get();
+                selectedIndices.clear();
+                selectedIndices.add(newIndex);
+                selectedIndicesState.forceUpdate();
+            }
+        }
+
+        externalIncrementerConstState.addOnUpdateCallback(lastClickedIndexIncrement, addToCleanup);
+
         if (allowKeyboardInput) {
             const onKeyDown = (e) => {
                 if (!isClickFocusedState.get() && elementsSelectable) {
                     return;
                 }
 
-                let change = 0;
                 if (e.key === "ArrowDown") {
-                    change = columnCountAvailableState.get();
+                    lastClickedIndexIncrement(columnCountAvailableState.get());
                 } else if (e.key === "ArrowUp") {
-                    change = -columnCountAvailableState.get();
+                    lastClickedIndexIncrement(-columnCountAvailableState.get());
                 } else if (rowCountAvailableState.get() !== 1 || !elementsSelectable) {
                     if (e.key === "ArrowRight") {
-                        change = 1;
+                        lastClickedIndexIncrement(1);
                     } else if (e.key === "ArrowLeft") {
-                        change = -1;
-                    } else {
-                        return;
+                        lastClickedIndexIncrement(-1);
                     }
-                } else {
-                    return;
-                }
-
-                const newIndex = clamp(lastClickedIndexState.get() + change, 0, valuesConstState.get().length - 1);
-                if (newIndex !== lastClickedIndexState.get()) {
-                    lastClickedIndexState.set(newIndex);
-                    const selectedIndices = selectedIndicesState.get();
-                    selectedIndices.clear();
-                    selectedIndices.add(newIndex);
-                    selectedIndicesState.forceUpdate();
                 }
             };
             window.addEventListener("keydown", onKeyDown);

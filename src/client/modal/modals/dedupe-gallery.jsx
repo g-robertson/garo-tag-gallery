@@ -3,11 +3,12 @@ import '../../global.css';
 
 /** @import {ExtraProperties} from "../modals.js" */
 /** @import {Modal} from "../modals.js" */
+/** @import {DBFileComparison} from '../../../db/duplicates.js' */
 
 /** 
  * @param {{
  *  extraProperties: ExtraProperties<{
- *      fileComparisons: any[]
+ *      fileComparisons: DBFileComparison[]>
  *      initialFileComparisonIndex?: number
  *      persistentState?: any
  *  }>

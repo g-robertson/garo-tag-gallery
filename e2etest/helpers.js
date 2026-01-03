@@ -62,14 +62,14 @@ export async function closePage(driver, pageNumber) {
     await page.findElement(By.className("page-cancel")).click();
 }
 
-export const BY_THUMBNAIL_GALLERY_IMAGE = xpathHelper({attrContains: {"class": "thumbnail-gallery-item"}, nthParent: 1});
-
 /**
  * @param {ThenableWebDriver} driver 
  */
 export async function closeJobError(driver) {
     await driver.findElement(By.className("job-error-cancel")).click();
 }
+
+export const BY_THUMBNAIL_GALLERY_IMAGE = xpathHelper({attrContains: {"class": "thumbnail-gallery-item"}, nthParent: 1});
 
 /**
  * @param {ThenableWebDriver} driver 
@@ -86,6 +86,27 @@ export async function findThumbnailGalleryImages(driver) {
 export async function findThumbnailGalleryImage(driver, imageNumber) {
     imageNumber ??= 0;
     const images = await findThumbnailGalleryImages(driver);
+    return images[imageNumber];
+}
+
+export const BY_GALLERY_IMAGE = xpathHelper({attrContains: {"class": "gallery-content"}});
+export const BY_DEDUPE_PREVIEW_GALLERY_IMAGE = xpathHelper({attrContains: {"class": "dedupe-preview-gallery-item"}, nthParent: 1});
+
+/**
+ * @param {ThenableWebDriver} driver 
+ * @param {number=} imageNumber
+ */
+export async function findDedupePreviewGalleryImages(driver) {
+    return driver.findElements(BY_DEDUPE_PREVIEW_GALLERY_IMAGE);
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ * @param {number=} imageNumber
+ */
+export async function findDedupePreviewGalleryImage(driver, imageNumber) {
+    imageNumber ??= 0;
+    const images = await findDedupePreviewGalleryImages(driver);
     return images[imageNumber];
 }
 
@@ -496,8 +517,10 @@ export async function doubleClick(driver, element) {
 
 /**
  * 
- * @param {ThenableWebDriver} driver 
+ * @param {ThenableWebDriver} driver
+ * @param {WebElement} element
  * @param {number} deltaY 
+ * @param {number} scrollCount
  */
 export async function scroll(driver, element, deltaY, scrollCount) {
     await driver.executeAsyncScript(`

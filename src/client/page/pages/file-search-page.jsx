@@ -10,8 +10,6 @@ import { Modals } from '../../modal/modals.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 import { FetchCache } from '../../js/fetch-cache.js';
 
-/** @import {ConstState, State, } from "../../page/pages.js" */
-
 /** 
  * @param {{
  *  page: Page
@@ -58,7 +56,7 @@ const FileSearchPageElement = ({page}) => {
             <div style={{flex: 1, height: "100%"}}>
                 <TagsSelector
                     taggableCursorConstState={taggableCursorConstState}
-                    onSearchChanged={async (clientSearchQuery, localTagServiceIDs) => {
+                    onSearchChanged={(clientSearchQuery, localTagServiceIDs) => {
                         clientSearchQueryState.set(clientSearchQuery);
                         localTagServiceIDsState.set(localTagServiceIDs);
                     }}
