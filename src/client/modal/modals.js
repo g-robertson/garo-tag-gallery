@@ -1,11 +1,6 @@
 /** @import {JSX} from "react" */
 
 /**
- * @template {any} [T=Record<string, any]
- * @typedef {T & {displayName? string}} ExtraProperties
- */
-
-/**
  * @typedef {Object} Modal
  * @property {JSX.Element} component
  * @property {string} displayName
@@ -14,21 +9,17 @@
  * @property {boolean=} hasTopbar
  * @property {number=} moveWithIndex
  * @property {boolean=} shrinkToContent
+ * @property {Promise<any>=} promiseValue
+ * @property {() => void} resolve
  */
 
-/**
- * @template {any} [T=Record<string, any>]
- * @typedef {Object} ModalInstance
- * @property {(param0: {modalResolve: (arg: any) => void}) => Modal} modal
- * @property {(result: any) => void} resolve
- */
 
 export class Modals {
-    /** @type {ModalInstance[]} */
+    /** @type {Modal[]} */
     #modals = [];
     /** @type {Set<() => void>} */
     #onUpdateCallbacks = new Set();
-    /** @type {Set<(modalInstance: ModalInstance, index: number) => void>} */
+    /** @type {Set<(modal: Modal, index: number) => void>} */
     #onPushCallbacks = new Set();
     /** @type {Set<() => void>} */
     #onPopCallbacks = new Set();
@@ -60,11 +51,11 @@ export class Modals {
     }
 
     /**
-     * @param {ModalInstance} modalInstance 
+     * @param {Modal} modal
      */
-    #onPush(modalInstance) {
+    #onPush(modal) {
         for (const callback of this.#onPushCallbacks) {
-            callback(modalInstance, this.#modals.length - 1);
+            callback(modal, this.#modals.length - 1);
         }
     }
 
@@ -91,7 +82,7 @@ export class Modals {
     }
 
     /**
-     * @param {() => void} onPushCallback
+     * @param {(modal: Modal, index: number) => void} onPushCallback
      * @param {(() => void)[]} addToCleanup
      */
     addOnPushCallback(onPushCallback, addToCleanup) {
@@ -123,18 +114,21 @@ export class Modals {
     }
 
     /**
-     * @param {(param0: {modalResolve: (arg: any) => void}) => Modal} modal
+     * @param {Modal} modal
      */
     async pushModal(modal) {
-        const self = this;
-        return new Promise(resolve => {
-            self.#modals.push({
-                modal,
-                resolve
+        this.#modals.push(modal);
+        this.#onPush(this.#modals[this.#modals.length - 1]);
+        this.#onUpdate();
+
+        if (modal.promiseValue !== undefined) {
+            modal.resolve = () => {};
+            return modal.promiseValue;
+        } else {
+            return new Promise(resolve => {
+                modal.resolve = resolve;
             });
-            self.#onPush(self.#modals[self.#modals.length - 1]);
-            self.#onUpdate();
-        });
+        }
     }
 
     popModal() {

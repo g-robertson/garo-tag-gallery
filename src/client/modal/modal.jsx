@@ -1,17 +1,16 @@
 import '../global.css';
 import { Modals } from './modals.js';
 
-/** @import {ModalInstance} from "./modals.js" */
+/** @import {Modal} from "./modals.js" */
 
 /**
  * @param {{
- *     modalInstance: ModalInstance
+ *     modal: Modal
  *     index: number,
  * }} param0 
  * @returns 
  */
-const ModalElement = ({modalInstance, index}) => {
-    const modal = modalInstance.modal({modalResolve: modalInstance.resolve});
+const ModalElement = ({modal, index}) => {
     const displayName = modal.displayName;
     const hasTopbar = modal.hasTopbar ?? true;
     const hasBorder = modal.hasBorder ?? true;

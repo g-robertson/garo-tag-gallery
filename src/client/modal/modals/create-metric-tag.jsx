@@ -4,9 +4,7 @@ import NumericInput from '../../components/numeric-input.jsx';
 import { Modals } from '../../modal/modals.js';
 import { User } from '../../js/user.js';
 import { State } from '../../page/pages.js';
-import { executeFunctions } from '../../js/client-util.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
 /** @import {DBLocalMetric} from "../../../db/metrics.js" */
 /** @import {ClientComparator, ClientSearchTagHasMetricID, ClientSearchTagInLocalMetricServiceID, ClientSearchTagLocalMetricComparison} from "../../../api/post/search-taggables.js" */
 
@@ -28,13 +26,11 @@ function createLocalMetricComparison(localMetric, comparator, metricComparisonVa
     return localMetricComparison;
 }
 
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * } param0}
-*/
-export default function CreateMetricTag({ extraProperties, modalResolve }) {
+export default function CreateMetricTag() {
+    let modalResolve;
+    /** @type {Promise<T>} */
+    const promiseValue = new Promise(resolve => { modalResolve = resolve; });
+
     const selectedLocalMetricServiceState = new State(User.Global().localMetricServices()[0]);
     const selectedLocalMetricState = new State(selectedLocalMetricServiceState.get()?.Local_Metrics?.[0]);
     const metricComparisonValueState = new State(0);
@@ -91,6 +87,7 @@ export default function CreateMetricTag({ extraProperties, modalResolve }) {
                 </div>
             </div>
         ),
-        displayName: "Create Metric Tag"
+        displayName: "Create Metric Tag",
+        promiseValue
     };
 };

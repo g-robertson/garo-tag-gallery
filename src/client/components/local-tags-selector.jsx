@@ -26,7 +26,7 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags) {
     for (let i = clientTags.length - 1; i >= 0; --i) {
         const tag = clientTags[i];
         if (tag.type === "modalTag") {
-            const modalTags = await Modals.Global().pushModal(tag.modalTagInfo.modal);
+            const modalTags = await Modals.Global().pushModal(tag.modalTagInfo.modal());
             if (modalTags !== undefined && modalTags !== null) {
                 mapped.push(modalTags);
             }

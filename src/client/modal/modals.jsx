@@ -10,13 +10,13 @@ const ModalsElement = () => {
 
     const ModalsContainer = ReferenceableReact();
     const onAdd = () => {
-        Modals.Global().addOnPushCallback((modalInstance, index) => {
+        Modals.Global().addOnPushCallback((modal, index) => {
             const lastChild = ModalsContainer.dom.lastChild;
             if (lastChild !== null) {
                 lastChild.style.pointerEvents = "none";
             }
             ModalsContainer.dom.appendChild(<div dom style={{pointerEvents: "auto"}}>
-                <ModalElement modalInstance={modalInstance} index={index} />
+                <ModalElement modal={modal} index={index} />
             </div>
         )}, addToCleanup);
         

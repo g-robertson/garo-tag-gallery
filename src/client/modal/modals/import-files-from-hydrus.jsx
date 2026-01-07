@@ -5,15 +5,7 @@ import LocalTagServiceSelector from '../../components/local-tag-service-selector
 import { ReferenceableReact } from '../../js/client-util.js';
 import { Jobs } from '../../jobs.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function ImportFilesFromHydrus({ extraProperties, modalResolve }) {
+export default function ImportFilesFromHydrus() {
     const FinishedImporting = ReferenceableReact();
 
     const {PartialSelector, PartialSubmitButton} = PartialUploadSelector({text: "Select hydrus ZIP file (parts) you wish to import:", onSubmitClick: () => {

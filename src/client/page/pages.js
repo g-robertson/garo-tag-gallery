@@ -5,7 +5,6 @@
  * @property {string} pageDisplayName
  * @property {string} pageID
  * @property {any} persistentState
- * @property {Record<string, any>} extraProperties
 */
 
 import setUserPages from "../../api/client-get/set-user-pages.js";
@@ -357,6 +356,10 @@ export class PersistentState {
         this.#states = new Map();
     }
 
+    isClear() {
+        return Object.keys(this.#priorState).length === 0 && this.#states.size === 0;
+    }
+
     /**
      * @param {PriorPersistentState} priorState 
      */
@@ -443,22 +446,19 @@ export class Page {
     #pageDisplayName;
     #pageID;
     #persistentState;
-    #extraProperties;
 
     /**
      * @param {string} pageType 
      * @param {string} pageDisplayName 
      * @param {PersistentState=} persistentState
-     * @param {Record<string, any>=} extraProperties
      * @param {string=} pageID
      */
-    constructor(pageType, pageDisplayName, persistentState, extraProperties, pageID) {
+    constructor(pageType, pageDisplayName, persistentState, pageID) {
         this.#pageType = pageType;
         this.#pageDisplayName = pageDisplayName;
         this.#persistentState = persistentState ?? new PersistentState();
         // no cleanup needed, page will already be destroyed if this needs cleaned up
         this.#persistentState.addOnUpdateCallback(() => {setUserPages(Pages.Global());});
-        this.#extraProperties = extraProperties ?? {};
         this.#pageID = pageID ?? unusedID();
     }
 
@@ -470,7 +470,6 @@ export class Page {
             pageJSON.pageType,
             pageJSON.pageDisplayName,
             new PersistentState(pageJSON.persistentState),
-            pageJSON.extraProperties,
             pageJSON.pageID
         );
     }
@@ -480,7 +479,6 @@ export class Page {
             pageType: this.#pageType,
             pageDisplayName: this.#pageDisplayName,
             persistentState: this.#persistentState.toJSON(),
-            extraProperties: this.#extraProperties,
             pageID: this.#pageID
         };
     }
@@ -499,10 +497,6 @@ export class Page {
 
     get persistentState() {
         return this.#persistentState;
-    }
-
-    get extraProperties() {
-        return this.#extraProperties;
     }
 }
 

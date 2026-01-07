@@ -3,15 +3,7 @@ import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import { Jobs } from '../../jobs.js';
 import { ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function ImportMappingsFromBackup({ extraProperties, modalResolve }) {
+export default function ImportMappingsFromBackup() {
     const FinishedImporting = ReferenceableReact();
 
     return {

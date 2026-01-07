@@ -3,7 +3,7 @@ import TagsSelector from '../../components/tags-selector.jsx';
 import { Modals } from '../../modal/modals.js';
 import { State } from '../../page/pages.js';
 
-/** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
+/** @import {ClientSearchQuery} from "../../../api/post/search-taggables.js" */
 /** @import {State} "../../page/pages.js" */
 
 /** 
@@ -12,14 +12,16 @@ import { State } from '../../page/pages.js';
  *  selectionButtonText: string
  *  searchType: "intersect" | "union"
  *  initialSelectedTags?: ClientSearchQuery[]
- *  modalResolve: (value: any) => void
  * }}
 */
-export default function TagSelectorModal({ titleText, selectionButtonText, searchType, initialSelectedTags, modalResolve }) {
+export default function TagSelectorModal({ titleText, selectionButtonText, searchType, initialSelectedTags }) {
     /** @type {State<ClientSearchQuery | null>} */
     const searchObjectsState = new State(null);
     initialSelectedTags ??= [];
 
+    let modalResolve;
+    /** @type {Promise<ClientSearchQuery>} */
+    const promiseValue = new Promise(resolve => { modalResolve = resolve; });
     
     return {
         component: (
@@ -40,6 +42,7 @@ export default function TagSelectorModal({ titleText, selectionButtonText, searc
                 }} />
             </div>
         ),
-        displayName: "Tag Selector"
+        displayName: "Tag Selector",
+        promiseValue
     };
 };

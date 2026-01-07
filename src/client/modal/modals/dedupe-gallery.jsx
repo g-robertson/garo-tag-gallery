@@ -1,8 +1,6 @@
 import LazyDedupeGallery from '../../components/lazy-dedupe-gallery.jsx';
 import '../../global.css';
 
-/** @import {ExtraProperties} from "../modals.js" */
-/** @import {Modal} from "../modals.js" */
 /** @import {DBFileComparison} from '../../../db/duplicates.js' */
 
 /** 
@@ -10,10 +8,9 @@ import '../../global.css';
  *  fileComparisons: DBFileComparison[]>
  *  initialFileComparisonIndex?: number
  *  persistentState?: any
- *  modalResolve: (value: any) => void
  * }}
 */
-export default function DedupeGalleryModal({ fileComparisons, initialFileComparisonIndex, persistentState, modalResolve }) {
+export default function DedupeGalleryModal({ fileComparisons, initialFileComparisonIndex, persistentState }) {
     return {
         component: (
             <div style={{width: "100%", height: "100%"}}>

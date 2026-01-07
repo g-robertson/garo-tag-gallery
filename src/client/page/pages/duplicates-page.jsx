@@ -179,13 +179,12 @@ const DuplicatesProcessingPage = ({page}) => {
         if (fileComparisonIndices.length > 1) {
             fileComparisons = fileComparisonIndices.map(index => fileComparisons[index]);
         }
-        
-        if (dedupeGalleryState.get("fileComparisonsEvaluated") !== undefined) {
+        if (!dedupeGalleryState.isClear()) {
             const REOPEN_BUTTON = 0;
             const COMMIT_BUTTON = 1;
             const DISCARD_BUTTON = 2;
 
-            const optionSelected = await Modals.Global().pushModal(({modalResolve}) => DialogBox({
+            const optionSelected = await Modals.Global().pushModal(DialogBox({
                 displayName: "Uncommitted Dedupe Gallery",
                 promptText: "You have an active dedupe gallery that is uncommitted. What do you wish to do with this gallery?",
                 optionButtons: [
@@ -201,13 +200,11 @@ const DuplicatesProcessingPage = ({page}) => {
                         value: DISCARD_BUTTON,
                         text: "Discard"
                     }
-                ],
-                modalResolve
+                ]
             }));
             if (optionSelected === REOPEN_BUTTON) {
-                Modals.Global().pushModal(({modalResolve}) => DedupeGalleryModal({
-                    persistentState: dedupeGalleryState,
-                    modalResolve
+                Modals.Global().pushModal(DedupeGalleryModal({
+                    persistentState: dedupeGalleryState
                 }));
                 return;
             }
@@ -220,10 +217,9 @@ const DuplicatesProcessingPage = ({page}) => {
                 return;
             }
         }
-        Modals.Global().pushModal(({modalResolve}) => DedupeGalleryModal({
+        Modals.Global().pushModal(DedupeGalleryModal({
             fileComparisons,
-            persistentState: dedupeGalleryState,
-            modalResolve
+            persistentState: dedupeGalleryState
         }));
     };
 

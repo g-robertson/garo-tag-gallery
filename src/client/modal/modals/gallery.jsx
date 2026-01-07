@@ -1,17 +1,13 @@
 import '../../global.css';
 import LazyGallery from '../../components/lazy-gallery.jsx';
 
-/** @import {ExtraProperties} from "../modals.js" */
-/** @import {Modal} from "../modals.js" */
-
 /** 
  * @param {{
  *  taggableIDs: number[]
  *  initialTaggableIndex?: number
- *  modalResolve: (value: any) => void
  * }}
 */
-export default function GalleryModal({ taggableIDs, initialTaggableIndex, modalResolve }) {
+export default function GalleryModal({ taggableIDs, initialTaggableIndex }) {
     return {
         component: (
             <div style={{width: "100%", height: "100%"}}>

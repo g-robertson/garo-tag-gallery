@@ -8,15 +8,7 @@ import { Modals } from '../../modal/modals.js';
 import { State } from '../../page/pages.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function UpdateLocalTagService({ extraProperties, modalResolve }) {
+export default function UpdateLocalTagService() {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 

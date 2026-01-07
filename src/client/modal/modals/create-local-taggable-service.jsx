@@ -4,15 +4,7 @@ import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
 import LocalTaggableServiceModifications from '../../components/local-taggable-service-modifications.jsx';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function CreateLocalTaggableService({ extraProperties, modalResolve }) {
+export default function CreateLocalTaggableService() {
     return {
         component: (
             <div>

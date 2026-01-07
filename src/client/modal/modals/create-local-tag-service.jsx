@@ -4,15 +4,7 @@ import LocalTagServiceModifications from '../../components/local-tag-service-mod
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function CreateLocalTagService({ extraProperties, modalResolve }) {
+export default function CreateLocalTagService() {
     return {
         component: (
             <div>

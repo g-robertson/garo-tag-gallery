@@ -48,11 +48,11 @@ const Navbar = () => {
                 {MENUS.File.react(<div className="topbar-dropdown-options" style={{display: "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(ImportFilesFromHydrus);
+                        Modals.Global().pushModal(ImportFilesFromHydrus());
                     }}>Import files from Hydrus</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(ImportMappingsFromBackup);
+                        Modals.Global().pushModal(ImportMappingsFromBackup());
                     }}>Import mappings from backup</div>
                     <a href="/api/get/backup" download="garo-backup.json"><div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
@@ -80,11 +80,11 @@ const Navbar = () => {
                 {MENUS.Tags.react(<div className="topbar-dropdown-options" style={{display: "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(CreateLocalTagService);
+                        Modals.Global().pushModal(CreateLocalTagService());
                     }}>Create new tag service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(UpdateLocalTagService);
+                        Modals.Global().pushModal(UpdateLocalTagService());
                     }}>Update/delete existing tag service</div>
                 </div>)}
             </div>
@@ -93,11 +93,11 @@ const Navbar = () => {
                 {MENUS.Taggables.react(<div className="topbar-dropdown-options" style={{display: "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(CreateLocalTaggableService);
+                        Modals.Global().pushModal(CreateLocalTaggableService());
                     }}>Create new taggable service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(UpdateLocalTaggableService);
+                        Modals.Global().pushModal(UpdateLocalTaggableService());
                     }}>Update/delete existing taggable service</div>
                 </div>)}
             </div>
@@ -106,23 +106,23 @@ const Navbar = () => {
                 {MENUS.Metrics.react(<div className="topbar-dropdown-options" style={{display: "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(CreateLocalMetricService);
+                        Modals.Global().pushModal(CreateLocalMetricService());
                     }}>Create new metric service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(UpdateLocalMetricService);
+                        Modals.Global().pushModal(UpdateLocalMetricService());
                     }}>Update/delete existing metric service</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(CreateLocalMetric);
+                        Modals.Global().pushModal(CreateLocalMetric());
                     }}>Create new metric</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(UpdateLocalMetric);
+                        Modals.Global().pushModal(UpdateLocalMetric());
                     }}>Update/delete existing metric</div>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(ChangeTagToMetricModal);
+                        Modals.Global().pushModal(ChangeTagToMetricModal());
                     }}>Change tag to metric</div>
                 </div>)}
             </div>
@@ -131,7 +131,7 @@ const Navbar = () => {
                 {MENUS.Parsers.react(<div className="topbar-dropdown-options" style={{display: "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(CreateURLGeneratorService);
+                        Modals.Global().pushModal(CreateURLGeneratorService());
                     }}>Create new URL generator service</div>
                     
                 </div>)}

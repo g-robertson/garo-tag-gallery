@@ -65,11 +65,10 @@ const FileSearchPageElement = ({page}) => {
             </div>
             <div style={{width: "auto", flex: 3, flexDirection: "column", height: "100%"}}>
                 <div>
-                    {ModifySelectedTaggablesButton.react(<input type="button" value="Modify selected taggables" onClick={async () => {
-                        await Modals.Global().pushModal(({modalResolve}) => ModifyTaggablesModal({
+                    {ModifySelectedTaggablesButton.react(<input type="button" value="Modify selected taggables" onClick={() => {
+                        Modals.Global().pushModal(ModifyTaggablesModal({
                             taggableCursorConstState,
                             taggableIDsConstState: selectedTaggableIDsState.asConst(),
-                            modalResolve
                         }));
                     }} />)}
                     {TrashSelectedTaggablesButton.react(<input type="button" value="Trash selected taggables" onClick={() => {
@@ -94,16 +93,14 @@ const FileSearchPageElement = ({page}) => {
                                 const taggableIDsToShow = taggableIDs.filter((_, index) => indicesSet.has(index));
                                 const initialTaggableIndex = taggableIDsToShow.findIndex(taggable => taggable === taggableIDs[indexClicked]);
 
-                                Modals.Global().pushModal(({modalResolve}) => GalleryModal({
+                                Modals.Global().pushModal(GalleryModal({
                                     taggableIDs: taggableIDsToShow,
-                                    initialTaggableIndex,
-                                    modalResolve
+                                    initialTaggableIndex
                                 }));
                             } else if (indices.length === 1) {
-                                Modals.Global().pushModal(({modalResolve}) => GalleryModal({
+                                Modals.Global().pushModal(GalleryModal({
                                     taggableIDs: taggableIDs,
-                                    initialTaggableIndex: indexClicked,
-                                    modalResolve
+                                    initialTaggableIndex: indexClicked
                                 }));
                             }
                         }}

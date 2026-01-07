@@ -1,28 +1,27 @@
 import '../../global.css';
 import TagSelectorModal from './tag-selector-modal.jsx';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
 /** 
  * @param {{
  *  titleText?: string
  *  selectionButtonText?: string
  *  initialSelectedTags?: ClientSearchQuery[]
- *  modalResolve: (value: any) => void
  * }}
 */
-export default function CreateOrSearchGroup({ titleText, selectionButtonText, initialSelectedTags, modalResolve }) {
+export default function CreateOrSearchGroup({ titleText, selectionButtonText, initialSelectedTags }) {
     titleText ??= "Select tags for your OR group:";
     selectionButtonText ??= "Select OR Group";
 
+    const tagSelectorModal = TagSelectorModal({
+        searchType: "union",
+        titleText,
+        selectionButtonText,
+        initialSelectedTags,
+    });
+
     return {
-        component: TagSelectorModal({
-            searchType: "union",
-            titleText,
-            selectionButtonText,
-            initialSelectedTags,
-            modalResolve
-        }).component,
-        displayName: "Create OR search group"
+        component: tagSelectorModal.component,
+        displayName: "Create OR search group",
+        promiseValue: tagSelectorModal.promiseValue
     };
 };

@@ -1,20 +1,19 @@
 import DualListboxLazyTextObjectSelector from '../../components/dual-listbox-lazy-text-object-selector.jsx';
 import '../../global.css';
-import { executeFunctions } from '../../js/client-util.js';
 import { Modals } from '../../modal/modals.js';
 import { State } from '../../page/pages.js';
-
-/** @import {ExtraProperties} from "../modals.js" */
-/** @import {Modal} from "../modals.js" */
 
 /** 
  * @param {{
  *  tags: any[]
- *  modalResolve: (value: any) => void
  * }}
 */
-export default function SelectFromListOfTags({ tags, modalResolve }) {
+export default function SelectFromListOfTags({ tags }) {
     const selectedTagsState = new State(new Set());
+
+    let modalResolve;
+    /** @type {Promise<any[]>} */
+    const promiseValue = new Promise(resolve => { modalResolve = resolve; });
 
     return {
         component: (
@@ -35,6 +34,7 @@ export default function SelectFromListOfTags({ tags, modalResolve }) {
                 }} />
             </div>
         ),
-        displayName: "Select list of tags"
+        displayName: "Select list of tags",
+        promiseValue
     };
 };

@@ -7,17 +7,10 @@ import { User } from '../../js/user.js';
 import { State } from '../../page/pages.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
 /** @import {State} from "../../page/pages.js" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function ChangeTagToMetricModal({ extraProperties, modalResolve }) {
+export default function ChangeTagToMetricModal() {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 

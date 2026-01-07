@@ -1,9 +1,6 @@
 import '../../global.css';
 import { Modals } from '../../modal/modals.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
-/** @import {Modal} from "../modals.js" */
-
 /**
  * @template T
  * @typedef {Object} OptionButton
@@ -17,10 +14,13 @@ import { Modals } from '../../modal/modals.js';
  *  displayName?: string
  *  promptText: string
  *  optionButtons: OptionButton<T>[]
- *  modalResolve: (value: T) => void
  * }} param0
 */
-export default function DialogBox({ displayName, promptText, optionButtons, modalResolve }) {
+export default function DialogBox({ displayName, promptText, optionButtons }) {
+    let modalResolve;
+    /** @type {Promise<T>} */
+    const promiseValue = new Promise(resolve => { modalResolve = resolve; });
+
     return {
         component: (
             <div className="dialog-box-modal" style={{flexDirection: "column", margin: 4}}>
@@ -40,6 +40,7 @@ export default function DialogBox({ displayName, promptText, optionButtons, moda
             </div>
         ),
         displayName: displayName ?? "Dialog Box",
-        shrinkToContent: true
+        shrinkToContent: true,
+        promiseValue
     };
 };

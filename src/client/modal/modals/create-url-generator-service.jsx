@@ -3,15 +3,7 @@ import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function CreateURLGeneratorService({ extraProperties, modalResolve }) {
+export default function CreateURLGeneratorService() {
     return {
         component: (
             <div>

@@ -1,14 +1,13 @@
 import '../../global.css';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import DialogBox from './dialog-box.jsx';
-import { executeFunctions, mapNullCoalesce } from '../../js/client-util.js';
+import { mapNullCoalesce } from '../../js/client-util.js';
 import { updateTaggables } from '../../../api/client-get/update-taggables.js';
 import { Modals } from '../modals.js';
 import { State } from '../../page/pages.js';
 import { User } from '../../js/user.js';
 
 /** @import {ConstState, State} from "../../page/pages.js" */
-/** @import {ExtraProperties} from "../modals.js" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 const UNKNOWN_OP_TAGS = -1;
@@ -19,10 +18,9 @@ const REMOVE_TAGS = 1;
  * @param {{
  *  taggableCursorConstState: ConstState<string>
  *  taggableIDsConstState: ConstState<number[]>
- *  modalResolve: (value: any) => void
  * }}
 */
-export default function ModifyTaggablesModal({ taggableCursorConstState, taggableIDsConstState, modalResolve }) {
+export default function ModifyTaggablesModal({ taggableCursorConstState, taggableIDsConstState }) {
     const localTagServicesConstState = User.Global().localTagServicesState();
     /** @type {State<Set<number>>} */
     const selectedLocalTagServiceIDsState = new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID)));
@@ -64,7 +62,7 @@ export default function ModifyTaggablesModal({ taggableCursorConstState, taggabl
                                 } else if (definitelyRemove) {
                                     operationToPerform = REMOVE_TAGS;
                                 } else {
-                                    const addOrRemove = await Modals.Global().pushModal(({modalResolve}) => DialogBox({
+                                    const addOrRemove = await Modals.Global().pushModal(DialogBox({
                                         displayName: "Add or remove tags",
                                         promptText: "This set of taggables already has some of the tag(s) you selected, do you wish to add or remove these tags?",
                                         optionButtons: [{
@@ -73,8 +71,7 @@ export default function ModifyTaggablesModal({ taggableCursorConstState, taggabl
                                         }, {
                                             text: "Remove tags",
                                             value: REMOVE_TAGS
-                                        }],
-                                        modalResolve
+                                        }]
                                     }));
                                     if (addOrRemove === undefined) {
                                         return;

@@ -92,7 +92,11 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
     const commitChanges = () => {
         persistentState.clear();
         Modals.Global().popModal();
-    }
+    };
+
+    const closeGallery = () => {
+
+    };
 
     return <div onAdd={onAdd} style={{width: "100%", height: "100%"}}>
         {imagePreloader.reactElement()}
@@ -130,14 +134,13 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
                 const OPTION_COMMIT_CHANGES = 1;
                 const OPTION_GO_BACK = 2;
 
-                const optionSelected = await Modals.Global().pushModal(({modalResolve}) => DialogBox({
+                const optionSelected = await Modals.Global().pushModal(DialogBox({
                     displayName: "Commit changes",
                     promptText: "You have finished processing the selected duplicates, select commit to commit your selections",
                     optionButtons: [
                         {text: "Commit", value: OPTION_COMMIT_CHANGES},
                         {text: "Go Back", value: OPTION_GO_BACK},
-                    ],
-                    modalResolve
+                    ]
                 }));
 
                 if (optionSelected === OPTION_COMMIT_CHANGES) {

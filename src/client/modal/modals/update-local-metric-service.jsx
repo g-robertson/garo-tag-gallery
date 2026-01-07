@@ -8,31 +8,23 @@ import { Modals } from '../../modal/modals.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 import { State } from '../../page/pages.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function UpdateLocalMetricService({ extraProperties, modalResolve }) {
+export default function UpdateLocalMetricService() {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
     const ModifySelectedMetricService = ReferenceableReact();
     const DeleteSelectedMetricService = ReferenceableReact();
-    const selectedLocalMetricServiceRef = new State(User.Global().localMetricServices()[0]);
+    const selectedLocalMetricServiceState = new State(User.Global().localMetricServices()[0]);
 
     const onAdd = () => {
         const onLocalMetricServiceSelected = () => {
-            const inputsDisabled = selectedLocalMetricServiceRef.get() === undefined;
+            const inputsDisabled = selectedLocalMetricServiceState.get() === undefined;
             ModifySelectedMetricService.dom.disabled = inputsDisabled;
             DeleteSelectedMetricService.dom.disabled = inputsDisabled;
         };
         onLocalMetricServiceSelected();
 
-        selectedLocalMetricServiceRef.addOnUpdateCallback(onLocalMetricServiceSelected, addToCleanup);
+        selectedLocalMetricServiceState.addOnUpdateCallback(onLocalMetricServiceSelected, addToCleanup);
         return () => executeFunctions(addToCleanup);
     };
 
@@ -41,8 +33,8 @@ export default function UpdateLocalMetricService({ extraProperties, modalResolve
         component: (
             <div onAdd={onAdd} style={{flexDirection: "column"}}>
                 <form action="/api/post/update-local-metric-service" target="frame" method="POST">
-                    <LocalMetricServiceSelector selectedLocalMetricServiceRef={selectedLocalMetricServiceRef} />
-                    <LocalMetricServiceModifications selectedLocalMetricServiceConstState={selectedLocalMetricServiceRef} />
+                    <LocalMetricServiceSelector selectedLocalMetricServiceState={selectedLocalMetricServiceState} />
+                    <LocalMetricServiceModifications selectedLocalMetricServiceConstState={selectedLocalMetricServiceState} />
                     <div style={{marginLeft: "8px"}}>
                         {ModifySelectedMetricService.react(<input type="submit" value="Modify selected metric service" />)}
                     </div>
@@ -52,7 +44,7 @@ export default function UpdateLocalMetricService({ extraProperties, modalResolve
                         const confirm = window.confirm("Are you sure you want to delete this metric service?\nWARNING: This will remove every Metric that exists under this metric service");
                         if (confirm) {
                             (async () => {
-                                await deleteLocalMetricService(selectedLocalMetricServiceRef.get().Local_Metric_Service_ID);
+                                await deleteLocalMetricService(selectedLocalMetricServiceState.get().Local_Metric_Service_ID);
                                 User.refreshGlobal();
                                 Modals.Global().popModal();
                             })();

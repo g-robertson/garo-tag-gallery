@@ -23,7 +23,7 @@ import CreateMetricTag from "../../client/modal/modals/create-metric-tag.jsx";
 
 /**
  * @param {string} displayName
- * @param {(resolve: ) => Modal} modal
+ * @param {() => Modal} modal
  * @returns {ClientQueryTag}
  */
 function modalSystemClientQueryTag(displayName, modal) {

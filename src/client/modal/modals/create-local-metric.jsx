@@ -5,15 +5,7 @@ import LocalMetricModifications from '../../components/local-metric-modification
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
-
-/** 
- * @param {{
- *  extraProperties: ExtraProperties<any>
- *  modalResolve: (value: any) => void
- * }}
-*/
-export default function CreateLocalMetric({ extraProperties, modalResolve }) {
+export default function CreateLocalMetric() {
     return {
         component: <div>
             <form action="/api/post/create-local-metric" target="frame" method="POST">
