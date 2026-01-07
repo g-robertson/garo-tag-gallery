@@ -5,19 +5,24 @@ import TagSelectorModal from './tag-selector-modal.jsx';
 
 /** 
  * @param {{
- *  extraProperties: ExtraProperties
+ *  titleText?: string
+ *  selectionButtonText?: string
+ *  initialSelectedTags?: ClientSearchQuery[]
  *  modalResolve: (value: any) => void
  * }}
 */
-export default function CreateAndSearchGroup({extraProperties, modalResolve}) {
-    return TagSelectorModal({
-        extraProperties: {
-            ...extraProperties,
-            displayName: "Create AND search group",
+export default function CreateAndSearchGroup({ titleText, selectionButtonText, initialSelectedTags, modalResolve }) {
+    titleText ??= "Select tags for your AND group:";
+    selectionButtonText ??= "Select AND Group";
+
+    return {
+        component: TagSelectorModal({
             searchType: "intersect",
-            titleText: extraProperties.titleText ?? "Select tags for your AND group:",
-            selectionButtonText: extraProperties.selectionButtonText ?? "Select AND Group"
-        },
-        modalResolve
-    });
+            titleText,
+            selectionButtonText,
+            initialSelectedTags,
+            modalResolve
+        }).component,
+        displayName: "Create AND search group",
+    };
 };

@@ -31,7 +31,7 @@ async function main() {
         //await driver.manage().window().setRect({width: 1920, height: 1080});
         const logInspector = await LogInspector(driver);
         logInspector.onLog(e => {
-            logs.push(e)
+            logs.push(e);
         });
         //await driver.manage().window().setRect({width: 1920, height: 1080, x: 0, y: 0});
         await executeTestSuite(driver, logs);

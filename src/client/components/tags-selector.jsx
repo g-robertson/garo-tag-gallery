@@ -73,7 +73,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchCh
                             } else {
 
                             }
-                            const orGroupSearchQuery = await Modals.Global().pushModal(CreateOrSearchGroup, {initialSelectedTags});
+                            const orGroupSearchQuery = await Modals.Global().pushModal(({modalResolve}) => CreateOrSearchGroup({initialSelectedTags, modalResolve}));
                             if (orGroupSearchQuery === null || orGroupSearchQuery === undefined) {
                                 return;
                             }

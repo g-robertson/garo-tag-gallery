@@ -11,8 +11,8 @@ import { Modals } from './modals.js';
  * @returns 
  */
 const ModalElement = ({modalInstance, index}) => {
-    const modal = modalInstance.modal({extraProperties: modalInstance.extraProperties, modalResolve: modalInstance.resolve});
-    const displayName = modalInstance.extraProperties.displayName ?? modal.displayName;
+    const modal = modalInstance.modal({modalResolve: modalInstance.resolve});
+    const displayName = modal.displayName;
     const hasTopbar = modal.hasTopbar ?? true;
     const hasBorder = modal.hasBorder ?? true;
     const width = modal.width ?? 80;

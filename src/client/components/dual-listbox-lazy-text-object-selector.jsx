@@ -66,7 +66,6 @@ const DualListboxLazyTextObjectSelector = ({
                             if (selectedItems.has(item)) {
                                 selectedItems.delete(item);
                             } else {
-                                console.log("added ", item);
                                 selectedItems.add(item);
                             }
                         }

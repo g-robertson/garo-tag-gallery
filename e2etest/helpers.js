@@ -97,7 +97,7 @@ export const BY_DEDUPE_PREVIEW_GALLERY_IMAGE = xpathHelper({attrContains: {"clas
  * @param {number=} imageNumber
  */
 export async function findDedupePreviewGalleryImages(driver) {
-    return driver.findElements(BY_DEDUPE_PREVIEW_GALLERY_IMAGE);
+    return await driver.findElements(BY_DEDUPE_PREVIEW_GALLERY_IMAGE);
 }
 
 /**
@@ -108,6 +108,16 @@ export async function findDedupePreviewGalleryImage(driver, imageNumber) {
     imageNumber ??= 0;
     const images = await findDedupePreviewGalleryImages(driver);
     return images[imageNumber];
+}
+
+export const BY_DEDUPE_GALLERY_IMAGE = xpathHelper({attrContains: {"class": "gallery-content"}});
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function findDedupeGalleryImage(driver) {
+    const image = await driver.findElement(BY_DEDUPE_GALLERY_IMAGE);
+    return image;
 }
 
 /**
@@ -169,6 +179,13 @@ export const UNTIL_JOB_BEGIN = until.elementLocated(By.className("job"));
 export const UNTIL_JOB_END = untilElementsNotLocated(By.className("job"));
 export const UNTIL_JOB_ERROR = until.elementLocated(By.className("job-error"));
 
+/**
+ * @param {ThenableWebDriver} driver 
+ * @param {string} option 
+ */
+export async function pressDialogBoxOption(driver, option) {
+    await driver.findElement(xpathHelper({attrContains: {"class": "dialog-box-modal"}, descendent: {type: "input", attrEq: {value: option}}})).click();
+}
 
 /**
  * @param {WebElement} localTagsSelector
@@ -411,14 +428,6 @@ export async function rmDownloadedFile(filePath) {
 
 /**
  * @param {ThenableWebDriver} driver
- * @param {string} keys
- */
-export async function sendKeys(driver, keys) {
-    await driver.actions({async: true}).sendKeys(keys).perform();
-}
-
-/**
- * @param {ThenableWebDriver} driver
  * @param {WebElement} element 
  */
 export async function mouseOver(driver, element) {
@@ -516,7 +525,6 @@ export async function doubleClick(driver, element) {
 }
 
 /**
- * 
  * @param {ThenableWebDriver} driver
  * @param {WebElement} element
  * @param {number} deltaY 
@@ -534,6 +542,15 @@ export async function scroll(driver, element, deltaY, scrollCount) {
         arguments[arguments.length - 1]();
     `, element, deltaY, scrollCount);
 }
+
+/**
+ * @param {ThenableWebDriver} driver
+ * @param {string} keys
+ */
+export async function sendKeys(driver, keys) {
+    await driver.actions({async: true}).sendKeys(keys).perform();
+}
+
 
 /**
  * @param {WebElement} element 

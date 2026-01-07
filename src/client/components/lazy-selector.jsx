@@ -1,5 +1,5 @@
 import '../global.css';
-import { clamp, executeFunctions, RealizationMap, ReferenceableReact, setToggle } from '../js/client-util.js';
+import { clamp, executeFunctions, NumericAscendingSort, RealizationMap, ReferenceableReact, setToggle } from '../js/client-util.js';
 import { State } from '../page/pages.js';
 import Scrollbar from './scrollbar.jsx';
 
@@ -51,7 +51,8 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[], indices: number[]) => void
  *  onValuesDoubleClicked?: (realizedValuesSelected: Awaited<R>[], indices: number[], indexClicked: number) => void
  *  valuesRealizer: ((values: T[]) => Promise<R[]>) | ((values: T[]) => R[])
- *  onValuesRangeRealized: (realizedValues: R[]) => void
+ *  onValuesRangeRealized?: (realizedValues: R[]) => void
+ *  onSelectedPastEnd?: () => void
  *  realizeSelectedValues?: boolean
  *  valueRealizationRange?: number
  *  valueRealizationDelay?: number
@@ -75,6 +76,7 @@ function LazySelector({
     onValuesDoubleClicked,
     valuesRealizer,
     onValuesRangeRealized,
+    onSelectedPastEnd,
     realizeSelectedValues,
     valueRealizationRange,
     valueRealizationDelay,
@@ -98,6 +100,7 @@ function LazySelector({
     onValuesSelected ??= () => {};
     realizeSelectedValues ??= true;
     onValuesRangeRealized ??= () => {};
+    onSelectedPastEnd ??= () => {};
     valueRealizationRange ??= 5;
     valueRealizationDelay ??= 200;
     realizeMinimumCount ??= 0;
@@ -218,14 +221,15 @@ function LazySelector({
             if (realizedValuesState.get() !== realizedValues) {
                 realizedValuesState.set(realizedValues);
             }
-            return;
+            return false;
+        }
+
+        for (const absentValue of absentValues) {
+            realizedValues.setAwaiting(absentValue.index);
         }
 
         const valuesPromise = valuesRealizer(absentValues.map(absentValue => absentValue.value));
         if (valuesPromise instanceof Promise) {
-            for (const absentValue of absentValues) {
-                realizedValues.setAwaiting(absentValue.index);
-            }
 
             const valuesAwaited = await valuesPromise;
 
@@ -242,7 +246,11 @@ function LazySelector({
 
         if (localValuesRealizationSyncState === valuesRealizationSyncState.get()) {
             realizedValuesState.set(realizedValues);
+            return true;
+        } else {
+            return false;
         }
+
     }
 
     /**
@@ -270,8 +278,10 @@ function LazySelector({
         for (let i = realizationRangeFrom; i <= realizationRangeTo; ++i) {
             allIndices.add(i);
         }
-        await setToRealize(forcedIndices, allIndices, realizedValues);
-        onValuesRangeRealized([...allIndices].map(index => realizedValues.getOrThrow(index)));
+        const realized = await setToRealize(forcedIndices, allIndices, realizedValues);
+        if (realized) {
+            onValuesRangeRealized([...allIndices].map(index => realizedValues.getOrThrow(index)));
+        }
     };
 
     const onAdd = () => {
@@ -335,7 +345,7 @@ function LazySelector({
                 }
             }
 
-            onValuesSelected(realizedValuesSelected, [...selectedIndicesState.get()]);
+            onValuesSelected(realizedValuesSelected, [...selectedIndicesState.get()].sort(NumericAscendingSort));
         };
         selectedIndicesState.addOnUpdateCallback(onSelectedIndicesChanged, addToCleanup);
         selectedIndicesState.addOnUpdateCallback(onRowItemsSelectedChanged, addToCleanup);
@@ -554,6 +564,8 @@ function LazySelector({
                 selectedIndices.clear();
                 selectedIndices.add(newIndex);
                 selectedIndicesState.forceUpdate();
+            } else if (changeAmount > 0) {
+                onSelectedPastEnd();        
             }
         }
 

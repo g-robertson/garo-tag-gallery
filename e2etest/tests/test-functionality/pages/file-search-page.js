@@ -53,6 +53,20 @@ export const FILE_SEARCH_PAGE_TESTS = [
         await driver.findElement(ByMultiSelectOption("Default local tags")).click();
         await driver.wait(until.elementsLocated(BySelectableTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
     }},
+    {name: "ClosingOtherPageShouldNotRemovePersistence", tests: async (driver) => {
+        await createNewFileSearchPage(driver);
+        await driver.findElement(xpathHelper({attrEq: {"class": "page-topbar-right"}, descendent: {attrEq: {"class": "page-cancel"}}})).click();
+        await driver.wait(untilCountElementsLocated(ByPage, 1), DEFAULT_TIMEOUT_TIME);
+        
+        await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
+        await driver.wait(until.elementLocated(BySearchTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
+
+        await driver.navigate().refresh();
+        await driver.wait(untilCountElementsLocatedNotEquals(ByPage, 0));
+
+        await selectPage(driver, 0);
+        await selectTagFromTagSearchQuery(driver, TEST_TAG_1);
+    }},
     {name: "RightClosePageButtonShouldWork", tests: async (driver) => {
         await createNewFileSearchPage(driver);
         await driver.findElement(xpathHelper({attrEq: {"class": "page-topbar-right"}, descendent: {attrEq: {"class": "page-cancel"}}})).click();
@@ -94,7 +108,10 @@ export const FILE_SEARCH_PAGE_TESTS = [
                 await selectTagFromTagSearchQuery(driver, tagTitle);
             }},
             {name: "ScrollingTagsFunctions", tests: async (driver) => {
-                await driver.wait(until.elementLocated(BySelectableTag(TEST_TAG_1)));
+                await applyTagFilter(driver, "CLEAR SELECTION");
+                await applyTagFilter(driver, "");
+
+                await driver.wait(until.elementLocated(BySelectableTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
 
                 const selectableContents = await driver.findElement(xpathHelper({attrEq: {"class": "local-tags-selector"}, descendent: {attrEq: {"class": "lazy-selector-selectable-contents"}}}));
                 await scroll(driver, selectableContents, 10, 10);
@@ -137,7 +154,36 @@ export const FILE_SEARCH_PAGE_TESTS = [
                 await driver.findElement(BySelectableTag(TEST_TAG_1)).click();
                 await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_3)), {ctrl: true, shift: true});
                 await driver.wait(untilCountElementsLocated(BySelectedTag(), 5), DEFAULT_TIMEOUT_TIME);
+                
+                await applyTagFilter(driver, "CLEAR SELECTION");
+                await applyTagFilter(driver, "");
             }},
+        ]},
+        {name: "TagSearchPersistsUponDoubleReload", tests: async (driver) => {
+            await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
+            await driver.wait(until.elementLocated(BySearchTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
+
+            await driver.navigate().refresh();
+            await driver.wait(untilCountElementsLocatedNotEquals(ByPage, 0));
+            await driver.navigate().refresh();
+            await driver.wait(untilCountElementsLocatedNotEquals(ByPage, 0));
+
+            await selectPage(driver, 0);
+            await selectTagFromTagSearchQuery(driver, TEST_TAG_1);
+        }},
+        {name: "TagSearchPersistsUponPageSwitch", tests: [
+            {name: "Setup", isSetup: true, tests: async (driver) => {
+                await createNewFileSearchPage(driver);
+            }},
+            {name: "Teardown", isTeardown: true, tests: async (driver) => {
+                await closePage(driver, 1);
+            }},
+            {name: "TagSearchPersistsUponPageSwitchWorks", tests: async (driver) => {
+                await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
+                await selectPage(driver, 0);
+                await selectPage(driver, 1);
+                await driver.wait(until.elementLocated(BySearchTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
+            }}
         ]},
         {name: "TagSelectionUpdatesSearchQuery", tests: async (driver) => {
             await applyTagFilter(driver, "CLEAR SELECTION");

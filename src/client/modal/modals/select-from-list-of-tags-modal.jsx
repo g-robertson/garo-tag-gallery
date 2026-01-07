@@ -9,13 +9,11 @@ import { State } from '../../page/pages.js';
 
 /** 
  * @param {{
- *  extraProperties: ExtraProperties<{
- *      tags: any[]
- *  }>
+ *  tags: any[]
  *  modalResolve: (value: any) => void
  * }}
 */
-export default function SelectFromListOfTags({ extraProperties, modalResolve }) {
+export default function SelectFromListOfTags({ tags, modalResolve }) {
     const selectedTagsState = new State(new Set());
 
     return {
@@ -24,7 +22,7 @@ export default function SelectFromListOfTags({ extraProperties, modalResolve }) 
                 Select from list of tags:
                 <div style={{width: "100%", height: "100%"}}>
                     <DualListboxLazyTextObjectSelector
-                        items={extraProperties.tags}
+                        items={tags}
                         selectedItemsState={selectedTagsState}
                         customItemSelectorComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
                         customItemSelectedComponent={({realizedValue}) => <>{realizedValue.displayName}</>}

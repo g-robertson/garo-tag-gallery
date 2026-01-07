@@ -99,6 +99,9 @@ export class State {
         }
     }
 
+    /**
+     * @param {T} value 
+     */
     set(value) {
         const previousValue = this.#valueRef.ref;
         this.#valueRef.ref = value;
@@ -369,7 +372,7 @@ export class PersistentState {
     }
     
     toJSON() {
-        const jsonState = {};
+        const jsonState = this.#priorState;
         for (const [key, state] of this.#states) {
             if (state instanceof PersistentState) {
                 jsonState[key] = state.toJSON();
@@ -377,7 +380,7 @@ export class PersistentState {
                 jsonState[key] = state.get();
             }
         }
-        
+
         return jsonState;
     }
 
@@ -409,16 +412,21 @@ export class PersistentState {
             }
         }
         
+        if (this.#states.has(key)) {
+            state = this.#states.get(key);
+        } else {
+            this.#states.set(key, state);
+        }
+
         if (options.isSaved === true) {
             this.#savedKeys.add(key);
         }
 
-        this.#states.set(key, state);
         if (this.#priorState[key] !== undefined) {
             state.set(this.#priorState[key]);
             delete this.#priorState[key];
         }
-        state.addOnUpdateCallback(this.#onUpdate.bind(this), options.addToCleanup, {...options, requireChangeForUpdate: true});
+        state.addOnUpdateCallback(this.#onUpdate.bind(this), options.addToCleanup, {...options});
         return state;
     }
 

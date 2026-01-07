@@ -14,23 +14,22 @@ import { Modals } from '../../modal/modals.js';
 /** 
  * @template T
  * @param {{
- *  extraProperties: ExtraProperties<{
- *      promptText: string
- *      optionButtons: OptionButton<T>[]
- *  }>
+ *  displayName?: string
+ *  promptText: string
+ *  optionButtons: OptionButton<T>[]
  *  modalResolve: (value: T) => void
  * }} param0
 */
-export default function DialogBox({ extraProperties, modalResolve }) {
+export default function DialogBox({ displayName, promptText, optionButtons, modalResolve }) {
     return {
         component: (
-            <div style={{flexDirection: "column", margin: 4}}>
+            <div className="dialog-box-modal" style={{flexDirection: "column", margin: 4}}>
                 <div>
-                    {extraProperties.promptText}
+                    {promptText}
                 </div>
                 <div style={{flexDirection: "row-reverse", marginTop: 16}}>
                     <div>
-                        {extraProperties.optionButtons.map(optionButton => (
+                        {optionButtons.map(optionButton => (
                             <input type="button" value={optionButton.text} onClick={() => {
                                 modalResolve(optionButton.value);
                                 Modals.Global().popModal();
@@ -40,7 +39,7 @@ export default function DialogBox({ extraProperties, modalResolve }) {
                 </div>
             </div>
         ),
-        displayName: "Dialog Box",
+        displayName: displayName ?? "Dialog Box",
         shrinkToContent: true
     };
 };

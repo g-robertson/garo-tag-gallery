@@ -19,11 +19,10 @@ import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
 /** 
  * @param {{
- *  extraProperties: ExtraProperties
  *  modalResolve: (value: any) => void
  * } param0}
 */
-export default function CreateAggregateTag({extraProperties, modalResolve}) {
+export default function CreateAggregateTag({modalResolve}) {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
@@ -117,9 +116,7 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                                 }
                             }
                             
-                            const notInTagList = await Modals.Global().pushModal(SelectFromListOfTags, {
-                                tags
-                            });
+                            const notInTagList = await Modals.Global().pushModal(({modalResolve}) => SelectFromListOfTags({tags, modalResolve}));
                             if (notInTagList === null || notInTagList === undefined) {
                                 return;
                             }
@@ -143,9 +140,10 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                                 <NumericInput selectedNumberState={countValueState} />
                             </div></div>
                             {TagOccurrencesCountSpecifyQuery.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify query" onClick={async () => {
-                                const searchQuery = await Modals.Global().pushModal(CreateAndSearchGroup, {
-                                    selectionButtonText: `Select query that ${countComparatorState.get()}${countValueState.get()} taggables must match`
-                                });
+                                const searchQuery = await Modals.Global().pushModal(({modalResolve}) => CreateAndSearchGroup({
+                                    selectionButtonText: `Select query that ${countComparatorState.get()}${countValueState.get()} taggables must match`,
+                                    modalResolve
+                                }));
 
                                 if (searchQuery === undefined) {
                                     return;
@@ -177,9 +175,11 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                                 />
                             </div></div>
                             {TagOccurrencesPercentageSpecifyQuery.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify query" onClick={async () => {
-                                const searchQuery = await Modals.Global().pushModal(CreateAndSearchGroup, {
-                                    selectionButtonText: `Select query that ${percentageComparatorState.get()}${percentageValueState.get()}% of taggables must match`
-                                });
+                                const searchQuery = await Modals.Global().pushModal(({modalResolve}) => CreateAndSearchGroup({
+                                    selectionButtonText: `Select query that ${percentageComparatorState.get()}${percentageValueState.get()}% of taggables must match`,
+                                    modalResolve
+                                }));
+
                                 if (searchQuery === undefined || searchQuery.value.length === 0) {
                                     return;
                                 }
@@ -210,12 +210,14 @@ export default function CreateAggregateTag({extraProperties, modalResolve}) {
                                 />
                             </div></div>
                             {TagOccurrencesPercentageSpecifyQueries.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify queries" onClick={async () => {
-                                const searchQuery = await Modals.Global().pushModal(CreateAndSearchGroup, {
-                                    selectionButtonText: "Select query that will filter taggables"
-                                });
-                                const secondSearchQuery = await Modals.Global().pushModal(CreateAndSearchGroup, {
-                                    selectionButtonText: `Select query that ${percentageOfSecondQueryComparatorState.get()}${percentageOfSecondQueryValueState.get()}% of filtered taggables must match`
-                                });
+                                const searchQuery = await Modals.Global().pushModal(({modalResolve}) => CreateAndSearchGroup({
+                                    selectionButtonText: "Select query that will filter taggables",
+                                    modalResolve
+                                }));
+                                const secondSearchQuery = await Modals.Global().pushModal(({modalResolve}) => CreateAndSearchGroup({
+                                    selectionButtonText: `Select query that ${percentageOfSecondQueryComparatorState.get()}${percentageOfSecondQueryValueState.get()}% of filtered taggables must match`,
+                                    modalResolve
+                                }));
                                 if (searchQuery === undefined || searchQuery.value.length === 0 || secondSearchQuery === undefined || secondSearchQuery.value.length === 0) {
                                     return;
                                 }

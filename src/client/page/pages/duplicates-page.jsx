@@ -60,10 +60,10 @@ const DuplicatesProcessingPage = ({page}) => {
     const PotentialDuplicateFileCount = ReferenceableReact();
 
     const dedupeGalleryState = page.persistentState.registerState("dedupeGallery", new PersistentState());
-    
     const maxSearchDistanceState = page.persistentState.registerState("maxSearchDistance", new State(REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER), {isSaved: true, addToCleanup});
     
     const clientSearchQueryState = new State(null);
+    /** @type {State<number[]>} */
     const localTagServiceIDsState = new State([]);
     const searchTaggablesResultConstState = page.persistentState.registerState("searchTaggablesResult", FetchCache.Global().searchTaggablesConstState(
         clientSearchQueryState,
@@ -87,6 +87,9 @@ const DuplicatesProcessingPage = ({page}) => {
         addToCleanup,
         {waitForSet: true}
     );
+
+    /** @type {State<number[]>} */
+    const potentialDuplicateIndicesSelectedState = new State([]);
 
     const potentialDuplicateFileComparisonsPendingConstState = potentialDuplicateFileComparisonsConstState.asTransform(potentialDuplicateFileComparisons => (
         potentialDuplicateFileComparisons
@@ -169,16 +172,21 @@ const DuplicatesProcessingPage = ({page}) => {
         return () => executeFunctions(addToCleanup);
     };
 
-    /**
-     * @param {DBFileComparison[]} fileComparisonsEvaluated
-     */
-    const openNewDedupeGallery = async (fileComparisons) => {
+    const openNewDedupeGallery = async () => {
+        let fileComparisons = potentialDuplicateFileComparisonsPendingConstState.get();
+
+        const fileComparisonIndices = potentialDuplicateIndicesSelectedState.get();
+        if (fileComparisonIndices.length > 1) {
+            fileComparisons = fileComparisonIndices.map(index => fileComparisons[index]);
+        }
+        
         if (dedupeGalleryState.get("fileComparisonsEvaluated") !== undefined) {
             const REOPEN_BUTTON = 0;
             const COMMIT_BUTTON = 1;
             const DISCARD_BUTTON = 2;
 
-            const optionSelected = await Modals.Global().pushModal(DialogBox, {
+            const optionSelected = await Modals.Global().pushModal(({modalResolve}) => DialogBox({
+                displayName: "Uncommitted Dedupe Gallery",
                 promptText: "You have an active dedupe gallery that is uncommitted. What do you wish to do with this gallery?",
                 optionButtons: [
                     {
@@ -193,12 +201,14 @@ const DuplicatesProcessingPage = ({page}) => {
                         value: DISCARD_BUTTON,
                         text: "Discard"
                     }
-                ]
-            });
+                ],
+                modalResolve
+            }));
             if (optionSelected === REOPEN_BUTTON) {
-                Modals.Global().pushModal(DedupeGalleryModal, {
-                    persistentState: dedupeGalleryState
-                });
+                Modals.Global().pushModal(({modalResolve}) => DedupeGalleryModal({
+                    persistentState: dedupeGalleryState,
+                    modalResolve
+                }));
                 return;
             }
             if (optionSelected === COMMIT_BUTTON) {
@@ -210,10 +220,11 @@ const DuplicatesProcessingPage = ({page}) => {
                 return;
             }
         }
-        Modals.Global().pushModal(DedupeGalleryModal, {
+        Modals.Global().pushModal(({modalResolve}) => DedupeGalleryModal({
             fileComparisons,
-            persistentState: dedupeGalleryState
-        });
+            persistentState: dedupeGalleryState,
+            modalResolve
+        }));
     };
 
     return (
@@ -263,20 +274,17 @@ const DuplicatesProcessingPage = ({page}) => {
                 <div style={{marginTop: 4}}>
                     Potential duplicate pairs processed: {PotentialDuplicateComparisonsMadeCount.react(<span></span>)}/{PotentialDuplicateFileCount.react(<span></span>)}
                     <input type="button" value="Begin filtering potential duplicates" style={{marginLeft: 4, marginTop: -2}} onClick={() => {
-                        openNewDedupeGallery(potentialDuplicateFileComparisonsPendingConstState.get());
+                        openNewDedupeGallery();
                     }} />
                 </div>
                 <div style={{marginTop: 4}}>Preview of file pairs to dedupe:</div>
                 <div style={{flex: 1}}>
                     <LazyDedupePreviewGallery
                         fileComparisonPairsConstState={potentialDuplicateFileComparisonsPendingConstState}
-                        onValuesDoubleClicked={(_, indices) => {
-                            if (indices.length > 1) {
-                                openNewDedupeGallery(indices.map(index => potentialDuplicateFileComparisonsPendingConstState.get()[index]));
-                            } else if (indices.length === 1) {
-                                openNewDedupeGallery(potentialDuplicateFileComparisonsPendingConstState.get());
-                            }
+                        onValuesSelected={(_, indices) => {
+                            potentialDuplicateIndicesSelectedState.set(indices);
                         }}
+                        onValuesDoubleClicked={openNewDedupeGallery}
                     />
                 </div>
             </div>

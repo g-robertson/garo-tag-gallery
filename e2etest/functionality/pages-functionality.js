@@ -1,4 +1,4 @@
-import { DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, findMetricVisualizer, mouseOver, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
+import { DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, findMetricVisualizer, mouseOver, pressDialogBoxOption, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
 import { navigateToDuplicatesProcessingPage, navigateToFileSearchPage } from "../navigation/pages-navigation.js";
 import {By, Condition, Key, until} from "selenium-webdriver"
 
@@ -395,4 +395,11 @@ export async function duplicateGoBack(driver) {
  */
 export async function commitDuplicates(driver) {
     await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Commit"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function commitDuplicatesFromDialog(driver) {
+    await pressDialogBoxOption(driver, "Commit");
 }

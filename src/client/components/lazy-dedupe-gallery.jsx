@@ -1,9 +1,11 @@
 import '../global.css';
-import { executeFunctions, ImagePreloader, preloadImg, ReferenceableReact, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
+import { executeFunctions, ReferenceableReact, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 import selectFiles from '../../api/client-get/select-files.js';
 import { ConstState, PersistentState, State } from "../page/pages.js";
 import { Modals } from '../modal/modals.js';
+import { ImagePreloader } from '../js/client-exclusive-util.js';
+import DialogBox from '../modal/modals/dialog-box.jsx';
 
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
 /** @import {DBFile} from "../../db/taggables.js" */
@@ -87,6 +89,11 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
         return () => executeFunctions(addToCleanup);
     };
 
+    const commitChanges = () => {
+        persistentState.clear();
+        Modals.Global().popModal();
+    }
+
     return <div onAdd={onAdd} style={{width: "100%", height: "100%"}}>
         {imagePreloader.reactElement()}
         <LazySelector
@@ -118,6 +125,24 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
                 }
 
                 imagePreloader.setPreload(preloadImages);
+            }}
+            onSelectedPastEnd={async () => {
+                const OPTION_COMMIT_CHANGES = 1;
+                const OPTION_GO_BACK = 2;
+
+                const optionSelected = await Modals.Global().pushModal(({modalResolve}) => DialogBox({
+                    displayName: "Commit changes",
+                    promptText: "You have finished processing the selected duplicates, select commit to commit your selections",
+                    optionButtons: [
+                        {text: "Commit", value: OPTION_COMMIT_CHANGES},
+                        {text: "Go Back", value: OPTION_GO_BACK},
+                    ],
+                    modalResolve
+                }));
+
+                if (optionSelected === OPTION_COMMIT_CHANGES) {
+                    commitChanges();
+                }
             }}
             customItemComponent={({realizedValue, index}) => {
                 visibleIndexState.set(index);
@@ -231,11 +256,7 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
         />
     
         <div style={{position: "absolute", bottom: "4px", right: "4px", flexDirection: "column"}}>
-            <input type="button" value="Commit" onClick={() => {
-                console.log(persistentState);
-                persistentState.clear();
-                Modals.Global().popModal();
-            }} />
+            <input type="button" value="Commit" onClick={commitChanges} />
         </div>
     </div>
 };

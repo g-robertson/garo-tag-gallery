@@ -2,6 +2,7 @@ import '../global.css';
 import LazySelector from './lazy-selector.jsx';
 import selectFiles from '../../api/client-get/select-files.js';
 import { preloadImg, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
+import { ConstState } from '../page/pages.js';
 
 const THUMB_ORIGINAL_WIDTH = 300;
 const THUMB_ORIGINAL_HEIGHT = 200;
@@ -17,10 +18,12 @@ const DISTANCE_HEIGHT = 0;
  * @param {{
  *  fileComparisonPairsConstState: ConstState<DBFileComparison[]>
  *  onValuesDoubleClicked?: (valuesSelected: any, indices: number[], indexClicked: number) => void
+ *  onValuesSelected?: (valuesSelected: any, indices: number[]) => void
  * }} param0
  */
-const LazyDedupePreviewGallery = ({fileComparisonPairsConstState, onValuesDoubleClicked}) => {
+const LazyDedupePreviewGallery = ({fileComparisonPairsConstState, onValuesDoubleClicked, onValuesSelected}) => {
     onValuesDoubleClicked ??= () => {};
+    onValuesSelected ??= () => {};
 
     return <LazySelector
         valuesConstState={fileComparisonPairsConstState}
@@ -83,6 +86,7 @@ const LazyDedupePreviewGallery = ({fileComparisonPairsConstState, onValuesDouble
             </div>
         }}
         onValuesDoubleClicked={onValuesDoubleClicked}
+        onValuesSelected={onValuesSelected}
         valueRealizationDelay={25}
         valueRealizationRange={2}
         realizeMinimumCount={30}

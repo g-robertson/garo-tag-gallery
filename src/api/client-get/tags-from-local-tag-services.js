@@ -10,7 +10,7 @@ import CreateMetricTag from "../../client/modal/modals/create-metric-tag.jsx";
  * @typedef {(ClientSearchQuery | {
  *     type: "modalTag"
  *     modalTagInfo?: {
- *         modalType: string
+ *         modal: () => Modal
  *     }
  * }) & {
  *     displayName: string
@@ -23,7 +23,7 @@ import CreateMetricTag from "../../client/modal/modals/create-metric-tag.jsx";
 
 /**
  * @param {string} displayName
- * @param {() => Modal} modal
+ * @param {(resolve: ) => Modal} modal
  * @returns {ClientQueryTag}
  */
 function modalSystemClientQueryTag(displayName, modal) {

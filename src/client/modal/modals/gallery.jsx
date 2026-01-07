@@ -6,19 +6,16 @@ import LazyGallery from '../../components/lazy-gallery.jsx';
 
 /** 
  * @param {{
- *  extraProperties: ExtraProperties<{
- *      taggableIDs: number[]
- *      initialTaggableIndex?: number
- *  }>
+ *  taggableIDs: number[]
+ *  initialTaggableIndex?: number
  *  modalResolve: (value: any) => void
  * }}
 */
-export default function GalleryModal({ extraProperties, modalResolve }) {
-    const taggableIDs = extraProperties.taggableIDs;
+export default function GalleryModal({ taggableIDs, initialTaggableIndex, modalResolve }) {
     return {
         component: (
             <div style={{width: "100%", height: "100%"}}>
-                <LazyGallery taggableIDs={taggableIDs} initialTaggableIndex={extraProperties?.initialTaggableIndex} />
+                <LazyGallery taggableIDs={taggableIDs} initialTaggableIndex={initialTaggableIndex} />
             </div>
         ),
         displayName: "Gallery",

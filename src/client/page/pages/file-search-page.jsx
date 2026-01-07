@@ -66,10 +66,11 @@ const FileSearchPageElement = ({page}) => {
             <div style={{width: "auto", flex: 3, flexDirection: "column", height: "100%"}}>
                 <div>
                     {ModifySelectedTaggablesButton.react(<input type="button" value="Modify selected taggables" onClick={async () => {
-                        await Modals.Global().pushModal(ModifyTaggablesModal, {
+                        await Modals.Global().pushModal(({modalResolve}) => ModifyTaggablesModal({
                             taggableCursorConstState,
-                            taggableIDsConstState: selectedTaggableIDsState.asConst()
-                        });
+                            taggableIDsConstState: selectedTaggableIDsState.asConst(),
+                            modalResolve
+                        }));
                     }} />)}
                     {TrashSelectedTaggablesButton.react(<input type="button" value="Trash selected taggables" onClick={() => {
                         const confirm = window.confirm("Are you sure you want to trash these taggables, they will be sent to trash can where they can either be restored or deleted permanently.");
@@ -93,15 +94,17 @@ const FileSearchPageElement = ({page}) => {
                                 const taggableIDsToShow = taggableIDs.filter((_, index) => indicesSet.has(index));
                                 const initialTaggableIndex = taggableIDsToShow.findIndex(taggable => taggable === taggableIDs[indexClicked]);
 
-                                Modals.Global().pushModal(GalleryModal, {
+                                Modals.Global().pushModal(({modalResolve}) => GalleryModal({
                                     taggableIDs: taggableIDsToShow,
-                                    initialTaggableIndex
-                                });
+                                    initialTaggableIndex,
+                                    modalResolve
+                                }));
                             } else if (indices.length === 1) {
-                                Modals.Global().pushModal(GalleryModal, {
+                                Modals.Global().pushModal(({modalResolve}) => GalleryModal({
                                     taggableIDs: taggableIDs,
-                                    initialTaggableIndex: indexClicked
-                                });
+                                    initialTaggableIndex: indexClicked,
+                                    modalResolve
+                                }));
                             }
                         }}
                     />

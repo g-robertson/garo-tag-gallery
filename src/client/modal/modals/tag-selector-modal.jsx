@@ -3,41 +3,38 @@ import TagsSelector from '../../components/tags-selector.jsx';
 import { Modals } from '../../modal/modals.js';
 import { State } from '../../page/pages.js';
 
-/** @import {ExtraProperties} from "../modals.js" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
 /** @import {State} "../../page/pages.js" */
 
 /** 
  * @param {{
- *  extraProperties: ExtraProperties<{
- *      titleText: string
- *      selectionButtonText: string
- *      searchType: "intersect" | "union"
- *      initialSelectedTags?: ClientSearchQuery[]
- *  }>
+ *  titleText: string
+ *  selectionButtonText: string
+ *  searchType: "intersect" | "union"
+ *  initialSelectedTags?: ClientSearchQuery[]
  *  modalResolve: (value: any) => void
  * }}
 */
-export default function TagSelectorModal({ extraProperties, modalResolve }) {
+export default function TagSelectorModal({ titleText, selectionButtonText, searchType, initialSelectedTags, modalResolve }) {
     /** @type {State<ClientSearchQuery | null>} */
     const searchObjectsState = new State(null);
-    extraProperties.initialSelectedTags ??= [];
+    initialSelectedTags ??= [];
 
     
     return {
         component: (
             <div class="tag-selector-modal" style={{width: "100%", height: "100%", flexDirection: "column"}}>
-                {extraProperties.titleText}
+                {titleText}
                 <div style={{width: "100%", height: "100%"}}>
                     <TagsSelector
-                        searchType={extraProperties.searchType}
-                        initialSelectedTags={extraProperties.initialSelectedTags}
+                        searchType={searchType}
+                        initialSelectedTags={initialSelectedTags}
                         onSearchChanged={(clientSearchQuery) => {
                             searchObjectsState.set(clientSearchQuery);
                         }}
                     />
                 </div>
-                <input style={{margin: 8}} type="button" value={extraProperties.selectionButtonText} onClick={() => {
+                <input style={{margin: 8}} type="button" value={selectionButtonText} onClick={() => {
                     modalResolve(searchObjectsState.get());
                     Modals.Global().popModal();
                 }} />

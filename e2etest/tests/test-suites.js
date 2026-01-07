@@ -41,11 +41,11 @@ const DISABLED_TESTS = new Set([
     // "Tests.PopulateData",
     // "Tests.Functional",
     "Tests.Functional.Files",
-    "Tests.Functional.Files.ImportFilesFromHydrus.TestImportFilesFromHydrus",
+    // "Tests.Functional.Files.ImportFilesFromHydrus.TestImportFilesFromHydrus",
     // "Tests.Functional.Pages",
-    "Tests.Functional.Pages.FileSearchPage",
-    "Tests.Functional.Pages.FileSearchPage.TagSearch",
-    "Tests.Functional.Metrics",
+    // "Tests.Functional.Pages.FileSearchPage",
+    // "Tests.Functional.Pages.FileSearchPage.TagSearch",
+    // "Tests.Functional.Metrics",
 ]);
 const HALT_ON_FAILURE = true;
 const HALT_AFTER = new Set([]);

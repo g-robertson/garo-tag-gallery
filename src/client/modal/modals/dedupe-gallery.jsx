@@ -7,22 +7,20 @@ import '../../global.css';
 
 /** 
  * @param {{
- *  extraProperties: ExtraProperties<{
- *      fileComparisons: DBFileComparison[]>
- *      initialFileComparisonIndex?: number
- *      persistentState?: any
- *  }>
+ *  fileComparisons: DBFileComparison[]>
+ *  initialFileComparisonIndex?: number
+ *  persistentState?: any
  *  modalResolve: (value: any) => void
  * }}
 */
-export default function DedupeGalleryModal({ extraProperties, modalResolve }) {
+export default function DedupeGalleryModal({ fileComparisons, initialFileComparisonIndex, persistentState, modalResolve }) {
     return {
         component: (
             <div style={{width: "100%", height: "100%"}}>
                 <LazyDedupeGallery
-                    fileComparisons={extraProperties.fileComparisons}
-                    initialFileComparisonIndex={extraProperties?.initialFileComparisonIndex}
-                    persistentState={extraProperties.persistentState}
+                    fileComparisons={fileComparisons}
+                    initialFileComparisonIndex={initialFileComparisonIndex}
+                    persistentState={persistentState}
                 />
             </div>
         ),

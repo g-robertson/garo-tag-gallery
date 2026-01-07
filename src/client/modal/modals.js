@@ -19,8 +19,7 @@
 /**
  * @template {any} [T=Record<string, any>]
  * @typedef {Object} ModalInstance
- * @property {() => Modal} modal
- * @property {ExtraProperties<T>} extraProperties
+ * @property {(param0: {modalResolve: (arg: any) => void}) => Modal} modal
  * @property {(result: any) => void} resolve
  */
 
@@ -124,16 +123,13 @@ export class Modals {
     }
 
     /**
-     * @param {() => Modal} modal
-     * @param {ExtraProperties=} extraProperties
+     * @param {(param0: {modalResolve: (arg: any) => void}) => Modal} modal
      */
-    async pushModal(modal, extraProperties) {
-        extraProperties ??= {};
+    async pushModal(modal) {
         const self = this;
         return new Promise(resolve => {
             self.#modals.push({
                 modal,
-                extraProperties,
                 resolve
             });
             self.#onPush(self.#modals[self.#modals.length - 1]);
