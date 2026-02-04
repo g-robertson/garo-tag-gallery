@@ -1,5 +1,5 @@
 import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
-import { ConstState } from "../page/pages.js";
+import { ConstState } from "../js/state.js";
 
 /** @import {DBPermissionedLocalMetricService} from "../../db/metrics.js" */
 

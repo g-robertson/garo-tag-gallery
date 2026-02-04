@@ -1,11 +1,11 @@
-import { ConstState, State } from '../page/pages.js';
+import { ConstState, State } from '../js/state.js';
 import '../global.css';
 
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
 import { executeFunctions } from '../js/client-util.js';
 
 
-/** @import {State} from '../page/pages.js' */
+/** @import {State} from '../js/state.js' */
 
 /**
  * @template T

@@ -1,10 +1,10 @@
 import '../../global.css';
 import TagsSelector from '../../components/tags-selector.jsx';
 import { Modals } from '../../modal/modals.js';
-import { State } from '../../page/pages.js';
+import { State } from '../../js/state.js';
 
 /** @import {ClientSearchQuery} from "../../../api/post/search-taggables.js" */
-/** @import {State} "../../page/pages.js" */
+/** @import {State} "../../js/state.js" */
 
 /** 
  * @param {{

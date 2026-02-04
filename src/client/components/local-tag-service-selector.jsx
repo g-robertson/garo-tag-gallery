@@ -1,10 +1,10 @@
 import '../global.css';
 import { executeFunctions } from '../js/client-util.js';
 import { User } from '../js/user.js';
-import { State } from '../page/pages.js';
+import { State } from '../js/state.js';
 
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
-/** @import {State} from '../page/pages.js' */
+/** @import {State} from '../js/state.js' */
 
 /**
  * @param {{

@@ -1,11 +1,10 @@
 
 /** @import {DBService} from "./services.js" */
-/** @import {PermissionInt} from "./user.js" */
 /** @import {Databases} from "./db-util.js" */
 /** @import {User} from "../client/js/user.js" */
 /** @import {DBLocalTag} from "./tags.js" */
 
-import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
+import { PERMISSIONS } from "../client/js/user.js";
 import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js"
 import { Users } from "./user.js";
@@ -27,7 +26,7 @@ import { mapNullCoalesce } from "../client/js/client-util.js";
  *     Has_Metric_From_Local_Metric_Service_Tag: DBLocalTag
  * }} DBJoinedLocalMetricService
  */
-/** @typedef {DBJoinedLocalMetricService & {Permission_Extent: PermissionInt}} DBPermissionedLocalMetricService */
+/** @typedef {DBJoinedLocalMetricService & {Permission: Set<string>}} DBPermissionedLocalMetricService */
 
 /**
  * @param {Databases} dbs
@@ -98,7 +97,8 @@ export class LocalMetricServices {
             SELECT *
               FROM Local_Metric_Services LMS
               JOIN Services S ON LMS.Service_ID = S.Service_ID
-              WHERE LMS.Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)};`, localMetricServiceIDs
+              WHERE LMS.Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)};`,
+            ...localMetricServiceIDs
         ));
     }
     /**
@@ -120,26 +120,31 @@ export class LocalMetricServices {
     /**
      * @param {Databases} dbs 
      * @param {User} user
-     * @param {PermissionInt} permissionBitsToCheck
+     * @param {string[]} permissionsToCheck
      * @param {number[]} localMetricServiceIDs
      */
-    static async userSelectManyByIDs(dbs, user, permissionBitsToCheck, localMetricServiceIDs) {
-        if (user.isSudo() || user.hasPermissions(permissionBitsToCheck, PERMISSIONS.LOCAL_METRIC_SERVICES)) {
+    static async userSelectManyByIDs(dbs, user, permissionsToCheck, localMetricServiceIDs) {
+        if (user.isSudo() || user.hasPermissions(permissionsToCheck)) {
             return await LocalMetricServices.selectManyByIDs(dbs, localMetricServiceIDs);
         }
 
         return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT LMS.*, S.*
-              FROM Local_Metric_Services LMS
-              JOIN Services_Users_Permissions SUP ON LMS.Service_ID = SUP.Service_ID
-              JOIN Services S ON LMS.Service_ID = S.Service_ID
-             WHERE SUP.User_ID = ?
-               AND (SUP.Permission_Extent & ?) = ?
-               AND LMS.Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)};
+            FROM Local_Metric_Services LMS
+            JOIN Services_Users_Permissions SUP ON LMS.Service_ID = SUP.Service_ID
+            JOIN Services S ON LMS.Service_ID = S.Service_ID
+            WHERE (
+                SELECT COUNT(1)
+                FROM Services_Users_Permissions SUP
+                WHERE LMS.Service_ID = SUP.Service_ID
+                AND SUP.User_ID = ?
+                AND SUP.Permission IN ${dbvariablelist(permissionsToCheck.length)}
+            ) = ?
+            AND LMS.Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)}
         `, [
             user.id(),
-            permissionBitsToCheck,
-            permissionBitsToCheck,
+            ...permissionsToCheck,
+            permissionsToCheck.length,
             ...localMetricServiceIDs
         ]));
     }
@@ -147,35 +152,33 @@ export class LocalMetricServices {
     /**
      * @param {Databases} dbs 
      * @param {User} user 
-     * @param {PermissionInt} permissionBitsToCheck 
+     * @param {string[]} permissionsToCheck 
      * @param {number} localMetricServiceID
      */
-    static async userSelectByID(dbs, user, permissionBitsToCheck, localMetricServiceID) {
-        return (await LocalMetricServices.userSelectManyByIDs(dbs, user, permissionBitsToCheck, [localMetricServiceID]))[0];
+    static async userSelectByID(dbs, user, permissionsToCheck, localMetricServiceID) {
+        return (await LocalMetricServices.userSelectManyByIDs(dbs, user, permissionsToCheck, [localMetricServiceID]))[0];
     }
 
     /**
      * @param {Databases} dbs
      * @param {User} user 
-     * @param {PermissionInt=} permissionBitsToCheck
+     * @param {=} permissionsToCheck
      */
-    static async userSelectAll(dbs, user, permissionBitsToCheck) {
+    static async userSelectAll(dbs, user, permissionsToCheck) {
         return await userSelectAllSpecificTypedServicesHelper(
             dbs,
             user,
-            PERMISSIONS.LOCAL_METRIC_SERVICES,
             LocalMetricServices.selectAll,
             async () => {
-                return await mapLocalMetricServices(dbs, await dballselect(dbs, `
-                    SELECT SUP.Permission_Extent, LMS.*, S.*
+                return await dballselect(dbs, `
+                    SELECT LMS.Local_Metric_Service_ID, SUP.Permission
                       FROM Local_Metric_Services LMS
                       JOIN Services_Users_Permissions SUP ON LMS.Service_ID = SUP.Service_ID
-                      JOIN Services S ON LMS.Service_ID = S.Service_ID
                      WHERE SUP.User_ID = $userID;
-                `, {$userID: user.id()}));
+                `, {$userID: user.id()});
             },
             "Local_Metric_Service_ID",
-            permissionBitsToCheck
+            permissionsToCheck
         );
     }
 
@@ -188,7 +191,7 @@ export class LocalMetricServices {
         dbs = await dbBeginTransaction(dbs);
 
         const serviceID = await Services.insert(dbs, serviceName);
-        await ServicesUsersPermissions.insert(dbs, serviceID, userID, PERMISSION_BITS.ALL);
+        await ServicesUsersPermissions.insertMany(dbs, serviceID, userID, Object.values(PERMISSIONS.LOCAL_METRIC_SERVICES).map(permission => permission.name));
 
         /** @type {number} */
         const localMetricServiceID = (await dbget(dbs, `

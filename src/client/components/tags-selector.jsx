@@ -5,10 +5,10 @@ import CreateOrSearchGroup from '../modal/modals/create-or-search-group.jsx';
 import LazyTextObjectSelector from './lazy-text-object-selector.jsx';
 import LocalTagsSelector, { MAP_TO_CLIENT_SEARCH_QUERY } from './local-tags-selector.jsx';
 import { clientSearchQueryToDisplayName, isConflictingClientSearchQuery } from '../js/tags.js';
-import { PersistentState, State } from '../page/pages.js';
+import { PersistentState, State } from '../js/state.js';
 import { Modals } from '../modal/modals.js';
 import { executeFunctions } from '../js/client-util.js';
-/** @import {ConstState} from "../page/pages.js" */
+/** @import {ConstState} from "../js/state.js" */
 /** @import {ClientSearchQuery} from "../../api/post/search-taggables.js" */
 /** @import {DBPermissionedLocalTagService} from '../../db/tags.js' */
 
@@ -93,7 +93,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchCh
             </div>
             <div style={{flex: "3 1 100%", height: "80%"}}>
                 <LocalTagsSelector 
-                    persistentState={persistentState.registerState("localTagsSelector", new PersistentState())}
+                    persistentState={persistentState.registerState("localTagsSelector", new PersistentState(), {addToCleanup})}
                     localTagServicesConstState={localTagServicesConstState}
                     selectedLocalTagServiceIDsState={selectedLocalTagServiceIDsState}
                     taggableCursorConstState={taggableCursorConstState}

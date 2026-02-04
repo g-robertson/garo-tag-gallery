@@ -1,10 +1,9 @@
 /**
- * @import {APIFunction} from "../api-types.js"
- * @import {DBLocalTag} from "../../db/tags.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
  */
 
 import { z } from "zod";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 
 export async function validate(dbs, req, res) {
     const jobID = z.number().safeParse(req?.body?.jobID, {path: ["jobID"]});
@@ -15,13 +14,12 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = {
-    TYPE: PERMISSIONS.NONE,
-    BITS: PERMISSION_BITS.NONE
-};
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    return true;
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [],
+        objects: {}
+    };
 }
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */

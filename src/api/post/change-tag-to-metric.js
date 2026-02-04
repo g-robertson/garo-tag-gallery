@@ -1,28 +1,26 @@
 /**
- * @import {APIFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
  */
 
 import { z } from "zod";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { AppliedMetrics, LocalMetricServices } from "../../db/metrics.js";
-import { LocalTags, LocalTagServices } from "../../db/tags.js";
-import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
+import { PERMISSIONS } from "../../client/js/user.js";
+import { AppliedMetrics } from "../../db/metrics.js";
+import { LocalTags } from "../../db/tags.js";
+import { Z_METRIC_VALUE, Z_USER_LOCAL_METRIC_ID, Z_USER_LOCAL_TAG_SERVICE_ID } from "../zod-types.js";
 
 export async function validate(dbs, req, res) {
     const tagLookupName = z.string().safeParse(req?.body?.tagLookupName, {path: ["tagLookupName"]});
     if (!tagLookupName.success) return tagLookupName.error.message;
 
-    const localTagServiceIDs = z.array(z.coerce.number().nonnegative().int()
-        .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
-    ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
+    const localTagServiceIDs = z.array(Z_USER_LOCAL_TAG_SERVICE_ID).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
     if (!localTagServiceIDs.success) { return localTagServiceIDs.error.message; }
 
     const removeExistingTag = req?.body?.removeExistingTag === "on";
 
-    const localMetricID = z.coerce.number().nonnegative().int().safeParse(req?.body?.localMetricID, {path: ["localMetricID"]});
+    const localMetricID = Z_USER_LOCAL_METRIC_ID.safeParse(req?.body?.localMetricID, {path: ["localMetricID"]});
     if (!localMetricID.success) return localMetricID.error.message;
 
-    const metricValue = z.coerce.number().finite().safeParse(req?.body?.metricValue, {path: ["metricValue"]});
+    const metricValue = Z_METRIC_VALUE.safeParse(req?.body?.metricValue, {path: ["metricValue"]});
     if (!metricValue.success) return metricValue.error.message;
 
     const localTags = await LocalTags.selectManyByLookupNames(dbs, [tagLookupName.data], localTagServiceIDs.data)
@@ -38,22 +36,20 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = [{
-    TYPE: PERMISSIONS.LOCAL_METRIC_SERVICES,
-    BITS: PERMISSION_BITS.READ
-}, {
-    TYPE: PERMISSIONS.LOCAL_TAG_SERVICES,
-    BITS: PERMISSION_BITS.READ | PERMISSION_BITS.DELETE
-}];
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    const localMetricServiceToCheck = await LocalMetricServices.selectByLocalMetricID(dbs, req.body.localMetricID);
-    const localMetricService = await LocalMetricServices.userSelectByID(dbs, req.user, PERMISSION_BITS.READ, localMetricServiceToCheck.Local_Metric_Service_ID);
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    const permissions = [PERMISSIONS.LOCAL_METRIC_SERVICES.APPLY_METRIC, PERMISSIONS.LOCAL_TAG_SERVICES.APPLY_TAGS];
+    if (req.body.removeExistingTag) {
+        permissions.push(PERMISSIONS.LOCAL_TAG_SERVICES.DELETE_TAGS);
+    }
 
-    const localTagServicePermissionsRequired = req.body.removeExistingTag ? PERMISSION_BITS.READ | PERMISSION_BITS.DELETE : PERMISSION_BITS.READ;
-    const localTagService = await LocalTagServices.userSelectByID(dbs, req.user, localTagServicePermissionsRequired, req.body.localTag.Local_Tag_Service_ID);
-    
-    return localMetricService !== undefined && localTagService !== undefined;
+    return {
+        permissions,
+        objects: {
+            Local_Metric_IDs: [req.body.localMetricID],
+            Local_Tag_Service_IDs: req.body.localTags.map(localTag => localTag.Local_Tag_Service_ID)
+        }
+    };
 }
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */

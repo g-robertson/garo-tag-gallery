@@ -1,4 +1,4 @@
-import { DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, findMetricVisualizer, mouseOver, pressDialogBoxOption, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
+import { DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, findMetricVisualizer, modClick, mouseOver, pressDialogBoxOption, realClear, realFocus, untilLocalTagsSelectorRefresh, xpathHelper } from "../helpers.js";
 import { navigateToDuplicatesProcessingPage, navigateToFileSearchPage } from "../navigation/pages-navigation.js";
 import {By, Condition, Key, until} from "selenium-webdriver"
 
@@ -380,9 +380,52 @@ export async function duplicateDiscardUncommitted(driver) {
 /**
  * @param {ThenableWebDriver} driver 
  */
+export async function duplicateCurrentIsBetterTrashOther(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Current is better, trash other"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateCurrentIsBetter(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Current is better"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateSameQualityTrashLarger(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Same quality, trash larger"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateSameQuality(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Same quality"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateAlternates(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Alternates"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateFalsePositive(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "False positives"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
 export async function duplicateSkip(driver) {
     await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Skip"}})).click();
 }
+
 /**
  * @param {ThenableWebDriver} driver 
  */

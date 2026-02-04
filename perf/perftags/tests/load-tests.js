@@ -1,5 +1,6 @@
 
-import { strTaggablePairingsToStrTagPairings, getPairingsFromStrPairings, TEST_DEFAULT_PERF_TAGS_ARGS, getTotalDirectoryBytes } from "./helpers.js";import PerfTags from "../../src/perf-tags-binding/perf-tags.js"
+import { strTaggablePairingsToStrTagPairings, getPairingsFromStrPairings, TEST_DEFAULT_PERF_TAGS_ARGS, getTotalDirectoryBytes } from "./helpers.js";
+import PerfTags from "../../../src/perf-tags-binding/perf-tags.js"
 /** @import {TestFunction} from "./helpers.js" */
 
 

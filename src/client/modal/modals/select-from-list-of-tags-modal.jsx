@@ -1,7 +1,7 @@
 import DualListboxLazyTextObjectSelector from '../../components/dual-listbox-lazy-text-object-selector.jsx';
 import '../../global.css';
 import { Modals } from '../../modal/modals.js';
-import { State } from '../../page/pages.js';
+import { State } from '../../js/state.js';
 
 /** 
  * @param {{

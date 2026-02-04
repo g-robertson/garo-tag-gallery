@@ -1,4 +1,4 @@
-/** @import {ClientTag} from "../post/update-taggables.js" */
+/** @import {ClientTag} from "../post/update-tags-on-taggables.js" */
 
 import { FetchCache } from "../../client/js/fetch-cache.js";
 

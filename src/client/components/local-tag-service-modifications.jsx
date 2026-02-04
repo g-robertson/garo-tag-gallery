@@ -1,5 +1,5 @@
 import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
-import { ConstState } from "../page/pages.js";
+import { ConstState } from "../js/state.js";
 
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
 

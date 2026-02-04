@@ -1,3 +1,4 @@
+import { jsx } from "../../static-react/jsx-runtime.js";
 import { ReferenceableReact } from "./client-util.js";
 
 export class ImagePreloader {
@@ -43,4 +44,15 @@ export class ImagePreloader {
         }
 
     }
+}
+
+
+/**
+ * @param {import("react").JSX.Element} jsxElement 
+ */
+export function asDom(jsxElement) {
+    return jsx(
+        "dom",
+        {children: jsxElement},
+    );
 }

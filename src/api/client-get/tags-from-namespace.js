@@ -1,6 +1,6 @@
 import { fbjsonParse } from "../../client/js/client-util.js";
 
-/** @import {ClientTag} from "../post/update-taggables.js" */
+/** @import {ClientTag} from "../post/update-tags-on-taggables.js" */
 
 /**
  * @param {number} namespaceID

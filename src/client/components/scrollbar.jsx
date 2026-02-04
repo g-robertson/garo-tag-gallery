@@ -1,9 +1,9 @@
 import { executeFunctions, ReferenceableReact } from "../js/client-util.js";
-import { State } from "../page/pages.js";
+import { State } from "../js/state.js";
 
 const SCROLL_CURSOR_MIN_LENGTH = 20;
 
-/** @import {State, ConstState} from "../page/pages.js" */
+/** @import {State, ConstState} from "../js/state.js" */
 
 /**
  * @param {{

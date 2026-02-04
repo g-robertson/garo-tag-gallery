@@ -1,18 +1,19 @@
 /**
- * @import {APIFunction} from "../api-types.js"
- * @import {DBTaggable, DedupedDBJoinedLocalFile} from "../../db/taggables.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
+ * @import {DBTaggable, TaggableGroupedDBJoinedLocalFile} from "../../db/taggables.js"
  * @import {DBAppliedMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js"
  */
 
 import { clientjsonStringify, replaceObject } from "../../client/js/client-util.js";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 import { LocalFiles, Taggables } from "../../db/taggables.js";
-import { LocalTags, LocalTagServices, TagsNamespaces } from "../../db/tags.js";
+import { LocalTags, TagsNamespaces } from "../../db/tags.js";
 import z from "zod";
 import PerfTags from "../../perf-tags-binding/perf-tags.js";
-import { IN_TRASH_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
+import { IN_TRASH_TAG } from "../../client/js/tags.js";
 import { AppliedMetrics, LocalMetrics, LocalMetricServices } from "../../db/metrics.js";
-import { Cursor, getCursorAsFileWantedFields, getCursorAsTaggableWantedFields, Z_WANTED_FILE_FIELD, Z_WANTED_TAGGABLE_FIELD } from "../../db/cursor-manager.js";
+import { Cursor, getCursorAsFileWantedFields, getCursorAsTaggableWantedFields } from "../../db/cursor-manager.js";
+import { Z_LOCAL_TAG_ID, Z_METRIC_VALUE, Z_NAMESPACE_ID, Z_PERCENTAGE, Z_USER_LOCAL_METRIC_ID, Z_USER_LOCAL_METRIC_SERVICE_ID, Z_USER_LOCAL_TAG_SERVICE_ID, Z_WANTED_FIELD } from "../zod-types.js";
 
 const Z_CLIENT_COMPARATOR = z.literal("<").or(z.literal("<=")).or(z.literal(">")).or(z.literal(">="));
 /** @typedef {z.infer<typeof Z_CLIENT_COMPARATOR>} ClientComparator */
@@ -25,34 +26,34 @@ const Z_CLIENT_SEARCH_TAG_BY_LOOKUP = z.object({
 
 const Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID = z.object({
     type: z.literal("tagByLocalTagID"),
-    localTagID: z.number()
+    localTagID: Z_LOCAL_TAG_ID
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID>} ClientSearchTagByLocalTagID */
 
 const Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID = z.object({
     type: z.literal("hasLocalMetricID"),
-    Local_Metric_ID: z.number()
+    Local_Metric_ID: Z_USER_LOCAL_METRIC_ID
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID>} ClientSearchTagHasMetricID */
 
 const Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID = z.object({
     type: z.literal("inLocalMetricServiceID"),
-    localMetricServiceID: z.number()
+    localMetricServiceID: Z_USER_LOCAL_METRIC_SERVICE_ID
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID>} ClientSearchTagInLocalMetricServiceID */
 
 const Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC = z.object({
     type: z.literal("appliedLocalMetric"),
-    Local_Metric_ID: z.number(),
-    Applied_Value: z.number()
+    Local_Metric_ID: Z_USER_LOCAL_METRIC_ID,
+    Applied_Value: Z_METRIC_VALUE
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC>} ClientSearchTagAppliedLocalMetric */
 
 const Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON = z.object({
     type: z.literal("localMetricComparison"),
     comparator: Z_CLIENT_COMPARATOR,
-    Local_Metric_ID: z.number(),
-    metricComparisonValue: z.number().finite()
+    Local_Metric_ID: Z_USER_LOCAL_METRIC_ID,
+    metricComparisonValue: Z_METRIC_VALUE
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON>} ClientSearchTagLocalMetricComparison */
 
@@ -66,11 +67,11 @@ const Z_CLIENT_SEARCH_TAG = Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID
 
 const Z_NAMESPACE_AGGREGATE_TAG_GROUP = z.object({
     type: z.literal("namespace"),
-    namespaceID: z.number().nonnegative().finite()
+    namespaceID: Z_NAMESPACE_ID
 });
 const Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP = z.object({
     type: z.literal("applied-metrics"),
-    Local_Metric_ID: z.number().nonnegative().finite()
+    Local_Metric_ID: Z_USER_LOCAL_METRIC_ID
 });
 
 const Z_AGGREGATE_TAG_GROUP = Z_NAMESPACE_AGGREGATE_TAG_GROUP.or(Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP);
@@ -79,23 +80,23 @@ const Z_AGGREGATE_TAG_GROUP = Z_NAMESPACE_AGGREGATE_TAG_GROUP.or(Z_APPLIED_METRI
 const Z_AGGREGATE_TAG_CONDITION = z.object({
     type: z.literal("tag-occurrences-compared-to-n-within-expression"),
     comparator: Z_CLIENT_COMPARATOR,
-    occurrences: z.number().nonnegative().finite(),
+    occurrences: z.number().nonnegative().int(),
     expression: z.lazy(() => Z_SEARCH_QUERY)
 }).or(z.object({
     type: z.literal("tag-occurrences-compared-to-n-percent-within-expression"),
     comparator: Z_CLIENT_COMPARATOR,
-    percentage: z.number().min(0).max(1),
+    percentage: Z_PERCENTAGE,
     expression: z.lazy(() => Z_SEARCH_QUERY)
 })).or(z.object({
     type: z.literal("filtered-tag-occurrences-compared-to-n-percent-within-expression"),
     comparator: Z_CLIENT_COMPARATOR,
-    percentage: z.number().min(0).max(1),
+    percentage: Z_PERCENTAGE,
     filteringExpression: z.lazy(() => Z_SEARCH_QUERY),
     expression: z.lazy(() => Z_SEARCH_QUERY)
 }));
 /** @typedef {z.infer<typeof Z_AGGREGATE_TAG_CONDITION>} AggregateTagCondition */
 
-const Z_CLIENT_AGGREGATE_TAG_CONDITION =Z_AGGREGATE_TAG_CONDITION.or(z.object({
+const Z_CLIENT_AGGREGATE_TAG_CONDITION = Z_AGGREGATE_TAG_CONDITION.or(z.object({
     type: z.literal("is-not-in-tag-list"),
     list: z.array(Z_CLIENT_SEARCH_TAG)
 }));
@@ -131,11 +132,6 @@ const Z_SEARCH_QUERY = z.object({
  *     value: ClientSearchQuery
  * } | ClientSearchTag | ClientAggregateTag} ClientSearchQuery
  **/
-
-
-const Z_WANTED_FIELD = Z_WANTED_TAGGABLE_FIELD
-.or(Z_WANTED_FILE_FIELD);
-/** @typedef {z.infer<typeof Z_WANTED_FIELD>} SearchWantedField */
 
 const Z_WANTED_CURSOR = z.literal("Taggable")
 .or(z.literal("File"));
@@ -517,9 +513,7 @@ export async function validate(dbs, req, res) {
     const wantedFields = Z_WANTED_FIELD.or(z.array(Z_WANTED_FIELD)).safeParse(req?.body?.wantedFields, {path: ["wantedFields"]});
     if (!wantedFields.success) return wantedFields.error.message;
 
-    const localTagServiceIDs = z.array(z.coerce.number().nonnegative().int()
-        .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
-    ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
+    const localTagServiceIDs = z.array(Z_USER_LOCAL_TAG_SERVICE_ID).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
     if (!localTagServiceIDs.success) return localTagServiceIDs.error.message;
 
     /** @type {Set<number>} */
@@ -555,7 +549,7 @@ export async function validate(dbs, req, res) {
     const localMetricServicesMap = new Map((await LocalMetricServices.userSelectManyByIDs(
         dbs,
         req.user,
-        PERMISSION_BITS.READ,
+        PERMISSIONS.LOCAL_METRIC_SERVICES.READ_METRIC,
         localMetricServiceIDsToCheck
     )).map(localMetricService => [localMetricService.Local_Metric_Service_ID, localMetricService]));
 
@@ -582,28 +576,29 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = [{
-    TYPE: PERMISSIONS.LOCAL_TAG_SERVICES,
-    BITS: PERMISSION_BITS.READ
-}, {
-    TYPE: PERMISSIONS.LOCAL_METRIC_SERVICES,
-    BITS: PERMISSION_BITS.READ
-}];
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    const localTagServicesToCheckFromLocalTagIDs = await LocalTagServices.selectManyByLocalTagIDs(dbs, req.body.allLocalTagIDs);
-    const localTagServiceIDsToCheck = [...new Set([
-        ...localTagServicesToCheckFromLocalTagIDs.map(localTagService => localTagService.Local_Tag_Service_ID),
-        ...req.body.localTagServiceIDs
-    ])].filter(localTagServiceID => localTagServiceID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
 
-    const localTagServices = await LocalTagServices.userSelectManyByIDs(dbs, req.user, PERMISSION_BITS.READ, localTagServiceIDsToCheck);
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    const permissions = [];
+    if (req.body.allLocalTagIDs.length !== 0 || req.body.localTagServiceIDs.length !== 0) {
+        permissions.push(PERMISSIONS.LOCAL_TAG_SERVICES.READ_TAGS);
+    }
+    if (req.body.allLocalMetricIDs.length !== 0) {
+        permissions.push(PERMISSIONS.LOCAL_METRIC_SERVICES.READ_METRIC);
+    }
 
-    return localTagServices.length === localTagServiceIDsToCheck.length;
+    return {
+        permissions,
+        objects: {
+            Local_Tag_IDs: req.body.allLocalTagIDs,
+            Local_Tag_Service_IDs: req.body.localTagServiceIDs,
+            Local_Metric_IDs: req.body.allLocalMetricIDs
+        }
+    };
 }
 
 /** @typedef {Cursor<"Taggable", DBTaggable[]>} DBTaggableCursor */
-/** @typedef {Cursor<"File", DedupedDBJoinedLocalFile[]>} DBFileCursor */
+/** @typedef {Cursor<"File", TaggableGroupedDBJoinedLocalFile[]>} DBFileCursor */
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {
@@ -670,7 +665,7 @@ export default async function get(dbs, req, res) {
         }
     } else if (req.body.wantedCursor === "File") {
         /** @type {DBFileCursor} */
-        const cursor = new Cursor({cursorType: "File", cursorValue: LocalFiles.dedupeLocalFilesTaggables(
+        const cursor = new Cursor({cursorType: "File", cursorValue: LocalFiles.groupLocalFilesTaggables(
             await LocalFiles.selectManyByTaggableIDs(dbs, taggables.map(taggable => taggable.Taggable_ID))
         )});
         dbs.cursorManager.addCursorToUser(req.user.id(), cursor);

@@ -1,11 +1,10 @@
 import { mapNullCoalesce } from "../client/js/client-util.js";
 import { SYSTEM_GENERATED, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash, normalPreInsertLocalTag } from "../client/js/tags.js";
-import { PERMISSION_BITS, PERMISSIONS, User } from "../client/js/user.js";
+import { PERMISSIONS, User } from "../client/js/user.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
 
 /** @import {DBService} from "./services.js" */
-/** @import {PermissionInt} from "../client/js/user.js" */
 /** @import {Databases} from "./db-util.js" */
 
 /**
@@ -59,7 +58,7 @@ export function insertsystemtag(systemTag) {
 /**
  * @typedef {DBLocalTagService & DBService} DBJoinedLocalTagService
  */
-/** @typedef {DBJoinedLocalTagService & {Permission_Extent: PermissionInt}} DBPermissionedLocalTagService */
+/** @typedef {DBJoinedLocalTagService & {Permissions: Set<string>}} DBPermissionedLocalTagService */
 
 export class LocalTagServices {
     /**
@@ -116,27 +115,32 @@ export class LocalTagServices {
     /**
      * @param {Databases} dbs 
      * @param {User} user
-     * @param {PermissionInt} permissionBitsToCheck
+     * @param {string[]} permissionsToCheck
      * @param {number[]} localTagServiceIDs
      * @returns {Promise<DBPermissionedLocalTagService[]>}
      */
-    static async userSelectManyByIDs(dbs, user, permissionBitsToCheck, localTagServiceIDs) {
-        if (user.isSudo() || user.hasPermissions(permissionBitsToCheck, PERMISSIONS.LOCAL_TAG_SERVICES)) {
+    static async userSelectManyByIDs(dbs, user, permissionsToCheck, localTagServiceIDs) {
+        if (user.isSudo() || user.hasPermissions(permissionsToCheck)) {
             return await LocalTagServices.selectManyByIDs(dbs, localTagServiceIDs);
         }
 
         return await dballselect(dbs, `
-            SELECT LTS.*, S.*, SUP.Permission_Extent
-              FROM Local_Tag_Services LTS
-              JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
-              JOIN Services S ON LTS.Service_ID = S.Service_ID
-             WHERE SUP.User_ID = ?
-               AND (SUP.Permission_Extent & ?) = ?
-               AND LTS.Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)};
+            SELECT LTS.*, S.*
+            FROM Local_Tag_Services LTS
+            JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
+            JOIN Services S ON LTS.Service_ID = S.Service_ID
+            WHERE (
+                SELECT COUNT(1)
+                FROM Services_Users_Permissions SUP
+                WHERE LTS.Service_ID = SUP.Service_ID
+                AND SUP.User_ID = ?
+                AND SUP.Permission IN ${dbvariablelist(permissionsToCheck.length)}
+            ) = ?
+            AND LTS.Local_Tag_Service_ID IN ${dbvariablelist(localTagServiceIDs.length)};
         `, [
             user.id(),
-            permissionBitsToCheck,
-            permissionBitsToCheck,
+            permissionsToCheck,
+            permissionsToCheck.length,
             ...localTagServiceIDs
         ]);
     }
@@ -144,35 +148,33 @@ export class LocalTagServices {
     /**
      * @param {Databases} dbs 
      * @param {User} user 
-     * @param {PermissionInt} permissionBitsToCheck 
+     * @param {string[]} permissionsToCheck 
      * @param {number} localTagServiceID 
      */
-    static async userSelectByID(dbs, user, permissionBitsToCheck, localTagServiceID) {
-        return (await LocalTagServices.userSelectManyByIDs(dbs, user, permissionBitsToCheck, [localTagServiceID]))[0];
+    static async userSelectByID(dbs, user, permissionsToCheck, localTagServiceID) {
+        return (await LocalTagServices.userSelectManyByIDs(dbs, user, permissionsToCheck, [localTagServiceID]))[0];
     }
 
     /**
      * @param {Databases} dbs 
      * @param {User} user 
-     * @param {PermissionInt} permissionBitsToCheck 
+     * @param {string[]} permissionsToCheck 
      */
-    static async userSelectAll(dbs, user, permissionBitsToCheck) {
+    static async userSelectAll(dbs, user, permissionsToCheck) {
         const userSelectedPermissionedLocalTagServices = await userSelectAllSpecificTypedServicesHelper(
             dbs,
             user,
-            PERMISSIONS.LOCAL_TAG_SERVICES,
             LocalTagServices.selectAll,
             async () => {
                 return await dballselect(dbs, `
-                    SELECT SUP.Permission_Extent, LTS.*, S.*
+                    SELECT LTS.Local_Tag_Service_ID, SUP.Permission
                       FROM Local_Tag_Services LTS
                       JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
-                      JOIN Services S ON LTS.Service_ID = S.Service_ID
                      WHERE SUP.User_ID = $userID;
                 `, {$userID: user.id()});
             },
             "Local_Tag_Service_ID",
-            permissionBitsToCheck
+            permissionsToCheck
         );
 
         return userSelectedPermissionedLocalTagServices.filter(dbLocalTagService => dbLocalTagService.User_Editable !== 0);
@@ -187,7 +189,7 @@ export class LocalTagServices {
         dbs = await dbBeginTransaction(dbs);
 
         const serviceID = await Services.insert(dbs, serviceName);
-        await ServicesUsersPermissions.insert(dbs, serviceID, userID, PERMISSION_BITS.ALL);
+        await ServicesUsersPermissions.insertMany(dbs, serviceID, userID, Object.values(PERMISSIONS.LOCAL_TAG_SERVICES).map(permission => permission.name));
 
         /** @type {number} */
         const localTagServiceID = (await dbget(dbs, `

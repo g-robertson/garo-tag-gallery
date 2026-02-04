@@ -1,7 +1,7 @@
-import { PERMISSION_BITS, User } from "../client/js/user.js";
+import { User } from "../client/js/user.js";
 import {dbBeginTransaction, dbEndTransaction, dbget, dbrun} from "./db-util.js";
 
-/** @import {PermissionInt} from "../client/js/user.js" */
+/** @import {Permission} from "../client/js/user.js" */
 /** @import {Databases} from "./db-util.js" */
 
 /**
@@ -11,68 +11,49 @@ import {dbBeginTransaction, dbEndTransaction, dbget, dbrun} from "./db-util.js";
  */
 
 
-/** @template T
+/** @template T, PrimaryKeyColumnName
  * @param {Databases} dbs 
  * @param {User} user 
- * @param {PermissionType} specificServicePermissionType 
  * @param {(dbs: Databases) => Promise<T[]>} selectAllSpecificTypedServices
- * @param {() => Promise<T & {Permission_Extent: PermissionInt}>} selectAllUserPermissionedSpecificTypedServices
+ * @param {() => Promise<({[PrimaryKeyColumnName: string]: number} & {Permission: string})[]>} selectAllUserPermissionedSpecificTypedServices
  * @param {keyof T} primaryKeyColumnName
- * @param {PermissionInt=} permissionBitsToCheck
+ * @param {(Permission | Permission[])=} permissionsToCheck
  */
 export async function userSelectAllSpecificTypedServicesHelper(
     dbs,
     user,
-    specificServicePermissionType,
     selectAllSpecificTypedServices,
     selectAllUserPermissionedSpecificTypedServices,
     primaryKeyColumnName,
-    permissionBitsToCheck
+    permissionsToCheck
 ) {
-    permissionBitsToCheck ??= PERMISSION_BITS.NONE;
+    permissionsToCheck ??= [];
+    if (!(permissionsToCheck instanceof Array)) {
+        permissionsToCheck = [permissionsToCheck];
+    }
 
-    /** @type {(T & {Permission_Extent: PermissionInt})[]} */
-    let returnedSpecificServices = [];
-    let giveAllSpecificTypedServicesPermission = 0;
+    let giveAllSpecificTypedServicesPermission = user.permissions();
     if (user.isSudo()) {
-        giveAllSpecificTypedServicesPermission = PERMISSION_BITS.ALL;
-    } else {
-        giveAllSpecificTypedServicesPermission = user.getPermission(specificServicePermissionType);
+        permissionsToCheck = [];
     }
 
-    if (giveAllSpecificTypedServicesPermission === PERMISSION_BITS.ALL) {
-        returnedSpecificServices = (await selectAllSpecificTypedServices(dbs)).map(dbSpecificService => ({
-            ...dbSpecificService,
-            Permission_Extent: PERMISSION_BITS.ALL
-        }));
-    } else {
-        /** @type {(T & {Permission_Extent: PermissionInt})[]} */
-        const permissionedSpecificServices = await selectAllUserPermissionedSpecificTypedServices(); 
-        if (giveAllSpecificTypedServicesPermission !== 0) {
-            /** @type {Map<number, T & {Permission_Extent: PermissionInt}} */
-            const specificServicesMap = new Map();
-            for (const specificService of await selectAllSpecificTypedServices(dbs)) {
-                specificServicesMap.set(specificService[primaryKeyColumnName], {
-                    ...specificService,
-                    Permission_Extent: giveAllSpecificTypedServicesPermission
-                });
-            }
-
-            for (const permissionedSpecificService of permissionedSpecificServices) {
-                const preExistingPermission = specificServicesMap.get(permissionedSpecificService[primaryKeyColumnName]).Permission_Extent ?? 0;
-                specificServicesMap.set(permissionedSpecificService[primaryKeyColumnName], {
-                    ...permissionedSpecificService,
-                    Permission_Extent: preExistingPermission | permissionedSpecificService.Permission_Extent
-                });
-            }
-            
-            returnedSpecificServices = [...specificServicesMap.values()];
-        } else {
-            returnedSpecificServices = permissionedSpecificServices;
-        }
+    /** @type {Map<number, T & {Permissions: Set<string>}} */
+    const specificServicesMap = new Map();
+    for (const specificService of await selectAllSpecificTypedServices(dbs)) {
+        specificServicesMap.set(specificService[primaryKeyColumnName], {
+            ...specificService,
+            Permissions: giveAllSpecificTypedServicesPermission
+        });
     }
 
-    return returnedSpecificServices.filter(specificService => (specificService.Permission_Extent & permissionBitsToCheck) === permissionBitsToCheck);
+    const permissionedSpecificServices = await selectAllUserPermissionedSpecificTypedServices();
+
+    for (const permissionedSpecificService of permissionedSpecificServices) {
+        const insertedService = specificServicesMap.get(permissionedSpecificService[primaryKeyColumnName]);
+        insertedService.Permissions.add(permissionedSpecificService.Permission);
+    }
+    
+    return [...specificServicesMap.values()].filter(specificService => permissionsToCheck.every(permission => specificService.Permissions.has(permission.name)));
 }
 
 export class Services {
@@ -124,10 +105,10 @@ export class ServicesUsersPermissions {
      * @param {Databases} dbs 
      * @param {number} serviceID 
      * @param {number} userID 
-     * @param {PermissionInt} permissionExtent 
+     * @param {string} permission 
      */
-    static async insert(dbs, serviceID, userID, permissionExtent) {
-        if (!Number.isSafeInteger(serviceID) || !Number.isSafeInteger(userID) || !Number.isSafeInteger(permissionExtent)) {
+    static async insert(dbs, serviceID, userID, permission) {
+        if (!Number.isSafeInteger(serviceID) || !Number.isSafeInteger(userID) || typeof permission !== "string") {
             throw "Bad call to insertServiceUserPermission";
         }
 
@@ -135,17 +116,29 @@ export class ServicesUsersPermissions {
             INSERT INTO Services_Users_Permissions(
                 Service_ID,
                 User_ID,
-                Permission_Extent
+                Permission
             ) VALUES (
                 $serviceID,
                 $userID,
-                $permissionExtent 
+                $permission
             );
         `, {
             $serviceID: serviceID,
             $userID: userID,
-            $permissionExtent: permissionExtent
+            $permission: permission
         });
+    }
+    
+    /**
+     * @param {Databases} dbs 
+     * @param {number} serviceID 
+     * @param {number} userID 
+     * @param {string[]} permissions
+     */
+    static async insertMany(dbs, serviceID, userID, permissions) {
+        for (const permission of permissions) {
+            await ServicesUsersPermissions.insert(dbs, serviceID, userID, permission);
+        }
     }
 
     /**

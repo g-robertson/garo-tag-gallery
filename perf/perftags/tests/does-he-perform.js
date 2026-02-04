@@ -1,6 +1,6 @@
 import { appendFileSync, statSync } from "fs";
 import { strTaggablePairingsToStrTagPairings, getPairingsFromStrPairings, getStrPairingsFromPairings, TEST_DEFAULT_PERF_TAGS_ARGS, getTotalDirectoryBytes, TEST_DEFAULT_DATABASE_DIR } from "./helpers.js";
-import PerfTags from "../../src/perf-tags-binding/perf-tags.js"
+import PerfTags from "../../../src/perf-tags-binding/perf-tags.js"
 /** @import {TestFunction} from "./helpers.js" */
 
 
@@ -67,6 +67,19 @@ const TESTS = {
         }
         if (taggablePairings.get(1n).indexOf(1n) === -1 ||
             taggablePairings.get(1n).indexOf(3n) === -1) {
+            throw "Taggable pairings 1 lacks one of the placed tags";
+        }
+    },
+    "read_taggables_specific_tags_should_not_read_count": async (createPerfTags) => {
+        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
+        const tagPairings = PerfTags.getTagPairingsFromTaggablePairings(new Map([[2n, [1n,2n,3n,4n]]]));
+        await perfTags.insertTagPairings(tagPairings);
+        const {ok, taggablePairings} = await perfTags.readTaggablesSpecifiedTags(PerfTags.getTaggablesFromTagPairings(tagPairings), [1n,3n]);
+        if (taggablePairings.get(2n).length !== 2) {
+            throw "Taggable pairings 1 does not have 2 tags";
+        }
+        if (taggablePairings.get(2n).indexOf(1n) === -1 ||
+            taggablePairings.get(2n).indexOf(3n) === -1) {
             throw "Taggable pairings 1 lacks one of the placed tags";
         }
     },

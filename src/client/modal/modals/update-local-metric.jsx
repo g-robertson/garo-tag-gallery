@@ -5,7 +5,7 @@ import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import deleteLocalMetric from '../../../api/client-get/delete-local-metric.js';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
-import { State } from '../../page/pages.js';
+import { State } from '../../js/state.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
 export default function UpdateLocalMetric() {

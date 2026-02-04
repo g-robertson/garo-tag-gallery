@@ -1,34 +1,32 @@
 import { Key, until } from "selenium-webdriver";
-import { applyTagFilter, beginDatabaseProcessingFiles, beginFilteringPotentialDuplicates, commitDuplicates, commitDuplicatesFromDialog, createNewDuplicatesProcessingPage, duplicateDiscardUncommitted, duplicateGoBack, duplicateSkip, selectTagFromLocalTagSelector, selectTagFromTagSearchQuery } from "../../../functionality/pages-functionality.js";
-import { BY_DEDUPE_PREVIEW_GALLERY_IMAGE, closeModal, closePage, DEFAULT_TIMEOUT_TIME, doubleClick, findDedupeGalleryImage, findDedupePreviewGalleryImage, findDedupePreviewGalleryImages, modClick, scroll, sendKeys, UNTIL_JOB_BEGIN, UNTIL_JOB_END, untilCountElementsLocated, xpathHelper } from "../../../helpers.js";
+import { applyTagFilter, beginDatabaseProcessingFiles, beginFilteringPotentialDuplicates, commitDuplicates, commitDuplicatesFromDialog, createNewDuplicatesProcessingPage, createNewFileSearchPage, duplicateCurrentIsBetterTrashOther, duplicateDiscardUncommitted, duplicateGoBack, duplicateSkip, selectTagFromLocalTagSelector, selectTagFromTagSearchQuery } from "../../../functionality/pages-functionality.js";
+import { BY_DEDUPE_PREVIEW_GALLERY_IMAGE, BY_THUMBNAIL_GALLERY_IMAGE, closeModal, closePage, DEFAULT_TIMEOUT_TIME, doubleClick, findDedupeGalleryImage, findDedupePreviewGalleryImage, findDedupePreviewGalleryImages, modClick, scroll, selectPage, sendKeys, UNTIL_JOB_BEGIN, UNTIL_JOB_END, untilCountElementsLocated, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
 import { BUG_IMPACTS, BUG_NOTICES, BUG_PRIORITIES, IMPLEMENTATION_DIFFICULTIES } from "../../../unimplemented-test-info.js";
+import { importFilesFromHydrus } from "../../../functionality/file-functionality.js";
 /** @import {TestSuite} from "../../test-suites.js" */
 
 
 /** @type {Record<string, any>} */
 const State = {};
 
-const TEST_TAG_SERVICE_NAME_1 = "TEST TAG SERVICE";
-const TEST_TAG_SERVICE_RENAME_1 = "TAG SERVICE RENAMED";
 const TEST_TAG_1_PAIR = "hairclip";
-const TEST_TAG_2 = "meta:highres";
-const TEST_TAG_3 = "solo";
-const TEST_TAG_4 = "meta:spoilers";
-const TEST_TAG_5 = "meta:commentary";
-
-const SERIES_TAG_1 = "series:toaru majutsu no index";
-
-const TEST_METRIC_SERVICE_1 = "TEST METRIC SERVICE";
-const TEST_METRIC_SERVICE_2 = "OTHER METRIC SERVICE";
-const TEST_METRIC_1_NAME = "TEST RATING";
-const TEST_METRIC_2_NAME = "OTHER METRIC";
+const TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER = "current-is-better-trash-other-test";
+const TEST_TAG_CURRENT_IS_BETTER = "current-is-better-test";
+const TEST_TAG_SAME_QUALITY_TRASH_LARGER = "same-quality-trash-larger-test";
+const TEST_TAG_SAME_QUALITY = "same-quality-test";
+const TEST_TAG_ALTERNATE = "alternate-test";
+const TEST_TAG_FALSE_POSITIVE = "false-positive-test";
 
 /** @type {TestSuite[]} */
 export const DUPLICATES_PROCESSING_PAGE_TESTS = [
     {name: "Setup", isSetup: true, tests: async (driver) => {
+        await importFilesFromHydrus(driver, {fileName: "./e2etest/data/hydrus-duplicates-test.zip"});
         await createNewDuplicatesProcessingPage(driver);
+        await createNewFileSearchPage(driver);
+        await selectPage(driver, 0);
     }},
     {name: "Teardown", isTeardown: true, tests: async (driver) => {
+        await closePage(driver);
         await closePage(driver);
     }},
     {name: "WithDuplicateProcessedFiles", tests: [
@@ -38,7 +36,7 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
             await driver.wait(UNTIL_JOB_END, 10000);
             await driver.wait(until.elementLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME);
         }},
-        // Need to develop an admin tool for resetting p-hashes + duplicates processed
+        // Need to develop an admin tool for resetting p-hashes + a tool under "Modify Taggables" for modifying/deleting file relationships
         {name: "Teardown", isTeardown: true, tests: {
             expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
             priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
@@ -81,11 +79,22 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
                 await duplicateSkip(driver);
                 await commitDuplicatesFromDialog(driver);
             }},
-            {name: "DedupeGalleryShouldTrashCurrentIsBetterTrashOther", tests: {
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-                priority: BUG_PRIORITIES.CURRENT_WORK,
-                impact: BUG_IMPACTS.UNUSABLE,
-                noticeability: BUG_NOTICES.MAJOR
+            {name: "DedupeGalleryShouldTrashCurrentIsBetterTrashOther", tests: async (driver) => {
+                await applyTagFilter(driver, TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER);
+                await selectTagFromLocalTagSelector(driver, TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER);
+                await driver.wait(untilCountElementsLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE, 1), DEFAULT_TIMEOUT_TIME);
+                await beginFilteringPotentialDuplicates(driver);
+                await duplicateCurrentIsBetterTrashOther(driver);
+                await commitDuplicatesFromDialog(driver);
+
+                await driver.wait(untilElementsNotLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME + 2000);
+
+                await selectPage(driver, 1);
+                await applyTagFilter(driver, TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER);
+                await selectTagFromLocalTagSelector(driver, TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER);
+                await driver.wait(untilCountElementsLocated(BY_THUMBNAIL_GALLERY_IMAGE, 1), DEFAULT_TIMEOUT_TIME);
+                await selectTagFromTagSearchQuery(driver, TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER);
+                await selectPage(driver, 0);
             }},
             {name: "DedupeGalleryShouldRemoveCurrentIsBetterFromPotentialsPending", tests: {
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,

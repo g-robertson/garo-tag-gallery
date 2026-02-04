@@ -1,20 +1,19 @@
 /**
- * @import {APIFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
  */
 
-import { z } from "zod";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { AppliedMetrics, LocalMetricServices } from "../../db/metrics.js";
-import { LocalTaggableServices } from "../../db/taggables.js";
+import { PERMISSIONS } from "../../client/js/user.js";
+import { AppliedMetrics } from "../../db/metrics.js";
+import { Z_DATABASE_ID, Z_METRIC_VALUE, Z_TAGGABLE_ID } from "../zod-types.js";
 
 export async function validate(dbs, req, res) {
-    const taggableID = z.coerce.bigint().nonnegative().safeParse(req?.body?.taggableID, {path: ["taggableID"]});
+    const taggableID = Z_TAGGABLE_ID.safeParse(req?.body?.taggableID, {path: ["taggableID"]});
     if (!taggableID.success) return taggableID.error.message;
 
-    const localMetricID = z.coerce.number().nonnegative().int().safeParse(req?.body?.localMetricID, {path: ["localMetricID"]});
+    const localMetricID = Z_DATABASE_ID.safeParse(req?.body?.localMetricID, {path: ["localMetricID"]});
     if (!localMetricID.success) return localMetricID.error.message;
 
-    const metricValue = z.coerce.number().finite().safeParse(req?.body?.metricValue, {path: ["metricValue"]});
+    const metricValue = Z_METRIC_VALUE.safeParse(req?.body?.metricValue, {path: ["metricValue"]});
     if (!metricValue.success) return metricValue.error.message;
 
     return {
@@ -24,22 +23,18 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = [{
-    TYPE: PERMISSIONS.LOCAL_METRIC_SERVICES,
-    BITS: PERMISSION_BITS.READ
-}, {
-    TYPE: PERMISSIONS.LOCAL_TAGGABLE_SERVICES,
-    BITS: PERMISSION_BITS.READ
-}];
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    const localMetricServiceToCheck = await LocalMetricServices.selectByLocalMetricID(dbs, req.body.localMetricID);
-    const localMetricService = await LocalMetricServices.userSelectByID(dbs, req.user, PERMISSION_BITS.READ, localMetricServiceToCheck.Local_Metric_Service_ID);
-
-    const localTaggableServiceToCheck = await LocalTaggableServices.selectByTaggableID(dbs, req.body.taggableID);
-    const localTaggableService = await LocalTaggableServices.userSelectByID(dbs, req.user, PERMISSION_BITS.READ, localTaggableServiceToCheck.Local_Taggable_Service_ID);
-    
-    return localMetricService !== undefined && localTaggableService !== undefined;
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [
+            PERMISSIONS.LOCAL_METRIC_SERVICES.APPLY_METRIC,
+            PERMISSIONS.LOCAL_TAGGABLE_SERVICES.READ_TAGGABLES
+        ],
+        objects: {
+            Local_Metric_IDs: [req.body.localMetricID],
+            Taggable_IDs: [req.body.taggableID]
+        }
+    };
 }
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */

@@ -11,42 +11,30 @@ import { executeFunctions, ReferenceableReact } from '../js/client-util.js';
  * @property {string} pageDisplayName
  * @property {string} pageID
  * @property {any} persistentState
- * @property {Record<string, any>} extraProperties
 */
 
 const PageElement = () => {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
+    const FullPage = ReferenceableReact();
+    const PageTitle = ReferenceableReact();
     const PageContents = ReferenceableReact();
 
     const onAdd = () => {
         const onCurrentPageChanged = () => {
             const page = Pages.Global().currentPage;
             if (page === undefined) {
-                PageContents.dom.textContent = "";
+                // Removes all children
+                PageContents.dom.replaceChildren();
+                FullPage.dom.style.display = "none";
                 return;
             }
-            
-            PageContents.dom.replaceChildren(...(<dom>
-                <div className="page-topbar">
-                    <div className="page-topbar-right">
-                        <div className="page-title">{page.pageDisplayName}</div>
-                        <div className="page-cancel" onClick={() => {
-                            Pages.Global().removePage(page)
-                        }}>X</div>
-                    </div>
-                </div>
-                <div className="page-contents">
-                    {(() => {
-                        if (page.pageType === FILE_SEARCH_PAGE_NAME) {
-                            return <FileSearchPage page={page} />
-                        } else if (page.pageType === DUPLICATES_PROCESSING_PAGE_NAME) {
-                            return <DuplicatesProcessingPage page={page} />
-                        }
-                    })()}
-                </div>
-            </dom>));
+
+            FullPage.dom.style.display = "flex";
+            PageTitle.dom.textContent = page.pageDisplayName;
+
+            PageContents.dom.replaceChildren(...page.dom);
         }
         onCurrentPageChanged();
 
@@ -55,7 +43,19 @@ const PageElement = () => {
     };
 
 
-    return PageContents.react(<div onAdd={onAdd} className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}></div>);
+    return FullPage.react(
+        <div onAdd={onAdd} className="page" style={{marginLeft: 8, marginRight: 8, width: "calc(100% - 16px)" }}>
+            <div className="page-topbar">
+                <div className="page-topbar-right">
+                    {PageTitle.react(<div className="page-title"></div>)}
+                    <div className="page-cancel" onClick={() => {
+                        Pages.Global().removePage(Pages.Global().currentPage)
+                    }}>X</div>
+                </div>
+            </div>
+            {PageContents.react(<div className="page-contents"></div>)}
+        </div>
+    );
 };
 
 export default PageElement;

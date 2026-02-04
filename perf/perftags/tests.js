@@ -4,7 +4,7 @@ import DOES_NOT_CRASH_TESTS from "./tests/does-not-crash.js";
 import DOES_HE_PERFORM_TESTS from "./tests/does-he-perform.js";
 import LOAD_TESTS from "./tests/load-tests.js";
 import IN_PRACTICE_TESTS from "./tests/in-practice-tests.js";
-import PerfTags from "../src/perf-tags-binding/perf-tags.js";
+import PerfTags from "../../src/perf-tags-binding/perf-tags.js";
 
 const TESTS = {
     ...IN_PRACTICE_TESTS,

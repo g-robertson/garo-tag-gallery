@@ -481,6 +481,7 @@ export async function drag(driver, element, direction) {
  * }} options 
  */
 export async function modClick(driver, element, options) {
+    options ??= {};
     options.ctrl ??= false;
     options.shift ??= false;
 

@@ -2,7 +2,7 @@ import '../global.css';
 import getPartialUploadSelections from '../../api/client-get/partial-upload-selections.js';
 import getPartialUploadSelectionFragments from '../../api/client-get/partial-upload-selection-fragments.js';
 import { executeFunctions, ReferenceableReact } from '../js/client-util.js';
-import { State } from '../page/pages.js';
+import { State } from '../js/state.js';
 import postPartialFile from '../../api/client-get/partial-file.js';
 import getNonPartialUploadCursor, { NOT_A_PARTIAL_UPLOAD } from '../../api/client-get/non-partial-upload-cursor.js';
 

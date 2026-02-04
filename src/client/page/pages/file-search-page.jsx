@@ -5,7 +5,8 @@ import LazyThumbnailGallery from '../../components/lazy-thumbnail-gallery.jsx';
 import GalleryModal from '../../modal/modals/gallery.jsx';
 import ModifyTaggablesModal from '../../modal/modals/modify-taggables.jsx';
 import { trashTaggables } from '../../../api/client-get/trash-taggables.js';
-import { Page, PersistentState, State, ConstState } from '../../page/pages.js';
+import { Page} from "../pages.js";
+import { PersistentState, State, ConstState } from '../../js/state.js';
 import { Modals } from '../../modal/modals.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 import { FetchCache } from '../../js/fetch-cache.js';
@@ -26,14 +27,14 @@ const FileSearchPageElement = ({page}) => {
     const selectedTaggableIDsState = new State([]);
     const clientSearchQueryState = new State(null);
     const localTagServiceIDsState = new State([]);
-    const searchTaggablesResultState = page.persistentState.registerState("searchTaggablesResult", FetchCache.Global().searchTaggablesConstState(
+    const searchTaggablesResultState = FetchCache.Global().searchTaggablesConstState(
         clientSearchQueryState,
         ConstState.instance("Taggable"),
         ConstState.instance("Taggable_ID"),
         localTagServiceIDsState,
         addToCleanup,
         {waitForSet: true}
-    ), {addToCleanup});
+    );
     const [taggableCursorConstState, taggableIDsConstState] = searchTaggablesResultState.asAtomicTransforms([
         taggablesResult => taggablesResult.cursor,
         taggablesResult => taggablesResult.result
@@ -60,7 +61,7 @@ const FileSearchPageElement = ({page}) => {
                         clientSearchQueryState.set(clientSearchQuery);
                         localTagServiceIDsState.set(localTagServiceIDs);
                     }}
-                    persistentState={page.persistentState.registerState("tagsSelector", new PersistentState())}
+                    persistentState={page.persistentState.registerState("tagsSelector", new PersistentState(), {addToCleanup})}
                 />
             </div>
             <div style={{width: "auto", flex: 3, flexDirection: "column", height: "100%"}}>

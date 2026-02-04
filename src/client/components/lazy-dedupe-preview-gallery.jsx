@@ -2,7 +2,7 @@ import '../global.css';
 import LazySelector from './lazy-selector.jsx';
 import selectFiles from '../../api/client-get/select-files.js';
 import { preloadImg, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
-import { ConstState } from '../page/pages.js';
+import { ConstState } from '../js/state.js';
 
 const THUMB_ORIGINAL_WIDTH = 300;
 const THUMB_ORIGINAL_HEIGHT = 200;

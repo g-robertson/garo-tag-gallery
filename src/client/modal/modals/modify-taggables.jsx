@@ -2,12 +2,12 @@ import '../../global.css';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import DialogBox from './dialog-box.jsx';
 import { mapNullCoalesce } from '../../js/client-util.js';
-import { updateTaggables } from '../../../api/client-get/update-taggables.js';
+import { updateTaggables } from '../../../api/client-get/update-tags-on-taggables.js';
 import { Modals } from '../modals.js';
-import { State } from '../../page/pages.js';
+import { State } from '../../js/state.js';
 import { User } from '../../js/user.js';
 
-/** @import {ConstState, State} from "../../page/pages.js" */
+/** @import {ConstState, State} from "../../js/state.js" */
 /** @import {ClientSearchQuery} from "../../components/tags-selector.jsx" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 const UNKNOWN_OP_TAGS = -1;

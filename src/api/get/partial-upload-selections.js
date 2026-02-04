@@ -1,18 +1,19 @@
 /**
- * @import {APIFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
  */
 
-import { PERMISSIONS } from "../../client/js/user.js";
 import { PARTIAL_ZIPS_FOLDER } from "../../db/db-util.js";
 import { readdir } from "fs/promises";
 import { NOT_A_PARTIAL_UPLOAD } from "../client-get/non-partial-upload-cursor.js";
 
 export async function validate(dbs, req, res) {}
 
-export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.NONE, BITS: 0};
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    return false;
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [],
+        objects: {}
+    };
 }
 
 

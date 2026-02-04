@@ -412,6 +412,7 @@ void TagFileMaintainer::readTaggablesSpecifiedTags(std::string_view input, void 
     }
 
     uint64_t taggableCount = util::deserializeUInt64(input);
+    input = input.substr(8);
     std::vector<uint64_t> tagsToWrite;
     for (std::size_t i = 0; i < taggableCount; ++i) {
         uint64_t taggable = util::deserializeUInt64(input);

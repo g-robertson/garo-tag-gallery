@@ -1,4 +1,4 @@
-import { State } from "../page/pages.js";
+import { State } from "../js/state.js";
 
 /**
  * 

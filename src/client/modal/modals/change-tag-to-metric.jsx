@@ -4,10 +4,10 @@ import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import LocalTagsSelector from '../../components/local-tags-selector.jsx';
 import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
 import { User } from '../../js/user.js';
-import { State } from '../../page/pages.js';
+import { State } from '../../js/state.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {State} from "../../page/pages.js" */
+/** @import {State} from "../../js/state.js" */
 /** @import {ClientQueryTag} from "../../../api/client-get/tags-from-local-tag-services.js" */
 
 export default function ChangeTagToMetricModal() {

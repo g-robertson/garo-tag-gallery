@@ -1,5 +1,5 @@
 import { TEST_DEFAULT_PERF_WRITE_INPUT, TEST_DEFAULT_PERF_TAGS_ARGS } from "./helpers.js";
-import PerfTags from "../../src/perf-tags-binding/perf-tags.js"
+import PerfTags from "../../../src/perf-tags-binding/perf-tags.js"
 import { copyFileSync, mkdirSync, readdirSync, readFileSync } from "fs";
 import path, { dirname } from "path";
 /** @import {TestFunction} from "./helpers.js" */

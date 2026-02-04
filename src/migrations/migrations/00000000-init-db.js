@@ -3,6 +3,7 @@ import { DEFAULT_ADMINISTRATOR_PERMISSION_ID, DEFAULT_ADMINISTRATOR_USER_ID } fr
 import { insertsystemtag } from "../../db/tags.js";
 import { DEFAULT_LOCAL_TAG_SERVICE, HAS_NOTES_TAG, HAS_URL_TAG, IN_TRASH_TAG, IS_FILE_TAG, IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG, LAST_SYSTEM_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
 import { DEFAULT_LOCAL_TAGGABLE_SERVICE } from "../../client/js/taggables.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 
 const accessKey = dbGenerateAccessKey();
 
@@ -16,117 +17,49 @@ export const MIGRATION = {
         dbsqlcommand(`
             CREATE TABLE Permission_Sets(
                 Permission_Set_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Permission_Set_Name TEXT NOT NULL,
-
-                User_Management_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_Taggable_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_Taggable_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Global_Taggable_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Global_Taggable_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Local_Metric_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_Metric_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Global_Metric_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Global_Metric_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Local_Tag_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_Tag_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Global_Tag_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Global_Tag_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Local_Tag_Relations_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_Tag_Relations_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Global_Tag_Relations_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Global_Tag_Relations_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Local_URL_Generator_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_URL_Generator_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Global_URL_Generator_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Global_URL_Generator_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Local_URL_Classifier_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_URL_Classifier_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Global_URL_Classifier_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Global_URL_Classifier_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Local_Parser_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Local_Parser_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-                Global_Parser_Services_Permission INTEGER NOT NULL DEFAULT 0,
-                Global_Parser_Services_Byte_Transfer_Limit INTEGER DEFAULT 0,
-
-                Settings_Permission INTEGER NOT NULL DEFAULT 0,
-                Advanced_Settings_Permission INTEGER NOT NULL DEFAULT 0
+                Permission_Set_Name TEXT NOT NULL
             );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Permission_Sets_Permissions(
+                Permission_Sets_Permissions_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Permission_Set_ID INTEGER NOT NULL,
+                Permission TEXT NOT NULL
+            ); 
         `),
         dbsqlcommand(`
             INSERT INTO Permission_Sets(
                 Permission_Set_ID,
-                Permission_Set_Name,
-                User_Management_Permission,
-                Local_Taggable_Services_Permission,
-                Local_Taggable_Services_Byte_Transfer_Limit,
-                Global_Taggable_Services_Permission,
-                Global_Taggable_Services_Byte_Transfer_Limit,
-                Local_Metric_Services_Permission,
-                Local_Metric_Services_Byte_Transfer_Limit,
-                Global_Metric_Services_Permission,
-                Global_Metric_Services_Byte_Transfer_Limit,
-                Local_Tag_Services_Permission,
-                Local_Tag_Services_Byte_Transfer_Limit,
-                Global_Tag_Services_Permission,
-                Global_Tag_Services_Byte_Transfer_Limit,
-                Local_Tag_Relations_Services_Permission,
-                Local_Tag_Relations_Services_Byte_Transfer_Limit,
-                Global_Tag_Relations_Services_Permission,
-                Global_Tag_Relations_Services_Byte_Transfer_Limit,
-                Local_URL_Generator_Services_Permission,
-                Local_URL_Generator_Services_Byte_Transfer_Limit,
-                Global_URL_Generator_Services_Permission,
-                Global_URL_Generator_Services_Byte_Transfer_Limit,
-                Local_URL_Classifier_Services_Permission,
-                Local_URL_Classifier_Services_Byte_Transfer_Limit,
-                Global_URL_Classifier_Services_Permission,
-                Global_URL_Classifier_Services_Byte_Transfer_Limit,
-                Local_Parser_Services_Permission,
-                Local_Parser_Services_Byte_Transfer_Limit,
-                Global_Parser_Services_Permission,
-                Global_Parser_Services_Byte_Transfer_Limit,
-                Settings_Permission,
-                Advanced_Settings_Permission
+                Permission_Set_Name
             ) VALUES (
                 $defaultAdminPermissionId, /* ID */
-                'Default Administrator Permission Set',
-                15, /* User_Management_Permission */
-                15, /* Local_Taggable_Services_Permission */
-                NULL,
-                15, /* Global_Taggable_Services_Permission */
-                NULL,
-                15, /* Local_Metric_Services_Permission */
-                NULL,
-                15, /* Global_Metric_Services_Permission */
-                NULL,
-                15, /* Local_Tag_Services_Permission */
-                NULL,
-                15, /* Global_Tag_Services_Permission, */
-                NULL,
-                15, /* Local_Tag_Relations_Services_Permission */
-                NULL,
-                15, /* Global_Tag_Relations_Services_Permission */
-                NULL,
-                15, /* Local_URL_Generator_Services_Permission */
-                NULL,
-                15, /* Global_URL_Generator_Services_Permission */
-                NULL,
-                15, /* Local_URL_Classifier_Services_Permission */
-                NULL,
-                15, /* Global_URL_Classifier_Services_Permission */
-                NULL,
-                15, /* Local_Parser_Services_Permission */
-                NULL,
-                15, /* Global_Parser_Services_Permission */
-                NULL,
-                15, /* Settings_Permission */
-                15 /* Advanced_Settings_Permission */
+                'Default Administrator Permission Set'
             );
             `,
             {
                 $defaultAdminPermissionId: DEFAULT_ADMINISTRATOR_PERMISSION_ID
             }
         ),
+        ...[
+            ...Object.values(PERMISSIONS.ADMINISTRATIVE),
+            ...Object.values(PERMISSIONS.LOCAL_TAG_SERVICES),
+            ...Object.values(PERMISSIONS.LOCAL_TAGGABLE_SERVICES),
+            ...Object.values(PERMISSIONS.LOCAL_METRIC_SERVICES),
+            ...Object.values(PERMISSIONS.LOCAL_URL_GENERATOR_SERVICES),
+        ].map(permission => dbsqlcommand(`
+                INSERT INTO Permission_Sets_Permissions(
+                    Permission_Set_ID,
+                    Permission
+                ) VALUES (
+                    $defaultAdminPermissionId,
+                    $permission
+                );
+            `,
+            {
+                $defaultAdminPermissionId: DEFAULT_ADMINISTRATOR_PERMISSION_ID,
+                $permission: permission.name
+            }
+        )),
         dbsqlcommand(`
             CREATE TABLE Users(
                 User_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -352,7 +285,7 @@ export const MIGRATION = {
                 Service_User_Permission_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Service_ID INTEGER NOT NULL,
                 User_ID INTEGER NOT NULL,
-                Permission_Extent INTEGER NOT NULL
+                Permission TEXT NOT NULL
             );
         `),
         dbsqlcommand(`

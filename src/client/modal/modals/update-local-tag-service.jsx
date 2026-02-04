@@ -5,7 +5,7 @@ import LocalTagServiceModifications from '../../components/local-tag-service-mod
 import deleteLocalTagService from '../../../api/client-get/delete-local-tag-service.js';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
-import { State } from '../../page/pages.js';
+import { State } from '../../js/state.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
 export default function UpdateLocalTagService() {

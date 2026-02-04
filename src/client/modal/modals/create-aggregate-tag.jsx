@@ -9,10 +9,10 @@ import NumericInput from '../../components/numeric-input.jsx';
 import { clientSearchQueryToDisplayName } from '../../js/tags.js';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
-import { State } from '../../page/pages.js';
+import { State } from '../../js/state.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {State} from "../../page/pages.js" */
+/** @import {State} from "../../js/state.js" */
 /** @import {ClientAggregateTag, ClientAggregateTagCondition, ClientComparator, ClientSearchTag} from "../../../api/post/search-taggables.js" */
 /** @import {DisplayClientTagGroup} from "../../components/tag-groups-selector.jsx" */
 

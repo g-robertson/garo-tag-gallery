@@ -20,6 +20,7 @@ import { readdir } from 'fs/promises';
 import { CursorManager, getCursorAsPath } from './src/db/cursor-manager.js';
 import PerfHashCmp from './src/perf-tags-binding/perf-hash-cmp.js';
 import { NOT_A_PARTIAL_UPLOAD } from './src/api/client-get/non-partial-upload-cursor.js';
+import { checkPermissions } from './src/api/check-permissions.js';
 /** @import {User} from "./src/client/js/user.js" */
 /** @import {APIEndpoint} from "./src/api/api-types.js" */
 
@@ -135,47 +136,22 @@ async function main() {
     /** @type {Map<string, APIEndpoint>} */
     const apis = new Map();
     const apiDirs = ["api/get", "api/post"];
-    const VALID_PERMISSIONS = Object.values(PERMISSIONS);
     for (const apiDir of apiDirs) {
         for (const apiFile of readdirSync(`src/${apiDir}`)) {
             const apiPath = `./src/${apiDir}/${apiFile}`;
             /** @type {APIEndpoint} */
-            const api = await import(apiPath);
-            let permissionsRequired = api.PERMISSIONS_REQUIRED
-            if (!(permissionsRequired instanceof Array)) {
-                permissionsRequired = [permissionsRequired];
-            }
-
-            const BAD_PERMISSION_IMPORT_ERROR = `Importing ${apiPath}: PERMISSIONS_REQUIRED is a required export for API endpoints and must be of type {
-                PERMISSION_TYPE: PermissionType
-                PERMISSION_BITS: PermissionInt
-            }[]`;
-            for (const permissionRequired of permissionsRequired) {
-                const {TYPE, BITS} = permissionRequired;
-                if (VALID_PERMISSIONS.indexOf(TYPE) === -1) {
-                    throw BAD_PERMISSION_IMPORT_ERROR;
-                }
-                if (!Number.isSafeInteger(BITS) || BITS < 0 || BITS > 15) {
-                    throw BAD_PERMISSION_IMPORT_ERROR;
-                }
-            }
-            if (permissionsRequired.length === 0) {
-                throw BAD_PERMISSION_IMPORT_ERROR;
-            }
-            if (typeof api.default !== "function") {
+            const apiEndpoint = await import(apiPath);
+            if (typeof apiEndpoint.default !== "function") {
                 throw `Importing ${apiPath}: API endpoints must default export the function used to call them`;
             }
-            if (typeof api.checkPermission !== "function") {
-                throw `Importing ${apiPath}: API endpoints must have an export to check permissions with signature checkPermission(dbs, req, res)`;
+            if (typeof apiEndpoint.getPermissions !== "function") {
+                throw `Importing ${apiPath}: API endpoints must have an export to get permissions with signature getPermissions(dbs, req, res)`;
             }
-            if (typeof api.validate !== "function") {
+            if (typeof apiEndpoint.validate !== "function") {
                 throw `Importing ${apiPath}: API endpoints must have an export to check if the request has a valid body with signature validate(dbs, req, res)`;
             }
 
-            apis.set(`/${apiDir}/${apiFile.slice(0, -3)}`, {
-                ...api,
-                permissionsRequired
-            });
+            apis.set(`/${apiDir}/${apiFile.slice(0, -3)}`, apiEndpoint);
         }
     }
 
@@ -272,22 +248,17 @@ async function main() {
                 return res.status(400).send("Invalid method path was provided");
             }
 
-            let canPerformAction = false;
             const validationResult = await api.validate(dbs, req, res);
             if (typeof validationResult === "string") {
                 return res.status(400).send(validationResult);
             } else {
                 req.body = validationResult;
             }
-            let userHasGlobalPermissions = true;
-            for (const {TYPE, BITS} of api.permissionsRequired) {
-                userHasGlobalPermissions &&= user.hasPermissions(BITS, TYPE);
-            }
-            canPerformAction ||= userHasGlobalPermissions;
-            canPerformAction ||= await api.checkPermission(dbs, req, res);
 
-            if (!canPerformAction) {
-                return res.redirect("/403");
+            const permissionsRequired = await api.getPermissions(dbs, req, res);
+            const permissionResult = await checkPermissions(dbs, req, res, permissionsRequired);
+            if (!permissionResult.success) {
+                return res.status(403).send(permissionResult.message);
             }
 
             req.apiToCall = api.default;

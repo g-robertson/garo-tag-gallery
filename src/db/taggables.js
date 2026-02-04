@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, IN_TRASH_TAG, IS_FILE_TAG, isURLAssociationTagLookupName, normalizeFileExtension,revertURLAssociationTagLookupName,SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
-import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
+import { PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-tags-binding/perf-tags.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbtuples, dbvariablelist, TMP_FOLDER} from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
@@ -16,7 +16,7 @@ import { mapNullCoalesce } from "../client/js/client-util.js";
 /** @import {URLAssociation} from "../client/js/tags.js" */
 /** @import {DBAppliedMetric, PreInsertLocalMetric} from "./metrics.js" */
 /** @import {DBService} from "./services.js" */
-/** @import {DBUser, PermissionInt} from "./user.js" */
+/** @import {DBUser} from "./user.js" */
 /** @import {Databases} from "./db-util.js" */
 /** @import {DBLocalTag, UserFacingLocalTag, UserFacingLocalTagGroup} from "./tags.js" */
 /** @import {DBPermissionedLocalMetricService} from "./metrics.js" */
@@ -34,7 +34,7 @@ import { mapNullCoalesce } from "../client/js/client-util.js";
  * @typedef {DBJoinedLocalTaggableService & {In_Local_Taggable_Service_Tag: DBLocalTag}} TagMappedDBJoinedLocalTaggableService
  */
 
-/** @typedef {DBJoinedLocalTaggableService & {Permission_Extent: PermissionInt}} DBPermissionedLocalTaggableService */
+/** @typedef {DBJoinedLocalTaggableService & {Permissions: Set<string>}} DBPermissionedLocalTaggableService */
 
 export class LocalTaggableServices {
     /**
@@ -96,7 +96,7 @@ export class LocalTaggableServices {
 
         return new Map([...taggablePairings].map(([taggable, inLocalTaggableServiceTagID]) => [
             taggable,
-            allLocalTaggableServicesMap.get(inLocalTaggableServiceTagID)
+            allLocalTaggableServicesMap.get(inLocalTaggableServiceTagID[0])
         ]));
     }
 
@@ -116,7 +116,7 @@ export class LocalTaggableServices {
 
     /**
      * @param {Databases} dbs 
-     * @param {bigint[]} taggableID 
+     * @param {bigint} taggableID 
      */
     static async selectByTaggableID(dbs, taggableID) {
         return (await LocalTaggableServices.selectManyByTaggableIDs(dbs, [taggableID]))[0];
@@ -159,31 +159,35 @@ export class LocalTaggableServices {
         return localTaggableServices;
     }
 
-    
     /**
      * @param {Databases} dbs 
      * @param {User} user
-     * @param {PermissionInt} permissionBitsToCheck
+     * @param {string[]} permissionsToCheck
      * @param {number[]} localTaggableServiceIDs
      */
-    static async userSelectManyByIDs(dbs, user, permissionBitsToCheck, localTaggableServiceIDs) {
-        if (user.isSudo() || user.hasPermissions(permissionBitsToCheck, PERMISSIONS.LOCAL_TAG_SERVICES)) {
+    static async userSelectManyByIDs(dbs, user, permissionsToCheck, localTaggableServiceIDs) {
+        if (user.isSudo() || user.hasPermissions(permissionsToCheck)) {
             return await LocalTaggableServices.selectManyByIDs(dbs, localTaggableServiceIDs);
         }
 
         /** @type {DBJoinedLocalTaggableService[]} */
         const localTaggableServices = await dballselect(dbs, `
             SELECT LTS.*, S.*
-              FROM Local_Taggable_Services LTS
-              JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
-              JOIN Services S ON LTS.Service_ID = S.Service_ID
-             WHERE SUP.User_ID = ?
-               AND (SUP.Permission_Extent & ?) = ?
-               AND LTS.Local_Taggable_Service_ID IN ${dbvariablelist(localTaggableServiceIDs.length)};
+            FROM Local_Taggable_Services LTS
+            JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
+            JOIN Services S ON LTS.Service_ID = S.Service_ID
+            WHERE (
+                SELECT COUNT(1)
+                FROM Services_Users_Permissions SUP
+                WHERE LTS.Service_ID = SUP.Service_ID
+                AND SUP.User_ID = ?
+                AND SUP.Permission IN ${dbvariablelist(permissionsToCheck.length)}
+            ) = ?
+            AND LTS.Local_Taggable_Service_ID IN ${dbvariablelist(localTaggableServiceIDs.length)};
         `, [
             user.id(),
-            permissionBitsToCheck,
-            permissionBitsToCheck,
+            permissionsToCheck,
+            permissionsToCheck.length,
             ...localTaggableServiceIDs
         ]);
 
@@ -194,35 +198,33 @@ export class LocalTaggableServices {
     /**
      * @param {Databases} dbs 
      * @param {User} user 
-     * @param {PermissionInt} permissionBitsToCheck 
+     * @param {string[]} permissionsToCheck 
      * @param {number} localTaggableServiceID
      */
-    static async userSelectByID(dbs, user, permissionBitsToCheck, localTaggableServiceID) {
-        return (await LocalTaggableServices.userSelectManyByIDs(dbs, user, permissionBitsToCheck, [localTaggableServiceID]))[0];
+    static async userSelectByID(dbs, user, permissionsToCheck, localTaggableServiceID) {
+        return (await LocalTaggableServices.userSelectManyByIDs(dbs, user, permissionsToCheck, [localTaggableServiceID]))[0];
     }
     
     /**
      * @param {Databases} dbs 
      * @param {User} user 
-     * @param {PermissionInt=} permissionBitsToCheck
+     * @param {string[]=} permissionsToCheck
      */
-    static async userSelectAll(dbs, user, permissionBitsToCheck) {
+    static async userSelectAll(dbs, user, permissionsToCheck) {
         return await userSelectAllSpecificTypedServicesHelper(
             dbs,
             user,
-            PERMISSIONS.LOCAL_TAGGABLE_SERVICES,
             LocalTaggableServices.selectAll,
             async () => {
-                return (await dballselect(dbs, `
-                    SELECT SUP.Permission_Extent, LTS.*, S.*
+                return await dballselect(dbs, `
+                    SELECT LTS.Local_Taggable_Service_ID, SUP.Permission
                       FROM Local_Taggable_Services LTS
                       JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
-                      JOIN Services S ON LTS.Service_ID = S.Service_ID
                      WHERE SUP.User_ID = $userID;
-                `, {$userID: user.id()}));
+                `, {$userID: user.id()});
             },
             "Local_Taggable_Service_ID",
-            permissionBitsToCheck
+            permissionsToCheck
         );
     }
 
@@ -235,7 +237,7 @@ export class LocalTaggableServices {
         dbs = await dbBeginTransaction(dbs);
 
         const serviceID = await Services.insert(dbs, serviceName);
-        await ServicesUsersPermissions.insert(dbs, serviceID, userID, PERMISSION_BITS.ALL);
+        await ServicesUsersPermissions.insertMany(dbs, serviceID, userID, Object.values(PERMISSIONS.LOCAL_TAGGABLE_SERVICES).map(permission => permission.name));
 
         /** @type {number} */
         const localTaggableServiceID = (await dbget(dbs, `
@@ -455,7 +457,7 @@ export class Taggables {
      * @param {User} user
      */
     static async searchWithUser(dbs, searchCriteria, user) {
-        const taggableServices = await LocalTaggableServices.userSelectAll(dbs, user, PERMISSION_BITS.READ);
+        const taggableServices = await LocalTaggableServices.userSelectAll(dbs, user, PERMISSIONS.LOCAL_TAGGABLE_SERVICES.READ_TAGGABLES);
         const inLocalTaggableServicesTags = await LocalTaggableServices.selectTagMappings(dbs, taggableServices.map(taggableService => taggableService.Local_Taggable_Service_ID));
         return await Taggables.search(dbs, searchCriteria, inLocalTaggableServicesTags.map(tag => tag.Tag_ID));
     }
@@ -898,7 +900,7 @@ function preparePreInsertLocalFile(preInsertLocalFile, dbFile) {
 /**
  * @typedef {DBFile & DBLocalFile} DBJoinedLocalFile
  */
-/** @typedef {Omit<DBJoinedLocalFile, "Taggable_ID"> & {Taggable_ID: bigint[]}} DedupedDBJoinedLocalFile */
+/** @typedef {Omit<DBJoinedLocalFile, "Taggable_ID"> & {Taggable_ID: bigint[]}} TaggableGroupedDBJoinedLocalFile */
 
 /**
  * @param {DBLocalFile} dbLocalFile 
@@ -916,8 +918,8 @@ export class LocalFiles {
     /**
      * @param {DBJoinedLocalFile[]} localFiles 
      */
-    static dedupeLocalFilesTaggables(localFiles) {
-        /** @type {Map<number, DedupedDBJoinedLocalFile>} */
+    static groupLocalFilesTaggables(localFiles) {
+        /** @type {Map<number, TaggableGroupedDBJoinedLocalFile>} */
         let files = new Map();
         for (const file of localFiles) {
             const mapFile = mapNullCoalesce(files, file.File_ID, {

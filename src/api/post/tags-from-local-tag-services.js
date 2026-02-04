@@ -1,14 +1,13 @@
 /**
- * @import {APIFunction, APIValidationFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction, APIValidationFunction} from "../api-types.js"
  */
 
 import { z } from "zod";
-import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { UserFacingLocalTags, LocalTagServices } from "../../db/tags.js";
+import { PERMISSIONS } from "../../client/js/user.js";
+import { UserFacingLocalTags } from "../../db/tags.js";
 import PerfTags from "../../perf-tags-binding/perf-tags.js";
 import { getCursorAsTaggableIDs } from "../../db/cursor-manager.js";
-import { bjsonStringify } from "../../client/js/client-util.js";
+import { Z_USER_LOCAL_TAG_SERVICE_ID } from "../zod-types.js";
 
 /**
  * @param {Parameters<APIValidationFunction>[0]} dbs 
@@ -16,15 +15,13 @@ import { bjsonStringify } from "../../client/js/client-util.js";
  * @param {Parameters<APIValidationFunction>[2]} res 
  */
 export async function validate(dbs, req, res) {
-    const localTagServiceIDs = z.array(z.coerce.number().nonnegative().int()
-        .refine(num => num !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID, {"message": "Cannot lookup tags in system local tag service"})
-    ).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
+    const localTagServiceIDs = z.array(Z_USER_LOCAL_TAG_SERVICE_ID).safeParse(req?.body?.localTagServiceIDs, {path: ["localTagServiceIDs"]});
     if (!localTagServiceIDs.success) return localTagServiceIDs.error.message;
     
-    const taggableCursor = z.string().or(z.undefined()).safeParse(req?.body?.taggableCursor, {path: ["taggableCursor"]});
+    const taggableCursor = z.optional(z.string()).safeParse(req?.body?.taggableCursor, {path: ["taggableCursor"]});
     if (!taggableCursor.success) return taggableCursor.error.message;
 
-    const taggableIDsRequested = z.array(z.number()).or(z.undefined()).safeParse(req?.body?.taggableIDs, {path: ["taggableIDs"]});
+    const taggableIDsRequested = z.optional(z.array(z.number())).safeParse(req?.body?.taggableIDs, {path: ["taggableIDs"]});
     if (!taggableIDsRequested.success) return taggableIDsRequested.error.message;
 
     let taggableIDs = getCursorAsTaggableIDs(dbs.cursorManager.getCursorForUser(req.user.id(), taggableCursor.data));
@@ -46,15 +43,24 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = {
-    TYPE: PERMISSIONS.LOCAL_TAG_SERVICES,
-    BITS: PERMISSION_BITS.READ
-};
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    const localTagServiceIDsToCheck = req.body.localTagServiceIDs;
-    const localTagServices = await LocalTagServices.userSelectManyByIDs(dbs, req.user, PERMISSION_BITS.READ, localTagServiceIDsToCheck);
-    return localTagServices.length === localTagServiceIDsToCheck.length;
+
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    const permissions = [];
+    if (req.body.localTagServiceIDs.length !== 0) {
+        permissions.push(PERMISSIONS.LOCAL_TAG_SERVICES.READ_TAGS);
+    }
+    if (req.body.taggableIDs !== undefined && req.body.taggableIDs.length !== 0) {
+        permissions.push(PERMISSIONS.LOCAL_TAGGABLE_SERVICES.READ_TAGGABLES);
+    }
+
+    return {
+        permissions,
+        objects: {
+            Taggable_IDs: req.body.taggableIDs,
+            Local_Tag_Service_IDs: req.body.localTagServiceIDs
+        }
+    };
 }
 
 

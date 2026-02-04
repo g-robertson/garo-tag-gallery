@@ -3,7 +3,7 @@ import LocalMetricSelector from '../../components/local-metric-selector.jsx';
 import NumericInput from '../../components/numeric-input.jsx';
 import { Modals } from '../../modal/modals.js';
 import { User } from '../../js/user.js';
-import { State } from '../../page/pages.js';
+import { State } from '../../js/state.js';
 
 /** @import {DBLocalMetric} from "../../../db/metrics.js" */
 /** @import {ClientComparator, ClientSearchTagHasMetricID, ClientSearchTagInLocalMetricServiceID, ClientSearchTagLocalMetricComparison} from "../../../api/post/search-taggables.js" */

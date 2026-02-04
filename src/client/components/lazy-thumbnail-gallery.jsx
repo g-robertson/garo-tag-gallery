@@ -8,7 +8,7 @@ const THUMB_ORIGINAL_HEIGHT = 200;
 const THUMB_WIDTH = 150;
 const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH);
 
-/** @import {ConstState} from "../page/pages.js" */
+/** @import {ConstState} from "../js/state.js" */
 /** @import {DBUserFacingLocalFile} from "../../db/taggables.js" */
 
 /**

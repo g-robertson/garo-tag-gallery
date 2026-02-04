@@ -1,23 +1,23 @@
 /**
- * @import {APIFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
  */
 
 import { abjsonStringify } from "../../client/js/client-util.js";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 import { IMPORTABLE_TYPES } from "../../db/import.js";
 import { LocalMetricServices } from "../../db/metrics.js";
 import { LocalTaggableServices, Taggables, UserFacingLocalFiles } from "../../db/taggables.js";
 import { LocalTagServices } from "../../db/tags.js";
-import { Users } from "../../db/user.js";
 import PerfTags from "../../perf-tags-binding/perf-tags.js";
-
-export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.NONE, BITS: 0};
 
 export async function validate(dbs, req, res) {}
 
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    return false;
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [],
+        objects: {}
+    };
 }
 
 // TODO: currently backup only works for the user who requested it, does not create whole backup of all users
@@ -25,9 +25,9 @@ export async function checkPermission(dbs, req, res) {
 export default async function get(dbs, req, res) {
     const taggables = await Taggables.searchWithUser(dbs, PerfTags.SEARCH_UNIVERSE, req.user);
 
-    const localTaggableServices = await LocalTaggableServices.userSelectAll(dbs, req.user, PERMISSION_BITS.READ);
-    const localTagServices = await LocalTagServices.userSelectAll(dbs, req.user, PERMISSION_BITS.READ);
-    const localMetricServices = await LocalMetricServices.userSelectAll(dbs, req.user, PERMISSION_BITS.READ);
+    const localTaggableServices = await LocalTaggableServices.userSelectAll(dbs, req.user, PERMISSIONS.LOCAL_TAGGABLE_SERVICES.READ_TAGGABLES);
+    const localTagServices = await LocalTagServices.userSelectAll(dbs, req.user, PERMISSIONS.LOCAL_TAG_SERVICES.READ_TAGS);
+    const localMetricServices = await LocalMetricServices.userSelectAll(dbs, req.user, PERMISSIONS.LOCAL_METRIC_SERVICES.READ_METRIC);
 
     
     const userFacingLocalFiles = await UserFacingLocalFiles.selectManyByTaggableIDs(

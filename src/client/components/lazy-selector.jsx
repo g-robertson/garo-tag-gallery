@@ -1,9 +1,9 @@
 import '../global.css';
 import { clamp, executeFunctions, NumericAscendingSort, RealizationMap, ReferenceableReact, setToggle } from '../js/client-util.js';
-import { State } from '../page/pages.js';
+import { State } from '../js/state.js';
 import Scrollbar from './scrollbar.jsx';
 
-/** @import {State, ConstState} from "../page/pages.js" */
+/** @import {State, ConstState} from "../js/state.js" */
 
 /** @import {JSX} from "react" */
 
@@ -557,8 +557,9 @@ function LazySelector({
          * @param {number} changeAmount 
          */
         const lastClickedIndexIncrement = (changeAmount) => {
-            const newIndex = clamp(lastClickedIndexState.get() + changeAmount, 0, valuesConstState.get().length - 1);
-            if (newIndex !== lastClickedIndexState.get()) {
+            const lastClickedIndex = lastClickedIndexState.get() ?? 0;
+            const newIndex = clamp(lastClickedIndex + changeAmount, 0, valuesConstState.get().length - 1);
+            if (newIndex !== lastClickedIndex) {
                 lastClickedIndexState.set(newIndex);
                 const selectedIndices = selectedIndicesState.get();
                 selectedIndices.clear();

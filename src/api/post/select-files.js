@@ -1,16 +1,15 @@
 /**
- * @import {APIFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
  */
 
 import { z } from "zod";
-import { bjsonStringify, clientjsonStringify } from "../../client/js/client-util.js";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
-import { LocalMetricServices } from "../../db/metrics.js";
-import { Files, LocalFiles, LocalTaggableServices, UserFacingLocalFiles } from "../../db/taggables.js";
-import { LocalTagServices } from "../../db/tags.js";
+import { clientjsonStringify } from "../../client/js/client-util.js";
+import { PERMISSIONS } from "../../client/js/user.js";
+import { Files } from "../../db/taggables.js";
+import { Z_FILE_ID } from "../zod-types.js";
 
 export function validate(dbs, req, res) {
-    const fileIDs = z.array(z.number().nonnegative().int()).safeParse(req?.body?.fileIDs, {path: ["fileIDs"]});
+    const fileIDs = z.array(Z_FILE_ID).safeParse(req?.body?.fileIDs, {path: ["fileIDs"]});
     if (!fileIDs.success) return fileIDs.error.message;
 
     return {
@@ -18,45 +17,15 @@ export function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = {
-    TYPE: PERMISSIONS.LOCAL_TAGGABLE_SERVICES,
-    BITS: PERMISSION_BITS.READ
-};
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    const localTaggableServiceIDs = new Set((await LocalTaggableServices.userSelectAll(
-        dbs,
-        req.user,
-        PERMISSION_BITS.READ
-    )).map(localTaggableService => localTaggableService.Local_Taggable_Service_ID));
-
-    /** @type {Set<bigint>} */
-    const allTaggables = new Set();
-    const files = LocalFiles.dedupeLocalFilesTaggables(await LocalFiles.selectManyByFileIDs(dbs, req.body.fileIDs));
-    for (const file of files) {
-        for (const taggable of file.Taggable_ID) {
-            allTaggables.add(taggable);
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [PERMISSIONS.LOCAL_TAGGABLE_SERVICES.READ_TAGGABLES],
+        objects: {
+            File_IDs: req.body.fileIDs
         }
-    }
-    const taggablesLocalTaggableServicesMap = await LocalTaggableServices.selectMappedByTaggableIDs(dbs, [...allTaggables]);
-
-    for (const file of files) {
-        let taggableMatchedTaggableService = false;
-        for (const taggable of file.Taggable_ID) {
-            if (localTaggableServiceIDs.has(taggablesLocalTaggableServicesMap.get(taggable).Local_Taggable_Service_ID)) {
-                taggableMatchedTaggableService = true;
-                break;
-            }
-        }
-
-        if (!taggableMatchedTaggableService) {
-            return false;
-        }
-    }
-
-    return true;
+    };
 }
-
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {

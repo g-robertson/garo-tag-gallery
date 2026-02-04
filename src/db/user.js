@@ -8,7 +8,6 @@ import { LRUCache } from "./lru-cache.js";
 
 /**
  * @import {DBBoolean} from "./db-util.js"
- * @import {PermissionInt} from "../client/js/user.js"
  * @import {DBPermissionedLocalTagService} from "./tags.js"
  * @import {DBPermissionedLocalTaggableService} from "./taggables.js"
  * @import {DBPermissionedLocalMetricService} from "./metrics.js"
@@ -22,37 +21,6 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @typedef {Object} DBPermissionSet
  * @property {number} Permission_Set_ID
  * @property {string} Permission_Set_Name
- * @property {PermissionInt} User_Management_Permission
- * @property {PermissionInt} Local_Taggable_Services_Permission
- * @property {number | null} Local_Taggable_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_Taggable_Services_Permission
- * @property {number | null} Global_Taggable_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Local_Metric_Services_Permission
- * @property {number | null} Local_Metric_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_Metric_Services_Permission
- * @property {number | null} Global_Metric_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Local_Tag_Services_Permission
- * @property {number | null} Local_Tag_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_Tag_Services_Permission
- * @property {number | null} Global_Tag_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Local_Tag_Relations_Services_Permission
- * @property {number | null} Local_Tag_Relations_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_Tag_Relations_Services_Permission
- * @property {number | null} Global_Tag_Relations_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Local_URL_Generator_Services_Permission
- * @property {number | null} Local_URL_Generator_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_URL_Generator_Services_Permission
- * @property {number | null} Global_URL_Generator_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Local_URL_Classifier_Services_Permission
- * @property {number | null} Local_URL_Classifier_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_URL_Classifier_Services_Permission
- * @property {number | null} Global_URL_Classifier_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Local_Parser_Services_Permission
- * @property {number | null} Local_Parser_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Global_Parser_Services_Permission
- * @property {number | null} Global_Parser_Services_Byte_Transfer_Limit
- * @property {PermissionInt} Settings_Permission
- * @property {PermissionInt} Advanced_Settings_Permission
  */
 
 /**
@@ -63,6 +31,7 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @property {number} Permission_Set_ID
  * @property {PageType[]} JSON_Pages
  * @property {Object} JSON_Preferences
+ * @property {string[]} Permissions
  * @property {number} User_Created_Date
  */
 
@@ -79,15 +48,32 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  */
 
 /**
- * @param {DBUser} dbUser 
+ * @param {Databases} dbs
+ * @param {DBUser[]} dbUsers
  */
-function mapDBUser(dbUser) {
-    const mappedDBUser = {
+async function mapDBUsers(dbs, dbUsers) {
+    const permissionSetIDs = new Set(dbUsers.map(dbUser => dbUser.Permission_Set_ID));
+
+    /** @type {{Permission_Set_ID: number, Permission: string}[]} */
+    const permissionSetPermissions = await dballselect(dbs, `
+        SELECT Permission_Set_ID, Permission
+        FROM Permission_Sets_Permissions
+        WHERE Permission_Set_ID IN ${dbvariablelist(permissionSetIDs.size)};
+    `, [...permissionSetIDs]);
+
+    /** @type {Map<number, string[]>} */
+    const permissionSetPermissionsMap = new Map([...permissionSetIDs].map(permissionSetID => [permissionSetID, []]));
+    for (const permissionSetPermission of permissionSetPermissions) {
+        permissionSetPermissionsMap.get(permissionSetPermission.Permission_Set_ID).push(permissionSetPermission.Permission);
+    }
+
+    const mappedDBUsers = dbUsers.map(dbUser => ({
         ...dbUser,
-        JSON_Pages: JSON.parse(dbUser.JSON_Pages)
-    };
-    delete mappedDBUser['Access_Key'];
-    return mappedDBUser;
+        JSON_Pages: JSON.parse(dbUser.JSON_Pages),
+        Permissions: permissionSetPermissionsMap.get(dbUser.Permission_Set_ID),
+        Access_Key: undefined
+    }));
+    return mappedDBUsers;
 }
 
 export class Users {
@@ -119,7 +105,7 @@ export class Users {
         /** @type {DBUser[]} */
         const dbUsers = (await dballselect(dbs, `SELECT * FROM Users WHERE User_ID IN ${dbvariablelist(userIDs.length)};`, userIDs));
 
-        return dbUsers.map(mapDBUser);
+        return await mapDBUsers(dbs, dbUsers);
     }
 
     /**
@@ -152,15 +138,14 @@ export class Users {
         if (cachedUser === undefined) {
             const user = await dbget(dbs, `
                 SELECT *
-                  FROM Users
-                  JOIN Permission_Sets ON Users.Permission_Set_ID = Permission_Sets.Permission_Set_ID
-                  WHERE Users.Access_Key = ?;`, [accessKey]
+                FROM Users
+                WHERE Users.Access_Key = ?;`, [accessKey]
             );
 
             if (user === undefined) {
                 return undefined;
             } else {
-                cachedUser = new User(mapDBUser(user));
+                cachedUser = new User((await mapDBUsers(dbs, [user]))[0]);
                 this.#accessKeyToUserLRUCache.set(accessKey, cachedUser);
             }
         }

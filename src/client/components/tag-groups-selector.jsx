@@ -1,7 +1,7 @@
 import getNamespaces from "../../api/client-get/namespaces.js";
 import { executeFunctions } from "../js/client-util.js";
 import { User } from "../js/user.js";
-import { ConstState, State } from "../page/pages.js";
+import { ConstState, State } from "../js/state.js";
 import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
 

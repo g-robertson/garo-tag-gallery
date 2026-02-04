@@ -1,7 +1,7 @@
 import '../global.css';
 import { executeFunctions, randomID, ReferenceableReact, unusedID } from '../js/client-util.js';
 
-/** @import {State, ConstState} from "../page/pages.js" */
+/** @import {State, ConstState} from "../js/state.js" */
 
 /**
  * @template T

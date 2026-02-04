@@ -1,11 +1,11 @@
 import '../global.css';
 import LocalMetricServiceSelector from './local-metric-service-selector.jsx';
 import { User } from '../js/user.js';
-import { State } from '../page/pages.js';
+import { State } from '../js/state.js';
 import { executeFunctions, ReferenceableReact } from '../js/client-util.js';
 
 /** @import {DBLocalMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js" */
-/** @import {State} from "../page/pages.js" */
+/** @import {State} from "../js/state.js" */
 
 /**
  * @param {{

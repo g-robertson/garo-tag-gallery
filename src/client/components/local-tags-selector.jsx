@@ -2,7 +2,7 @@ import LazyTextObjectSelector from "./lazy-text-object-selector.jsx";
 import MultiSelect from "./multi-select.jsx";
 import { User } from "../js/user.js";
 import { Modals } from "../modal/modals.js";
-import { PersistentState, State, ConstState } from "../page/pages.js";
+import { PersistentState, State, ConstState } from "../js/state.js";
 import { executeFunctions, mapUnion } from "../js/client-util.js";
 import { FetchCache } from "../js/fetch-cache.js";
 

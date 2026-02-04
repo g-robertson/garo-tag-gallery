@@ -1,7 +1,7 @@
 import { METRIC_TYPES } from "../js/metrics.js";
 import { clamp, executeFunctions, ReferenceableReact } from "../js/client-util.js";
 import HoverInfo from "./hover-info.jsx";
-import { State, ConstState } from "../page/pages.js";
+import { State, ConstState } from "../js/state.js";
 
 /** @import {DBLocalMetric} from "../../db/metrics.js" */
 

@@ -1,9 +1,9 @@
 /**
- * @import {APIFunction, APIValidationFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction, APIValidationFunction} from "../api-types.js"
  */
 
 import { z } from "zod";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 import { getCursorAsFileIDs } from "../../db/cursor-manager.js";
 import { FileComparisons } from "../../db/duplicates.js";
 import { NO_FILE_CURSOR_FOUND } from "../../client/js/cursor.js";
@@ -15,7 +15,8 @@ import { NO_FILE_CURSOR_FOUND } from "../../client/js/cursor.js";
  * @param {Parameters<APIValidationFunction>[2]} res 
  */
 export async function validate(dbs, req, res) {
-    const fileCursor = z.string().or(z.undefined()).safeParse(req?.body?.fileCursor, {path: ["fileCursor"]});
+    
+    const fileCursor = z.optional(z.string()).safeParse(req?.body?.fileCursor, {path: ["fileCursor"]});
     if (!fileCursor.success) return fileCursor.error.message;
 
     const fileIDs = getCursorAsFileIDs(dbs.cursorManager.getCursorForUser(req.user.id(), fileCursor.data));
@@ -28,13 +29,14 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = {
-    TYPE: PERMISSIONS.NONE,
-    BITS: PERMISSION_BITS.NONE
-};
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission(dbs, req, res) {
-    return true;
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [PERMISSIONS.LOCAL_TAGGABLE_SERVICES.UPDATE_TAGGABLES],
+        objects: {
+            File_IDs: req.body.fileIDs
+        }
+    };
 }
 
 const COMPARE_FILES_FOR_DUPLICATES_JOB_TYPE = "compare-files-for-duplicates";

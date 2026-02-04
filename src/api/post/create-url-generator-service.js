@@ -1,9 +1,9 @@
 /**
- * @import {APIFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
  */
 
 import { z } from "zod";
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 import { LocalURLGeneratorServices } from "../../db/url-generators.js";
 
 export async function validate(dbs, req, res) {
@@ -15,10 +15,12 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.IS_ADMIN, BITS: PERMISSION_BITS.ALL};
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission() {
-    return false;
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [PERMISSIONS.ADMINISTRATIVE.CREATE_URL_GENERATOR_SERVICE],
+        objects: {}
+    };
 }
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */

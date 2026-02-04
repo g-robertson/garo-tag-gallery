@@ -2,7 +2,7 @@ import '../global.css';
 import { executeFunctions, ReferenceableReact, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 import selectFiles from '../../api/client-get/select-files.js';
-import { ConstState, PersistentState, State } from "../page/pages.js";
+import { ConstState, PersistentState, State } from "../js/state.js";
 import { Modals } from '../modal/modals.js';
 import { ImagePreloader } from '../js/client-exclusive-util.js';
 import DialogBox from '../modal/modals/dialog-box.jsx';
@@ -89,13 +89,10 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
         return () => executeFunctions(addToCleanup);
     };
 
-    const commitChanges = () => {
+    const commitChanges = async () => {
+        console.log(fileComparisonsEvaluatedState.get());
         persistentState.clear();
         Modals.Global().popModal();
-    };
-
-    const closeGallery = () => {
-
     };
 
     return <div onAdd={onAdd} style={{width: "100%", height: "100%"}}>

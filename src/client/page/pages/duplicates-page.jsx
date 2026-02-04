@@ -11,7 +11,8 @@ import DialogBox from '../../modal/modals/dialog-box.jsx';
 import { executeFunctions, mergeGroups, ReferenceableReact } from '../../js/client-util.js';
 import { Modals } from '../../modal/modals.js';
 import { Jobs } from '../../jobs.js';
-import { ConstState, Page, PersistentState, State } from '../pages.js';
+import { Page} from "../pages.js";
+import { ConstState, PersistentState, State } from '../../js/state.js';
 import { FetchCache } from '../../js/fetch-cache.js';
 
 /** @import {DBFileComparison} from "../../../db/duplicates.js" */
@@ -59,27 +60,27 @@ const DuplicatesProcessingPage = ({page}) => {
     const PotentialDuplicateComparisonsMadeCount = ReferenceableReact();
     const PotentialDuplicateFileCount = ReferenceableReact();
 
-    const dedupeGalleryState = page.persistentState.registerState("dedupeGallery", new PersistentState());
+    const dedupeGalleryState = page.persistentState.registerState("dedupeGallery", new PersistentState(), {addToCleanup});
     const maxSearchDistanceState = page.persistentState.registerState("maxSearchDistance", new State(REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER), {isSaved: true, addToCleanup});
     
     const clientSearchQueryState = new State(null);
     /** @type {State<number[]>} */
     const localTagServiceIDsState = new State([]);
-    const searchTaggablesResultConstState = page.persistentState.registerState("searchTaggablesResult", FetchCache.Global().searchTaggablesConstState(
+    const searchTaggablesResultConstState = FetchCache.Global().searchTaggablesConstState(
         clientSearchQueryState,
         ConstState.instance("File"),
         ConstState.instance([]),
         localTagServiceIDsState,
         addToCleanup,
         {waitForSet: true}
-    ), {addToCleanup});
+    );
     const fileCursorConstState = searchTaggablesResultConstState.asTransform(taggablesResult => taggablesResult.cursor, addToCleanup);
-    const filesConstState = page.persistentState.registerState("files", FetchCache.Global().reselectFilesConstState(
+    const filesConstState = FetchCache.Global().reselectFilesConstState(
         fileCursorConstState,
         ConstState.instance(["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"]),
         addToCleanup,
         {waitForSet: true}
-    ).asTransform(mapToFiles, addToCleanup), {addToCleanup});
+    ).asTransform(mapToFiles, addToCleanup);
 
     const potentialDuplicateFileComparisonsConstState = FetchCache.Global().selectFileComparisonsConstState(
         fileCursorConstState,
@@ -234,7 +235,7 @@ const DuplicatesProcessingPage = ({page}) => {
                             clientSearchQueryState.set(clientSearchQuery);
                             localTagServiceIDsState.set(localTagServiceIDs);
                         }}
-                        persistentState={page.persistentState.registerState("tagsSelector", new PersistentState())}
+                        persistentState={page.persistentState.registerState("tagsSelector", new PersistentState(), {addToCleanup})}
                     />
                 </div>
             </div>

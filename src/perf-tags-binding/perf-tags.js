@@ -421,7 +421,6 @@ export default class PerfTags {
      */
     async readTaggablesSpecifiedTags(taggables, tags) {
         await this.#readMutex.acquire();
-
         await this.__writeToReadInputFile(`${serializeUint64(BigInt(tags.length))}${PerfTags.#serializeSingles(tags)}${serializeUint64(BigInt(taggables.length))}${PerfTags.#serializeSingles(taggables)}`);
         await this.__writeLineToStdin("read_taggables_specified_tags");
         const ok = await this.__dataOrTimeout(PerfTags.READ_OK_RESULT, THIRTY_MINUTES);

@@ -264,7 +264,7 @@ export function clamp(number, lower, upper) {
 /**
  * @template {Map} T
  * @param {T} map 
- * @param {Parameters<Map<number, string>['has']>>[0]} key
+ * @param {Parameters<T['has']>[0]} key
  * @param {ReturnType<T['get']>} value
  * @returns {ReturnType<T['get']>}
  */

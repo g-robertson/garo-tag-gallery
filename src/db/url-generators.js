@@ -1,11 +1,10 @@
 import { createFromLocalURLGeneratorLookupName, createFromLocalURLGeneratorServiceLookupName } from "../client/js/url-generators.js";
-import { PERMISSION_BITS, PERMISSIONS } from "../client/js/user.js";
+import { PERMISSIONS } from "../client/js/user.js";
 import { dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun } from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
 import { LocalTags } from "./tags.js";
 
 /** @import {DBService} from "./services.js" */
-/** @import {PermissionInt} from "./user.js" */
 /** @import {Databases} from "./db-util.js" */
 /** @import {User} from "../client/js/user.js" */
 
@@ -18,7 +17,7 @@ import { LocalTags } from "./tags.js";
 /**
  * @typedef {DBLocalURLGeneratorService & DBService} DBJoinedLocalURLGeneratorService
  */
-/** @typedef {DBJoinedLocalURLGeneratorService & {Permission_Extent: PermissionInt}} DBPermissionedLocalURLGeneratorService */
+/** @typedef {DBJoinedLocalURLGeneratorService & {Permissions: Set<string>}} DBPermissionedLocalURLGeneratorService */
 
 export class LocalURLGeneratorServices {
     /**
@@ -70,27 +69,32 @@ export class LocalURLGeneratorServices {
     /**
      * @param {Databases} dbs 
      * @param {User} user
-     * @param {PermissionInt} permissionBitsToCheck
+     * @param {string[]} permissionsToCheck
      * @param {number[]} localURLGeneratorServiceIDs
      */
-    static async userSelectManyByIDs(dbs, user, permissionBitsToCheck, localURLGeneratorServiceIDs) {
-        if (user.isSudo() || user.hasPermissions(permissionBitsToCheck, PERMISSIONS.LOCAL_TAG_SERVICES)) {
+    static async userSelectManyByIDs(dbs, user, permissionsToCheck, localURLGeneratorServiceIDs) {
+        if (user.isSudo() || user.hasPermissions(permissionsToCheck)) {
             return await LocalURLGeneratorServices.selectManyByIDs(dbs, localURLGeneratorServiceIDs);
         }
 
         /** @type {DBJoinedLocalURLGeneratorService[]} */
         const localURLGeneratorServices = await dballselect(dbs, `
             SELECT LUGS.*, S.*
-              FROM Local_URL_Generator_Services LUGS
-              JOIN Services_Users_Permissions SUP ON LUGS.Service_ID = SUP.Service_ID
-              JOIN Services S ON LUGS.Service_ID = S.Service_ID
-             WHERE SUP.User_ID = ?
-               AND (SUP.Permission_Extent & ?) = ?
-               AND LUGS.Local_URL_Generator_Service_ID IN ${dbvariablelist(localURLGeneratorServiceIDs.length)};
+            FROM Local_URL_Generator_Services LUGS
+            JOIN Services_Users_Permissions SUP ON LUGS.Service_ID = SUP.Service_ID
+            JOIN Services S ON LUGS.Service_ID = S.Service_ID
+            WHERE (
+                SELECT COUNT(1)
+                FROM Services_Users_Permissions SUP
+                WHERE LMS.Service_ID = SUP.Service_ID
+                AND SUP.User_ID = ?
+                AND SUP.Permission IN ${dbvariablelist(permissionsToCheck.length)}
+            ) = ?
+            AND LUGS.Local_URL_Generator_Service_ID IN ${dbvariablelist(localURLGeneratorServiceIDs.length)};
         `, [
             user.id(),
-            permissionBitsToCheck,
-            permissionBitsToCheck,
+            permissionsToCheck,
+            permissionsToCheck.length,
             ...localURLGeneratorServiceIDs
         ]);
 
@@ -101,35 +105,33 @@ export class LocalURLGeneratorServices {
     /**
      * @param {Databases} dbs 
      * @param {User} user 
-     * @param {PermissionInt} permissionBitsToCheck 
+     * @param {string[]} permissionsToCheck 
      * @param {number} localURLGeneratorServiceID
      */
-    static async userSelectByID(dbs, user, permissionBitsToCheck, localURLGeneratorServiceID) {
-        return (await LocalURLGeneratorServices.userSelectManyByIDs(dbs, user, permissionBitsToCheck, [localURLGeneratorServiceID]))[0];
+    static async userSelectByID(dbs, user, permissionsToCheck, localURLGeneratorServiceID) {
+        return (await LocalURLGeneratorServices.userSelectManyByIDs(dbs, user, permissionsToCheck, [localURLGeneratorServiceID]))[0];
     }
     
     /**
      * @param {Databases} dbs 
      * @param {User} user 
-     * @param {PermissionInt=} permissionBitsToCheck
+     * @param {string[]=} permissionsToCheck
      */
-    static async userSelectAll(dbs, user, permissionBitsToCheck) {
+    static async userSelectAll(dbs, user, permissionsToCheck) {
         return await userSelectAllSpecificTypedServicesHelper(
             dbs,
             user,
-            PERMISSIONS.LOCAL_TAGGABLE_SERVICES,
             LocalURLGeneratorServices.selectAll,
             async () => {
-                return (await dballselect(dbs, `
-                    SELECT SUP.Permission_Extent, LUGS.*, S.*
+                return await dballselect(dbs, `
+                    SELECT LUGS.Local_URL_Generator_Service_ID, SUP.Permission
                       FROM Local_URL_Generator_Services LUGS
                       JOIN Services_Users_Permissions SUP ON LUGS.Service_ID = SUP.Service_ID
-                      JOIN Services S ON LUGS.Service_ID = S.Service_ID
                      WHERE SUP.User_ID = $userID;
-                `, {$userID: user.id()}));
+                `, {$userID: user.id()});
             },
             "Local_URL_Generator_Service_ID",
-            permissionBitsToCheck
+            permissionsToCheck
         );
     }
     
@@ -142,7 +144,7 @@ export class LocalURLGeneratorServices {
         dbs = await dbBeginTransaction(dbs);
 
         const serviceID = await Services.insert(dbs, serviceName);
-        await ServicesUsersPermissions.insert(dbs, serviceID, user.id(), PERMISSION_BITS.ALL);
+        await ServicesUsersPermissions.insertMany(dbs, serviceID, user.id(), Object.values(PERMISSIONS.LOCAL_URL_GENERATOR_SERVICES).map(permission => permission.name));
 
         /** @type {number} */
         const localURLGeneratorServiceID = (await dbget(dbs, `

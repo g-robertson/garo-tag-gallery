@@ -1,10 +1,10 @@
 import {readFile, rm} from "fs/promises";
 
 /**
- * @import {APIFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
  */
 
-import { PERMISSION_BITS, PERMISSIONS } from "../../client/js/user.js";
+import { PERMISSIONS } from "../../client/js/user.js";
 import { abjsonParse } from "../../client/js/client-util.js";
 import { importMappingsFromBackupJob } from "../../db/import.js";
 
@@ -20,10 +20,14 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.IS_ADMIN, BITS: PERMISSION_BITS.ALL};
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission() {
-    return false;
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [
+            PERMISSIONS.ADMINISTRATIVE.IMPORT
+        ],
+        objects: {}
+    };
 }
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */

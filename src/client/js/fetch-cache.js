@@ -3,7 +3,7 @@ import { searchTaggables } from "../../api/client-get/search-taggables.js";
 import selectFileComparisons from "../../api/client-get/select-file-comparisons.js";
 import selectFiles from "../../api/client-get/select-files.js";
 import getTagsFromLocalTagServiceIDs from "../../api/client-get/tags-from-local-tag-services.js";
-import { State, ConstState } from "../page/pages.js";
+import { State, ConstState } from "../js/state.js";
 import { RealizationMap } from "./client-util.js";
 import { User } from "./user.js";
 

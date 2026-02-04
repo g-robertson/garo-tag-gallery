@@ -1,5 +1,5 @@
 /**
- * @import {APIFunction, APIValidationFunction} from "../api-types.js"
+ * @import {APIFunction, APIGetPermissionsFunction, APIValidationFunction} from "../api-types.js"
  */
 
 import { mkdir, rename } from "fs/promises";
@@ -19,7 +19,7 @@ import { NOT_A_PARTIAL_UPLOAD } from "../client-get/non-partial-upload-cursor.js
 export async function validate(dbs, req, res) {
     const partialUploadSelection = z.string().nonempty().max(127).safeParse(req?.body?.partialUploadSelection, {path: ["partialUploadSelection"]});
     if (!partialUploadSelection.success) return partialUploadSelection.error.message;
-    const pathCursorID = z.string().or(z.undefined()).safeParse(req?.body?.pathCursorID, {path: ["pathCursorID"]});
+    const pathCursorID = z.optional(z.string()).safeParse(req?.body?.pathCursorID, {path: ["pathCursorID"]});
     if (!pathCursorID.success) return pathCursorID.error.message;
 
     if (req?.files?.length !== 1) {
@@ -62,10 +62,12 @@ export async function validate(dbs, req, res) {
     };
 }
 
-export const PERMISSIONS_REQUIRED = {TYPE: PERMISSIONS.NONE, BITS: 0};
-/** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
-export async function checkPermission() {
-    return false;
+/** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
+export async function getPermissions(dbs, req, res) {
+    return {
+        permissions: [],
+        objects: {}
+    };
 }
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */

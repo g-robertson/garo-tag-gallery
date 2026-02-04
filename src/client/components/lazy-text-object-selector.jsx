@@ -1,6 +1,6 @@
 import LazySelector from "./lazy-selector.jsx";
 
-/** @import {ConstState} from "../page/pages.js" */
+/** @import {ConstState} from "../js/state.js" */
 
 /**
  * @template T
