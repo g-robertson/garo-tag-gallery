@@ -21,6 +21,7 @@ const TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_1 = "./e2etest/data/hydrus-test-mul
 const TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_2 = "./e2etest/data/hydrus-test-multipart-import.zip.002";
 const TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_3 = "./e2etest/data/hydrus-test-multipart-import.zip.003";
 
+const TEST_SAME_FILE_UPDATE_TAGGABLE_SERVICE = "TEST SAME FILE UPDATE TAGGABLE SERVICE";
 const TEST_PAGE_UPDATE_TAG_SERVICE = "TEST PAGE UPDATE TAG SERVICE";
 const TEST_PAGE_UPDATE_TAG = "1girl";
 
@@ -28,12 +29,16 @@ const TEST_PAGE_UPDATE_TAG = "1girl";
 const IMPORT_FILES_FROM_HYDRUS_TESTS = [
     {name: "TestImportFilesFromHydrus", tests: [
         {name: "Setup", isSetup: true, tests: async (driver) => {
+            await navigateToFileSearchPage(driver);
             await createNewTagService(driver, TEST_TAG_SERVICE_NAME_1);
             await createNewTaggableService(driver, TEST_TAGGABLE_SERVICE_NAME_1);
+            await driver.findElement(ByMultiSelectOption("All")).click();
+            await driver.wait(untilElementsNotLocated(BySelectableTag()), DEFAULT_TIMEOUT_TIME);
         }},
         {name: "Teardown", isTeardown: true, tests: async (driver) => {
             await deleteTagService(driver, TEST_TAG_SERVICE_NAME_1);
             await deleteTaggableService(driver, TEST_TAGGABLE_SERVICE_NAME_1);
+            await closePage(driver);
         }},
         {name: "TestImportFilesFromHydrusWorks", tests: [
             {name: "ImportingWorks", isSetup: true, tests: async (driver) => {
@@ -47,15 +52,11 @@ const IMPORT_FILES_FROM_HYDRUS_TESTS = [
             }},
             {name: "ImportingWithOpenPageShouldUpdatePage", tests: [
                 {name: "Setup", isSetup: true, tests: async (driver) => {
-                    await navigateToFileSearchPage(driver);
                     await createNewTagService(driver, TEST_PAGE_UPDATE_TAG_SERVICE);
-                    await driver.findElement(ByMultiSelectOption("All")).click();
                     await driver.findElement(ByMultiSelectOption(TEST_PAGE_UPDATE_TAG_SERVICE)).click();
-                    await driver.wait(untilElementsNotLocated(BySelectableTag()), DEFAULT_TIMEOUT_TIME);
                 }},
                 {name: "Teardown", isTeardown: true, tests: async (driver) => {
                     await deleteTagService(driver, TEST_PAGE_UPDATE_TAG_SERVICE);
-                    await closePage(driver);
                 }},
                 {name: "ImportingWithOpenPageShouldUpdatePageWorks", tests: async (driver) => {
                     await importFilesFromHydrus(driver, {
@@ -65,9 +66,7 @@ const IMPORT_FILES_FROM_HYDRUS_TESTS = [
                     });
                     await driver.wait(UNTIL_JOB_BEGIN, CREATE_HYDRUS_JOB_TIMEOUT);
                     await driver.wait(UNTIL_JOB_END, FINISH_HYDRUS_JOB_TIMEOUT);
-
                     await driver.wait(until.elementLocated(BySelectableTag(TEST_PAGE_UPDATE_TAG)), DEFAULT_TIMEOUT_TIME);
-
                 }}
             ]},
             {name: "EmptySubmitShouldGiveProperMessage", tests: async (driver) => {

@@ -94,10 +94,12 @@ export class LocalTaggableServices {
             dbs.inTransaction
         );
 
-        return new Map([...taggablePairings].map(([taggable, inLocalTaggableServiceTagID]) => [
-            taggable,
-            allLocalTaggableServicesMap.get(inLocalTaggableServiceTagID[0])
-        ]));
+        return new Map(
+            [...taggablePairings].map(([taggable, inLocalTaggableServiceTagID]) => [
+                taggable,
+                allLocalTaggableServicesMap.get(inLocalTaggableServiceTagID[0])
+            ])
+        );
     }
 
     /**
@@ -105,13 +107,23 @@ export class LocalTaggableServices {
      * @param {bigint[]} taggableIDs
      */
     static async selectManyByTaggableIDs(dbs, taggableIDs) {
+        let allTaggablesExist = true;
+
         /** @type {Map<bigint, DBJoinedLocalTaggableService>} */
         const localTaggableServicesMap = new Map();
         for (const localTaggableService of (await LocalTaggableServices.selectMappedByTaggableIDs(dbs, taggableIDs)).values()) {
+            if (localTaggableService === undefined) {
+                allTaggablesExist = false;
+                continue;
+            }
+
             localTaggableServicesMap.set(localTaggableService.Local_Taggable_Service_ID, localTaggableService);
         }
         
-        return [...localTaggableServicesMap.values()];
+        return {
+            allTaggablesExist,
+            localTaggableServices: [...localTaggableServicesMap.values()]
+        };
     }
 
     /**
@@ -119,7 +131,7 @@ export class LocalTaggableServices {
      * @param {bigint} taggableID 
      */
     static async selectByTaggableID(dbs, taggableID) {
-        return (await LocalTaggableServices.selectManyByTaggableIDs(dbs, [taggableID]))[0];
+        return (await LocalTaggableServices.selectManyByTaggableIDs(dbs, [taggableID])).localTaggableServices[0];
     }
 
     /**

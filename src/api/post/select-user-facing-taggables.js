@@ -21,8 +21,13 @@ export function validate(dbs, req, res) {
 
 /** @type {APIGetPermissionsFunction<Awaited<ReturnType<typeof validate>>>} */
 export async function getPermissions(dbs, req, res) {
+    const permissions = [];
+    if (req.body.taggableIDs.length !== 0) {
+        permissions.push(PERMISSIONS.LOCAL_TAGGABLE_SERVICES.READ_TAGGABLES);
+    }
+
     return {
-        permissions: [PERMISSIONS.LOCAL_TAGGABLE_SERVICES.READ_TAGGABLES],
+        permissions,
         objects: {
             Taggable_IDs: req.body.taggableIDs
         }

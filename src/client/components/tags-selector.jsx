@@ -28,12 +28,12 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchCh
     const localTagServicesConstState = User.Global().localTagServicesAvailableState(addToCleanup);
     persistentState ??= new PersistentState();
     /** @type {State<ClientSearchQuery[]>} */
-    const clientSearchQueryState = persistentState.registerState("clientSearchQuery", new State(initialSelectedTags ?? []), {isSaved: true, addToCleanup});
+    const clientSearchQueryState = persistentState.registerState("clientSearchQuery", new State(initialSelectedTags ?? []), {isSaved: true, addToCleanup, name: "TagsSelector.clientSearchQueryState"});
     /** @type {State<Set<number>>} */
     const selectedLocalTagServiceIDsState = persistentState.registerState(
         "selectedLocalTagServiceIDs",
         new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID))),
-        {isSaved: true, addToCleanup}
+        {isSaved: true, addToCleanup, name: "TagsSelector.selectedLocalTagServiceIDsState"}
     );
     onSearchChanged ??= () => {};
     searchType ??= "intersect";

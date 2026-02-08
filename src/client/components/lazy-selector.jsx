@@ -120,76 +120,76 @@ function LazySelector({
     const RootElement = ReferenceableReact();
     const SelectableContents = ReferenceableReact();
     /** @type {State<Map<number, ReturnType<ReferenceableReact>} */
-    const rowItemElementsState = new State(new Map());
+    const rowItemElementsState = new State(new Map(), {name: "LazySelector.rowItemElementsState"});
 
-    const widthAvailableState = new State(0);
-    const heightAvailableState = new State(0);
+    const widthAvailableState = new State(0, {name: "LazySelector.widthAvailableState"});
+    const heightAvailableState = new State(0, {name: "LazySelector.heightAvailableState"});
     /** @type {State<RealizationMap<number, R>>} */
-    const realizedValuesState = new State(new RealizationMap());
-    const shownStartIndexState = new State(initialLastClickedIndex ?? 0);
+    const realizedValuesState = new State(new RealizationMap(), {name: "LazySelector.realizedValuesState"});
+    const shownStartIndexState = new State(initialLastClickedIndex ?? 0, {name: "LazySelector.shownStartIndexState"});
 
     /** @type {State<Set<number> | null>} */
-    const preShiftClickIndicesState = new State(null);
+    const preShiftClickIndicesState = new State(null, {name: "LazySelector.preShiftClickIndicesState"});
     /** @type {State<Set<number>>} */
-    const selectedIndicesState = new State(new Set());
+    const selectedIndicesState = new State(new Set(), {name: "LazySelector.selectedIndicesState"});
 
-    const isClickFocusedState = new State(false);
+    const isClickFocusedState = new State(false, {name: "LazySelector.isClickFocusedState"});
 
     const fullItemWidthState = widthAvailableState.asTransform(widthAvailable => {
         if (typeof itemProperties.width === "number") {
             return itemProperties.width + (2 * itemProperties.horizontalMargin);
         }
         return widthAvailable;
-    }, addToCleanup);
+    }, addToCleanup, {name: "LazySelector.fullItemWidthState"});
     const fullItemHeightState = heightAvailableState.asTransform(heightAvailable => {
         if (typeof itemProperties.height === "number") {
             return itemProperties.height + (2 * itemProperties.horizontalMargin);
         }
         return heightAvailable;
-    }, addToCleanup);
+    }, addToCleanup, {name: "LazySelector.fullItemHeightState"});
 
     const columnCountAvailableState = State.tupleTransform([widthAvailableState, fullItemWidthState], () => {
         if (fullItemWidthState.get() === 0) {
             return 0;
         }
         return Math.floor(widthAvailableState.get() / fullItemWidthState.get());
-    }, addToCleanup);
+    }, addToCleanup, {name: "LazySelector.columnCountAvailableState"});
     const rowCountAvailableState = State.tupleTransform([heightAvailableState, fullItemHeightState], () => {
         if (fullItemHeightState.get() === 0) {
             return 0;
         }
         return Math.floor(heightAvailableState.get() / fullItemHeightState.get());
-    }, addToCleanup);
+    }, addToCleanup, {name: "LazySelector.rowCountAvailableState"});
     const rootElementWidthState = State.tupleTransform([columnCountAvailableState, fullItemWidthState, widthAvailableState], () => {
         if (typeof itemProperties.width === "number") {
             return columnCountAvailableState.get() * fullItemWidthState.get();
         }
         return widthAvailableState.get();
-    }, addToCleanup) 
+    }, addToCleanup, {name: "LazySelector.rootElementWidthState"}) 
     const rootElementHeightState = State.tupleTransform([rowCountAvailableState, fullItemHeightState, heightAvailableState], () => {
         if (typeof itemProperties.height === "number") {
             return rowCountAvailableState.get() * fullItemHeightState.get();
         }
         return heightAvailableState.get();
-    }, addToCleanup) 
+    }, addToCleanup, {name: "LazySelector.rootElementHeightState"}) 
     const currentItemsShownCountState = State.tupleTransform([rowCountAvailableState, columnCountAvailableState], () => {
         return rowCountAvailableState.get() * columnCountAvailableState.get();
-    }, addToCleanup);
+    }, addToCleanup, {name: "LazySelector.currentItemsShownCountState"});
     const shownEndIndexState = State.tupleTransform([shownStartIndexState, currentItemsShownCountState], () => {
         return shownStartIndexState.get() + currentItemsShownCountState.get() - 1;
-    }, addToCleanup);
+    }, addToCleanup, {name: "LazySelector.shownEndIndexState"});
     const lastPossibleShownStartIndexState = State.tupleTransform([columnCountAvailableState, currentItemsShownCountState, valuesConstState], () => {
         if (columnCountAvailableState.get() === 0) {
             return 0;
         }
 
         return Math.max((columnCountAvailableState.get() * Math.ceil(valuesConstState.get().length / columnCountAvailableState.get())) - currentItemsShownCountState.get(), 0);
-    }, addToCleanup);
+    }, addToCleanup, {name: "LazySelector.lastPossibleShownStartIndexState"});
 
     /** @type {State<number | null>} */
-    const lastClickedIndexState = new State(initialLastClickedIndex);
+    const lastClickedIndexState = new State(initialLastClickedIndex, {name: "LazySelector.lastClickedIndexState"});
 
-    const valuesRealizationSyncState = new State(0);
+    const valuesRealizationSyncState = new State(0, {name: "LazySelector.valuesRealizationSyncState"});
     /**
      * @param {Iterable<number>} forcedIndices
      * @param {Iterable<number>} allIndices
@@ -314,7 +314,7 @@ function LazySelector({
             onRealizationUpdateNeeded(new RealizationMap());
         };
         onValuesChange();
-        valuesConstState.addOnUpdateCallback(onValuesChange, addToCleanup);
+        valuesConstState.addOnUpdateCallback(onValuesChange, addToCleanup, {name: "LazySelector.onValuesChange", whenInvalidSubstitute: "no-update"});
         
         const onRowItemsSelectedChanged = () => {
             for (const rowItemElement of rowItemElementsState.get().values()) {
@@ -382,7 +382,7 @@ function LazySelector({
                 columnCountAvailableState.get()
             ));
         };
-        lastPossibleShownStartIndexState.addOnUpdateCallback(onShownStartIndexClampConditionsChange, addToCleanup, {requireChangeForUpdate: true});
+        lastPossibleShownStartIndexState.addOnUpdateCallback(onShownStartIndexClampConditionsChange, addToCleanup, {requireChangeForUpdate: true, whenInvalidSubstitute: "no-update"});
         columnCountAvailableState.addOnUpdateCallback(onShownStartIndexClampConditionsChange, addToCleanup, {requireChangeForUpdate: true});
 
         const onActiveRealizedValuesChanged = () => {

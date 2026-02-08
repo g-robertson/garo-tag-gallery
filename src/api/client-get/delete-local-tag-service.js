@@ -1,3 +1,6 @@
+import { FetchCache } from "../../client/js/fetch-cache.js";
+import { User } from "../../client/js/user.js";
+
 /**
  * @param {number} localTagServiceID
  */
@@ -11,4 +14,6 @@ export default async function deleteLocalTagService(localTagServiceID) {
         },
         method: "POST"
     });
+    await User.refreshGlobal();
+    FetchCache.Global().resetCacheType("tags");
 }

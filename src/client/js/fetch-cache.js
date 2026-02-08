@@ -7,11 +7,13 @@ import { State, ConstState } from "../js/state.js";
 import { RealizationMap } from "./client-util.js";
 import { User } from "./user.js";
 
-/** @typedef {"tags" | "taggables" | "files" | "user"} ResettableCacheType */
+const ResettableCacheTypes = /** @type {const} */ (["tags", "taggables", "files", "user", "metrics"]);
+
+/** @typedef {(typeof ResettableCacheTypes)[number]} ResettableCacheType */
 /**
  * @typedef {Object} FetchCacheOptions
  * @property {any} initialValue
- * @property {boolean=} waitForSet
+ * @property {boolean=} updateOnCreate
  */
 
 /**
@@ -35,12 +37,15 @@ const CacheProperties = new Map(CachePropertiesArray);
 /** @typedef {(typeof CachePropertiesArray)[number][0]} Endpoint */
 
 export class FetchCache {
+    /** @type {Map<Endpoint, RealizationMap<string, any>>} */
     #cache = new Map(CachePropertiesArray.map(([endpoint,]) => [
-        endpoint, {
-            /** @type {RealizationMap<string, any>} */
-            values: new RealizationMap(),
-            state: new State()
-        }
+        endpoint, new RealizationMap()
+        
+    ]));
+    /** @type {Map<ResettableCacheType, State>} */
+    #cacheStates = new Map(ResettableCacheTypes.map(resettableCacheType => [
+        resettableCacheType,
+        new State()
     ]));
 
     static #Gl_FetchCache = new FetchCache();
@@ -60,10 +65,18 @@ export class FetchCache {
 
         for (const [cacheName, cache] of this.#cache) {
             if (CacheProperties.get(cacheName).resetsWith.has(cacheType)) {
-                cache.values.clear();
-                cache.state.forceUpdate();
+                cache.clear();
             }
         }
+
+        this.#cacheStates.get(cacheType).forceUpdate();
+    }
+
+    /**
+     * @param {Endpoint} cacheName
+     */
+    #getCacheStates(cacheName) {
+        return [...CacheProperties.get(cacheName).resetsWith].map(cacheType => this.#cacheStates.get(cacheType));
     }
 
     /**
@@ -78,19 +91,29 @@ export class FetchCache {
      */
     #apiCallConstState(constStates, cacheName, hasher, apiMethod, addToCleanup, options) {
         const cache = this.#cache.get(cacheName);
+        const cacheStates = this.#getCacheStates(cacheName);
         return State.asyncTupleTransform([
             ...constStates,
-            cache.state
+            ...cacheStates
         ], async () => {
-            const values = constStates.map(ref => ref.get());
-            const hash = hasher(...values);
-            if (cache.values.getStatus(hash) === "empty") {
-                cache.values.setAwaiting(hash);
-                cache.values.set(hash, await apiMethod(...values));
+            const values = [];
+            for (const constState of constStates) {
+                values.push(await constState.getWhenValid());
             }
-            const returned = await cache.values.get(hash);
+            
+            const hash = hasher(...values);
+            if (cache.getStatus(hash) === "empty") {
+                cache.setAwaiting(hash);
+                cache.set(hash, await apiMethod(...values));
+            }
+            const returned = await cache.get(hash);
             return returned;
-        }, addToCleanup, options);
+        }, addToCleanup, {
+            ...options,
+            invalidatesOn: cacheStates,
+            invalidValue: options.initialValue,
+            name: cacheName
+        });
     }
 
     /**

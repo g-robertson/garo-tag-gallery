@@ -24,21 +24,20 @@ const FileSearchPageElement = ({page}) => {
     const TrashSelectedTaggablesButton = ReferenceableReact();
 
     /** @type {State<number[]>} */
-    const selectedTaggableIDsState = new State([]);
-    const clientSearchQueryState = new State(null);
-    const localTagServiceIDsState = new State([]);
+    const selectedTaggableIDsState = new State([], {name: "FileSearchPage.selectedTaggableIDsState"});
+    const clientSearchQueryState = new State(null, {name: "FileSearchPage.clientSearchQueryState"});
+    const localTagServiceIDsState = new State([], {name: "FileSearchPage.localTagServiceIDsState"});
     const searchTaggablesResultState = FetchCache.Global().searchTaggablesConstState(
         clientSearchQueryState,
         ConstState.instance("Taggable"),
         ConstState.instance("Taggable_ID"),
         localTagServiceIDsState,
-        addToCleanup,
-        {waitForSet: true}
+        addToCleanup
     );
     const [taggableCursorConstState, taggableIDsConstState] = searchTaggablesResultState.asAtomicTransforms([
         taggablesResult => taggablesResult.cursor,
         taggablesResult => taggablesResult.result
-    ], addToCleanup);
+    ], addToCleanup, {name: "FileSearchPage.(taggableCursorConstState|taggableIDsConstState)"});
 
     const onAdd = () => {
         const onSelectedTaggables = () => {

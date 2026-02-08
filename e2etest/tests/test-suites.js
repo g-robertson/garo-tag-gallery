@@ -35,6 +35,7 @@ const TESTS = {
     ]
 };
 
+export const OK_LOGS = new Set(["info"]);
 export const HEADLESS = false;
 const DISABLED_TESTS = new Set([
     // "Tests.Navigation",
@@ -139,12 +140,10 @@ export async function executeTestSuite(driver, logs) {
     await executeTestSuite_(TESTS, "", driver);
     //After all done, check the log for any errors not caught by testing
     console.log("Printing all NON-OK browser console logs");
-    const OK_LOGS = new Set(["info"]);
-    const badLogs = logs.filter(log => !OK_LOGS.has(log.level));
-    for (const log of badLogs) {
+    for (const log of logs) {
         console.log(log);
     }
-    if (badLogs.length === 0 && testFailCount === 0) {
+    if (logs.length === 0 && testFailCount === 0) {
         console.log("E2E testing passed");
     } else {
         console.log(`E2E testing failed, only ${testCount - testFailCount}/${testCount} tests passed`);

@@ -1,8 +1,9 @@
 import webdriver, { logging, LogInspector } from "selenium-webdriver";
-import { executeTestSuite, HEADLESS } from "./tests/test-suites.js";
+import { executeTestSuite, HEADLESS, OK_LOGS } from "./tests/test-suites.js";
 import Firefox from "selenium-webdriver/firefox.js";
 import { DOWNLOAD_DIRECTORY } from "./helpers.js";
 import { BaseLogEntry } from "selenium-webdriver/bidi/logEntries.js";
+
 
 async function main() {
     // Make sure tests fail in HEADLESS mode before thinking they're really failing, or just remove your mouse from focus of the selenium window
@@ -31,10 +32,14 @@ async function main() {
         //await driver.manage().window().setRect({width: 1920, height: 1080});
         const logInspector = await LogInspector(driver);
         logInspector.onLog(e => {
-            logs.push(e);
+            if (!OK_LOGS.has(e.level)) {
+                logs.push(e);
+                console.log(e);
+            }
         });
         //await driver.manage().window().setRect({width: 1920, height: 1080, x: 0, y: 0});
         await executeTestSuite(driver, logs);
+        await logInspector.close();
         // process.exit(0);
     } catch (e) {
         throw e;

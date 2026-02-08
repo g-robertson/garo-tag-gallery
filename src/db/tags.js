@@ -64,10 +64,18 @@ export class LocalTagServices {
     /**
      * @param {Databases} dbs 
      * @param {number[]} localTagIDs
-     * @returns {Promise<DBJoinedLocalTagService[]>}
      */
     static async selectManyByLocalTagIDs(dbs, localTagIDs) {
-        return (await dballselect(dbs, `
+        /** @type {number} */
+        const localTagIDsPresent = (await dbget(dbs, `
+                SELECT COUNT(1) AS Count
+                FROM Local_Tags
+                WHERE Local_Tag_ID IN ${dbvariablelist(localTagIDs.length)}
+            `, localTagIDs
+        )).Count;
+
+        /** @type {DBJoinedLocalTagService[]} */
+        const localTagServices = (await dballselect(dbs, `
             SELECT DISTINCT LTS.*, S.*
               FROM Local_Tag_Services LTS
               JOIN Services S ON LTS.Service_ID = S.Service_ID
@@ -75,6 +83,11 @@ export class LocalTagServices {
               WHERE LT.Local_Tag_ID IN ${dbvariablelist(localTagIDs.length)}
             `, localTagIDs
         ));
+
+        return {
+            allLocalTagsExist: localTagIDsPresent === localTagIDs.length,
+            localTagServices
+        }
     }
 
     /**

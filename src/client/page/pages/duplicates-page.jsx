@@ -71,22 +71,19 @@ const DuplicatesProcessingPage = ({page}) => {
         ConstState.instance("File"),
         ConstState.instance([]),
         localTagServiceIDsState,
-        addToCleanup,
-        {waitForSet: true}
+        addToCleanup
     );
     const fileCursorConstState = searchTaggablesResultConstState.asTransform(taggablesResult => taggablesResult.cursor, addToCleanup);
     const filesConstState = FetchCache.Global().reselectFilesConstState(
         fileCursorConstState,
         ConstState.instance(["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"]),
-        addToCleanup,
-        {waitForSet: true}
+        addToCleanup
     ).asTransform(mapToFiles, addToCleanup);
 
     const potentialDuplicateFileComparisonsConstState = FetchCache.Global().selectFileComparisonsConstState(
         fileCursorConstState,
         maxSearchDistanceState,
-        addToCleanup,
-        {waitForSet: true}
+        addToCleanup
     );
 
     /** @type {State<number[]>} */

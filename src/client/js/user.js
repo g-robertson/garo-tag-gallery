@@ -145,7 +145,8 @@ export class User {
     #createdDate;
     /** @type {State<DBJoinedUser['Local_Tag_Services']} */
     #localTagServices = new State();
-    #localTaggableServices;
+    /** @type {State<DBJoinedUser['Local_Taggable_Services']} */
+    #localTaggableServices = new State();
     #localURLGeneratorServices;
     /** @type {State<DBJoinedUser['Local_Metric_Services']} */
     #localMetricServices = new State();
@@ -165,7 +166,7 @@ export class User {
         this.#createdDate = json.User_Created_Date ?? 0;
         this.#isAdmin = json.Is_Administrator ?? false;
         this.#localTagServices.set(json.Local_Tag_Services ?? []);
-        this.#localTaggableServices = json.Local_Taggable_Services ?? [];
+        this.#localTaggableServices.set(json.Local_Taggable_Services ?? []);
         this.#localMetricServices.set(json.Local_Metric_Services ?? []);
         this.#localURLGeneratorServices = json.Local_URL_Generator_Services ?? [];
 
@@ -188,8 +189,9 @@ export class User {
     static makeGlobal(newUser) {
         const oldGlobal = User.#Gl_User;
         User.#Gl_User = newUser;
-        User.#Gl_User.#localTagServices.consumeCallbacks(oldGlobal.#localTagServices);
-        User.#Gl_User.#localMetricServices.consumeCallbacks(oldGlobal.#localMetricServices);
+        User.#Gl_User.#localTagServices.consume(oldGlobal.#localTagServices);
+        User.#Gl_User.#localTaggableServices.consume(oldGlobal.#localTaggableServices);
+        User.#Gl_User.#localMetricServices.consume(oldGlobal.#localMetricServices);
     }
 
     static async refreshGlobal() {
@@ -264,7 +266,7 @@ export class User {
     }
 
     localTaggableServices() {
-        return this.#localTaggableServices;
+        return this.#localTaggableServices.get();
     }
 
     /**

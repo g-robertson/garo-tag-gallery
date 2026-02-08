@@ -28,7 +28,14 @@ export async function checkPermissions(dbs, req, res, apiPermissions) {
         const localTagServiceIDsToCheck = new Set(apiPermissions.objects.Local_Tag_Service_IDs ?? []);
 
         if (apiPermissions.objects.Local_Tag_IDs !== undefined) {
-            for (const localTagService of await LocalTagServices.selectManyByLocalTagIDs(dbs, apiPermissions.objects.Local_Tag_IDs)) {
+            const localTagServicesToAdd = await LocalTagServices.selectManyByLocalTagIDs(dbs, apiPermissions.objects.Local_Tag_IDs);
+            if (!localTagServicesToAdd.allLocalTagsExist) {
+                return {
+                    success: false,
+                    message: "Local Tag ID requested did nto exist and cannot have permissions granted"
+                };
+            }
+            for (const localTagService of localTagServicesToAdd.localTagServices) {
                 localTagServiceIDsToCheck.add(localTagService.Local_Tag_Service_ID);
             }
         }
@@ -41,6 +48,7 @@ export async function checkPermissions(dbs, req, res, apiPermissions) {
                     message: "User does not have a permission required for one of the local tag service IDs provided"
                 };
             }
+
             madeCheck = true;
         }
 
@@ -59,7 +67,14 @@ export async function checkPermissions(dbs, req, res, apiPermissions) {
         const localTaggableServiceIDsToCheck = new Set(apiPermissions.objects.Local_Taggable_Service_IDs ?? []);
 
         if (apiPermissions.objects.Taggable_IDs !== undefined) {
-            for (const localTaggableService of await LocalTaggableServices.selectManyByTaggableIDs(dbs, apiPermissions.objects.Taggable_IDs)) {
+            const localTaggableServicesToAdd = await LocalTaggableServices.selectManyByTaggableIDs(dbs, apiPermissions.objects.Taggable_IDs);
+            if (!localTaggableServicesToAdd.allTaggablesExist) {
+                return {
+                    success: false,
+                    message: "Taggable ID requested did not exist and cannot have permissions granted"
+                };
+            }
+            for (const localTaggableService of localTaggableServicesToAdd.localTaggableServices) {
                 localTaggableServiceIDsToCheck.add(localTaggableService.Local_Taggable_Service_ID);
             }
         }

@@ -77,22 +77,23 @@ const LocalTagsSelector = ({
     
     selectedLocalTagServiceIDsState = persistentState.registerState(
         "selectedLocalTagServiceIDs",
-        selectedLocalTagServiceIDsState ?? new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID))),
+        selectedLocalTagServiceIDsState ?? new State(new Set(localTagServicesConstState.get().map(localTagService => localTagService.Local_Tag_Service_ID)), {name: "LocalTagsSelector.selectedLocalTagServiceIDsState"}),
         {isSaved: true, addToCleanup}
     );
-    const isExcludeOnState = persistentState.registerState("isExcludeOn", new State(false), {isSaved: true, addToCleanup});
-    const tagFilterValueState = persistentState.registerState("tagFilterValue", new State(""), {addToCleanup});
+    const isExcludeOnState = persistentState.registerState("isExcludeOn", new State(false, {name: "LocalTagsSelector.isExcludeOnState"}), {isSaved: true, addToCleanup});
+    const tagFilterValueState = persistentState.registerState("tagFilterValue", new State("", {name: "LocalTagsSelector.tagFilterValueState"}), {addToCleanup});
     /** @type {State<ClientQueryTag[]>} */
     const tagsState = persistentState.registerState("tags", new State([]), {addToCleanup});
-    taggableCursorConstState ??= new State(undefined);
-    taggableIDsConstState ??= new State(undefined);
-    tagsToRemoveConstState ??= new State(new Map());
-    tagsToAddConstState ??= new State(new Map());
+    taggableCursorConstState ??= new State(undefined, {name: "LocalTagsSelector.taggableCursorConstState"});
+    taggableIDsConstState ??= new State(undefined, {name: "LocalTagsSelector.taggableIDsConstState"});
+    tagsToRemoveConstState ??= new State(new Map(), {name: "LocalTagsSelector.tagsToRemoveConstState"});
+    tagsToAddConstState ??= new State(new Map(), {name: "LocalTagsSelector.tagsToAddConstState"});
     const tagsPreFilter = FetchCache.Global().getTagsFromLocalTagServiceIDsConstState(
         selectedLocalTagServiceIDsState.asTransform(selectedLocalTagServiceIDs => [...selectedLocalTagServiceIDs], addToCleanup),
         taggableCursorConstState,
         taggableIDsConstState,
-        addToCleanup
+        addToCleanup,
+        {updateOnCreate: true}
     );
     multiSelect ??= true;
     excludeable ??= true;
@@ -110,58 +111,59 @@ const LocalTagsSelector = ({
                 .map(([, tags]) => tags)
             );
             const tagsToRemove = tagsToRemoveConstState.get();
-            let tags = tagsPreFilter.get();
-            tags = tags.filter(tag => {
-                if (tagsToAdd.has(tag.tagName) || tag.tagCount === 0) {
-                    return false;
-                }
-                // if every local tag service id on the tag has the tag removed, then it's removed
-                if (tag.localTagServiceIDs.every(localTagServiceID => tagsToRemove.get(localTagServiceID)?.has(tag.tagName))) {
-                    return false;
-                }
-
-                return true;
-            });
-            tags.push(...tagsToAdd.values());
-            tags = tags.sort((a, b) => b.tagCount - a.tagCount);
-
-            const tagFilterValue = tagFilterValueState.get();
-            tags = tags.filter(tag => {
-                const colonSplitTagFilter = tagFilterValue.split(':');
-                let tagNameMatchedPartsFrom = colonSplitTagFilter.length;
-                for (let i = 0; i < colonSplitTagFilter.length; ++i) {
-                    if (tag.tagName.startsWith(colonSplitTagFilter.slice(i).join(':'))) {
-                        tagNameMatchedPartsFrom = i;
-                        break;
-                    }
-                }
-
-                const namespaceParts = colonSplitTagFilter.slice(0, Math.min(colonSplitTagFilter.length - 1, tagNameMatchedPartsFrom));
-                for (const namespacePart of namespaceParts) {
-                    if (tag.namespaces.indexOf(namespacePart) === -1) {
+            tagsPreFilter.getWhenValid().then(tags => {
+                tags = tags.filter(tag => {
+                    if (tagsToAdd.has(tag.tagName) || tag.tagCount === 0) {
                         return false;
                     }
-                }
-                if (tagNameMatchedPartsFrom === colonSplitTagFilter.length) {
-                    let namespacePartialMatch = false;
-                    for (const namespace of tag.namespaces) {
-                        if (namespace.startsWith(colonSplitTagFilter[colonSplitTagFilter.length - 1])) {
-                            namespacePartialMatch = true;
+                    // if every local tag service id on the tag has the tag removed, then it's removed
+                    if (tag.localTagServiceIDs.every(localTagServiceID => tagsToRemove.get(localTagServiceID)?.has(tag.tagName))) {
+                        return false;
+                    }
+
+                    return true;
+                });
+                tags.push(...tagsToAdd.values());
+                tags = tags.sort((a, b) => b.tagCount - a.tagCount);
+
+                const tagFilterValue = tagFilterValueState.get();
+                tags = tags.filter(tag => {
+                    const colonSplitTagFilter = tagFilterValue.split(':');
+                    let tagNameMatchedPartsFrom = colonSplitTagFilter.length;
+                    for (let i = 0; i < colonSplitTagFilter.length; ++i) {
+                        if (tag.tagName.startsWith(colonSplitTagFilter.slice(i).join(':'))) {
+                            tagNameMatchedPartsFrom = i;
+                            break;
                         }
                     }
-                    if (!namespacePartialMatch) {
-                        return false;
+
+                    const namespaceParts = colonSplitTagFilter.slice(0, Math.min(colonSplitTagFilter.length - 1, tagNameMatchedPartsFrom));
+                    for (const namespacePart of namespaceParts) {
+                        if (tag.namespaces.indexOf(namespacePart) === -1) {
+                            return false;
+                        }
                     }
-                }
+                    if (tagNameMatchedPartsFrom === colonSplitTagFilter.length) {
+                        let namespacePartialMatch = false;
+                        for (const namespace of tag.namespaces) {
+                            if (namespace.startsWith(colonSplitTagFilter[colonSplitTagFilter.length - 1])) {
+                                namespacePartialMatch = true;
+                            }
+                        }
+                        if (!namespacePartialMatch) {
+                            return false;
+                        }
+                    }
 
-                return true;
+                    return true;
+                });
+
+                tagsState.set(tags);
             });
-
-            tagsState.set(tags);
         };
         onTagCriteriaChanged();
 
-        tagsPreFilter.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup);
+        tagsPreFilter.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup, {whenInvalidSubstitute: "no-update"});
         tagFilterValueState.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup);
         tagsToAddConstState.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup);
         tagsToRemoveConstState.addOnUpdateCallback(onTagCriteriaChanged, addToCleanup);

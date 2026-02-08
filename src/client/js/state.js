@@ -1,6 +1,18 @@
+/** @typedef {"invalidValueSubstitute" | "previousValidSubstitute" | "validOnly" | "no-update" | () => void} InvalidSubstitute */
+
 /**
  * @typedef {Object} StateCallbackOptions
  * @property {boolean=} requireChangeForUpdate
+ * @property {InvalidSubstitute=} whenInvalidSubstitute
+ * @property {string=} name
+ */
+
+/**
+ * @template T
+ * @typedef {Object} StateValueOptions
+ * @property {T} validOnly
+ * @property {T} invalidValueSubstitute
+ * @property {T} previousValidSubstitute
  */
 
 /**
@@ -13,39 +25,99 @@
  * @typedef {Object} StateCallbackInfo
  * @property {StateCallback<T>} callback
  * @property {StateCallbackOptions} options
+ * @property {InvalidSubstitute=} whenInvalidSubstitute
+ * @property {string=} name
  */
 
 /**
+ * @template T
  * @typedef {Object} StateOptions
+ * @property {(State | ConstState)[]=} validityDependents
+ * @property {(() => void)[]} addToCleanup
+ * @property {T=} invalidValue
+ * @property {string=} name
  */
 
 /**
  * @template T
  * @typedef {Object} StateTransformOptions
  * @property {T=} initialValue
+ * @property {T=} invalidValue
+ * @property {InvalidSubstitute=} whenInvalidSubstitute
+ * @property {string=} name
  */
 
 /**
  * @template T
- * @typedef {Object} StateTransformOptions
+ * @typedef {Object} StateAsyncTransformOptions
  * @property {T=} initialValue
- * @property {boolean=} waitForSet
+ * @property {State[]=} invalidatesOn
+ * @property {T=} invalidValue
+ * @property {boolean=} updateOnCreate
+ * @property {InvalidSubstitute=} whenInvalidSubstitute
+ * @property {string=} name
  */
 
 /** @template T */
 export class State {
-    /** @type {Set<StateCallbackInfo<T>>} */
-    #callbackInfos = new Set();
-    /** @type {{ref: T}} */
-    #valueRef = {ref: undefined};
+    #stateRef = {
+        name: undefined,
+        /** @type {T} */
+        value: undefined,
+        /** @type {T} */
+        previousValidValue: undefined,
+        /** @type {T} */
+        invalidValue: undefined,
+        /** @type {Set<StateCallbackInfo<T>>} */
+        callbackInfos: new Set(),
+        /** @type {Set<() => void>} */
+        invalidationCallbacks: new Set(),
+        /** @type {Set<() => void>} */
+        onValidCallbacks: new Set(),
+        /** @type {(() => void)[]} */
+        onValidCallbackThenClear: [],
+        valid: true,
+        /** @type {(State | ConstState)[]} */
+        validityDependents: []
+    }
 
     /**
      * @param {T} initialValue
-     * @param {StateOptions} options
+     * @param {StateOptions<T>} options
      */
     constructor(initialValue, options) {
         options ??= {};
-        this.#valueRef.ref = initialValue;
+        options.name ??= "Unnamed";
+        options.validityDependents ??= [];
+        
+        this.#stateRef.value = initialValue;
+        this.#stateRef.validityDependents = options.validityDependents
+        this.#stateRef.invalidValue = options.invalidValue;
+        this.#stateRef.name = options.name;
+
+        for (const validityDependent of this.#stateRef.validityDependents) {
+            if (options.addToCleanup === undefined) {
+                throw new Error(`State variable ${this.#stateRef.name} does not have a cleanup collection specified for validity dependent states, one must be specified.`);
+            }
+
+            validityDependent.addOnValidCallback(this.#checkValidity.bind(this), options.addToCleanup);
+        }
+    }
+
+    #getValueOptions() {
+        let validOnly = () => { return this.#stateRef.value; };
+        if (!this.isValid()) {
+            validOnly = () => { throw new Error(`Trying to access current or previous invalid value on ${this.#stateRef.name}`); }
+        }
+
+        const invalidValueSubstitute = this.#stateRef.valid ? this.#stateRef.value : this.#stateRef.invalidValue;
+        const previousValidSubstitute = this.#stateRef.valid ? this.#stateRef.value : this.#stateRef.previousValidValue;
+
+        return {
+            get validOnly() { return validOnly(); },
+            invalidValueSubstitute,
+            previousValidSubstitute
+        };
     }
 
     /**
@@ -55,33 +127,58 @@ export class State {
      */
     addOnUpdateCallback(callback, addToCleanup, options) {
         options ??= {};
+        options.name ??= "Unnamed";
+        options.name += ` provided by state ${this.#stateRef.name}`;
+        options.whenInvalidSubstitute ??= "validOnly";
         if (addToCleanup === undefined) {
-            throw new Error("State variable does not have a cleanup collection specified for callback, one must be specified.");
+            throw new Error(`State variable ${this.#stateRef.name} does not have a cleanup collection specified for callback ${options.name}, one must be specified.`);
         }
 
         const callbackInfo = {callback, options};
-        this.#callbackInfos.add(callbackInfo);
+        this.#stateRef.callbackInfos.add(callbackInfo);
         
         const cleanupFunction = () => {
-            this.#callbackInfos.delete(callbackInfo);
+            this.#stateRef.callbackInfos.delete(callbackInfo);
         };
-        if (addToCleanup !== undefined) {
-            addToCleanup.push(cleanupFunction);
-        }
+        addToCleanup.push(cleanupFunction);
     }
 
     /**
-     * @param {T} value 
-     * @param {T} previousValue 
+     * @param {StateValueOptions<T>} valueOptions 
+     * @param {StateValueOptions<T>} previousValueOptions 
      */
-    #onUpdate(value, previousValue) {
-        for (const callbackInfo of this.#callbackInfos) {
-            if (callbackInfo.options.requireChangeForUpdate === true) {
-                if (previousValue !== value) {
+    #onUpdate(valueOptions, previousValueOptions) {
+        for (const invalidationCallback of this.#stateRef.invalidationCallbacks) {
+            invalidationCallback();
+        }
+
+        for (const callbackInfo of this.#stateRef.callbackInfos) {
+            let whenInvalidSubstitute = callbackInfo.options.whenInvalidSubstitute;
+            if (whenInvalidSubstitute === "no-update") {
+                whenInvalidSubstitute = () => {};
+            }
+            if (typeof whenInvalidSubstitute === "function") {
+                if (!this.isValid()) {
+                    whenInvalidSubstitute();
+                    continue;
+                } else {
+                    whenInvalidSubstitute = "validOnly";
+                }
+            }
+
+            try {
+                const value = valueOptions[whenInvalidSubstitute];
+                const previousValue = previousValueOptions.invalidValueSubstitute;
+                
+                if (callbackInfo.options.requireChangeForUpdate === true) {
+                    if (previousValue !== value) {
+                        callbackInfo.callback(value, previousValue);
+                    }
+                } else {
                     callbackInfo.callback(value, previousValue);
                 }
-            } else {
-                callbackInfo.callback(value, previousValue);
+            } catch (e) {
+                throw new Error(`Error "${e.message}" occurred within callback ${callbackInfo.options.name}`);
             }
         }
     }
@@ -90,9 +187,36 @@ export class State {
      * @param {T} value 
      */
     set(value) {
-        const previousValue = this.#valueRef.ref;
-        this.#valueRef.ref = value;
-        this.#onUpdate(this.#valueRef.ref, previousValue);
+        if (!this.isValid()) {
+            throw new Error(`Setting value on invalid state ${this.#stateRef.name} without setting validity`);
+        }
+
+        const previousValueOptions = this.#getValueOptions();
+        this.#stateRef.previousValidValue = this.#stateRef.value;
+        this.#stateRef.value = value;
+        this.#onUpdate(this.#getValueOptions(), previousValueOptions);
+    }
+
+    /**
+     * @param {T} value 
+     */
+    setWithValidity(value) {
+        const previousValueOptions = this.#getValueOptions();
+
+        let updatedValidity = false;
+        if (!this.#stateRef.valid) {
+            updatedValidity = true;
+            this.#stateRef.valid = true;
+        } else {
+            this.#stateRef.previousValidValue = this.#stateRef.value;
+        }
+        
+        this.#stateRef.value = value;
+        this.#onUpdate(this.#getValueOptions(), previousValueOptions);
+
+        if (updatedValidity) {
+            this.#onValid();
+        }
     }
 
     /** @type {State<T>} */
@@ -100,34 +224,112 @@ export class State {
     /**
      * @param {State<T>} otherState 
      */
-    consumeCallbacks(otherState) {
-        const otherStateCallbacks = otherState.#callbackInfos;
-        const otherStateValueRef = otherState.#valueRef;
+    consume(otherState) {
+        const otherStateCallbacks = otherState.#stateRef.callbackInfos;
         for (const callback of otherStateCallbacks) {
-            this.#callbackInfos.add(callback)
+            this.#stateRef.callbackInfos.add(callback)
         }
 
         // Move all moved from states to be equivalent to the current state
         this.#movedFrom = otherState
         let movedFromState = this.#movedFrom;
         while (movedFromState !== undefined) {
-            movedFromState.#callbackInfos = this.#callbackInfos;
-            movedFromState.#valueRef = this.#valueRef;
+            movedFromState.#stateRef = this.#stateRef;
 
             movedFromState = movedFromState.#movedFrom;
         }
-        
-        for (const callback of otherStateCallbacks) {
-            callback.callback(this.#valueRef.ref, otherStateValueRef.ref);
-        }
+
+        this.#onUpdate(this.#getValueOptions(), otherState.#getValueOptions())
     }
 
     forceUpdate() {
-        this.#onUpdate(this.#valueRef.ref, this.#valueRef.ref);
+        this.#onUpdate(this.#getValueOptions(), this.#getValueOptions());
     }
 
-    get() {
-        return this.#valueRef.ref;
+    /**
+     * @param {InvalidSubstitute=} whenInvalidSubstitute 
+     */
+    get(whenInvalidSubstitute) {
+        whenInvalidSubstitute ??= "validOnly";
+        const valueOptions = this.#getValueOptions();
+        return valueOptions[whenInvalidSubstitute];
+    }
+
+    /**
+     * @returns {Promise<T>}
+     */
+    async getWhenValid() {
+        if (this.isValid()) {
+            return this.get();
+        } else {
+            return new Promise(resolve => {
+                this.#stateRef.onValidCallbackThenClear.push(() => {
+                    resolve(this.get());
+                });
+            })
+        }
+    }
+
+    addOnValidCallback(callback, addToCleanup) {
+        if (addToCleanup === undefined) {
+            throw new Error("State variable does not have a cleanup collection specified for onValid callback, one must be specified");
+        }
+
+        this.#stateRef.onValidCallbacks.add(callback);
+
+        const cleanupFunction = () => {
+            this.#stateRef.onValidCallbacks.delete(callback);
+        }
+        addToCleanup.push(cleanupFunction);
+    }
+
+    /**
+     * @param {() => void} callback
+     * @param {(() => void)[]} addToCleanup 
+     */
+    addInvalidationCallback(callback, addToCleanup) {
+        if (addToCleanup === undefined) {
+            throw new Error("State variable does not have a cleanup collection specified for invalidation callback, one must be specified");
+        }
+
+        this.#stateRef.invalidationCallbacks.add(callback);
+
+        const cleanupFunction = () => {
+            this.#stateRef.invalidationCallbacks.delete(callback);
+        }
+        addToCleanup.push(cleanupFunction);
+    }
+
+    #onValid() {
+        for (const callback of this.#stateRef.onValidCallbacks) {
+            callback();
+        }
+        
+        for (const callback of this.#stateRef.onValidCallbackThenClear) {
+            callback();
+        }
+        this.#stateRef.onValidCallbackThenClear = [];
+    }
+
+    isValid() {
+        return this.#stateRef.valid && this.#stateRef.validityDependents.every(state => state.isValid());
+    }
+
+    setInvalid() {
+        if (this.#stateRef.valid) {
+            this.#stateRef.valid = false;
+            this.forceUpdate();
+        }
+    }
+
+    #checkValidity() {
+        if (this.isValid()) {
+            this.#onValid();
+        }
+    }
+
+    name() {
+        return this.#stateRef.name;
     }
 
     /**
@@ -146,18 +348,20 @@ export class State {
      */
     asTransform(transform, addToCleanup, options) {
         options ??= {};
-        const state = new State();
+        const state = new State(undefined, {validityDependents: [this], addToCleanup, invalidValue: options.invalidValue, name: options.name});
 
         this.addOnUpdateCallback(currentValue => {
             state.set(transform(currentValue))
-        }, addToCleanup);
-        state.set(transform(this.#valueRef.ref));
+        }, addToCleanup, {whenInvalidSubstitute: () => {
+            state.forceUpdate();
+        }, name: `${options.name} update callback from ${this.name()}`});
+        state.set(transform(this.get()));
 
         return new ConstState(state);
     }
 
     /**
-     * @template R1, R2, R3, R4, R5, R6, R7
+     * @template T, R1, R2, R3, R4, R5, R6, R7
      * @typedef {(
      *     transforms: [
      *         (currentValue: T) => R1,
@@ -169,7 +373,7 @@ export class State {
      *         (currentValue: T) => R7, 
      *     ],
      *     addToCleanup: (() => void)[],
-     *     options: StateTransformOptions=
+     *     options: StateTransformOptions<any>=
      * ) => [
      *     ConstState<R1>,
      *     ConstState<R2>,
@@ -182,23 +386,27 @@ export class State {
      **/
 
     /**
-     * @template R1, R2, R3, R4, R5, R6, R7
-     * @type {AsAtomicTransformFunction<R1, R2, R3, R4, R5, R6, R7>}
+     * @template T, R1, R2, R3, R4, R5, R6, R7
+     * @type {AsAtomicTransformFunction<T, R1, R2, R3, R4, R5, R6, R7>}
      **/
     asAtomicTransforms(transforms, addToCleanup, options) {
         options ??= {};
-        const states = transforms.map(() => new State());
+        const states = transforms.map(() => new State(undefined, {validityDependents: [this], addToCleanup, invalidValue: options.invalidValue, name: options.name}));
 
         this.addOnUpdateCallback(currentValue => {
             for (let i = 0; i < transforms.length; ++i) {
-                states[i].#valueRef.ref = transforms[i](currentValue);
+                states[i].#stateRef.value = transforms[i](currentValue);
             }
             for (const state of states) {
                 state.forceUpdate();
             }
-        }, addToCleanup);
+        }, addToCleanup, {whenInvalidSubstitute: () => {
+            for (const state of states) {
+                state.forceUpdate();
+            }
+        }, name: `Atomic states ${options.name} update callback from ${this.name()}`});
         for (let i = 0; i < transforms.length; ++i) {
-            states[i].#valueRef.ref = transforms[i](this.#valueRef.ref);
+            states[i].#stateRef.value = transforms[i](this.get());
         }
         for (const state of states) {
             state.forceUpdate();
@@ -217,12 +425,14 @@ export class State {
     static tupleTransform(states, transform, addToCleanup, options) {
         options ??= {};
         /** @type {State<T>} */
-        const transformState = new State();
+        const transformState = new State(undefined, {validityDependents: states, addToCleanup, invalidValue: options.invalidValue, name: options.name});
 
         for (const state of states) {
             state.addOnUpdateCallback(() => {
                 transformState.set(transform());
-            }, addToCleanup)
+            }, addToCleanup, {whenInvalidSubstitute: () => {
+                transformState.forceUpdate();
+            }, name: `${options.name} update callback from ${state.name()}`})
         }
         transformState.set(transform());
 
@@ -238,26 +448,41 @@ export class State {
      */
     static asyncTupleTransform(states, asyncTransform, addToCleanup, options) {
         options ??= {};
+        options.invalidatesOn ??= [];
+
         /** @type {State<T>} */
-        const transformState = new State(options.initialValue);
+        const transformState = new State(options.initialValue, {validityDependents: states, addToCleanup, invalidValue: options.invalidValue, name: options.name});
+        for (const state of options.invalidatesOn) {
+            state.addInvalidationCallback(() => {
+                transformState.setInvalid();
+            }, addToCleanup);
+        }
 
         let updateNumber = 0;
-        for (const state of states) {
-            state.addOnUpdateCallback(() => {
-                let localUpdateNumber = ++updateNumber;
-                asyncTransform().then(result => {
-                    if (localUpdateNumber < updateNumber) {
-                        return;
-                    }
-
-                    transformState.set(result);
-                });
-            }, addToCleanup)
-        }
-        if (options.waitForSet !== true) {
+        const updateTransformState = () => {
+            let localUpdateNumber = ++updateNumber;
             asyncTransform().then(result => {
-                transformState.set(result);
+                if (localUpdateNumber < updateNumber) {
+                    return;
+                }
+
+                transformState.setWithValidity(result);
             });
+        }
+
+        for (const state of states) {
+            state.addOnUpdateCallback(
+                updateTransformState,
+                addToCleanup,
+                {
+                    whenInvalidSubstitute: () => { transformState.forceUpdate(); },
+                    name: `${options.name} update callback from ${state.name()}`
+                }
+            )
+        }
+
+        if (options.updateOnCreate) {
+            updateTransformState();
         }
 
         return new ConstState(transformState);
@@ -289,6 +514,42 @@ export class ConstState {
         return this.#state.get();
     }
 
+    async getWhenValid() {
+        return this.#state.getWhenValid();
+    }
+
+    /**
+     * @param {() => void} callback 
+     * @param {(() => void)[]} addToCleanup
+     */
+    addOnValidCallback(callback, addToCleanup) {
+        this.#state.addOnValidCallback(callback, addToCleanup);
+    }
+
+    /**
+     * @param {() => void} callback 
+     * @param {(() => void)[]} addToCleanup
+     */
+    addInvalidationCallback(callback, addToCleanup) {
+        this.#state.addInvalidationCallback(callback, addToCleanup);
+    }
+
+    isValid() {
+        return this.#state.isValid();
+    }
+
+    hasValue() {
+        return this.#state.hasValue();
+    }
+
+    checkValidity() {
+        return this.#state.checkValidity();
+    }
+
+    name() {
+        return this.#state.name();
+    }
+
     /**
      * @template T
      * @param {T} value 
@@ -309,8 +570,8 @@ export class ConstState {
     }
     
     /**
-     * @template R1, R2, R3, R4, R5, R6, R7
-     * @type {AsAtomicTransformFunction<R1, R2, R3, R4, R5, R6, R7>}
+     * @template T, R1, R2, R3, R4, R5, R6, R7
+     * @type {AsAtomicTransformFunction<T, R1, R2, R3, R4, R5, R6, R7>}
      **/
     asAtomicTransforms(transforms, addToCleanup, options) {
         return this.#state.asAtomicTransforms(transforms, addToCleanup, options);
@@ -423,7 +684,7 @@ export class PersistentState {
             state.set(this.#priorState[key]);
             delete this.#priorState[key];
         }
-        state.addOnUpdateCallback(this.#onUpdate.bind(this), options.addToCleanup, {...options});
+        state.addOnUpdateCallback(() => {this.#onUpdate();}, options.addToCleanup, {...options});
         return state;
     }
 

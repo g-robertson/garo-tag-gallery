@@ -31,17 +31,17 @@ const Scrollbar = ({
     const addToCleanup = [];
     scrollbarWidth ??= 17;
     alternativeScrollingElements ??= [];
-    scrollbarIntervalConstState ??= new State(1);
-    scrollbarIncrementConstState ??= new State(4);
+    scrollbarIntervalConstState ??= new State(1, {name: "Scrollbar.scrollbarIntervalConstState"});
+    scrollbarIncrementConstState ??= new State(4, {name: "Scrollbar.scrollbarIncrementConstState"});
     /** @type {State<number | null>} */
-    const preClickitemPositionState = new State(null);
+    const preClickitemPositionState = new State(null, {name: "Scrollbar.preClickitemPositionState"});
     /** @type {State<number | null>} */
-    const clickedCursorPosState = new State(null);
+    const clickedCursorPosState = new State(null, {name: "Scrollbar.clickedCursorPosState"});
     /** @type {State<number | null>} */
-    const clickedScrollbarPosState = new State(null);
+    const clickedScrollbarPosState = new State(null, {name: "Scrollbar.clickedScrollbarPosState"});
     const lastPossibleScrollPositionState = State.tupleTransform([totalItemsConstState, itemsDisplayedConstState, scrollbarIntervalConstState], () => {
         return Math.max(Math.ceil((totalItemsConstState.get() - itemsDisplayedConstState.get()) / scrollbarIntervalConstState.get()) * scrollbarIntervalConstState.get(), 0);
-    }, addToCleanup);
+    }, addToCleanup, {name: "Scrollbar.lastPossibleScrollPositionState"});
 
     const RootElement = ReferenceableReact();
     const ScrollCursor = ReferenceableReact();
@@ -52,18 +52,18 @@ const Scrollbar = ({
             return Math.max(SCROLL_CURSOR_MIN_LENGTH, lengthConstState.get() * Math.min(1, itemsDisplayedConstState.get() / totalItemsConstState.get()));
         }
         return lengthConstState.get();
-    }, addToCleanup);
+    }, addToCleanup, {name: "Scrollbar.scrollCursorLengthState"});
 
     const scrollBarTravelDistanceState = State.tupleTransform([lengthConstState, scrollCursorLengthState], () => {
         return lengthConstState.get() - scrollCursorLengthState.get();
-    }, addToCleanup);
+    }, addToCleanup, {name: "Scrollbar.scrollBarTravelDistanceState"});
 
     const scrollbarPositionTopState = State.tupleTransform([itemPositionState, lastPossibleScrollPositionState, scrollBarTravelDistanceState], () => {
         if (lastPossibleScrollPositionState.get() !== 0) {
             return (itemPositionState.get() / lastPossibleScrollPositionState.get()) * scrollBarTravelDistanceState.get();
         }
         return 0;
-    }, addToCleanup)
+    }, addToCleanup, {name: "Scrollbar.scrollbarPositionTopState"})
 
     /** @type {(itemPosition: number) => void} */
     const getClampedItemPosition = (itemPosition) => {
@@ -115,15 +115,15 @@ const Scrollbar = ({
             ScrollCursor.dom.style.height = `${scrollCursorLengthState.get()}px`;
             ScrollCursor.dom.style.lineHeight = `${scrollCursorLengthState.get()}px`;
         }
-        scrollCursorLengthState.addOnUpdateCallback(onScrollCursorLengthChanged, addToCleanup, {requireChangeForUpdate: true});
+        scrollCursorLengthState.addOnUpdateCallback(onScrollCursorLengthChanged, addToCleanup, {requireChangeForUpdate: true, whenInvalidSubstitute: "no-update"});
 
         const onScrollbarPositionTopChanged = () => {
             if (ScrollCursor.dom === null) return;
             
             ScrollCursor.dom.style.marginTop = `${scrollbarPositionTopState.get()}px`;
         }
-        // ideally this would requireChangeForUpdate, doesn't work!!!
-        scrollbarPositionTopState.addOnUpdateCallback(onScrollbarPositionTopChanged, addToCleanup, {requireChangeForUpdate: true, debug:true});
+        
+        scrollbarPositionTopState.addOnUpdateCallback(onScrollbarPositionTopChanged, addToCleanup, {requireChangeForUpdate: true, whenInvalidSubstitute: "no-update"});
 
         for (const item of alternativeScrollingElements) {
             item.dom.addEventListener("wheel", wheelListener);

@@ -1,14 +1,20 @@
 import { Key, until } from "selenium-webdriver";
-import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, modClick, modDoubleClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
+import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, FINISH_HYDRUS_JOB_TIMEOUT, modClick, modDoubleClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, UNTIL_JOB_BEGIN, UNTIL_JOB_END, UNTIL_MODAL_CLOSE, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
 import { addAggregateTag, AGGREGATE_CONDITION_TYPES, AGGREGATE_TAG_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, enterTagFilter, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveModifyTaggablesChanges, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../../functionality/pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../../../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../../functionality/metrics-functionality.js";
 import { BUG_IMPACTS, BUG_NOTICES, BUG_PRIORITIES, IMPLEMENTATION_DIFFICULTIES } from "../../../unimplemented-test-info.js";
+import { createNewTaggableService, deleteTaggableService } from "../../../functionality/taggables-functionality.js";
+import { importFilesFromHydrus } from "../../../functionality/file-functionality.js";
 /** @import {TestSuite} from "../../test-suites.js" */
 
 
 /** @type {Record<string, any>} */
 const State = {};
+
+const SINGLE_IMAGE_IMPORT = "./e2etest/data/hydrus-test-bad-thumbnail-import.zip";
+
+const TEST_TAGGABLE_SERVICE_NAME_1 = "TEST TAGGABLE SERVICE";
 
 const TEST_TAG_SERVICE_NAME_1 = "TEST TAG SERVICE";
 const TEST_TAG_SERVICE_RENAME_1 = "TAG SERVICE RENAMED";
@@ -47,6 +53,16 @@ export const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(untilElementsNotLocated(BySearchQueryTagService(TEST_TAG_SERVICE_RENAME_1)), DEFAULT_TIMEOUT_TIME);
         }}
     ]},
+    {name: "DeletingTaggableServiceWithTaggablesWithFileSearchPageOpenShouldNotError", tests: async (driver) => {
+        await createNewTaggableService(driver, TEST_TAGGABLE_SERVICE_NAME_1);
+        await importFilesFromHydrus(driver, {
+            fileName: SINGLE_IMAGE_IMPORT,
+            taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1
+        });
+        await driver.wait(UNTIL_JOB_BEGIN, FINISH_HYDRUS_JOB_TIMEOUT);
+        await driver.wait(UNTIL_JOB_END, FINISH_HYDRUS_JOB_TIMEOUT);
+        await deleteTaggableService(driver, TEST_TAGGABLE_SERVICE_NAME_1);
+    }},
     {name: "ToggleTagServiceTogglesTags", tests: async (driver) => {
         await driver.findElement(ByMultiSelectOption("Default local tags")).click();
         await driver.wait(untilElementsNotLocated(BySelectableTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
