@@ -21,6 +21,8 @@ const TEST_TAG_FALSE_POSITIVE = "false-positive-test";
 export const DUPLICATES_PROCESSING_PAGE_TESTS = [
     {name: "Setup", isSetup: true, tests: async (driver) => {
         await importFilesFromHydrus(driver, {fileName: "./e2etest/data/hydrus-duplicates-test.zip"});
+        await driver.wait(UNTIL_JOB_BEGIN, DEFAULT_TIMEOUT_TIME);
+        await driver.wait(UNTIL_JOB_END, 10000);
         await createNewDuplicatesProcessingPage(driver);
         await createNewFileSearchPage(driver);
         await selectPage(driver, 0);

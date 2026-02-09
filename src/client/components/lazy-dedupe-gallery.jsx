@@ -31,15 +31,15 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
     const ActiveFile = ReferenceableReact();
     const imagePreloader = new ImagePreloader();
 
-    const visibleIndexState = persistentState.registerState("visibleIndex", new State(initialFileComparisonIndex ?? 0), {isSaved: true, addToCleanup})
-    const fileComparisonsEvaluatedState = persistentState.registerState("fileComparisonsEvaluated", new State({}), {isSaved: true, addToCleanup});
+    const visibleIndexState = persistentState.registerState("visibleIndex", new State(initialFileComparisonIndex ?? 0), {isSaved: true, addToCleanup, name: "LazyDedupeGallery.visibleIndexState"})
+    const fileComparisonsEvaluatedState = persistentState.registerState("fileComparisonsEvaluated", new State({}), {isSaved: true, addToCleanup, name: "LazyDedupeGallery.fileComparisonsEvaluatedState"});
 
-    const selectorIncrementerState = new State(0);
+    const selectorIncrementerState = new State(0, {name: "LazyDedupeGallery.selectorIncrementerState"});
     /** @type {State<LazyDedupeGalleryRealizedValue>} */
-    const realizedValueState = new State(null);
+    const realizedValueState = new State(null, {name: "LazyDedupeGallery.realizedValueState"});
 
     /** @type {State<"File_1" | "File_2">} */
-    const activeFileState = new State("File_1");
+    const activeFileState = new State("File_1", {name: "LazyDedupeGallery.activeFileState"});
 
     const onAdd = () => {
         const onActiveFileChanged = () => {

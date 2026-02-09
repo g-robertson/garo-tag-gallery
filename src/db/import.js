@@ -1,7 +1,7 @@
 import path from "path";
 import { extractWith7Z, getAllFileEntries, sha256 } from "../util.js";
 import { dbBeginTransaction, dbEndTransaction } from "./db-util.js";
-import { LocalTags, Namespaces, TagsNamespaces, Tags, LocalTagServices } from "./tags.js";
+import { LocalTags, TagsNamespaces, Tags, LocalTagServices } from "./tags.js";
 import { localTagsPKHash } from "../client/js/tags.js";
 import { Files, LocalFiles, LocalTaggableServices, Taggables } from "./taggables.js";
 import { addNotesToTaggables } from "./notes.js";
@@ -11,7 +11,6 @@ import { readFile } from "fs/promises";
 import { z } from "zod";
 import { mapNullCoalesce } from "../client/js/client-util.js";
 import { AppliedMetrics, appliedMetricsPKHash, LocalMetrics, LocalMetricServices } from "./metrics.js";
-import { METRIC_TYPES } from "../client/js/metrics.js";
 /**
  * @import {Databases} from "./db-util.js"
  * @import {URLAssociation} from "../client/js/tags.js"
@@ -224,6 +223,7 @@ export async function importChunks(dbs, importables) {
 export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePaths, localTagServiceID, localTaggableServiceID) {
     return new Job({durationBetweenTasks: 250, jobName: "Importing files from Hydrus"}, async function*() {
         yield {upcomingSubtasks: 1, upcomingTaskName: "Extracting ZIP file"};
+        console.log("started job");
 
         let leadFilePath;
         if (partialFilePaths.length === 1) {

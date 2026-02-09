@@ -27,7 +27,7 @@ export default async function get(dbs, req, res) {
     /** @type {PathCursor} */
     const pathCursor = new Cursor({
         cursorType: "Path",
-        cursorValue: path.join(TMP_FOLDER, `__NOT_PARTIAL__${unusedID()}`),
+        cursorValue: path.join(TMP_FOLDER, `__NOT_PARTIAL__${Date.now().valueOf()}_${unusedID()}`),
         cursorTimeout: 1 * T_DAY
     });
     dbs.cursorManager.addCursorToUser(req.user.id(), pathCursor);

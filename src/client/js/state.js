@@ -247,7 +247,8 @@ export class State {
     }
 
     /**
-     * @param {InvalidSubstitute=} whenInvalidSubstitute 
+     * @param {InvalidSubstitute=} whenInvalidSubstitute
+     * @returns {T}
      */
     get(whenInvalidSubstitute) {
         whenInvalidSubstitute ??= "validOnly";
@@ -510,8 +511,11 @@ export class ConstState {
         this.#state.addOnUpdateCallback(callback, addToCleanup, options);
     }
 
-    get() {
-        return this.#state.get();
+    /**
+     * @param {InvalidSubstitute} whenInvalidSubstitute 
+     */
+    get(whenInvalidSubstitute) {
+        return this.#state.get(whenInvalidSubstitute);
     }
 
     async getWhenValid() {

@@ -38,18 +38,18 @@ const TESTS = {
 export const OK_LOGS = new Set(["info"]);
 export const HEADLESS = false;
 const DISABLED_TESTS = new Set([
-    // "Tests.Navigation",
+    "Tests.Navigation",
     // "Tests.PopulateData",
     // "Tests.Functional",
-    // "Tests.Functional.Files",
-    // "Tests.Functional.Files.ImportFilesFromHydrus.TestImportFilesFromHydrus",
+    "Tests.Functional.Files",
+    "Tests.Functional.Files.ImportFilesFromHydrus.TestImportFilesFromHydrus",
     // "Tests.Functional.Pages",
-    // "Tests.Functional.Pages.FileSearchPage",
-    // "Tests.Functional.Pages.FileSearchPage.TagSearch",
-    // "Tests.Functional.Tags",
-    // "Tests.Functional.Taggables",
-    // "Tests.Functional.Metrics",
-    "Tests.Functional.Pages.DuplicatesProcessingPage"
+    "Tests.Functional.Pages.FileSearchPage",
+    "Tests.Functional.Pages.FileSearchPage.TagSearch",
+    "Tests.Functional.Tags",
+    "Tests.Functional.Taggables",
+    "Tests.Functional.Metrics",
+    // "Tests.Functional.Pages.DuplicatesProcessingPage"
 ]);
 const HALT_ON_FAILURE = true;
 const HALT_AFTER = new Set([]);
@@ -83,9 +83,6 @@ async function executeTestSuite_(testSuite, previousContext, driver, skippingTes
         console.log(`Skipping tests: ${currentContext}`);
         skippingTests = true;
     }
-    if (!skippingTests) {
-        console.log(`Executing tests: ${currentContext}`);
-    }
 
     /** @type {TestSuite[]} */
     let teardowns = [];
@@ -93,6 +90,7 @@ async function executeTestSuite_(testSuite, previousContext, driver, skippingTes
         if (skippingTests) {
             return;
         }
+        console.log(`Executing tests: ${currentContext}`);
 
         ++testCount;
         try {
@@ -114,6 +112,7 @@ async function executeTestSuite_(testSuite, previousContext, driver, skippingTes
             }
         }
     } else {
+        console.log(`Unimplemented test: ${currentContext}`);
         unimplementedTests.push({
             name: currentContext,
             ...testSuite.tests

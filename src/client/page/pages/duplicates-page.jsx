@@ -60,12 +60,12 @@ const DuplicatesProcessingPage = ({page}) => {
     const PotentialDuplicateComparisonsMadeCount = ReferenceableReact();
     const PotentialDuplicateFileCount = ReferenceableReact();
 
-    const dedupeGalleryState = page.persistentState.registerState("dedupeGallery", new PersistentState(), {addToCleanup});
-    const maxSearchDistanceState = page.persistentState.registerState("maxSearchDistance", new State(REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER), {isSaved: true, addToCleanup});
+    const dedupeGalleryState = page.persistentState.registerState("dedupeGallery", new PersistentState(), {addToCleanup, name: "DuplicatesProcessingPage.dedupeGalleryState"});
+    const maxSearchDistanceState = page.persistentState.registerState("maxSearchDistance", new State(REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER), {isSaved: true, addToCleanup, name: "DuplicatesProcessingPage.maxSearchDistanceState"});
     
-    const clientSearchQueryState = new State(null);
+    const clientSearchQueryState = new State(null, {name: "DuplicatesProcessingPage.clientSearchQueryState"});
     /** @type {State<number[]>} */
-    const localTagServiceIDsState = new State([]);
+    const localTagServiceIDsState = new State([], {name: "DuplicatesProcessingPage.localTagServiceIDsState"});
     const searchTaggablesResultConstState = FetchCache.Global().searchTaggablesConstState(
         clientSearchQueryState,
         ConstState.instance("File"),
@@ -73,12 +73,12 @@ const DuplicatesProcessingPage = ({page}) => {
         localTagServiceIDsState,
         addToCleanup
     );
-    const fileCursorConstState = searchTaggablesResultConstState.asTransform(taggablesResult => taggablesResult.cursor, addToCleanup);
+    const fileCursorConstState = searchTaggablesResultConstState.asTransform(taggablesResult => taggablesResult.cursor, addToCleanup, {name: "DuplicatesProcessingPage.fileCursorConstState"});
     const filesConstState = FetchCache.Global().reselectFilesConstState(
         fileCursorConstState,
         ConstState.instance(["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"]),
         addToCleanup
-    ).asTransform(mapToFiles, addToCleanup);
+    ).asTransform(mapToFiles, addToCleanup, {name: "DuplicatesProcessingPage.filesConstState"});
 
     const potentialDuplicateFileComparisonsConstState = FetchCache.Global().selectFileComparisonsConstState(
         fileCursorConstState,
@@ -87,13 +87,13 @@ const DuplicatesProcessingPage = ({page}) => {
     );
 
     /** @type {State<number[]>} */
-    const potentialDuplicateIndicesSelectedState = new State([]);
+    const potentialDuplicateIndicesSelectedState = new State([], {name: "DuplicatesProcessingPage.potentialDuplicateIndicesSelectedState"});
 
     const potentialDuplicateFileComparisonsPendingConstState = potentialDuplicateFileComparisonsConstState.asTransform(potentialDuplicateFileComparisons => (
         potentialDuplicateFileComparisons
         .filter(fileComparison => !fileComparison.Comparison_Is_Checked)
         .sort((a, b) => a.Perceptual_Hash_Distance - b.Perceptual_Hash_Distance)
-    ), addToCleanup);
+    ), addToCleanup, {name: "DuplicatesProcessingPage.potentialDuplicateFileComparisonsPendingConstState"});
     // const potentialDuplicateFileComparisonsPendingMergedGroups = mergeGroups(potentialDuplicateFileComparisonsPending, fileComparisonPending => [fileComparisonPending.File_ID_1, fileComparisonPending.File_ID_2]);
     // const MAX_SUBGROUP_SIZE = 5;
     // const potentialDuplicateFileComparisonsPendingSubgroups = potentialDuplicateFileComparisonsPendingMergedGroups.flatMap(group => {
@@ -106,7 +106,7 @@ const DuplicatesProcessingPage = ({page}) => {
     //             currentSubgroup.push(constituent);
     //             currentSubgroupFileIDs.add(constituent.File_ID_1);
     //             currentSubgroupFileIDs.add(constituent.File_ID_2);
-// 
+    // 
     //             if (currentSubgroupFileIDs.size >= MAX_SUBGROUP_SIZE) {
     //                 subgroups.push({
     //                     constituents: currentSubgroup,
@@ -164,8 +164,8 @@ const DuplicatesProcessingPage = ({page}) => {
             PotentialDuplicateComparisonsMadeCount.dom.textContent = potentialDuplicateComparisonsMadeCount;
         };
 
-        filesConstState.addOnUpdateCallback(onFilesUpdated, addToCleanup);
-        potentialDuplicateFileComparisonsConstState.addOnUpdateCallback(onPotentialDuplicatesUpdated, addToCleanup);
+        filesConstState.addOnUpdateCallback(onFilesUpdated, addToCleanup, {whenInvalidSubstitute: "no-update"});
+        potentialDuplicateFileComparisonsConstState.addOnUpdateCallback(onPotentialDuplicatesUpdated, addToCleanup, {whenInvalidSubstitute: "no-update"});
 
         return () => executeFunctions(addToCleanup);
     };
