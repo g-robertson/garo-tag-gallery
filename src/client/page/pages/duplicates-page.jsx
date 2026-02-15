@@ -76,7 +76,7 @@ const DuplicatesProcessingPage = ({page}) => {
     const fileCursorConstState = searchTaggablesResultConstState.asTransform(taggablesResult => taggablesResult.cursor, addToCleanup, {name: "DuplicatesProcessingPage.fileCursorConstState"});
     const filesConstState = FetchCache.Global().reselectFilesConstState(
         fileCursorConstState,
-        ConstState.instance(["Taggable_ID", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"]),
+        ConstState.instance(["Taggable_IDs", "File_ID", "File_Hash", "File_Extension", "Perceptual_Hash_Version"]),
         addToCleanup
     ).asTransform(mapToFiles, addToCleanup, {name: "DuplicatesProcessingPage.filesConstState"});
 
@@ -250,7 +250,7 @@ const DuplicatesProcessingPage = ({page}) => {
                                                 + `Maximum value allowed for input is ${MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} as higher values would just cause lower performance for no more similar images`
                     }>search distance</HoverInfo> of pairs:
                     <div style={{marginLeft: 4}}>
-                        <NumericInput selectedNumberState={maxSearchDistanceState} minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} />
+                        <NumericInput className="duplicate-search-distance" selectedNumberState={maxSearchDistanceState} minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} />
                     </div>
                 </div>
                 <div style={{marginTop: 4}}>Taggables included in query: {TaggablesIncludedInDisplayCount.react(<span></span>)}</div>

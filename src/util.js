@@ -157,55 +157,150 @@ export async function extractNthSecondWithFFMPEG(inputFileName, seconds, outputF
         })
     });
 }
-
 /**
  * @param {string} inputFileName 
- * @param {string} ffprobeExecutable
+ * @param {string=} ffprobeExecutable
  * @returns {Promise<{
  *   frames: number
  *   duration: number
  *   width: number
  *   height: number
+ *   videoSize: number
  * }>}
- */
-export async function extractMetadataWithFFPROBE(inputFileName, ffprobeExecutable) {
-    const ret = spawn(ffprobeExecutable ?? getFFPROBEExecutableName(), [
+ **/
+export async function extractVideoMetadataWithFFProbe(inputFileName, ffprobeExecutable) {
+    const NULL_RETURN = {
+        frames: 0,
+        duration: undefined,
+        width: undefined,
+        height: undefined,
+        videoSize: 0
+    };
+
+    const videoDataFFProbe = spawn(ffprobeExecutable ?? getFFPROBEExecutableName(), [
         "-v",
         "error",
         "-select_streams",
         "v:0",
         "-count_packets",
         "-show_entries",
-        "format=duration:stream=nb_read_packets,width,height",
+        "format=duration:stream=nb_read_packets,width,height:packet=size",
         "-of",
         "json=c=1",
         inputFileName
     ]);
     let metadata = "";
-    ret.stdout.on("data", (chunk) => {
+    videoDataFFProbe.stdout.on("data", (chunk) => {
         metadata += chunk.toString();
     });
 
-    return await new Promise(resolve => {
-        ret.on("error", (e) => {
+    const videoData = await new Promise(resolve => {
+        videoDataFFProbe.on("error", (e) => {
             console.log(e);
-            resolve(undefined);
+            resolve(NULL_RETURN);
         });
 
-        ret.on("exit", (code) => {
+        videoDataFFProbe.on("exit", (code) => {
             if (code !== 0) {
-                resolve(undefined);
+                resolve(NULL_RETURN);
+                return;
             }
 
             const parsedMetadata = JSON.parse(metadata);
+            const format = parsedMetadata.format ?? {};
+            const stream = parsedMetadata.streams[0] ?? {};
+            const packets = parsedMetadata.packets ?? [];
+            const frames = Number(stream.nb_read_packets ?? 0);
             resolve({
-                duration: Number(parsedMetadata.format.duration),
-                frames: Number(parsedMetadata.streams[0].nb_read_packets),
-                width: parsedMetadata.streams[0].width,
-                height: parsedMetadata.streams[0].height,
+                duration: (frames <= 1 || format.duration === undefined) ? undefined : Number(format.duration),
+                frames,
+                width: stream.width === undefined ? undefined : Number(stream.width),
+                height: stream.height === undefined ? undefined : Number(stream.height),
+                videoSize: packets.reduce((acc, cur) => acc + Number(cur.size ?? 0), 0)
             });
         })
     });
+
+    videoDataFFProbe.kill();
+    return videoData;
+}
+
+/**
+ * @param {string} inputFileName 
+ * @param {string=} ffprobeExecutable
+ * @returns {Promise<{
+ *   duration: number
+ *   sampleRate: number
+ *   channelCount: number
+ *   audioSize: number
+ * }>}
+ **/
+export async function extractAudioMetadataWithFFProbe(inputFileName, ffprobeExecutable) {
+    const NULL_RETURN = {
+        duration: undefined,
+        sampleRate: undefined,
+        channelCount: undefined,
+        audioSize: 0
+    };
+
+    const audioDataFFProbe = spawn(ffprobeExecutable ?? getFFPROBEExecutableName(), [
+        "-v",
+        "error",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "format=duration:stream=sample_rate,channels:packet=size",
+        "-of",
+        "json=c=1",
+        inputFileName
+    ]);
+    let metadata = "";
+    audioDataFFProbe.stdout.on("data", (chunk) => {
+        metadata += chunk.toString();
+    });
+
+    const audioData = await new Promise(resolve => {
+        audioDataFFProbe.on("error", (e) => {
+            console.log(e);
+            resolve(NULL_RETURN);
+        });
+
+        audioDataFFProbe.on("exit", (code) => {
+            if (code !== 0) {
+                resolve(NULL_RETURN);
+                return;
+            }
+
+            const parsedMetadata = JSON.parse(metadata);
+            const format = parsedMetadata.format ?? {};
+            const streamExists = parsedMetadata.streams[0] !== undefined;
+            const stream = parsedMetadata.streams[0] ?? {};
+            const packets = parsedMetadata.packets ?? [];
+            resolve({
+                duration: (!streamExists || format.duration === undefined) ? undefined : Number(format.duration),
+                sampleRate: stream.sample_rate === undefined ? undefined : Number(stream.sample_rate),
+                channelCount: stream.channels === undefined ? undefined : Number(stream.channels),
+                audioSize: packets.reduce((acc, cur) => acc + Number(cur.size ?? 0), 0)
+            });
+        })
+    });
+
+    audioDataFFProbe.kill();
+    return audioData;
+}
+
+/**
+ * @param {string} inputFileName 
+ * @param {string=} ffprobeExecutable
+ */
+export async function extractMetadataWithFFProbe(inputFileName, ffprobeExecutable) {
+    const videoData = await extractVideoMetadataWithFFProbe(inputFileName, ffprobeExecutable);
+    const audioData = await extractAudioMetadataWithFFProbe(inputFileName, ffprobeExecutable);
+    return {
+        ...videoData,
+        ...audioData,
+        duration: videoData.duration ?? audioData.duration
+    };
 }
 
 const SERIALIZATION_BUF = Buffer.allocUnsafe(4);

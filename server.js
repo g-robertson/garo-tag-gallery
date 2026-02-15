@@ -7,8 +7,7 @@ import { Users } from './src/db/user.js';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appendFileSync, mkdirSync, readdirSync } from 'fs';
-import { PERMISSIONS } from './src/client/js/user.js';
-import PerfTags from './src/perf-tags-binding/perf-tags.js';
+import PerfTags from './src/perf-binding/perf-tags.js';
 import { randomBytes } from 'crypto';
 import { rootedPath } from './src/util.js';
 import multer from 'multer';
@@ -18,7 +17,7 @@ import { JobManager } from './src/db/job-manager.js';
 import { Mutex } from "async-mutex";
 import { readdir } from 'fs/promises';
 import { CursorManager, getCursorAsPath } from './src/db/cursor-manager.js';
-import PerfHashCmp from './src/perf-tags-binding/perf-hash-cmp.js';
+import PerfImg from './src/perf-binding/perf-img.js';
 import { NOT_A_PARTIAL_UPLOAD } from './src/api/client-get/non-partial-upload-cursor.js';
 import { checkPermissions } from './src/api/check-permissions.js';
 /** @import {User} from "./src/client/js/user.js" */
@@ -33,6 +32,7 @@ mkdirSync(TMP_FOLDER, {recursive: true});
 
 async function main() {
     const dbs = {
+        inTransaction: 0,
         sqlite3: new sqlite3.Database(path.join(DATABASE_DIR, "garo.db"), err => {
             if (err) {
                 throw `Database failed to initialize: ${err.message}`;
@@ -50,10 +50,10 @@ async function main() {
             path.join(DATABASE_DIR, "perf-tags"),
             "archive-commands"
         ),
-        perfHashCmp: new PerfHashCmp(
-            `perf/perf-hash-cmp/${PerfHashCmp.EXE_NAME}`,
-            path.join(DATABASE_DIR, "perfhash-write-input.txt"),
-            path.join(DATABASE_DIR, "perfhash-write-output.txt")
+        perfImg: new PerfImg(
+            `perf/perfimg/${PerfImg.EXE_NAME}`,
+            path.join(DATABASE_DIR, "perfimg-write-input.txt"),
+            path.join(DATABASE_DIR, "perfimg-write-output.txt")
         ),
         fileStorage: new FileStorage(path.join(DATABASE_DIR, "file-storage")),
         jobManager: new JobManager(),
@@ -63,8 +63,8 @@ async function main() {
     dbs.perfTags.__addStderrListener((data) => {
         appendFileSync(path.join(DATABASE_DIR, "perf-tags-stderr.log"), data);
     });
-    dbs.perfHashCmp.__addStderrListener((data) => {
-        appendFileSync(path.join(DATABASE_DIR, "perf-hash-cmp-stderr.log"), data);
+    dbs.perfImg.__addStderrListener((data) => {
+        appendFileSync(path.join(DATABASE_DIR, "perf-img-stderr.log"), data);
     })
     //await dbs.fileStorage.extractAllTo(path.join(PARTIAL_ZIPS_FOLDER, "hydrus import from laptop/export-path/hydrus export"));
     //await dbs.fileStorage.extractAllTo(path.join(PARTIAL_ZIPS_FOLDER, "hydrus import small/export-path/hydrus export 1024"));

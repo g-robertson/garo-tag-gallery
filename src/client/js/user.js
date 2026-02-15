@@ -2,7 +2,7 @@
 
 import getMe from "../../api/client-get/me.js";
 import { State } from "./state.js";
-import { SYSTEM_LOCAL_TAG_SERVICE } from "./tags.js";
+import { SYSTEM_LOCAL_TAG_SERVICE } from "./defaults.js";
 
 export const SCOPES = /** @type {const} */ ({
     LOCAL_TAG_SERVICES: "LTS",
@@ -11,6 +11,9 @@ export const SCOPES = /** @type {const} */ ({
     LOCAL_URL_GENERATOR_SERVICES: "LUGS"
 });
 /** @typedef {(typeof SCOPES)[keyof typeof SCOPES]} PermissionObjectScope */
+
+/** @type {undefined} */
+export const SYSTEM_USER_ID = undefined;
 
 /**
  * @typedef {Object} Permission

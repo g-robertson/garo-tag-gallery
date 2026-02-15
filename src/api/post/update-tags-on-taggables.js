@@ -72,7 +72,7 @@ export default async function post(dbs, req, res) {
     /** @type {Set<bigint>} */
     const allTagsToAdd = new Set();
     for (const [localTagServiceID, tags] of req.body.tagsToAdd) {
-        const dbLocalTagsMap = new Map((await LocalTags.upsertMany(
+        const dbLocalTagsMap = new Map((await LocalTags.uniqueInsertMany(
             dbs, 
             [...tags.keys()].map(tag => normalPreInsertLocalTag(tag, "User added")),
             localTagServiceID
@@ -81,7 +81,7 @@ export default async function post(dbs, req, res) {
             dbLocalTag
         ]));
 
-        await TagsNamespaces.upsertMany(dbs, new Map([...tags.values()].filter(tag => tag.namespaces.length !== 0).map(tag => [
+        await TagsNamespaces.uniqueInsertMany(dbs, new Map([...tags.values()].filter(tag => tag.namespaces.length !== 0).map(tag => [
             dbLocalTagsMap.get(tag.tagName).Tag_ID,
             new Set(tag.namespaces)
         ])));
@@ -102,7 +102,7 @@ export default async function post(dbs, req, res) {
         tagID,
         req.body.taggableIDs
     ]));
-    await Tags.upsertTagPairingsToTaggables(dbs, tagPairingsToAdd);
+    await Tags.uniqueInsertTagPairingsToTaggables(dbs, tagPairingsToAdd);
 
     await dbEndTransaction(dbs);
 

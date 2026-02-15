@@ -18,10 +18,3 @@ export function isInLocalTaggableServiceLookupName(lookupName) {
 export function revertInLocalTaggableServiceLookupName(lookupName) {
     return Number(lookupName.slice("system:in local taggable service:".length));
 }
-
-export const DEFAULT_LOCAL_TAGGABLE_SERVICE = {
-    Service_ID: 2,
-    Local_Taggable_Service_ID: 0,
-    Service_Name: "Default local taggables",
-    In_Local_Taggable_Service_Tag_ID: 3n
-};

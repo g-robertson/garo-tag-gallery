@@ -16,6 +16,7 @@ import path from "path";
 const TEST_TAG_SERVICE_NAME_1 = "TEST TAG SERVICE";
 const TEST_TAGGABLE_SERVICE_NAME_1 = "TEST TAGGABLE SERVICE";
 const TEST_HYDRUS_IMPORT_FILE_NAME = "./e2etest/data/hydrus-test-import.zip";
+const TEST_HYDRUS_TEXT_FILE_FILE_NAME = "./e2etest/data/hydrus-test-text-file-import.zip"
 const TEST_HYDRUS_BAD_THUMBNAIL_FILE_NAME = "./e2etest/data/hydrus-test-bad-thumbnail-import.zip"
 const TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_1 = "./e2etest/data/hydrus-test-multipart-import.zip.001";
 const TEST_HYDRUS_MULTIPART_IMPORT_FILE_NAME_2 = "./e2etest/data/hydrus-test-multipart-import.zip.002";
@@ -101,6 +102,15 @@ const IMPORT_FILES_FROM_HYDRUS_TESTS = [
                 });
                 await driver.wait(UNTIL_JOB_ERROR, FINISH_HYDRUS_JOB_TIMEOUT);
                 await closeJobError(driver);
+            }},
+            {name: "TextFileShouldNotCrash", tests: async (driver) => {
+                await importFilesFromHydrus(driver, {
+                    fileName: TEST_HYDRUS_TEXT_FILE_FILE_NAME,
+                    taggableServiceName: TEST_TAGGABLE_SERVICE_NAME_1,
+                    tagServiceName: TEST_TAG_SERVICE_NAME_1
+                });
+                await driver.wait(UNTIL_JOB_BEGIN, CREATE_HYDRUS_JOB_TIMEOUT);
+                await driver.wait(UNTIL_JOB_END, FINISH_HYDRUS_JOB_TIMEOUT);
             }},
             {name: "UnthumbnailableFileShouldNotCrash", tests: async (driver) => {
                 await importFilesFromHydrus(driver, {

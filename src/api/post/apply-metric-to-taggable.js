@@ -39,7 +39,7 @@ export async function getPermissions(dbs, req, res) {
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
-    const appliedMetric = await AppliedMetrics.tagMap(dbs, await AppliedMetrics.upsert(dbs, {
+    const appliedMetric = await AppliedMetrics.tagMap(dbs, await AppliedMetrics.uniqueInsert(dbs, {
         Local_Metric_ID: req.body.localMetricID,
         User_ID: req.user.id(),
         Applied_Value: req.body.metricValue

@@ -1,6 +1,6 @@
 /** @import {Databases} from "./db-util.js" */
 
-import { HAS_NOTES_TAG } from "../client/js/tags.js";
+import { HAS_NOTES_TAG } from "../client/js/defaults.js";
 import {dball, dbtuples} from "./db-util.js";
 
 /**

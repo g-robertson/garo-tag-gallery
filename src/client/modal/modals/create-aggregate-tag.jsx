@@ -12,11 +12,14 @@ import { Modals } from '../../modal/modals.js';
 import { State } from '../../js/state.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 
-/** @import {State} from "../../js/state.js" */
-/** @import {ClientAggregateTag, ClientAggregateTagCondition, ClientComparator, ClientSearchTag} from "../../../api/post/search-taggables.js" */
-/** @import {DisplayClientTagGroup} from "../../components/tag-groups-selector.jsx" */
+/**
+ * @import {State} from "../../js/state.js"
+ * @import {ClientComparator} from "../../../api/zod-types.js"
+ * @import {ClientConditionalExpressionListUnion, ExpressionListCondition, ClientSearchTag} from "../../../api/post/search-taggables.js"
+ * @import {DisplayClientExpressionList} from "../../components/tag-groups-selector.jsx"
+ **/
 
-export default function CreateAggregateTag() {
+export default function CreateConditionalExpressionListUnionType() {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
@@ -28,11 +31,11 @@ export default function CreateAggregateTag() {
     const TagOccurrencesCountSpecifyQuery = ReferenceableReact();
     const TagOccurrencesPercentageSpecifyQuery = ReferenceableReact();
     const TagOccurrencesPercentageSpecifyQueries = ReferenceableReact();
-    const CreateAggregateTagButton = ReferenceableReact();
+    const CreateConditionalExpressionListUnionTypeButton = ReferenceableReact();
 
-    /** @type {State<DisplayClientTagGroup | undefined} */
-    const tagGroupState = new State(undefined);
-    /** @type {State<ClientAggregateTagCondition[]} */
+    /** @type {State<DisplayClientExpressionList | undefined} */
+    const expressionListState = new State(undefined);
+    /** @type {State<ExpressionListCondition[]} */
     const conditionsState = new State([]);
 
     /** @type {State<ClientComparator>} */
@@ -47,30 +50,30 @@ export default function CreateAggregateTag() {
 
     const onAdd = () => {
         const onTagGroupChanged = () => {
-            SpecifyTagGroupTags.dom.disabled = tagGroupState.get() === undefined;
-            TagOccurrencesCountSpecifyQuery.dom.disabled = tagGroupState.get() === undefined;
-            TagOccurrencesPercentageSpecifyQuery.dom.disabled = tagGroupState.get() === undefined;
-            TagOccurrencesPercentageSpecifyQueries.dom.disabled = tagGroupState.get() === undefined;
-            CreateAggregateTagButton.dom.disabled = tagGroupState.get() === undefined;
+            SpecifyTagGroupTags.dom.disabled = expressionListState.get() === undefined;
+            TagOccurrencesCountSpecifyQuery.dom.disabled = expressionListState.get() === undefined;
+            TagOccurrencesPercentageSpecifyQuery.dom.disabled = expressionListState.get() === undefined;
+            TagOccurrencesPercentageSpecifyQueries.dom.disabled = expressionListState.get() === undefined;
+            CreateConditionalExpressionListUnionTypeButton.dom.disabled = expressionListState.get() === undefined;
         };
         onTagGroupChanged();
 
-        tagGroupState.addOnUpdateCallback(onTagGroupChanged, addToCleanup);
+        expressionListState.addOnUpdateCallback(onTagGroupChanged, addToCleanup);
         return () => executeFunctions(addToCleanup);
     }
 
     return {
         component: <div style={{width: "100%", height: "100%", flexDirection: "column"}} onAdd={onAdd}>
-            An aggregate tag selects from a union of all of the tags in a certain selected group that meets a specified condition
+            An conditional expression list union selects from a union of all of the expressions in a certain selected expression list that meets a specified condition
             <div style={{flex: 4}}>
                 <TagGroupsSelector
                     multiSelect={false}
-                    onTagGroupsSelected={(tagGroups) => {
-                        tagGroupState.set(tagGroups[0]);
+                    onTagGroupsSelected={(expressionLists) => {
+                        expressionListState.set(expressionLists[0]);
                     }} />
             </div>
             <div style={{marginLeft: 8, marginTop: 4}}>
-                Select a tag group from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjectsConstState={tagGroupState.asTransform(tagGroup => [tagGroup], addToCleanup)} elementsSelectable={false} scrollbarWidth={0} /></div>
+                Select a tag group from above: <div style={{height: 20, flexGrow: 100}}><LazyTextObjectSelector textObjectsConstState={expressionListState.asTransform(expressionList => [expressionList], addToCleanup)} elementsSelectable={false} scrollbarWidth={0} /></div>
             </div>
             <div style={{marginLeft: 8, flexDirection: "column"}}>
                 <div style={{marginTop: 4}}>Where the tags within the group must follow any selected conditions below</div>
@@ -85,44 +88,45 @@ export default function CreateAggregateTag() {
                     <div>
                         Apply condition: Tag must not be within specified list of tags
                         {SpecifyTagGroupTags.react(<input style={{marginLeft: 4, marginTop: -2}} type="button" value="Specify tags" onClick={async () => {
-                            const tagGroup = tagGroupState.get();
+                            const expressionList = expressionListState.get();
                             /** @type {ClientSearchTag[]} */
                             let tags = [];
-                            if (tagGroup.type === "applied-metrics") {
-                                const localMetric = tagGroup.extraInfo.localMetric;
+                            if (expressionList.type === "applied-metrics") {
+                                const localMetric = expressionList.extraInfo.localMetric;
                                 if (localMetric.Local_Metric_Lower_Bound === -Infinity || localMetric.Local_Metric_Upper_Bound === Infinity) {
                                     throw "Have not yet implemented applied metric exact selection for unbounded metrics";
                                 } else {
                                     const step = Math.pow(10, localMetric.Local_Metric_Precision);
                                     for (let i = localMetric.Local_Metric_Lower_Bound; i <= localMetric.Local_Metric_Upper_Bound; i += step) {
                                         tags.push({
-                                            type: "appliedLocalMetric",
+                                            type: "localMetricComparison",
                                             Local_Metric_ID: localMetric.Local_Metric_ID,
-                                            Applied_Value: i,
+                                            comparator: "=",
+                                            localMetricComparison: i,
                                             displayName: createAppliedMetricDisplayName(localMetric.Local_Metric_Name, User.Global().name(), i)
                                         });
                                     }
                                 }
-                            } else if (tagGroup.type === "namespace") {
-                                const tagsFromNamespaces = await getTagsFromNamespaceID(tagGroup.namespaceID);
-                                for (const tagGroup of tagsFromNamespaces) {
+                            } else if (expressionList.type === "namespace") {
+                                const tagsFromNamespaces = await getTagsFromNamespaceID(expressionList.namespaceID);
+                                for (const expressionList of tagsFromNamespaces) {
                                     tags.push({
                                         type: "tagByLookup",
-                                        Lookup_Name: tagGroup.tagName,
-                                        displayName: tagGroup.displayName
+                                        Lookup_Name: expressionList.tagName,
+                                        displayName: expressionList.displayName
                                     });
                                 }
                             }
                             
-                            const notInTagList = await Modals.Global().pushModal(SelectFromListOfTags({tags}));
-                            if (notInTagList === null || notInTagList === undefined) {
+                            const notInCompareList = await Modals.Global().pushModal(SelectFromListOfTags({tags}));
+                            if (notInCompareList === null || notInCompareList === undefined) {
                                 return;
                             }
 
                             conditionsState.get().push({
-                                type: "is-not-in-tag-list",
-                                list: notInTagList,
-                                displayName: `is not in tags:${notInTagList.map(tag => tag.displayName).join(' OR ')}`
+                                type: "is-not-in-compare-list",
+                                compareList: notInCompareList,
+                                displayName: `is not in list:${notInCompareList.map(tag => tag.displayName).join(' OR ')}`
                             });
                             conditionsState.forceUpdate();
                         }}/>)}
@@ -147,11 +151,11 @@ export default function CreateAggregateTag() {
                                 }
 
                                 conditionsState.get().push({
-                                    type: "tag-occurrences-compared-to-n-within-expression",
+                                    type: "expression-occurrences-compared-to-n-within-compare-expression",
                                     comparator: countComparatorState.get(),
                                     occurrences: countValueState.get(),
-                                    expression: searchQuery,
-                                    displayName: `must have ${countComparatorState.get()}${countValueState.get()} taggables${searchQuery.value.length !== 0 ? ` match the query (${clientSearchQueryToDisplayName(searchQuery)})`: ""}`
+                                    compareExpression: searchQuery,
+                                    displayName: `must have ${countComparatorState.get()}${countValueState.get()} taggables${searchQuery.expressions.length !== 0 ? ` match the query (${clientSearchQueryToDisplayName(searchQuery)})`: ""}`
                                 });
                                 conditionsState.forceUpdate();
                             }} />)}
@@ -176,15 +180,15 @@ export default function CreateAggregateTag() {
                                     selectionButtonText: `Select query that ${percentageComparatorState.get()}${percentageValueState.get()}% of taggables must match`,
                                 }));
 
-                                if (searchQuery === undefined || searchQuery.value.length === 0) {
+                                if (searchQuery === undefined || searchQuery.expressions.length === 0) {
                                     return;
                                 }
 
                                 conditionsState.get().push({
-                                    type: "tag-occurrences-compared-to-n-percent-within-expression",
+                                    type: "expression-occurrences-compared-to-n-percent-within-compare-expression",
                                     comparator: percentageComparatorState.get(),
                                     percentage: percentageValueState.get() / 100,
-                                    expression: searchQuery,
+                                    compareExpression: searchQuery,
                                     displayName: `must have ${percentageComparatorState.get()}${percentageValueState.get()}% of taggables match the query (${clientSearchQueryToDisplayName(searchQuery)})`
                                 });
                                 conditionsState.forceUpdate();
@@ -212,16 +216,16 @@ export default function CreateAggregateTag() {
                                 const secondSearchQuery = await Modals.Global().pushModal(CreateAndSearchGroup({
                                     selectionButtonText: `Select query that ${percentageOfSecondQueryComparatorState.get()}${percentageOfSecondQueryValueState.get()}% of filtered taggables must match`
                                 }));
-                                if (searchQuery === undefined || searchQuery.value.length === 0 || secondSearchQuery === undefined || secondSearchQuery.value.length === 0) {
+                                if (searchQuery === undefined || searchQuery.expressions.length === 0 || secondSearchQuery === undefined || secondSearchQuery.expressions.length === 0) {
                                     return;
                                 }
 
                                 conditionsState.get().push({
-                                    type: "filtered-tag-occurrences-compared-to-n-percent-within-expression",
+                                    type: "filtered-expression-occurrences-compared-to-n-percent-within-compare-expression",
                                     comparator: percentageOfSecondQueryComparatorState.get(),
                                     percentage: percentageOfSecondQueryValueState.get() / 100,
                                     filteringExpression: searchQuery,
-                                    expression: secondSearchQuery,
+                                    compareExpression: secondSearchQuery,
                                     displayName: `must have ${percentageOfSecondQueryComparatorState.get()}${percentageOfSecondQueryValueState.get()}% of taggables that match the query (${clientSearchQueryToDisplayName(searchQuery)}) also match the query (${clientSearchQueryToDisplayName(secondSearchQuery)})`
                                 });
                                 conditionsState.forceUpdate();
@@ -230,23 +234,22 @@ export default function CreateAggregateTag() {
                     </div>
                 </div>
                 <div style={{marginTop: 4, marginBottom: 4}}>
-                    {CreateAggregateTagButton.react(<input type="button" value="Create Aggregate Tag" onClick={() => {
-                        /** @type {ClientAggregateTag} */
-                        const aggregateTag = {
-                            type: "aggregateTag",
-                            tagGroup: tagGroupState.get(),
+                    {CreateConditionalExpressionListUnionTypeButton.react(<input type="button" value="Create Conditional List Expression Union" onClick={() => {
+                        /** @type {ClientConditionalExpressionListUnion} */
+                        const conditionalExpressionListUnion = {
+                            type: "conditional-expression-list-union",
+                            expressionList: expressionListState.get(),
                             conditions: conditionsState.get(),
-                            displayName: `system:aggregate tag with group:${tagGroupState.get().displayName}${conditionsState.get().length !== 0 ? " WHERE " : ""}${conditionsState.get().map(condition => condition.displayName).join(" AND ")}`
-                        }
+                            displayName: `system:conditional ${expressionListState.get().displayName} union${conditionsState.get().length !== 0 ? " WHERE " : ""}${conditionsState.get().map(condition => condition.displayName).join(" AND ")}`                        }
 
-                        delete aggregateTag.tagGroup['extraInfo'];
-                        modalResolve(aggregateTag);
+                        delete conditionalExpressionListUnion.expressionList['extraInfo'];
+                        modalResolve(conditionalExpressionListUnion);
                         Modals.Global().popModal();
                     }}/>)}
                 </div>
             </div>
         </div>,
-        displayName: "Create Aggregate Tag",
+        displayName: "Create Conditional List Expression Union",
         promiseValue
     };
 };

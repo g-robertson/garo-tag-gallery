@@ -11,7 +11,7 @@ const THUMB_WIDTH = 150;
 const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH);
 const DISTANCE_HEIGHT = 0;
 
-/** @import {DBJoinedLocalFile} from "../../db/taggables.js" */
+/** @import {DBJoinedTaggableFile} from "../../db/taggables.js" */
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
 
 /**

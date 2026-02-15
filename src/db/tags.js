@@ -1,5 +1,6 @@
 import { mapNullCoalesce } from "../client/js/client-util.js";
-import { SYSTEM_GENERATED, SYSTEM_LOCAL_TAG_SERVICE, localTagsPKHash, normalPreInsertLocalTag } from "../client/js/tags.js";
+import { SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/defaults.js";
+import { SYSTEM_GENERATED, localTagsPKHash, mapLookupNameToPreInsertSystemTag, normalPreInsertLocalTag } from "../client/js/tags.js";
 import { PERMISSIONS, User } from "../client/js/user.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbsqlcommand, dbtuples, dbvariablelist} from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
@@ -10,7 +11,7 @@ import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesH
 /**
  * @param {PreInsertLocalTag & {Tag_ID: bigint}} systemTag 
  */
-export function insertsystemtag(systemTag) {
+export function insertSystemTag(systemTag) {
     return [
         dbsqlcommand(`
             INSERT INTO Tags(
@@ -455,7 +456,7 @@ export class Tags {
      * @param {Databases} dbs
      * @param {Map<bigint, bigint[]>} tagPairings 
      */
-    static async upsertTagPairingsToTaggables(dbs, tagPairings) {
+    static async uniqueInsertTagPairingsToTaggables(dbs, tagPairings) {
         const ok = await dbs.perfTags.insertTagPairings(tagPairings, dbs.inTransaction);
         if (!ok) {
             console.log(dbs.perfTags);
@@ -509,12 +510,12 @@ export class Tags {
 
 /**
  * @typedef {Object} DBLocalTag
- * @property {number} Local_Tag_ID,
+ * @property {number} Local_Tag_ID
+ * @property {string} Local_Tags_PK_Hash
  * @property {bigint} Tag_ID
  * @property {number} Local_Tag_Service_ID
  * @property {string} Lookup_Name
  * @property {string} Source_Name
- * @property {string} Local_Tags_PK_Hash
  * @property {string} Display_Name
  */
 
@@ -529,14 +530,25 @@ function mapDBLocalTag(dbLocalTag) {
     }
 }
 
-/**
- * @param {string} lookupName 
- */
-function mapLookupNameToSystemTag(lookupName) {
-    return normalPreInsertLocalTag(lookupName, SYSTEM_GENERATED);
-}
 
 export class LocalTags {
+    /**
+     * @param {Databases} dbs 
+     * @param {Map<bigint, string>} taggableToSystemTagLookupNameMap 
+     */
+    static async createTagPairingsFromTaggableToSystemTagLookupNameMap(dbs, taggableToSystemTagLookupNameMap) {
+        const systemTagsMap = new Map((await LocalTags.uniqueInsertManySystemTags(dbs, [...taggableToSystemTagLookupNameMap.values()])).map(systemTag => [
+            systemTag.Lookup_Name, systemTag
+        ]));
+
+        /** @type {Map<bigint, bigint[]>} */
+        const tagPairings = new Map();
+        for (const [taggableID, systemTagLookupName] of taggableToSystemTagLookupNameMap) {
+            mapNullCoalesce(tagPairings, systemTagsMap.get(systemTagLookupName).Tag_ID, []).push(taggableID);
+        }
+        return tagPairings;
+    }
+
     /**
      * @param {Databases} dbs 
      * @param {bigint[]} tagIDs 
@@ -625,7 +637,7 @@ export class LocalTags {
      * @param {string[]} lookupNames 
      */
     static async selectManySystemTagsByLookupNames(dbs, lookupNames) {
-        return await LocalTags.selectManyByFullLookups(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+        return await LocalTags.selectManyByFullLookups(dbs, lookupNames.map(mapLookupNameToPreInsertSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
     }
 
     /**
@@ -692,7 +704,7 @@ export class LocalTags {
      * @param {string[]} lookupNames
      */
     static async insertManySystemTags(dbs, lookupNames) {
-        return (await LocalTags.insertMany(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID));
+        return (await LocalTags.insertMany(dbs, lookupNames.map(mapLookupNameToPreInsertSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID));
     }
 
     /**
@@ -708,7 +720,7 @@ export class LocalTags {
      * @param {PreInsertLocalTag[]} localTags
      * @param {number} localTagServiceID
      */
-    static async upsertMany(dbs, localTags, localTagServiceID) {
+    static async uniqueInsertMany(dbs, localTags, localTagServiceID) {
         if (localTags.length === 0) {
             return [];
         }
@@ -727,8 +739,8 @@ export class LocalTags {
      * @param {Databases} dbs 
      * @param {string[]} lookupNames
      */
-    static async upsertManySystemTags(dbs, lookupNames) {
-        return await LocalTags.upsertMany(dbs, lookupNames.map(mapLookupNameToSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
+    static async uniqueInsertManySystemTags(dbs, lookupNames) {
+        return await LocalTags.uniqueInsertMany(dbs, lookupNames.map(mapLookupNameToPreInsertSystemTag), SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
     }
 
     /**
@@ -780,19 +792,12 @@ export class LocalTags {
 };
 
 /**
- * @typedef {Object} DBTagNamespace
- * @property {number} Tags_Namespaces_ID
- * @property {bigint} Tag_ID 
- * @property {number} Namespace_ID
- * @property {string} Tags_Namespaces_PK_Hash
- */
-
-/**
  * @typedef {Object} PreInsertTagNamespace
  * @property {bigint} Tag_ID
  * @property {number} Namespace_ID
  * 
- * @typedef {PreInsertTagNamespace & {Tags_Namespaces_PK_Hash: string}} PreparedPreInsertTagNamespace
+ * @typedef {PreInsertTagNamespace & { Tags_Namespaces_PK_Hash: string }} PreparedPreInsertTagNamespace
+ * @typedef {PreparedPreInsertTagNamespace & { Tags_Namespace_ID: number }} DBTagNamespace
  */
 
 /**
@@ -908,7 +913,7 @@ export class TagsNamespaces {
      * @param {Databases} dbs 
      * @param {Map<bigint, Iterable<string>>} tagNamespacePairings 
      */
-    static async upsertMany(dbs, tagNamespacePairings) {
+    static async uniqueInsertMany(dbs, tagNamespacePairings) {
         if (tagNamespacePairings.size === 0) {
             return [];
         }
@@ -921,7 +926,7 @@ export class TagsNamespaces {
                 allNamespaces.add(Namespace_Name);
             }
         }
-        const namespaceMap = new Map((await Namespaces.upsertMany(dbs, [...allNamespaces])).map(dbNamespace => [
+        const namespaceMap = new Map((await Namespaces.uniqueInsertMany(dbs, [...allNamespaces])).map(dbNamespace => [
             dbNamespace.Namespace_Name,
             dbNamespace.Namespace_ID
         ]));
@@ -990,7 +995,7 @@ export class Namespaces {
         }
 
         /** @type {DBNamespace[]} */
-        const insertedDBNamespaces = await dballselect(dbs, `
+        const insertedDBNamespaces = await dball(dbs, `
             INSERT INTO Namespaces(
                 Namespace_Name
             ) VALUES ${dbtuples(namespaces.length, 1)} RETURNING *;
@@ -1003,7 +1008,7 @@ export class Namespaces {
      * @param {Databases} dbs
      * @param {string[]} namespaces 
      */
-    static async upsertMany(dbs, namespaces) {
+    static async uniqueInsertMany(dbs, namespaces) {
         if (namespaces.length === 0) {
             return [];
         }

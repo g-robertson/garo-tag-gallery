@@ -5,3 +5,14 @@ export const DUP_LIKELY_PERCEPTUAL_HASH_DISTANCE = 1000000;
 export const ALT_LIKELY_PERCEPTUAL_HASH_DISTANCE = 55000000;
 export const REASONABLE_PERCEPTUAL_HASH_DISTANCE = 62000000;
 export const MAX_PERCEPTUAL_HASH_DISTANCE = 80000000;
+
+export const TRANSITIVE_FILE_RELATION_TYPES = /** @type {const} */ ({
+    DUPLICATES: 1,
+    ALTERNATES: 2
+});
+/** @typedef {(typeof TRANSITIVE_FILE_RELATION_TYPES)[keyof typeof TRANSITIVE_FILE_RELATION_TYPES]} TransitiveFileRelationType */
+
+export const NONTRANSITIVE_FILE_RELATION_TYPES = /** @type {const} */ ({
+    FALSE_POSITIVES: 1
+});
+/** @typedef {(typeof NONTRANSITIVE_FILE_RELATION_TYPES)[keyof typeof NONTRANSITIVE_FILE_RELATION_TYPES]} NontransitiveFileRelationType */

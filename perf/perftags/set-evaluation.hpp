@@ -17,12 +17,14 @@ class SetEvaluation {
 
         void complement();
         std::size_t size() const;
-        static SetEvaluation rightHandSide(SetEvaluation&& lhsSet, SetEvaluation rhsSet);
-        static SetEvaluation symmetricDifference(SetEvaluation&& lhsSet, SetEvaluation rhsSet);
-        static SetEvaluation difference(SetEvaluation&& lhsSet, SetEvaluation rhsSet);
-        static SetEvaluation intersect(const SetEvaluation& lhsSet, SetEvaluation rhsSet);
-        static SetEvaluation intersect(SetEvaluation&& lhsSet, SetEvaluation rhsSet);
-        static SetEvaluation setUnion(SetEvaluation&& lhsSet, SetEvaluation rhsSet);
+        static SetEvaluation rightHandSide(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet);
+        static SetEvaluation symmetricDifference(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet);
+        static SetEvaluation difference(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet);
+        static SetEvaluation intersect(const SetEvaluation& lhsSet, SetEvaluation&& rhsSet);
+        static SetEvaluation intersect(const SetEvaluation& lhsSet, const SetEvaluation& rhsSet);
+        static SetEvaluation intersect(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet);
+        static SetEvaluation setUnion(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet);
+        static SetEvaluation setUnion(const SetEvaluation& lhsSet, const SetEvaluation& rhsSet);
     private:
         static std::unordered_set<uint64_t> usetIntersect_(const std::unordered_set<uint64_t>& smallerSet, const std::unordered_set<uint64_t>& largerSet);
         static std::unordered_set<uint64_t>& usetUnion_(std::unordered_set<uint64_t>& modifiableSet, const std::unordered_set<uint64_t>& unmodifiableSet);

@@ -42,7 +42,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchCh
         const searchChanged = () => {
             onSearchChanged({
                 type: searchType,
-                value: clientSearchQueryState.get()
+                expressions: clientSearchQueryState.get()
             }, [...selectedLocalTagServiceIDsState.get()]);
         };
         searchChanged();
@@ -79,7 +79,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchCh
                             }
 
                             const clientSearchQuery = clientSearchQueryState.get();
-                            if (orGroupSearchQuery.value.length === 0) {
+                            if (orGroupSearchQuery.expressions.length === 0) {
                                 clientSearchQuery.splice(index, 1);
                             } else {
                                 clientSearchQuery[index] = orGroupSearchQuery;
@@ -104,7 +104,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchCh
                             if (isExcludeOn) {
                                 clientSearchQueryToAdd = {
                                     type: "complement",
-                                    value: clientSearchQueryToAdd
+                                    expression: clientSearchQueryToAdd
                                 };
                             }
 

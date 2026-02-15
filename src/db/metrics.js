@@ -3,16 +3,55 @@
 /** @import {Databases} from "./db-util.js" */
 /** @import {User} from "../client/js/user.js" */
 /** @import {DBLocalTag} from "./tags.js" */
+/** @import {ClientComparator} from "../api/zod-types.js" */
 
 import { PERMISSIONS } from "../client/js/user.js";
-import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
+import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbsqlcommand, dbtuples, dbvariablelist } from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js"
 import { Users } from "./user.js";
-import { LocalTags } from "./tags.js";
+import { insertSystemTag, LocalTags } from "./tags.js";
 import { Taggables } from "./taggables.js";
-import PerfTags from "../perf-tags-binding/perf-tags.js";
+import PerfTags from "../perf-binding/perf-tags.js";
 import { createAppliedMetricLookupName, createInLocalMetricServiceLookupName, createLocalMetricLookupName } from "../client/js/metrics.js";
 import { mapNullCoalesce } from "../client/js/client-util.js";
+import { Z_CLIENT_COMPARATOR } from "../api/zod-types.js";
+import { SYSTEM_LOCAL_METRIC_SERVICE } from "../client/js/defaults.js";
+
+/**
+ * @param {TagMappedDBLocalMetric} systemMetric
+ */
+export function insertSystemMetric(systemMetric) {
+    return [
+        ...insertSystemTag(systemMetric.Has_Local_Metric_Tag),
+        dbsqlcommand(`
+            INSERT INTO Local_Metrics(
+                Local_Metric_ID,
+                Local_Metric_Service_ID,
+                Local_Metric_Name,
+                Local_Metric_Lower_Bound,
+                Local_Metric_Upper_Bound,
+                Local_Metric_Precision,
+                Local_Metric_Type
+            ) VALUES (
+                $systemLocalMetricID,
+                $systemLocalMetricServiceID,
+                $systemLocalMetricName,
+                $systemLocalMetricLowerBound,
+                $systemLocalMetricUpperBound,
+                $systemLocalMetricPrecision,
+                $systemLocalMetricType 
+            );
+        `, {
+            $systemLocalMetricID: systemMetric.Local_Metric_ID,
+            $systemLocalMetricServiceID: SYSTEM_LOCAL_METRIC_SERVICE.Local_Metric_Service_ID,
+            $systemLocalMetricName: systemMetric.Local_Metric_Name,
+            $systemLocalMetricLowerBound: systemMetric.Local_Metric_Lower_Bound,
+            $systemLocalMetricUpperBound: systemMetric.Local_Metric_Upper_Bound,
+            $systemLocalMetricPrecision: systemMetric.Local_Metric_Precision,
+            $systemLocalMetricType: systemMetric.Local_Metric_Type
+        })
+    ];
+}
 
 /**
  * @typedef {Object} DBLocalMetricService
@@ -36,15 +75,15 @@ async function mapLocalMetricServices(dbs, localMetricServices) {
     const localMetrics = await LocalMetrics.selectManyByLocalMetricServiceIDs(dbs, localMetricServices.map(localMetricService => localMetricService.Local_Metric_Service_ID));
     const tagMappings = await LocalMetricServices.selectTagMappings(dbs, localMetricServices.map(localMetricService => localMetricService.Local_Metric_Service_ID));
     /** @type {Map<number, DBLocalMetric[]>} */
-    const localMetricsMap = new Map(localMetricServices.map(localMetricService => [localMetricService.Local_Metric_Service_ID, []]));
+    const localMetricServiceToLocalMetricsMap = new Map(localMetricServices.map(localMetricService => [localMetricService.Local_Metric_Service_ID, []]));
     for (const localMetric of localMetrics) {
-        localMetricsMap.get(localMetric.Local_Metric_Service_ID).push(localMetric);
+        localMetricServiceToLocalMetricsMap.get(localMetric.Local_Metric_Service_ID).push(localMetric);
     }
 
     return localMetricServices.map((localMetricService, i) => ({
         ...localMetricService,
         Has_Metric_From_Local_Metric_Service_Tag: tagMappings[i],
-        Local_Metrics: localMetricsMap.get(localMetricService.Local_Metric_Service_ID)
+        Local_Metrics: localMetricServiceToLocalMetricsMap.get(localMetricService.Local_Metric_Service_ID)
     }));
 }
 
@@ -244,36 +283,21 @@ export class LocalMetricServices {
 }
 
 /**
- * @typedef {Object} DBAppliedMetric
- * @property {number} Local_Applied_Metric_ID
- * @property {number} Local_Metric_ID
- * @property {number} User_ID
- * @property {number} Applied_Value
- * @property {string} Local_Applied_Metric_PK_Hash
- */
-
-/**
- * @typedef {{
- *     Local_Applied_Metric_Tag: DBLocalTag
- * } & DBAppliedMetric} TagMappedDBAppliedMetric
- */
-
-/**
  * @typedef {Object} PreInsertAppliedMetric
  * @property {number} Local_Metric_ID
- * @property {number} User_ID
+ * @property {number=} User_ID
  * @property {number} Applied_Value
- */
-
-/**
- * @typedef {PreInsertAppliedMetric & DBLocalMetric & {User_Name: string, Local_Applied_Metric_PK_Hash: string}} PreparedPreInsertAppliedMetric
- */
+ * 
+ * @typedef {PreInsertAppliedMetric & {Local_Applied_Metric_PK_Hash: string}} PreparedPreInsertAppliedMetric
+ * @typedef {PreparedPreInsertAppliedMetric & { Local_Applied_Metric_ID: number }} DBAppliedMetric
+ * @typedef {DBAppliedMetric & {Local_Applied_Metric_Tag: DBLocalTag}} TagMappedDBAppliedMetric
+ **/
 
 /**
  * @param {PreInsertAppliedMetric} preInsertAppliedMetric
  */
 export function appliedMetricsPKHash(preInsertAppliedMetric) {
-    return `${preInsertAppliedMetric.Local_Metric_ID}\x01${preInsertAppliedMetric.User_ID}\x01${preInsertAppliedMetric.Applied_Value}`;
+    return `${preInsertAppliedMetric.Local_Metric_ID}\x01${preInsertAppliedMetric.User_ID ?? "SYS"}\x01${preInsertAppliedMetric.Applied_Value}`;
 }
 
 /**
@@ -298,6 +322,30 @@ async function preparePreInsertAppliedMetrics(dbs, preInsertAppliedMetrics) {
 export class AppliedMetrics {
     /**
      * @param {Databases} dbs 
+     * @param {Map<bigint, PreInsertAppliedMetric>} taggableToAppliedSystemMetricMap 
+     */
+    static async createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, taggableToAppliedSystemMetricMap) {
+        for (const [taggableID, appliedMetric] of taggableToAppliedSystemMetricMap) {
+            if (appliedMetric.Applied_Value === null) {
+                taggableToAppliedSystemMetricMap.delete(taggableID);
+            }
+        }
+
+        const appliedMetricsMap = new Map((await AppliedMetrics.tagMapped(dbs, await AppliedMetrics.uniqueInsertMany(dbs, [...taggableToAppliedSystemMetricMap.values()]))).map(appliedMetric => [
+            appliedMetric.Local_Applied_Metric_PK_Hash,
+            appliedMetric
+        ]));
+
+        /** @type {Map<bigint, bigint[]>} */
+        const tagPairings = new Map();
+        for (const [taggableID, appliedSystemMetric] of taggableToAppliedSystemMetricMap) {
+            mapNullCoalesce(tagPairings, appliedMetricsMap.get(appliedMetricsPKHash(appliedSystemMetric)).Local_Applied_Metric_Tag.Tag_ID, []).push(taggableID);
+        }
+        return tagPairings;
+    }
+                
+    /**
+     * @param {Databases} dbs 
      * @param {PreInsertAppliedMetric[]} preInsertAppliedMetrics 
      */
     static async selectTagMappings(dbs, preInsertAppliedMetrics) {
@@ -309,7 +357,6 @@ export class AppliedMetrics {
      */
     static async tagMapped(dbs, appliedMetrics) {
         const localAppliedMetricTags = await AppliedMetrics.selectTagMappings(dbs, appliedMetrics);
-
         if (localAppliedMetricTags.length !== appliedMetrics.length) {
             throw "Differing tags to applied metrics";
         }
@@ -349,6 +396,45 @@ export class AppliedMetrics {
      */
     static async userSelectManyByLocalMetricID(dbs, userID, localMetricID) {
         return await AppliedMetrics.userSelectManyByLocalMetricIDs(dbs, userID, [localMetricID]);
+    }
+    
+    /**
+     * 
+     * @param {Databases} dbs 
+     * @param {number} userID 
+     * @param {number} localMetricID 
+     * @param {bigint[]} taggableIDs 
+     */
+    static async userSelectMappedByTaggableIDsByLocalMetricID(dbs, userID, localMetricID, taggableIDs) {
+        const appliedMetrics = await AppliedMetrics.tagMapped(dbs, await dballselect(dbs,
+            `SELECT * FROM Local_Applied_Metrics WHERE (User_ID = ? OR (User_ID IS NULL AND ? = NULL)) AND Local_Metric_ID = ?`,
+            [userID, userID, localMetricID]
+        ));
+        const appliedMetricsTagMap = new Map(appliedMetrics.map(appliedMetric => [appliedMetric.Local_Applied_Metric_Tag.Tag_ID, appliedMetric]));
+
+        const {taggablePairings} = await dbs.perfTags.readTaggablesSpecifiedTags(taggableIDs, [...appliedMetricsTagMap.keys()], dbs.inTransaction);
+        return new Map([...taggablePairings].map(([taggableID, [tag]]) => [taggableID, appliedMetricsTagMap.get(tag)]));
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number} userID
+     * @param {number} localMetricID
+     * @param {ClientComparator} comparator
+     * @param {number} metricComparisonValue
+     */
+    static async userSelectManyByComparison(dbs, userID, localMetricID, comparator, metricComparisonValue) {
+        const safeComparator = Z_CLIENT_COMPARATOR.safeParse(comparator);
+        if (!safeComparator.success) {
+            throw `Unsafe comparator value "${comparator}" managed its way into userSelectManyByComparisons`;
+        }
+
+        /** @type {DBAppliedMetric[]} */
+        const dbAppliedMetrics = await dballselect(dbs,
+            `SELECT * FROM Local_Applied_Metrics WHERE User_ID = ? AND Local_Metric_ID = ? AND Applied_Value ${safeComparator.data} ?;`,
+            [userID, localMetricID, metricComparisonValue]
+        );
+        return dbAppliedMetrics;
     }
 
     /**
@@ -404,18 +490,18 @@ export class AppliedMetrics {
         for (let i = 0; i < appliedMetrics.length; ++i) {
             const appliedMetric = appliedMetrics[i];
             appliedMetricsInsertionParams.push(appliedMetric.Local_Metric_ID);
+            appliedMetricsInsertionParams.push(appliedMetric.Local_Applied_Metric_PK_Hash);
             appliedMetricsInsertionParams.push(appliedMetric.User_ID);
             appliedMetricsInsertionParams.push(appliedMetric.Applied_Value);
-            appliedMetricsInsertionParams.push(appliedMetric.Local_Applied_Metric_PK_Hash);
         }
 
         /** @type {DBAppliedMetric[]} */
         const insertedDBAppliedMetrics = await dball(dbs, `
             INSERT INTO Local_Applied_Metrics(
                 Local_Metric_ID,
+                Local_Applied_Metric_PK_Hash,
                 User_ID,
-                Applied_Value,
-                Local_Applied_Metric_PK_Hash
+                Applied_Value
             ) VALUES ${dbtuples(appliedMetrics.length, 4)} RETURNING *;
             `, appliedMetricsInsertionParams
         );
@@ -429,7 +515,7 @@ export class AppliedMetrics {
      * @param {Databases} dbs 
      * @param {PreInsertAppliedMetric[]} preInsertAppliedMetrics 
      */
-    static async upsertMany(dbs, preInsertAppliedMetrics) {
+    static async uniqueInsertMany(dbs, preInsertAppliedMetrics) {
         let preparedAppliedMetrics = await preparePreInsertAppliedMetrics(dbs, preInsertAppliedMetrics);
 
         // dedupe
@@ -446,8 +532,8 @@ export class AppliedMetrics {
      * @param {Databases} dbs 
      * @param {PreInsertAppliedMetric} preInsertAppliedMetric 
      */
-    static async upsert(dbs, preInsertAppliedMetric) {
-        return (await AppliedMetrics.upsertMany(dbs, [preInsertAppliedMetric]))[0];
+    static async uniqueInsert(dbs, preInsertAppliedMetric) {
+        return (await AppliedMetrics.uniqueInsertMany(dbs, [preInsertAppliedMetric]))[0];
     }
 
     /**
@@ -460,7 +546,7 @@ export class AppliedMetrics {
     static async userConvertFromLocalTag(dbs, localTag, preInsertAppliedMetric, deleteExistingTag, user) {
         dbs = await dbBeginTransaction(dbs);
 
-        const appliedMetric = await AppliedMetrics.tagMap(dbs, await AppliedMetrics.upsert(dbs, preInsertAppliedMetric));
+        const appliedMetric = await AppliedMetrics.tagMap(dbs, await AppliedMetrics.uniqueInsert(dbs, preInsertAppliedMetric));
 
         const taggables = await Taggables.searchWithUser(dbs, PerfTags.searchTag(localTag.Tag_ID), user);
         await AppliedMetrics.applyToTaggables(dbs, taggables.map(taggable => taggable.Taggable_ID), appliedMetric);
@@ -579,21 +665,12 @@ export class AppliedMetrics {
  * @property {number} Local_Metric_Upper_Bound
  * @property {number} Local_Metric_Precision
  * @property {number} Local_Metric_Type
+ * 
+ * @typedef {PreInsertLocalMetric & { Local_Metric_ID: number, Local_Metric_Service_ID: number }} DBLocalMetric
  */
 
 /**
- * @typedef {Object} DBLocalMetric
- * @property {number} Local_Metric_ID
- * @property {number} Local_Metric_Service_ID
- * @property {string} Local_Metric_Name
- * @property {number} Local_Metric_Lower_Bound
- * @property {number} Local_Metric_Upper_Bound
- * @property {number} Local_Metric_Precision
- * @property {number} Local_Metric_Type
- */
-
-/**
- * @typedef {{
+ * @typedef {DBLocalMetric & {
  *     Has_Local_Metric_Tag: DBLocalTag
  * }} TagMappedDBLocalMetric
  */

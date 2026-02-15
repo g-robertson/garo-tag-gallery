@@ -1,57 +1,55 @@
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
 import path from 'path';
 import { mapNullCoalesce, serializeUint32, T_MINUTE } from '../client/js/client-util.js';
 import { Mutex } from 'async-mutex';
 import { mkdir, readFile, writeFile } from 'fs/promises';
-import { serializeFloat } from '../util.js';
-import { z } from 'zod';
 
-/** @import {Databases} from "../db/db-util.js" */
-/** @import {ClientComparator} from "../api/post/search-taggables.js" */
+/**
+ * @import {Databases} from "../db/db-util.js"
+ **/
 
 const THIRTY_MINUTES = 30 * T_MINUTE;
 
-export default class PerfHashCmp {
+export default class PerfImg {
     #closed = false;
     #closing = false;
-    #perfHashCmp;
+    #perfImg;
     #path;
     #writeInputFileName;
     #writeOutputFileName;
     #writeMutex = new Mutex();
     #data = "";
 
-    static EXE_NAME = process.platform === "win32" ? "perfhashcmp.exe" : "perfhashcmp";
+    static EXE_NAME = process.platform === "win32" ? "perfimg.exe" : "perfimg";
     static NEWLINE = process.platform === "win32" ? "\r\n" : "\n";
-    static OK_RESULT = `OK!${PerfHashCmp.NEWLINE}`;
+    static OK_RESULT = `OK!${PerfImg.NEWLINE}`;
 
     __open() {
         this.#closed = false;
         this.#closing = false;
-        this.#perfHashCmp = spawn(this.#path, [this.#writeInputFileName, this.#writeOutputFileName]);
-        if (this.#perfHashCmp.pid === undefined) {
+        this.#perfImg = spawn(this.#path, [this.#writeInputFileName, this.#writeOutputFileName]);
+        if (this.#perfImg.pid === undefined) {
             throw "Perf hash cmp did not start with spawn arguments"
         }
-        this.#perfHashCmp.stdout.on("data", (chunk) => {
+        this.#perfImg.stdout.on("data", (chunk) => {
             this.#data += chunk;
             for (const dataCallback of this.#dataCallbacks) {
                 dataCallback();  
             }
         });
 
-        this.#perfHashCmp.stderr.on("data", (chunk) => {
+        this.#perfImg.stderr.on("data", (chunk) => {
             for (const listener of this.#stderrListeners) {
                 listener(chunk);
             }
         });
 
-        this.#perfHashCmp.on("error", () => {
+        this.#perfImg.on("error", () => {
             ++this.#errorCount;
             this.#errorCallback();
         });
 
-        this.#perfHashCmp.on("exit", () => {
+        this.#perfImg.on("exit", () => {
             if (!this.#closed) {
                 throw "Perf hash cmp exited before close was called";
             }
@@ -71,7 +69,7 @@ export default class PerfHashCmp {
     }
 
     constructor(path, writeInputFileName, writeOutputFileName) {
-        this.#path = path ?? `./${PerfHashCmp.EXE_NAME}`;
+        this.#path = path ?? `./${PerfImg.EXE_NAME}`;
         this.#writeInputFileName = writeInputFileName ?? "hash-write-input.txt";
         this.#writeOutputFileName = writeOutputFileName ?? "hash-write-output.txt";
 
@@ -156,7 +154,7 @@ export default class PerfHashCmp {
 
         await this.__writeToWriteInputFile(Buffer.from(hashComparisonString, 'binary'));
         await this.__writeLineToStdin("set_already_compared");
-        const ok = await this.__dataOrTimeout(PerfHashCmp.OK_RESULT, THIRTY_MINUTES);
+        const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
     }
     
     /**
@@ -170,7 +168,7 @@ export default class PerfHashCmp {
         await this.#writeMutex.acquire();
         const distanceCutoffStr = serializeUint32(distanceCutoff);
         const missingEntryWeightStr = serializeUint32(missingEntryWeight);
-        const weightsStr = `${serializeUint32(mulWeights.length)}${PerfHashCmp.#serializeSingles(mulWeights)}${PerfHashCmp.#serializeSingles(powHundredthWeights)}`;
+        const weightsStr = `${serializeUint32(mulWeights.length)}${PerfImg.#serializeSingles(mulWeights)}${PerfImg.#serializeSingles(powHundredthWeights)}`;
         let hashComparisonString = `${distanceCutoffStr}${missingEntryWeightStr}${weightsStr}${serializeUint32(toCompareHashes.length)}`;
         
         for (const hash of toCompareHashes) {
@@ -178,7 +176,7 @@ export default class PerfHashCmp {
         }
         await this.__writeToWriteInputFile(Buffer.from(hashComparisonString, 'binary'));
         await this.__writeLineToStdin("compare_hashes");
-        const ok = await this.__dataOrTimeout(PerfHashCmp.OK_RESULT, THIRTY_MINUTES);
+        const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
 
         /** @type {{hash1Index: number, hash2Index: number, distance: number}[]} */
         const comparisonsMade = [];
@@ -233,7 +231,7 @@ export default class PerfHashCmp {
         this.#closing = true;
 
         await this.__writeLineToStdin("exit");
-        await this.__dataOrTimeout(PerfHashCmp.WRITE_OK_RESULT, THIRTY_MINUTES);
+        await this.__dataOrTimeout(PerfImg.WRITE_OK_RESULT, THIRTY_MINUTES);
         this.#closed = true;
         const result = await this.__nonErrorExitOrTimeout(THIRTY_MINUTES);
         this.#writeMutex.release();
@@ -241,7 +239,7 @@ export default class PerfHashCmp {
     }
 
     __process() {
-        return this.#perfHashCmp;
+        return this.#perfImg;
     }
 
     /**
@@ -259,14 +257,14 @@ export default class PerfHashCmp {
      * @param {string} data 
      */
     async __writeLineToStdin(data) {
-        return await this.__writeToStdin(`${data}${PerfHashCmp.NEWLINE}`);
+        return await this.__writeToStdin(`${data}${PerfImg.NEWLINE}`);
     }
 
     /**
      * @param {string} data 
      */
     async __writeToStdin(data) {
-        this.#perfHashCmp.stdin.write(data);
+        this.#perfImg.stdin.write(data);
     }
 
     #stderrListeners = new Set();

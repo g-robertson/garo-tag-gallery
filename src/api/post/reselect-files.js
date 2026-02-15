@@ -3,9 +3,8 @@
  */
 
 import { z } from "zod";
-import { PERMISSIONS } from "../../client/js/user.js";
 import { getCursorAsFileIDs, getCursorAsFileWantedFields } from "../../db/cursor-manager.js";
-import { LocalFiles } from "../../db/taggables.js";
+import { TaggableFiles } from "../../db/taggables.js";
 import { clientjsonStringify } from "../../client/js/client-util.js";
 import { Z_WANTED_FIELD } from "../zod-types.js";
 
@@ -43,7 +42,7 @@ export async function getPermissions(dbs, req, res) {
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {
-    req.body.fileCursor.setValue(LocalFiles.groupLocalFilesTaggables(await LocalFiles.selectManyByFileIDs(dbs, getCursorAsFileIDs(req.body.fileCursor))));
+    req.body.fileCursor.setValue(TaggableFiles.groupTaggableFilesTaggables(await TaggableFiles.selectManyByFileIDs(dbs, getCursorAsFileIDs(req.body.fileCursor))));
 
     return res.status(200).send(clientjsonStringify(getCursorAsFileWantedFields(req.body.fileCursor, req.body.wantedFields)));
 }

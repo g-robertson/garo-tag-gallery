@@ -1,6 +1,6 @@
 import { appendFileSync, statSync } from "fs";
 import { strTaggablePairingsToStrTagPairings, getPairingsFromStrPairings, getStrPairingsFromPairings, TEST_DEFAULT_PERF_TAGS_ARGS, getTotalDirectoryBytes, TEST_DEFAULT_DATABASE_DIR } from "./helpers.js";
-import PerfTags from "../../../src/perf-tags-binding/perf-tags.js"
+import PerfTags from "../../../src/perf-binding/perf-tags.js"
 /** @import {TestFunction} from "./helpers.js" */
 
 
@@ -634,7 +634,7 @@ const TESTS = {
             [6n, [2n]],
         ]);
         await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
-        let {taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n],[PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.SEARCH_UNIVERSE, ">", 3)]));
+        let {taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)],[PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(PerfTags.SEARCH_UNIVERSE, ">", 3)]));
         if (taggables.length !== 4
          || taggables.indexOf(1n) === -1
          || taggables.indexOf(2n) === -1
@@ -644,7 +644,7 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 1";
         }
         
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n],[PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.SEARCH_UNIVERSE, ">=", 3)])));
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)],[PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(PerfTags.SEARCH_UNIVERSE, ">=", 3)])));
         if (taggables.length !== 6
          || taggables.indexOf(1n) === -1
          || taggables.indexOf(2n) === -1
@@ -656,7 +656,7 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 2";
         }
 
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n],[PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.SEARCH_UNIVERSE, "<", 4)])));
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)],[PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(PerfTags.SEARCH_UNIVERSE, "<", 4)])));
         if (taggables.length !== 3
          || taggables.indexOf(4n) === -1
          || taggables.indexOf(5n) === -1
@@ -666,7 +666,7 @@ const TESTS = {
         }
 
         
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n],[PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.SEARCH_UNIVERSE, "<=", 4)])));
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)],[PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(PerfTags.SEARCH_UNIVERSE, "<=", 4)])));
         if (taggables.length !== 6
          || taggables.indexOf(1n) === -1
          || taggables.indexOf(2n) === -1
@@ -689,7 +689,7 @@ const TESTS = {
             [6n, [   2n,   4n,   6n]],
         ]);
         await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
-        let {taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.searchUnion([
+        let {taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(PerfTags.searchUnion([
             PerfTags.searchTag(3n),
             PerfTags.searchTag(4n)
         ]), ">", 3)]));
@@ -697,7 +697,7 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 1";
         }
         
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(PerfTags.searchUnion([
             PerfTags.searchTag(3n),
             PerfTags.searchTag(4n)
         ]), ">=", 3)])));
@@ -710,7 +710,7 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 2";
         }
 
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(PerfTags.searchUnion([
             PerfTags.searchTag(3n),
             PerfTags.searchTag(4n)
         ]), "<=", 3)])));
@@ -725,7 +725,7 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 3";
         }
         
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(PerfTags.searchUnion([
             PerfTags.searchTag(3n),
             PerfTags.searchTag(4n)
         ]), "<", 3)])));
@@ -748,8 +748,8 @@ const TESTS = {
             [6n, [   2n,   4n,   6n]],
         ]);
         await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
-        let {taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        let {taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), ">", 0.7)
@@ -763,8 +763,8 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 1";
         }
         
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), "<", 0.7)
@@ -777,8 +777,8 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 2";
         }
 
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), "<=", 0.75)
@@ -794,8 +794,8 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 3";
         }
         
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), ">", 0.65)
@@ -826,8 +826,8 @@ const TESTS = {
             [10n, [   2n,           ]],
         ]);
         await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
-        let {taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        let {taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionFilteredExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), PerfTags.searchUnion([
@@ -847,8 +847,8 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 1";
         }
         
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionFilteredExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), PerfTags.searchUnion([
@@ -866,8 +866,8 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 2";
         }
 
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionFilteredExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), PerfTags.searchUnion([
@@ -890,8 +890,8 @@ const TESTS = {
             throw "Could not find one of the taggables that was supposed to be returned from case 3";
         }
         
-        ({taggables} = await perfTags.search(PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        ({taggables} = await perfTags.search(PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionFilteredExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), PerfTags.searchUnion([
@@ -930,8 +930,8 @@ const TESTS = {
             [10n, [   2n,           ]],
         ]);
         await perfTags.insertTagPairings(PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
-        let {taggables} = await perfTags.search(PerfTags.searchIntersect([PerfTags.searchAggregateConditions([1n,2n], [
-            PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(PerfTags.searchUnion([
+        let {taggables} = await perfTags.search(PerfTags.searchIntersect([PerfTags.searchConditionalExpressionListUnion([PerfTags.searchTag(1n),PerfTags.searchTag(2n)], [
+            PerfTags.searchExpressionListUnionConditionFilteredExpressionOccurrencesComparedToNPercentWithinCompareExpression(PerfTags.searchUnion([
                 PerfTags.searchTag(3n),
                 PerfTags.searchTag(4n)
             ]), PerfTags.searchUnion([

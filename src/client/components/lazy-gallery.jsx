@@ -6,7 +6,7 @@ import applyMetricToTaggable from '../../api/client-get/apply-metric-to-taggable
 import { User } from '../js/user.js';
 import { ConstState, State } from '../js/state.js';
 
-/** @import {DBUserFacingLocalFile} from "../../db/taggables.js" */
+/** @import {DBUserFacingTaggableFile} from "../../db/taggables.js" */
 
 /**
  * @param {{
@@ -36,7 +36,7 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                 method: "POST"
             });
         
-            /** @type {DBUserFacingLocalFile[]} */
+            /** @type {DBUserFacingTaggableFile[]} */
             const taggablesResponse = await fbjsonParse(response);
             const taggablesResponseMap = new Map(taggablesResponse.map(taggable => [Number(taggable.Taggable_ID), taggable]));
             for (const taggableResponse of taggablesResponse) {

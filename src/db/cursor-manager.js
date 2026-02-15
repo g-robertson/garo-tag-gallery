@@ -163,7 +163,7 @@ export function getCursorAsTaggableIDs(cursor) {
     if (cursor.type === "Taggable") {
         return cursor.value.map(taggable => taggable.Taggable_ID);
     } else if (cursor.type === "File") {
-        return cursor.value.flatMap(file => file.Taggable_ID);
+        return cursor.value.flatMap(file => file.Taggable_IDs);
     } else {
         return undefined;
     }
@@ -206,7 +206,8 @@ export function getCursorAsTaggableWantedFields(cursor, wantedFields) {
 export const Z_WANTED_FILE_FIELD = z.literal("File_ID")
 .or(z.literal("File_Hash"))
 .or(z.literal("File_Extension"))
-.or(z.literal("Perceptual_Hash_Version"));
+.or(z.literal("Perceptual_Hash_Version"))
+.or(z.literal("Taggable_IDs"));
 /** @typedef {z.infer<typeof Z_WANTED_FILE_FIELD>} WantedFileField */
 
 /**

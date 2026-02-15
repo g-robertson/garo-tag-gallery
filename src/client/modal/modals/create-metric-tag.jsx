@@ -5,8 +5,11 @@ import { Modals } from '../../modal/modals.js';
 import { User } from '../../js/user.js';
 import { State } from '../../js/state.js';
 
-/** @import {DBLocalMetric} from "../../../db/metrics.js" */
-/** @import {ClientComparator, ClientSearchTagHasMetricID, ClientSearchTagInLocalMetricServiceID, ClientSearchTagLocalMetricComparison} from "../../../api/post/search-taggables.js" */
+/**
+ * @import {DBLocalMetric} from "../../../db/metrics.js"
+ * @import {ClientComparator} from "../../../api/zod-types.js"
+ * @import {ClientSearchTagHasMetricID, ClientSearchTagInLocalMetricServiceID, ClientSearchTagLocalMetricComparison} from "../../../api/post/search-taggables.js"
+ **/
 
 /**
  * 

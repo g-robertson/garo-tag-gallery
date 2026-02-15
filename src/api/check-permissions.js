@@ -3,7 +3,7 @@
 /** @import {Permission, PermissionObjectScope} from "../client/js/user.js" */
 import { SCOPES } from "../client/js/user.js";
 import { LocalMetricServices } from "../db/metrics.js";
-import { LocalFiles, LocalTaggableServices } from "../db/taggables.js";
+import { TaggableFiles, LocalTaggableServices } from "../db/taggables.js";
 import { LocalTagServices } from "../db/tags.js";
 
 /**
@@ -100,9 +100,23 @@ export async function checkPermissions(dbs, req, res, apiPermissions) {
 
             /** @type {Set<bigint>} */
             const allTaggables = new Set();
-            const files = LocalFiles.groupLocalFilesTaggables(await LocalFiles.selectManyByFileIDs(dbs, apiPermissions.objects.File_IDs));
+            const files = TaggableFiles.groupTaggableFilesTaggables(await TaggableFiles.selectManyByFileIDs(dbs, apiPermissions.objects.File_IDs));
+            if (files.length !== apiPermissions.objects.File_IDs.length) {
+                return {
+                    success: false,
+                    message: "File ID requested did not exist and cannot have permissions granted"
+                };
+            }
+
             for (const file of files) {
-                for (const taggable of file.Taggable_ID) {
+                if (file.Taggable_IDs.length === 0) {
+                    return {
+                        success: false,
+                        message: "File ID requested did not have any existing taggable IDs and cannot have permissions granted"
+                    };
+                }
+
+                for (const taggable of file.Taggable_IDs) {
                     allTaggables.add(taggable);
                 }
             }
@@ -110,7 +124,7 @@ export async function checkPermissions(dbs, req, res, apiPermissions) {
         
             for (const file of files) {
                 let taggableMatchedTaggableService = false;
-                for (const taggable of file.Taggable_ID) {
+                for (const taggable of file.Taggable_IDs) {
                     if (allUserPermissionedLocalTaggableServiceIDs.has(taggablesLocalTaggableServicesMap.get(taggable).Local_Taggable_Service_ID)) {
                         taggableMatchedTaggableService = true;
                         break;

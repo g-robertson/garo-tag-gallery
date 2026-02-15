@@ -7,7 +7,7 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { serializeFloat } from '../util.js';
 
 /** @import {Databases} from "../db/db-util.js" */
-/** @import {ClientComparator} from "../api/post/search-taggables.js" */
+/** @import {ClientComparator} from "../api/zod-types.js" */
 
 const THIRTY_MINUTES = 30 * T_MINUTE;
 
@@ -157,6 +157,11 @@ export default class PerfTags {
         let offset = 0;
         let buffer = Buffer.allocUnsafe(numbers.length * 8);
         for (const number of numbers) {
+            if (typeof number !== "bigint") {
+                console.error(number);
+                throw `number provided to serializeSingles logged above was not a bigint`;
+            }
+
             offset = buffer.writeBigUInt64BE(number, offset);
         }
         return buffer.toString("binary");
@@ -164,17 +169,20 @@ export default class PerfTags {
 
     /**
      * @param {bigint[]} taggables 
-     * @param {boolean=} inTransaction
+     * @param {number} inTransaction
      */
     async insertTaggables(taggables, inTransaction = false) {
-        if (!inTransaction) {
+        if (inTransaction === undefined) {
+            throw "inTransaction was not passed to insertTags";
+        }
+        if (inTransaction === 0) {
             await this.#writeMutex.acquire();
         }
 
         const result = await this.__insertTaggables(taggables);
         this.#unflushedData = true;
 
-        if (!inTransaction) {
+        if (inTransaction === 0) {
             this.#writeMutex.release();
         }
         return result;
@@ -188,17 +196,20 @@ export default class PerfTags {
     
     /**
      * @param {bigint[]} tags 
-     * @param {boolean=} inTransaction
+     * @param {number} inTransaction
      */
-    async insertTags(tags, inTransaction = false) {
-        if (!inTransaction) {
+    async insertTags(tags, inTransaction) {
+        if (inTransaction === undefined) {
+            throw "inTransaction was not passed to insertTags";
+        }
+        if (inTransaction === 0) {
             await this.#writeMutex.acquire();
         }
 
         const result = await this.__insertTags(tags);
         this.#unflushedData = true;
 
-        if (!inTransaction) {
+        if (inTransaction === 0) {
             this.#writeMutex.release();
         }
         return result;
@@ -233,10 +244,13 @@ export default class PerfTags {
 
     /**
      * @param {Map<bigint, bigint[]>} tagPairings
-     * @param {boolean=} inTransaction
+     * @param {number} inTransaction
      */
-    async insertTagPairings(tagPairings, inTransaction = false) {
-        if (!inTransaction) {
+    async insertTagPairings(tagPairings, inTransaction) {
+        if (inTransaction === undefined) {
+            throw "inTransaction was not passed to insertTags";
+        }
+        if (inTransaction === 0) {
             await this.#writeMutex.acquire();
         }
 
@@ -245,7 +259,7 @@ export default class PerfTags {
         const result = await this.__insertTagPairings(tagPairings);
         this.#unflushedData = true;
 
-        if (!inTransaction) {
+        if (inTransaction === 0) {
             this.#writeMutex.release();
         }
         return result;
@@ -262,10 +276,13 @@ export default class PerfTags {
 
     /**
      * @param {Map<bigint, bigint[]>} tagPairings
-     * @param {boolean=} inTransaction
+     * @param {number} inTransaction
      */
-    async toggleTagPairings(tagPairings, inTransaction = false) {
-        if (!inTransaction) {
+    async toggleTagPairings(tagPairings, inTransaction) {
+        if (inTransaction === undefined) {
+            throw "inTransaction was not passed to insertTags";
+        }
+        if (inTransaction === 0) {
             await this.#writeMutex.acquire();
         }
 
@@ -274,7 +291,7 @@ export default class PerfTags {
         const result = await this.__toggleTagPairings(tagPairings);
         this.#unflushedData = true;
 
-        if (!inTransaction) {
+        if (inTransaction === 0) {
             this.#writeMutex.release();
         }
         return result;
@@ -291,10 +308,10 @@ export default class PerfTags {
 
     /**
      * @param {Map<bigint, bigint[]>} tagPairings
-     * @param {boolean=} inTransaction
+     * @param {number} inTransaction
      */
-    async deleteTagPairings(tagPairings, inTransaction = false) {
-        if (!inTransaction) {
+    async deleteTagPairings(tagPairings, inTransaction) {
+        if (inTransaction === 0) {
             await this.#writeMutex.acquire();
         }
 
@@ -303,7 +320,7 @@ export default class PerfTags {
         const result = await this.__deleteTagPairings(tagPairings);
         this.#unflushedData = true;
 
-        if (!inTransaction) {
+        if (inTransaction === 0) {
             this.#writeMutex.release();
         }
         return result;
@@ -320,10 +337,13 @@ export default class PerfTags {
 
     /**
      * @param {bigint[]} tags
-     * @param {boolean=} inTransaction
+     * @param {number} inTransaction
      */
-    async deleteTags(tags, inTransaction = false) {
-        if (!inTransaction) {
+    async deleteTags(tags, inTransaction) {
+        if (inTransaction === undefined) {
+            throw "inTransaction was not passed to insertTags";
+        }
+        if (inTransaction === 0) {
             await this.#writeMutex.acquire();
         }
 
@@ -332,7 +352,7 @@ export default class PerfTags {
         const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
         this.#unflushedData = true;
 
-        if (!inTransaction) {
+        if (inTransaction === 0) {
             this.#writeMutex.release();
         }
         return result;
@@ -340,10 +360,13 @@ export default class PerfTags {
     
     /**
      * @param {bigint[]} taggables
-     * @param {boolean=} inTransaction
+     * @param {number} inTransaction
      */
-    async deleteTaggables(taggables, inTransaction = false) {
-        if (!inTransaction) {
+    async deleteTaggables(taggables, inTransaction) {
+        if (inTransaction === undefined) {
+            throw "inTransaction was not passed to insertTags";
+        }
+        if (inTransaction === 0) {
             await this.#writeMutex.acquire();
         }
 
@@ -352,7 +375,7 @@ export default class PerfTags {
         const result = await this.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, THIRTY_MINUTES);
         this.#unflushedData = true;
 
-        if (!inTransaction) {
+        if (inTransaction === 0) {
             this.#writeMutex.release();
         }
         return result;
@@ -549,45 +572,48 @@ export default class PerfTags {
     }
 
     /**
+     * @param {string[]} expressionList
      * @param {string[]} conditions 
-     * @param {bigint[]} tags
      */
-    static searchAggregateConditions(tags, conditions) {
-        return `A${serializeUint64(BigInt(tags.length))}${this.#serializeSingles(tags)}${conditions.join('')})`;
+    static searchConditionalExpressionListUnion(expressionList, conditions) {
+        if (conditions.length === 0) {
+            throw "Should not make a non-conditional expression list union, if there are no expressions it should be converted to a regular union, preventing this stops optimization of the query";
+        }
+        return `X${serializeUint64(BigInt(expressionList.length))}${expressionList.map(expression => `${expression})`).join('')}${conditions.join('')})`;
     }
 
     /**
-     * @description Gets all taggables with tags where that tag is represented {comparator} {occurrences} amount of times within {expression}
-     * @param {string} expression 
+     * @description Gets all taggables with expressions where that expression is represented {comparator} {occurrences} amount of times within {compareExpression}
+     * @param {string} compareExpression 
      * @param {ClientComparator} comparator
      * @param {number} occurrences
      */
-    static aggregateConditionTagOccurrencesComparedToNWithinExpression(expression, comparator, occurrences) {
+    static searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(compareExpression, comparator, occurrences) {
         if (!Number.isSafeInteger(occurrences)) {
             throw "occurrences was not a safe integer";
         }
-        return `C${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeUint64(BigInt(occurrences))}${expression})`;
+        return `C${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeUint64(BigInt(occurrences))}${compareExpression})`;
     }
     
     /**
-     * @description Gets all taggables with tags where that tag is represented {comparator} {percentage} within {expression}
-     * @param {string} expression 
+     * @description Gets all taggables with expressions where that expression is represented {comparator} {percentage} within {compareExpression}
+     * @param {string} compareExpression 
      * @param {ClientComparator} comparator
      * @param {number} percentage
      */
-    static aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(expression, comparator, percentage) {
-        return `P${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeFloat(percentage)}${expression})`;
+    static searchExpressionListUnionConditionExpressionOccurrencesComparedToNPercentWithinCompareExpression(compareExpression, comparator, percentage) {
+        return `P${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeFloat(percentage)}${compareExpression})`;
     }
     
     /**
-     * @description Gets all taggables filtered by {filteringExpression} with tags where that tag is represented {comparator} {percentage} within {expression}
+     * @description Gets all taggables filtered by {filteringExpression} with tags where that tag is represented {comparator} {percentage} within {compareExpression}
      * @param {string} filteringExpression
-     * @param {string} expression 
+     * @param {string} compareExpression 
      * @param {ClientComparator} comparator
      * @param {number} percentage
      */
-    static aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(filteringExpression, expression, comparator, percentage) {
-        return `F${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeFloat(percentage)}${filteringExpression})${expression})`;
+    static searchExpressionListUnionConditionFilteredExpressionOccurrencesComparedToNPercentWithinCompareExpression(filteringExpression, compareExpression, comparator, percentage) {
+        return `F${PerfTags.__comparatorToPerfTagsComparator(comparator)}${serializeFloat(percentage)}${filteringExpression})${compareExpression})`;
     }
 
     async beginTransaction() {

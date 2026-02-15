@@ -9,8 +9,10 @@
   "scripts": {
     "e2eServer": "npx @dotenvx/dotenvx run -f build/.env.test -- node server.js",
     "e2e": "npx @dotenvx/dotenvx run -f build/.env.test -- node e2etest/test.js",
+    "phashtest": "npx @dotenvx/dotenvx run -f build/.env.phashtest -- node test-dup/test-dup.js",
+    "phashgd": "npx @dotenvx/dotenvx run -f build/.env.phashtest -- node test-dup/test-gradient-descent-params.js",
     "dev": "npx @dotenvx/dotenvx run -f build/.env.dev -- node server.js",
-    "buildcpp": "cd perf/perftags && make && cd ../perf-hash-cmp && make",
+    "buildcpp": "cd perf/perftags && make && cd ../perfimg && make",
     "build": "node build/pre-build.js && npx rsbuild --config rsbuild.config.mjs build && node build/post-build.js"
   },
   "dependencies": {

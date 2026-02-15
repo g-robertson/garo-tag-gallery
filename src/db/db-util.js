@@ -1,12 +1,12 @@
 import sqlite3 from "sqlite3";
 import crypto from "crypto";
-import PerfTags from "../perf-tags-binding/perf-tags.js";
+import PerfTags from "../perf-binding/perf-tags.js";
 import { FileStorage } from "./file-storage.js";
 import { JobManager } from "./job-manager.js";
 import { Mutex } from "async-mutex";
 import path from "path";
 import { CursorManager } from "./cursor-manager.js";
-import PerfHashCmp from "../perf-tags-binding/perf-hash-cmp.js";
+import PerfImg from "../perf-binding/perf-img.js";
 
 export const DATABASE_DIR = process.env.DATABASE_DIR;
 export const PARTIAL_ZIPS_FOLDER = path.join(DATABASE_DIR, "_partial-zips");
@@ -15,11 +15,12 @@ export const TMP_FOLDER = path.join(DATABASE_DIR, "_tmp");
 /**
  * @typedef {0 | 1} DBBoolean
  * @typedef {Object} Databases
+ * @property {number} inTransaction
  * @property {sqlite3.Database} sqlite3
  * @property {Mutex} sqlMutex
  * @property {Mutex} sqlTransactionMutex
  * @property {PerfTags} perfTags
- * @property {PerfHashCmp} perfHashCmp
+ * @property {PerfImg} perfImg
  * @property {Mutex} perfTagsMutex
  * @property {FileStorage} fileStorage
  * @property {JobManager<number>} jobManager
@@ -32,7 +33,7 @@ export const TMP_FOLDER = path.join(DATABASE_DIR, "_tmp");
  * @param {any} params
  */
 export async function dbrun(dbs, sql, params) {
-    if (dbs.inTransaction === undefined) {
+    if (dbs.inTransaction === 0) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
@@ -44,7 +45,7 @@ export async function dbrun(dbs, sql, params) {
     });
 
     dbs.sqlMutex.release();
-    if (dbs.inTransaction === undefined) {
+    if (dbs.inTransaction === 0) {
         dbs.sqlTransactionMutex.release();
     }
 
@@ -87,7 +88,7 @@ export async function dbgetselect(dbs, sql, params) {
  * @param {any} params
  */
 export async function dbget(dbs, sql, params) {
-    if (dbs.inTransaction === undefined) {
+    if (dbs.inTransaction === 0) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
@@ -99,7 +100,7 @@ export async function dbget(dbs, sql, params) {
     });
 
     dbs.sqlMutex.release();
-    if (dbs.inTransaction === undefined) {
+    if (dbs.inTransaction === 0) {
         dbs.sqlTransactionMutex.release();
     }
 
@@ -141,7 +142,7 @@ export async function dballselect(dbs, sql, params) {
  * @param {any} params
  */
 export async function dball(dbs, sql, params) {
-    if (dbs.inTransaction === undefined) {
+    if (dbs.inTransaction === 0) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
@@ -153,7 +154,7 @@ export async function dball(dbs, sql, params) {
     });
 
     dbs.sqlMutex.release();
-    if (dbs.inTransaction === undefined) {
+    if (dbs.inTransaction === 0) {
         dbs.sqlTransactionMutex.release();
     }
 
@@ -196,7 +197,7 @@ export function dbtuples(rows, columns) {
  * @param {Databases} dbs 
  */
 export async function dbBeginTransaction(dbs) {
-    if (dbs.inTransaction !== undefined) {
+    if (dbs.inTransaction !== 0) {
         return {
             ...dbs,
             inTransaction: dbs.inTransaction + 1
@@ -210,7 +211,6 @@ export async function dbBeginTransaction(dbs) {
     };
     await dbrun(dbs, "BEGIN TRANSACTION;");
     await dbs.perfTags.beginTransaction();
-
     return dbs;
 }
 
@@ -228,6 +228,11 @@ export async function dbEndTransaction(dbs) {
     await dbs.perfTags.endTransaction();
     await dbrun(dbs, "COMMIT;");
     dbs.sqlTransactionMutex.release();
+
+    return {
+        ...dbs,
+        inTransaction: 0
+    };
 }
 
 export function dbsqlcommand(sql, params) {

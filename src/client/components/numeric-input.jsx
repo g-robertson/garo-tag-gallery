@@ -12,6 +12,7 @@
 function NumericInput({selectedNumberState, minValue, maxValue, className}) {
     minValue ??= -Infinity;
     maxValue ??= Infinity;
+    className ??= "";
 
     return <input className={className} type="text" value={selectedNumberState.get().toString()} onBlur={e => {
         let newNumericValue = Number(e.currentTarget.value);

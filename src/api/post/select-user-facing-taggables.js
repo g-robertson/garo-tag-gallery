@@ -6,7 +6,7 @@ import { z } from "zod";
 import { bjsonStringify } from "../../client/js/client-util.js";
 import { PERMISSIONS } from "../../client/js/user.js";
 import { LocalMetricServices } from "../../db/metrics.js";
-import { UserFacingLocalFiles } from "../../db/taggables.js";
+import { UserFacingTaggableFiles } from "../../db/taggables.js";
 import { LocalTagServices } from "../../db/tags.js";
 import { Z_TAGGABLE_ID } from "../zod-types.js";
 
@@ -39,7 +39,7 @@ export async function getPermissions(dbs, req, res) {
 export default async function get(dbs, req, res) {
     const localTagServices = await LocalTagServices.userSelectAll(dbs, req.user, PERMISSIONS.LOCAL_TAG_SERVICES.READ_TAGS);
     const localMetricServices = await LocalMetricServices.userSelectAll(dbs, req.user, PERMISSIONS.LOCAL_METRIC_SERVICES.READ_METRIC);
-    const userFacingTaggables = await UserFacingLocalFiles.selectManyByTaggableIDs(
+    const userFacingTaggables = await UserFacingTaggableFiles.selectManyByTaggableIDs(
         dbs,
         req.body.taggableIDs,
         req.user.id(),

@@ -1,12 +1,13 @@
 import { mapNullCoalesce } from "../client/js/client-util.js";
 import { CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE } from "../client/js/duplicates.js";
 import { closeHash, closeHashDistances, exactDuplicateHash } from "../server/duplicates.js";
-import { dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
+import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
 import { Job } from "./job-manager.js";
 import { Files } from "./taggables.js";
 
 /** @import {Databases} from "./db-util.js" */
 /** @import {DBFile} from "./taggables.js" */
+/** @import {TransitiveFileRelationType, NontransitiveFileRelationType} from "../client/js/duplicates.js" */
 
 /**
  * @param {Databases} dbs
@@ -83,9 +84,9 @@ async function compareFiles(dbs, existingPHashedFilesExactBitmapHashMap, existin
  * @typedef {Object} DBFileComparison
  * @property {number} File_Comparisons_Made_ID
  * @property {Buffer} File_Comparisons_Made_PK_Hash
+ * @property {number} Comparison_Is_Checked
  * @property {number} File_ID_1
  * @property {number} File_ID_2
- * @property {number} Comparison_Is_Checked
  * @property {number} Perceptual_Hash_Distance
  */
 
@@ -100,8 +101,16 @@ function fileComparisonPKHash(preInsertFileComparison) {
  * @param {PreInsertFileComparison} preInsertFileComparison 
  */
 function preparePreInsertFileComparison(preInsertFileComparison) {
+    let {File_ID_1, File_ID_2} = preInsertFileComparison;
+    if (preInsertFileComparison.File_ID_1 > preInsertFileComparison.File_ID_2) {
+        File_ID_1 = preInsertFileComparison.File_ID_2;
+        File_ID_2 = preInsertFileComparison.File_ID_1;
+    }
+
     return {
         ...preInsertFileComparison,
+        File_ID_1,
+        File_ID_2,
         File_Comparisons_Made_PK_Hash: fileComparisonPKHash(preInsertFileComparison)
     };
 }
@@ -121,7 +130,7 @@ export class FileComparisons {
             // Get all already hashed files
             const existingPHashedFiles = await Files.selectAllWithPerceptualHashVersion(dbs, CURRENT_PERCEPTUAL_HASH_VERSION);
             // Set them as already hashed within perf hash cmp
-            await dbs.perfHashCmp.setAlreadyComparedHashes(existingPHashedFiles.map(file => file.Perceptual_Hash));
+            await dbs.perfImg.setAlreadyComparedHashes(existingPHashedFiles.map(file => file.Perceptual_Hash));
             const existingPHashedFileIDs = new Set(existingPHashedFiles.map(file => file.File_ID));
             /** @type {Map<string, DBFile[]>} */
             const existingPHashedFilesExactBitmapHashMap = new Map();
@@ -183,14 +192,29 @@ export class FileComparisons {
             return [];
         }
 
+        /** @type {DBFileComparison[]} */
         const fileComparisons = await dballselect(dbs, `
-            SELECT *
-              FROM File_Comparisons_Made
-             WHERE Perceptual_Hash_Distance < ?
-               AND (File_ID_1 IN ${dbvariablelist(fileIDs.length)}
-                 OR File_ID_2 IN ${dbvariablelist(fileIDs.length)}
-               )
-            ;
+            SELECT 
+                FCR.*,
+                CASE WHEN (
+                    NOT EXISTS (
+                        SELECT COUNT(1)
+                        FROM Transitive_File_Relation_Groups_Files TFRGF
+                        WHERE TFRGF.File_ID IN (FCR.File_ID_1, FCR.File_ID_2)
+                        GROUP BY TFRGF.Transitive_File_Relation_Groups_ID
+                        HAVING COUNT(1) = 2
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM Nontransitive_File_Relations NFR
+                        WHERE NFR.File_ID_1 = FCR.File_ID_1 AND NFR.File_ID_2 = FCR.File_ID_2
+                    )
+                ) THEN 0 ELSE 1 END AS Comparison_Is_Checked
+            FROM File_Comparisons_Made FCR
+            WHERE FCR.Perceptual_Hash_Distance < ?
+            AND (FCR.File_ID_1 IN ${dbvariablelist(fileIDs.length)}
+             AND FCR.File_ID_2 IN ${dbvariablelist(fileIDs.length)}
+            );
         `, [maxPerceptualHashDistance, ...fileIDs, ...fileIDs]);
 
         return fileComparisons;
@@ -225,5 +249,487 @@ export class FileComparisons {
                 Perceptual_Hash_Distance
             ) VALUES ${dbtuples(fileComparisons.length, 4)}
         `, fileComparisonsMadeInsertionParams)
+    }
+}
+
+/**
+ * @typedef {Object} PreInsertBetterDuplicateFileRelation
+ * @property {number} Better_File_ID
+ * @property {number} Worse_File_ID
+ * 
+ * @typedef {PreInsertBetterDuplicateFileRelation & { Better_Duplicate_File_RelationsPK_Hash: string }} PreparedPreInsertBetterDuplicateFileRelation
+ * @typedef {PreparedPreInsertBetterDuplicateFileRelation & { Better_Duplicate_File_RelationsID: number }} DBBetterDuplicateFileRelation
+ **/
+
+/**
+ * @param {PreInsertBetterDuplicateFileRelation} preInsertBetterDuplicateFileRelation 
+ */
+function betterDuplicateFileRelationPKHash(preInsertBetterDuplicateFileRelation) {
+    return `${preInsertBetterDuplicateFileRelation.Better_File_ID}\x01${preInsertBetterDuplicateFileRelation.Worse_File_ID}`;
+}
+
+/**
+ * @param {PreInsertBetterDuplicateFileRelation} preInsertBetterDuplicateFileRelation 
+ */
+function preparePreInsertBetterDuplicateFileRelation(preInsertBetterDuplicateFileRelation) {
+    return {
+        ...preInsertBetterDuplicateFileRelation,
+        Better_Duplicate_File_RelationsPK_Hash: betterDuplicateFileRelationPKHash(preInsertBetterDuplicateFileRelation)
+    };
+}
+
+export class BetterDuplicateFileRelations {
+    /**
+     * @param {Databases} dbs 
+     * @param {PreparedPreInsertBetterDuplicateFileRelation[]} betterDuplicateFileRelations
+     */
+    static async selectMany(dbs, betterDuplicateFileRelations) {
+        if (betterDuplicateFileRelations.length === 0) {
+            return [];
+        }
+
+        /** @type {DBBetterDuplicateFileRelation[]} */
+        const dbBetterDuplicateFileRelations = await dballselect(dbs,
+            `SELECT * FROM Better_Duplicate_File_Relations WHERE Better_Duplicate_File_Relations_PK_Hash IN ${dbvariablelist(betterDuplicateFileRelations.length)};`,
+            betterDuplicateFileRelations.map(betterDuplicateFileRelation => betterDuplicateFileRelation.Better_Duplicate_File_RelationsPK_Hash)
+        );
+        return dbBetterDuplicateFileRelations;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {PreparedPreInsertBetterDuplicateFileRelation[]} betterDuplicateFileRelations 
+     */
+    static async insertMany(dbs, betterDuplicateFileRelations) {
+        if (betterDuplicateFileRelations.length === 0) {
+            return [];
+        }
+
+        const betterDuplicateFileRelationsInsertionParams = [];
+        for (const betterDuplicateFileRelation of betterDuplicateFileRelations) {
+            betterDuplicateFileRelationsInsertionParams.push(betterDuplicateFileRelation.Better_Duplicate_File_RelationsPK_Hash);
+            betterDuplicateFileRelationsInsertionParams.push(betterDuplicateFileRelation.Better_File_ID);
+            betterDuplicateFileRelationsInsertionParams.push(betterDuplicateFileRelation.Worse_File_ID);
+        }
+        
+        /** @type {DBBetterDuplicateFileRelation[]} */
+        const betterDuplicateFileRelationsInserted = await dball(dbs, `
+            INSERT INTO
+            Better_Duplicate_File_Relations(
+                Better_Duplicate_File_Relations_PK_Hash,
+                Better_File_ID,
+                Worse_File_ID
+            ) VALUES ${dbtuples(betterDuplicateFileRelations.length, 3)} RETURNING *;
+        `, betterDuplicateFileRelationsInsertionParams);
+
+        return betterDuplicateFileRelationsInserted;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {PreInsertBetterDuplicateFileRelation[]} betterDuplicateFileRelations 
+     */
+    static async uniqueInsertMany(dbs, betterDuplicateFileRelations) {
+        if (betterDuplicateFileRelations.length === 0) {
+            return [];
+        }
+
+        let preparedBetterDuplicateFileRelations = betterDuplicateFileRelations.map(preparePreInsertBetterDuplicateFileRelation);
+        
+        // dedupe
+        preparedBetterDuplicateFileRelations = [...(new Map(preparedBetterDuplicateFileRelations.map(betterDuplicateFileRelation => [betterDuplicateFileRelation.Better_Duplicate_File_RelationsPK_Hash, betterDuplicateFileRelation]))).values()];
+
+        const dbBetterDuplicateFileRelations = await BetterDuplicateFileRelations.selectMany(dbs, preparedBetterDuplicateFileRelations);
+        const dbBetterDuplicateFileRelationsExisting = new Set(dbBetterDuplicateFileRelations.map(betterDuplicateFileRelation => betterDuplicateFileRelation.Better_Duplicate_File_RelationsPK_Hash));
+        const betterDuplicateFileRelationsToInsert = preparedBetterDuplicateFileRelations.filter(betterDuplicateFileRelation => !dbBetterDuplicateFileRelationsExisting.has(betterDuplicateFileRelation.Better_Duplicate_File_RelationsPK_Hash));
+        const insertedBetterDuplicateFileRelations = await BetterDuplicateFileRelations.insertMany(dbs, betterDuplicateFileRelationsToInsert);
+
+        return dbBetterDuplicateFileRelations.concat(insertedBetterDuplicateFileRelations);
+    }
+}
+
+/**
+ * @typedef {Object} DBTransitiveFileRelation
+ * @property {number} Transitive_File_Relation_Groups_ID
+ * @property {number} File_ID
+ */
+
+/**
+ * @typedef {Object} DBTransitiveFileRelationGroup
+ * @property {number} Transitive_File_Relation_Groups_ID
+ * @property {TransitiveFileRelationType} File_Relation_Type 
+ */
+
+/**
+ * @typedef {Object} PreInsertTransitiveFileRelation
+ * @property {number} File_ID_1
+ * @property {number} File_ID_2
+ * @property {TransitiveFileRelationType} File_Relation_Type
+ **/
+
+
+/**
+ * @param {Databases} dbs
+ * @param {DBTransitiveFileRelationGroup[]} transitiveFileRelationGroups
+ */
+async function mapTransitiveFileRelationGroups(dbs, transitiveFileRelationGroups) {
+    /** @type {Map<number, number[]>} */
+    const transitiveFileRelationGroupToFileIDsMap = new Map(transitiveFileRelationGroups.map(transitiveFileRelationGroup => [transitiveFileRelationGroup.Transitive_File_Relation_Groups_ID, []]));
+    
+    const transitiveFileRelations = await TransitiveFileRelations.selectManyFileRelationsByGroupIDs(dbs, transitiveFileRelationGroups.map(group => group.Transitive_File_Relation_Groups_ID));
+    for (const transitiveFileRelation of transitiveFileRelations) {
+        transitiveFileRelationGroupToFileIDsMap.get(transitiveFileRelation.Transitive_File_Relation_Groups_ID).push(transitiveFileRelation.File_ID);
+    }
+
+    return transitiveFileRelationGroups.map(group => ({
+        ...group,
+        File_IDs: transitiveFileRelationGroupToFileIDsMap.get(group.Transitive_File_Relation_Groups_ID)
+    }));
+}
+
+export class TransitiveFileRelations {
+    /**
+     * @param {Databases} dbs 
+     * @param {number[]} groupIDs 
+     */
+    static async selectManyFileRelationsByGroupIDs(dbs, groupIDs) {
+        /** @type {DBTransitiveFileRelation[]} */
+        const dbTransitiveFileRelations = await dballselect(dbs, `
+            SELECT *
+            FROM Transitive_File_Relation_Groups_Files
+            WHERE Transitive_File_Relation_Groups_ID IN ${dbvariablelist(groupIDs.length)}  
+        `, groupIDs
+        );
+
+        return dbTransitiveFileRelations;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number[]} fileIDs
+     * @param {number} fileRelationType
+     */
+    static async selectManyGroupsByFileIDsWithRelationType(dbs, fileIDs, fileRelationType) {
+        if (fileIDs.length === 0) {
+            return [];
+        }
+
+        /** @type {DBTransitiveFileRelationGroup[]} */
+        const dbTransitiveFileRelationGroups = await dballselect(dbs, `
+            SELECT *
+            FROM Transitive_File_Relation_Groups TFRG
+            WHERE File_Relation_Type = ?
+            AND EXISTS (
+                SELECT 1
+                FROM Transitive_File_Relation_Groups_Files TFRGF
+                WHERE TFRGF.Transitive_File_Relation_Groups_ID = TFRG.Transitive_File_Relation_Groups_ID
+                  AND File_ID IN ${dbvariablelist(fileIDs.length)}
+            );
+        `, [fileRelationType, ...fileIDs]
+        );
+        return await mapTransitiveFileRelationGroups(dbs, dbTransitiveFileRelationGroups);
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {TransitiveFileRelationType[]} fileRelationTypes
+     */
+    static async insertManyGroups(dbs, fileRelationTypes) {
+        if (fileRelationTypes.length === 0) {
+            return [];
+        }
+
+        const transitiveFileRelationsInsertionParams = [];
+        for (const fileRelationType of fileRelationTypes) {
+            transitiveFileRelationsInsertionParams.push(fileRelationType);
+        }
+        
+        /** @type {DBTransitiveFileRelationGroup[]} */
+        const dbTransitiveFileRelationGroups = await dball(dbs, `
+            INSERT INTO
+            Transitive_File_Relation_Groups(
+                File_Relation_Type
+            ) VALUES ${dbtuples(fileRelationTypes.length, 1)} RETURNING *;
+        `, transitiveFileRelationsInsertionParams);
+
+        return dbTransitiveFileRelationGroups;
+    }
+
+    /**
+     * 
+     * @param {Databases} dbs 
+     * @param {DBTransitiveFileRelation[]} dbTransitiveFileRelations 
+     */
+    static async insertManyGroupFiles(dbs, dbTransitiveFileRelations ) {
+        if (dbTransitiveFileRelations.length === 0) {
+            return;
+        }
+
+        const transitiveFileRelationGroupsFilesInsertionParams = [];
+        for (const transitiveFileRelation of dbTransitiveFileRelations) {
+            transitiveFileRelationGroupsFilesInsertionParams.push(transitiveFileRelation.Transitive_File_Relation_Groups_ID);
+            transitiveFileRelationGroupsFilesInsertionParams.push(transitiveFileRelation.File_ID);
+        }
+        
+        await dbrun(dbs, `
+            INSERT INTO
+            Transitive_File_Relation_Groups_Files(
+                Transitive_File_Relation_Groups_ID,
+                File_ID
+            ) VALUES ${dbtuples(dbTransitiveFileRelations.length, 2)};
+        `, transitiveFileRelationGroupsFilesInsertionParams);
+    }
+
+    /**
+     * 
+     * @param {Databases} dbs 
+     * @param {TransitiveFileRelationType} fileRelationType 
+     * @param {Omit<PreInsertTransitiveFileRelation, "File_Relation_Type">[]} transitiveFileRelations 
+     */
+    static async #uniqueInsertManyByFileRelationType(dbs, fileRelationType, transitiveFileRelations) {
+        const fileIDs = [...new Set(transitiveFileRelations.flatMap(fileRelation => [fileRelation.File_ID_1, fileRelation.File_ID_2]))];
+        const transitiveFileRelationGroups = await TransitiveFileRelations.selectManyGroupsByFileIDsWithRelationType(dbs, fileIDs, fileRelationType);
+        const beforeGroupIDToFileIDs = new Map(transitiveFileRelationGroups.map(group => [group.Transitive_File_Relation_Groups_ID, new Set(group.File_IDs)]));
+        const afterGroupIDToFileIDs = new Map(transitiveFileRelationGroups.map(group => [group.Transitive_File_Relation_Groups_ID, new Set(group.File_IDs)]));
+        /** @type {Map<number, number>} */
+        const afterFileIDsToGroupID = new Map();
+        for (const fileRelationGroup of transitiveFileRelationGroups) {
+            for (const fileID of fileRelationGroup.File_IDs) {
+                afterFileIDsToGroupID.set(fileID, fileRelationGroup.Transitive_File_Relation_Groups_ID);
+            }
+        }
+
+        // Not a fun implementation, all groups that dont yet exist but need transitivity will be represented starting at MAX_SAFE_INTEGER going downwards, we cannot make them preemptively as we cannot know how many are needed
+        let nextNewGroupFakeID = Number.MAX_SAFE_INTEGER;
+
+        for (const fileRelation of transitiveFileRelations) {
+            const fileID1Group = afterFileIDsToGroupID.get(fileRelation.File_ID_1);
+            const fileID2Group = afterFileIDsToGroupID.get(fileRelation.File_ID_2);
+
+            if (fileID1Group === undefined) {
+                if (fileID2Group === undefined) {
+                    // new group needed
+                    const newGroup = nextNewGroupFakeID;
+                    --nextNewGroupFakeID;
+
+                    afterFileIDsToGroupID.set(fileRelation.File_ID_1, newGroup);
+                    afterFileIDsToGroupID.set(fileRelation.File_ID_2, newGroup);
+                    afterGroupIDToFileIDs.set(newGroup, new Set([fileRelation.File_ID_1, fileRelation.File_ID_2]));
+                } else {
+                    afterFileIDsToGroupID.set(fileRelation.File_ID_1, fileID2Group);
+                    afterGroupIDToFileIDs.get(fileID2Group).add(fileRelation.File_ID_1);
+                }
+            } else {
+                if (fileID2Group === undefined) {
+                    afterFileIDsToGroupID.set(fileRelation.File_ID_2, fileID1Group);
+                    afterGroupIDToFileIDs.get(fileID1Group).add(fileRelation.File_ID_2);
+                } else {
+                    if (fileID1Group !== fileID2Group) {
+                        // merge groups needed
+                        // choose least expensive group to delete
+                        let sourceGroup = fileID1Group;
+                        let targetGroup = fileID2Group;
+                        if (fileID1Group > nextNewGroupFakeID) {
+                            sourceGroup = fileID1Group;
+                            targetGroup = fileID2Group;
+                        } else if (fileID2Group > nextNewGroupFakeID) {
+                            sourceGroup = fileID2Group;
+                            targetGroup = fileID1Group;
+                        } else if (beforeGroupIDToFileIDs.get(fileID1Group).size > beforeGroupIDToFileIDs.get(fileID2Group).size) {
+                            sourceGroup = fileID2Group;
+                            targetGroup = fileID1Group;
+                        } else {
+                            sourceGroup = fileID1Group;
+                            targetGroup = fileID2Group;
+                        }
+
+                        // merge the group in
+                        for (const fileID of afterGroupIDToFileIDs.get(sourceGroup)) {
+                            afterFileIDsToGroupID.set(fileID, targetGroup);
+                            afterGroupIDToFileIDs.get(targetGroup).add(fileID);
+                        }
+                        // delete the group
+                        afterGroupIDToFileIDs.delete(sourceGroup);
+                    }
+                }
+            }
+        }
+
+        dbs = await dbBeginTransaction(dbs);
+        const newGroupsNeeded = [...afterGroupIDToFileIDs.keys()].filter(groupID => groupID > nextNewGroupFakeID);
+        const newGroups = await TransitiveFileRelations.insertManyGroups(dbs, newGroupsNeeded.map(_ => fileRelationType));
+        const fakeIDToNewGroupsMap = new Map(newGroups.map((group, i) => [newGroupsNeeded[i], group]));
+
+        const deleteGroupsNeeded = [...beforeGroupIDToFileIDs.keys()].filter(groupID => !afterGroupIDToFileIDs.has(groupID));
+        await TransitiveFileRelations.deleteManyGroupsByID(dbs, deleteGroupsNeeded);
+
+        /** @type {DBTransitiveFileRelation[]} */
+        const dbTransitiveFileRelations = [];
+        for (let [groupID, afterFileIDs] of afterGroupIDToFileIDs) {
+            if (groupID > nextNewGroupFakeID) {
+                groupID = fakeIDToNewGroupsMap.get(groupID).Transitive_File_Relation_Groups_ID;
+            }
+            const beforeFileIDs = beforeGroupIDToFileIDs.get(groupID) ?? new Set();
+            for (const afterFileID of afterFileIDs) {
+                if (!beforeFileIDs.has(afterFileID)) {
+                    dbTransitiveFileRelations.push({
+                        Transitive_File_Relation_Groups_ID: groupID,
+                        File_ID: afterFileID
+                    });
+                }
+            }
+        }
+
+        await TransitiveFileRelations.insertManyGroupFiles(dbs, dbTransitiveFileRelations);
+
+        await dbEndTransaction(dbs);
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {PreInsertTransitiveFileRelation[]} transitiveFileRelations 
+     */
+    static async uniqueInsertMany(dbs, transitiveFileRelations) {
+        if (transitiveFileRelations.length === 0) {
+            return [];
+        }
+
+        /** @type {Map<TransitiveFileRelationType, PreInsertTransitiveFileRelation[]>} */
+        const fileRelationTypeToTransitiveFileRelationMap = new Map();
+        for (const fileRelation of transitiveFileRelations) {
+            mapNullCoalesce(fileRelationTypeToTransitiveFileRelationMap, fileRelation.File_Relation_Type, []).push(fileRelation);
+        }
+
+        for (const [fileRelationType, transitiveFileRelations] of fileRelationTypeToTransitiveFileRelationMap) {
+            await TransitiveFileRelations.#uniqueInsertManyByFileRelationType(dbs, fileRelationType, transitiveFileRelations);
+        }
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {number[]} groupIDs 
+     */
+    static async deleteManyGroupsByID(dbs, groupIDs) {
+        if (groupIDs.length === 0) {
+            return;
+        }
+
+        dbs = await dbBeginTransaction(dbs);
+        await dbrun(dbs, `
+            DELETE FROM Transitive_File_Relation_Groups_Files WHERE Transitive_File_Relation_Groups_ID IN ${dbvariablelist(groupIDs.length)};
+        `, groupIDs);
+        
+        await dbrun(dbs, `
+            DELETE FROM Transitive_File_Relation_Groups WHERE Transitive_File_Relation_Groups_ID IN ${dbvariablelist(groupIDs.length)};
+        `, groupIDs);
+
+        dbs = await dbEndTransaction(dbs);
+    }
+}
+
+/**
+ * @typedef {Object} PreInsertNontransitiveFileRelation
+ * @property {number} File_ID_1
+ * @property {number} File_ID_2
+ * @property {NontransitiveFileRelationType} File_Relation_Type
+ * 
+ * @typedef {PreInsertNontransitiveFileRelation & { Nontransitive_File_Relations_PK_Hash: string }} PreparedPreInsertNontransitiveFileRelation
+ * @typedef {PreparedPreInsertNontransitiveFileRelation & { Nontransitive_File_Relations_ID: number}} DBNontransitiveFileRelation
+ **/
+
+/**
+ * @param {PreInsertNontransitiveFileRelation} nontransitiveFileRelation 
+ */
+function nontransitiveFileRelationPKHash(nontransitiveFileRelation) {
+    return `${nontransitiveFileRelation.File_ID_1}\x01${nontransitiveFileRelation.File_ID_2}\x01${nontransitiveFileRelation.File_Relation_Type}`;
+}
+
+/**
+ * @param {PreInsertNontransitiveFileRelation} nontransitiveFileRelation 
+ */
+function preparePreInsertNontransitiveFileRelation(nontransitiveFileRelation) {
+    let {File_ID_1, File_ID_2} = nontransitiveFileRelation;
+    if (nontransitiveFileRelation.File_ID_1 > nontransitiveFileRelation.File_ID_2) {
+        File_ID_1 = nontransitiveFileRelation.File_ID_2;
+        File_ID_2 = nontransitiveFileRelation.File_ID_1;
+    }
+
+    return {
+        ...nontransitiveFileRelation,
+        File_ID_1,
+        File_ID_2,
+        Nontransitive_File_Relations_PK_Hash: nontransitiveFileRelationPKHash(nontransitiveFileRelation)
+    };
+}
+
+export class NontransitiveFileRelations {
+    /**
+     * @param {Databases} dbs 
+     * @param {PreparedPreInsertNontransitiveFileRelation[]} nontransitiveFileRelations
+     */
+    static async selectMany(dbs, nontransitiveFileRelations) {
+        if (nontransitiveFileRelations.length === 0) {
+            return [];
+        }
+
+        /** @type {DBNontransitiveFileRelation[]} */
+        const dbNontransitiveFileRelations = await dballselect(dbs,
+            `SELECT * FROM Nontransitive_File_Relations WHERE Nontransitive_File_Relations_PK_Hash IN ${dbvariablelist(nontransitiveFileRelations.length)};`,
+            nontransitiveFileRelations.map(nontransitiveFileRelation => nontransitiveFileRelation.Nontransitive_File_Relations_PK_Hash)
+        );
+        return dbNontransitiveFileRelations;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {PreparedPreInsertNontransitiveFileRelation[]} nontransitiveFileRelations 
+     */
+    static async insertMany(dbs, nontransitiveFileRelations) {
+        if (nontransitiveFileRelations.length === 0) {
+            return [];
+        }
+
+        const nontransitiveFileRelationsInsertionParams = [];
+        for (const betterDuplicateFileRelation of nontransitiveFileRelations) {
+            nontransitiveFileRelationsInsertionParams.push(betterDuplicateFileRelation.Nontransitive_File_Relations_PK_Hash);
+            nontransitiveFileRelationsInsertionParams.push(betterDuplicateFileRelation.File_ID_1);
+            nontransitiveFileRelationsInsertionParams.push(betterDuplicateFileRelation.File_ID_2);
+            nontransitiveFileRelationsInsertionParams.push(betterDuplicateFileRelation.File_Relation_Type);
+        }
+        
+        /** @type {DBNontransitiveFileRelation[]} */
+        const dbNontransitiveFileRelations = await dball(dbs, `
+            INSERT INTO
+            Nontransitive_File_Relations(
+                Nontransitive_File_Relations_PK_Hash,
+                File_ID_1,
+                File_ID_2,
+                File_Relation_Type
+            ) VALUES ${dbtuples(nontransitiveFileRelations.length, 4)} RETURNING *;
+        `, nontransitiveFileRelationsInsertionParams);
+
+        return dbNontransitiveFileRelations;
+    }
+
+    /**
+     * @param {Databases} dbs 
+     * @param {PreInsertNontransitiveFileRelation[]} nontransitiveFileRelations 
+     */
+    static async uniqueInsertMany(dbs, nontransitiveFileRelations) {
+        if (nontransitiveFileRelations.length === 0) {
+            return [];
+        }
+
+        let preparedNontransitiveFileRelations = nontransitiveFileRelations.map(preparePreInsertNontransitiveFileRelation);
+        
+        // dedupe
+        preparedNontransitiveFileRelations = [...(new Map(preparedNontransitiveFileRelations.map(nontransitiveFileRelation => [nontransitiveFileRelation.Nontransitive_File_Relations_PK_Hash, nontransitiveFileRelation]))).values()];
+
+        const dbNontransitiveFileRelations = await NontransitiveFileRelations.selectMany(dbs, preparedNontransitiveFileRelations);
+        const dbNontransitiveFileRelationsExisting = new Set(dbNontransitiveFileRelations.map(dbNontransitiveFileRelation => dbNontransitiveFileRelation.Nontransitive_File_Relations_PK_Hash));
+        const nontransitiveFileRelationsToInsert = preparedNontransitiveFileRelations.filter(nontransitiveFileRelation => !dbNontransitiveFileRelationsExisting.has(nontransitiveFileRelation.Nontransitive_File_Relations_PK_Hash));
+        const insertedNontransitiveFileRelations = await NontransitiveFileRelations.insertMany(dbs, nontransitiveFileRelationsToInsert);
+
+        return dbNontransitiveFileRelations.concat(insertedNontransitiveFileRelations);
     }
 }

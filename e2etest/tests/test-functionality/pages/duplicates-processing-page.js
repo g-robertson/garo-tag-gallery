@@ -1,5 +1,5 @@
 import { Key, until } from "selenium-webdriver";
-import { applyTagFilter, beginDatabaseProcessingFiles, beginFilteringPotentialDuplicates, commitDuplicates, commitDuplicatesFromDialog, createNewDuplicatesProcessingPage, createNewFileSearchPage, duplicateCurrentIsBetterTrashOther, duplicateDiscardUncommitted, duplicateGoBack, duplicateSkip, selectTagFromLocalTagSelector, selectTagFromTagSearchQuery } from "../../../functionality/pages-functionality.js";
+import { adjustDuplicateSearchDistance, applyTagFilter, beginDatabaseProcessingFiles, beginFilteringPotentialDuplicates, commitDuplicates, commitDuplicatesFromDialog, createNewDuplicatesProcessingPage, createNewFileSearchPage, duplicateCurrentIsBetterTrashOther, duplicateDiscardUncommitted, duplicateGoBack, duplicateSkip, selectTagFromLocalTagSelector, selectTagFromTagSearchQuery } from "../../../functionality/pages-functionality.js";
 import { BY_DEDUPE_PREVIEW_GALLERY_IMAGE, BY_THUMBNAIL_GALLERY_IMAGE, closeModal, closePage, DEFAULT_TIMEOUT_TIME, doubleClick, findDedupeGalleryImage, findDedupePreviewGalleryImage, findDedupePreviewGalleryImages, modClick, scroll, selectPage, sendKeys, UNTIL_JOB_BEGIN, UNTIL_JOB_END, untilCountElementsLocated, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
 import { BUG_IMPACTS, BUG_NOTICES, BUG_PRIORITIES, IMPLEMENTATION_DIFFICULTIES } from "../../../unimplemented-test-info.js";
 import { importFilesFromHydrus } from "../../../functionality/file-functionality.js";
@@ -9,7 +9,7 @@ import { importFilesFromHydrus } from "../../../functionality/file-functionality
 /** @type {Record<string, any>} */
 const State = {};
 
-const TEST_TAG_1_PAIR = "hairclip";
+const TEST_TAG_1_PAIR = "blue kimono";
 const TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER = "current-is-better-trash-other-test";
 const TEST_TAG_CURRENT_IS_BETTER = "current-is-better-test";
 const TEST_TAG_SAME_QUALITY_TRASH_LARGER = "same-quality-trash-larger-test";
@@ -26,6 +26,7 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
         await createNewDuplicatesProcessingPage(driver);
         await createNewFileSearchPage(driver);
         await selectPage(driver, 0);
+        await adjustDuplicateSearchDistance(driver, 80);
     }},
     {name: "Teardown", isTeardown: true, tests: async (driver) => {
         await closePage(driver);
@@ -38,7 +39,7 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
             await driver.wait(UNTIL_JOB_END, 10000);
             await driver.wait(until.elementLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME);
         }},
-        // Need to develop an admin tool for resetting p-hashes + a tool under "Modify Taggables" for modifying/deleting file relationships
+        // Need to develop an admin tool for resetting p-hashes and an admin tool for deleting all file relations
         {name: "Teardown", isTeardown: true, tests: {
             expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
             priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
@@ -89,7 +90,9 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
                 await duplicateCurrentIsBetterTrashOther(driver);
                 await commitDuplicatesFromDialog(driver);
 
-                await driver.wait(untilElementsNotLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME + 2000);
+                await driver.wait(untilElementsNotLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME);
+
+                await selectTagFromTagSearchQuery(driver, TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER);
 
                 await selectPage(driver, 1);
                 await applyTagFilter(driver, TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER);
@@ -98,35 +101,89 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
                 await selectTagFromTagSearchQuery(driver, TEST_TAG_CURRENT_IS_BETTER_TRASH_OTHER);
                 await selectPage(driver, 0);
             }},
-            {name: "DedupeGalleryShouldRemoveCurrentIsBetterFromPotentialsPending", tests: {
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-                priority: BUG_PRIORITIES.CURRENT_WORK,
-                impact: BUG_IMPACTS.UNUSABLE,
-                noticeability: BUG_NOTICES.MAJOR
+            {name: "DedupeGalleryShouldRemoveCurrentIsBetterFromPotentialsPending", tests: async (driver) => {
+                await applyTagFilter(driver, TEST_TAG_CURRENT_IS_BETTER);
+                await selectTagFromLocalTagSelector(driver, TEST_TAG_CURRENT_IS_BETTER);
+                await driver.wait(untilCountElementsLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE, 1), DEFAULT_TIMEOUT_TIME);
+                await beginFilteringPotentialDuplicates(driver);
+                await duplicateCurrentIsBetterTrashOther(driver);
+                await commitDuplicatesFromDialog(driver);
+
+                await driver.wait(untilElementsNotLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME);
+
+                await selectTagFromTagSearchQuery(driver, TEST_TAG_CURRENT_IS_BETTER);
             }},
             {name: "DedupeGalleryShouldTrashSameQualityTrashLarger", tests: {
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
                 priority: BUG_PRIORITIES.CURRENT_WORK,
                 impact: BUG_IMPACTS.UNUSABLE,
                 noticeability: BUG_NOTICES.MAJOR
             }},
-            {name: "DedupeGalleryShouldRemoveSameQualityFromPotentialsPending", tests: {
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-                priority: BUG_PRIORITIES.CURRENT_WORK,
-                impact: BUG_IMPACTS.UNUSABLE,
-                noticeability: BUG_NOTICES.MAJOR
+            {name: "DedupeGalleryShouldRemoveSameQualityFromPotentialsPending", tests: async (driver) => {
+                await applyTagFilter(driver, TEST_TAG_SAME_QUALITY);
+                await selectTagFromLocalTagSelector(driver, TEST_TAG_SAME_QUALITY);
+                await driver.wait(untilCountElementsLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE, 1), DEFAULT_TIMEOUT_TIME);
+                await beginFilteringPotentialDuplicates(driver);
+                await duplicateCurrentIsBetterTrashOther(driver);
+                await commitDuplicatesFromDialog(driver);
+
+                await driver.wait(untilElementsNotLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME);
+
+                await selectTagFromTagSearchQuery(driver, TEST_TAG_SAME_QUALITY);
             }},
-            {name: "DedupeGalleryShouldRemoveAlternatesFromPotentialsPending", tests: {
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-                priority: BUG_PRIORITIES.CURRENT_WORK,
-                impact: BUG_IMPACTS.UNUSABLE,
-                noticeability: BUG_NOTICES.MAJOR
+            {name: "DedupeGalleryShouldRemoveAlternatesFromPotentialsPending", tests: async (driver) => {
+                await applyTagFilter(driver, TEST_TAG_ALTERNATE);
+                await selectTagFromLocalTagSelector(driver, TEST_TAG_ALTERNATE);
+                await driver.wait(untilCountElementsLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE, 1), DEFAULT_TIMEOUT_TIME);
+                await beginFilteringPotentialDuplicates(driver);
+                await duplicateCurrentIsBetterTrashOther(driver);
+                await commitDuplicatesFromDialog(driver);
+
+                await driver.wait(untilElementsNotLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME);
+
+                await selectTagFromTagSearchQuery(driver, TEST_TAG_ALTERNATE);
             }},
-            {name: "DedupeGalleryShouldRemoveFalsePositivesFromPotentialsPending", tests: {
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
+            {name: "DedupeGalleryShouldRemoveFalsePositivesFromPotentialsPending", tests: async (driver) => {
+                await applyTagFilter(driver, TEST_TAG_FALSE_POSITIVE);
+                await selectTagFromLocalTagSelector(driver, TEST_TAG_FALSE_POSITIVE);
+                await driver.wait(untilCountElementsLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE, 1), DEFAULT_TIMEOUT_TIME);
+                await beginFilteringPotentialDuplicates(driver);
+                await duplicateCurrentIsBetterTrashOther(driver);
+                await commitDuplicatesFromDialog(driver);
+
+                await driver.wait(untilElementsNotLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME);
+
+                await selectTagFromTagSearchQuery(driver, TEST_TAG_FALSE_POSITIVE);
+            }},
+            {name: "DedupeGalleryDuplicateIsTransitive", tests: {
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
                 priority: BUG_PRIORITIES.CURRENT_WORK,
-                impact: BUG_IMPACTS.UNUSABLE,
-                noticeability: BUG_NOTICES.MAJOR
+                impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
+                noticeability: BUG_NOTICES.MINOR
+            }},
+            {name: "DedupeGalleryAlternateIsTransitive", tests: {
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
+                priority: BUG_PRIORITIES.CURRENT_WORK,
+                impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
+                noticeability: BUG_NOTICES.MINOR
+            }},
+            {name: "DedupeGalleryAlternateIsTransitiveThroughDuplicate", tests: {
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
+                priority: BUG_PRIORITIES.CURRENT_WORK,
+                impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
+                noticeability: BUG_NOTICES.MINOR
+            }},
+            {name: "DedupeGalleryTransitivityWorksThroughNonSelectedFileComparisons", tests: {
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
+                priority: BUG_PRIORITIES.CURRENT_WORK,
+                impact: BUG_IMPACTS.COSMETIC,
+                noticeability: BUG_NOTICES.MINOR
+            }},
+            {name: "DedupeGalleryTransitiveAlternatesShouldNotBeMarkedAsCompared", tests: {
+                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
+                priority: BUG_PRIORITIES.CURRENT_WORK,
+                impact: BUG_IMPACTS.COSMETIC,
+                noticeability: BUG_NOTICES.MINOR
             }},
             {name: "DedupeGallerySkipAndGoBackShouldWork", tests: async (driver) => {
                 await beginFilteringPotentialDuplicates(driver);

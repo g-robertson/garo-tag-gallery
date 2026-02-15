@@ -65,10 +65,10 @@ std::size_t SetEvaluation::size() const {
     }
 }
 
-SetEvaluation SetEvaluation::rightHandSide(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::rightHandSide(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet) {
     return SetEvaluation(rhsSet.isComplement_, rhsSet.universe_, std::unordered_set<uint64_t>(*rhsSet.itemsPtr_));
 }
-SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet) {
     if (lhsSet.universe_ != rhsSet.universe_) {
         throw std::logic_error("Sets had different universe values");
     }
@@ -92,7 +92,7 @@ SetEvaluation SetEvaluation::symmetricDifference(SetEvaluation&& lhsSet, SetEval
         }
     }
 }
-SetEvaluation SetEvaluation::difference(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::difference(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet) {
     if (lhsSet.universe_ != rhsSet.universe_) {
         throw std::logic_error("Sets had different universe values");
     }
@@ -117,7 +117,7 @@ SetEvaluation SetEvaluation::difference(SetEvaluation&& lhsSet, SetEvaluation rh
     }
 }
 
-SetEvaluation SetEvaluation::intersect(const SetEvaluation& lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::intersect(const SetEvaluation& lhsSet, SetEvaluation&& rhsSet) {
     if (lhsSet.universe_ != rhsSet.universe_) {
         throw std::logic_error("Sets had different universe values");
     }
@@ -142,12 +142,37 @@ SetEvaluation SetEvaluation::intersect(const SetEvaluation& lhsSet, SetEvaluatio
     }
 }
 
-SetEvaluation SetEvaluation::intersect(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::intersect(const SetEvaluation& lhsSet, const SetEvaluation& rhsSet) {
+    if (lhsSet.universe_ != rhsSet.universe_) {
+        throw std::logic_error("Sets had different universe values");
+    }
+    const auto* universe = lhsSet.universe_;
+
+    if (lhsSet.isComplement_) {
+        if (rhsSet.isComplement_) {
+            // ~A N ~B <=> ~(A U B)
+            return SetEvaluation(true, universe, usetUnion_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
+        } else {
+            // ~A N B <=> B N ~A
+            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*rhsSet.itemsPtr_, *lhsSet.itemsPtr_));
+        }
+    } else {
+        if (rhsSet.isComplement_) {
+            // A N ~B
+            return SetEvaluation(false, universe, usetIntersectRHSComplement_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
+        } else {
+            // A N B
+            return SetEvaluation(false, universe, usetIntersect_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
+        }
+    }
+}
+
+SetEvaluation SetEvaluation::intersect(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet) {
     const auto& immutableLHSSet = lhsSet;
     return intersect(immutableLHSSet, std::move(rhsSet));
 }
 
-SetEvaluation SetEvaluation::setUnion(SetEvaluation&& lhsSet, SetEvaluation rhsSet) {
+SetEvaluation SetEvaluation::setUnion(SetEvaluation&& lhsSet, SetEvaluation&& rhsSet) {
     if (!lhsSet.items_.has_value()) {
         throw std::logic_error("LHS did not have real value");
     }
@@ -172,6 +197,34 @@ SetEvaluation SetEvaluation::setUnion(SetEvaluation&& lhsSet, SetEvaluation rhsS
             // A U B
             usetUnion_(*lhsSet.items_, *rhsSet.itemsPtr_);
             return SetEvaluation(false, universe_, std::move(*lhsSet.items_));
+        }
+    }
+}
+
+SetEvaluation SetEvaluation::setUnion(const SetEvaluation& lhsSet, const SetEvaluation& rhsSet) {
+    if (!lhsSet.items_.has_value()) {
+        throw std::logic_error("LHS did not have real value");
+    }
+    if (lhsSet.universe_ != rhsSet.universe_) {
+        throw std::logic_error("Sets had different universe values");
+    }
+    const auto* universe_ = lhsSet.universe_;
+
+    if (lhsSet.isComplement_) {
+        if (rhsSet.isComplement_) {
+            // ~A U ~B <=> ~(A N B)
+            return SetEvaluation(true, universe_, usetIntersect_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
+        } else {
+            // ~A U B <=> ~(A N ~B)
+            return SetEvaluation(true, universe_, usetIntersectRHSComplement_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
+        }
+    } else {
+        if (rhsSet.isComplement_) {
+            // A U ~B <=> ~(~A N B) <=> ~(B N ~A)
+            return SetEvaluation(true, universe_, usetIntersectRHSComplement_(*rhsSet.itemsPtr_, *lhsSet.itemsPtr_));
+        } else {
+            // A U B
+            return SetEvaluation(false, universe_, usetUnion_(*lhsSet.itemsPtr_, *rhsSet.itemsPtr_));
         }
     }
 }

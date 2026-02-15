@@ -1,22 +1,20 @@
 /**
  * @import {APIFunction, APIGetPermissionsFunction} from "../api-types.js"
- * @import {DBTaggable, TaggableGroupedDBJoinedLocalFile} from "../../db/taggables.js"
+ * @import {ClientComparator} from "../zod-types.js"
+ * @import {DBTaggable, TaggableGroupedDBJoinedTaggableFile} from "../../db/taggables.js"
  * @import {DBAppliedMetric, DBPermissionedLocalMetricService} from "../../db/metrics.js"
  */
 
-import { clientjsonStringify, replaceObject } from "../../client/js/client-util.js";
+import { bjsonStringify, clientjsonStringify, mapNullCoalesce, replaceObject } from "../../client/js/client-util.js";
 import { PERMISSIONS } from "../../client/js/user.js";
-import { LocalFiles, Taggables } from "../../db/taggables.js";
+import { TaggableFiles, Taggables } from "../../db/taggables.js";
 import { LocalTags, TagsNamespaces } from "../../db/tags.js";
 import z from "zod";
-import PerfTags from "../../perf-tags-binding/perf-tags.js";
-import { IN_TRASH_TAG } from "../../client/js/tags.js";
+import PerfTags from "../../perf-binding/perf-tags.js";
+import { IN_TRASH_TAG } from "../../client/js/defaults.js";
 import { AppliedMetrics, LocalMetrics, LocalMetricServices } from "../../db/metrics.js";
 import { Cursor, getCursorAsFileWantedFields, getCursorAsTaggableWantedFields } from "../../db/cursor-manager.js";
-import { Z_LOCAL_TAG_ID, Z_METRIC_VALUE, Z_NAMESPACE_ID, Z_PERCENTAGE, Z_USER_LOCAL_METRIC_ID, Z_USER_LOCAL_METRIC_SERVICE_ID, Z_USER_LOCAL_TAG_SERVICE_ID, Z_WANTED_FIELD } from "../zod-types.js";
-
-const Z_CLIENT_COMPARATOR = z.literal("<").or(z.literal("<=")).or(z.literal(">")).or(z.literal(">="));
-/** @typedef {z.infer<typeof Z_CLIENT_COMPARATOR>} ClientComparator */
+import { Z_CLIENT_COMPARATOR, Z_LOCAL_TAG_ID, Z_METRIC_VALUE, Z_NAMESPACE_ID, Z_PERCENTAGE, Z_USER_LOCAL_METRIC_ID, Z_USER_LOCAL_METRIC_SERVICE_ID, Z_USER_LOCAL_TAG_SERVICE_ID, Z_WANTED_FIELD } from "../zod-types.js";
 
 const Z_CLIENT_SEARCH_TAG_BY_LOOKUP = z.object({
     type: z.literal("tagByLookup"),
@@ -42,13 +40,6 @@ const Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID = z.object({
 });
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID>} ClientSearchTagInLocalMetricServiceID */
 
-const Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC = z.object({
-    type: z.literal("appliedLocalMetric"),
-    Local_Metric_ID: Z_USER_LOCAL_METRIC_ID,
-    Applied_Value: Z_METRIC_VALUE
-});
-/** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC>} ClientSearchTagAppliedLocalMetric */
-
 const Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON = z.object({
     type: z.literal("localMetricComparison"),
     comparator: Z_CLIENT_COMPARATOR,
@@ -61,99 +52,114 @@ const Z_CLIENT_SEARCH_TAG = Z_CLIENT_SEARCH_TAG_BY_LOCAL_TAG_ID
     .or(Z_CLIENT_SEARCH_TAG_BY_LOOKUP)
     .or(Z_CLIENT_SEARCH_TAG_HAS_METRIC_ID)
     .or(Z_CLIENT_SEARCH_TAG_IN_METRIC_SERVICE_ID)
-    .or(Z_CLIENT_SEARCH_TAG_APPLIED_LOCAL_METRIC)
     .or(Z_CLIENT_SEARCH_TAG_LOCAL_METRIC_COMPARISON);
 /** @typedef {z.infer<typeof Z_CLIENT_SEARCH_TAG>} ClientSearchTag */
 
-const Z_NAMESPACE_AGGREGATE_TAG_GROUP = z.object({
+const Z_PSEUDO_TAG = z.object({
+    type: z.literal("pseudo-tag"),
+    pseudoTagName: z.string()
+});
+/** @typedef {z.infer<typeof Z_PSEUDO_TAG} ClientPseudoTag */
+
+const Z_NAMESPACE_TAGS_LIST = z.object({
     type: z.literal("namespace"),
     namespaceID: Z_NAMESPACE_ID
 });
-const Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP = z.object({
+const Z_APPLIED_METRICS_TAGS_LISTS = z.object({
     type: z.literal("applied-metrics"),
     Local_Metric_ID: Z_USER_LOCAL_METRIC_ID
 });
 
-const Z_AGGREGATE_TAG_GROUP = Z_NAMESPACE_AGGREGATE_TAG_GROUP.or(Z_APPLIED_METRICS_AGGREGATE_TAG_GROUP);
-/** @typedef {z.infer<typeof Z_AGGREGATE_TAG_GROUP>} ClientTagGroup */
+const Z_EXPRESSION_LIST = Z_NAMESPACE_TAGS_LIST.or(Z_APPLIED_METRICS_TAGS_LISTS);
+/** @typedef {z.infer<typeof Z_EXPRESSION_LIST>} ClientExpressionList */
 
-const Z_AGGREGATE_TAG_CONDITION = z.object({
-    type: z.literal("tag-occurrences-compared-to-n-within-expression"),
+const Z_EXPRESSION_LIST_CONDITION = z.object({
+    type: z.literal("expression-occurrences-compared-to-n-within-compare-expression"),
     comparator: Z_CLIENT_COMPARATOR,
     occurrences: z.number().nonnegative().int(),
-    expression: z.lazy(() => Z_SEARCH_QUERY)
+    compareExpression: z.lazy(() => Z_SEARCH_QUERY)
 }).or(z.object({
-    type: z.literal("tag-occurrences-compared-to-n-percent-within-expression"),
+    type: z.literal("expression-occurrences-compared-to-n-percent-within-compare-expression"),
     comparator: Z_CLIENT_COMPARATOR,
     percentage: Z_PERCENTAGE,
-    expression: z.lazy(() => Z_SEARCH_QUERY)
+    compareExpression: z.lazy(() => Z_SEARCH_QUERY)
 })).or(z.object({
-    type: z.literal("filtered-tag-occurrences-compared-to-n-percent-within-expression"),
+    type: z.literal("filtered-expression-occurrences-compared-to-n-percent-within-compare-expression"),
     comparator: Z_CLIENT_COMPARATOR,
     percentage: Z_PERCENTAGE,
     filteringExpression: z.lazy(() => Z_SEARCH_QUERY),
-    expression: z.lazy(() => Z_SEARCH_QUERY)
+    compareExpression: z.lazy(() => Z_SEARCH_QUERY)
+})).or(z.object({
+    type: z.literal("is-not-in-compare-list"),
+    compareList: z.array(Z_CLIENT_SEARCH_TAG.or(Z_PSEUDO_TAG))
 }));
-/** @typedef {z.infer<typeof Z_AGGREGATE_TAG_CONDITION>} AggregateTagCondition */
+/** @typedef {z.infer<typeof Z_EXPRESSION_LIST_CONDITION>} ExpressionListCondition */
 
-const Z_CLIENT_AGGREGATE_TAG_CONDITION = Z_AGGREGATE_TAG_CONDITION.or(z.object({
-    type: z.literal("is-not-in-tag-list"),
-    list: z.array(Z_CLIENT_SEARCH_TAG)
-}));
-/** @typedef {z.infer<typeof Z_CLIENT_AGGREGATE_TAG_CONDITION>} ClientAggregateTagCondition */
-
-const Z_CLIENT_AGGREGATE_TAG = z.object({
-    type: z.literal("aggregateTag"),
-    tagGroup: Z_AGGREGATE_TAG_GROUP,
-    conditions: z.array(Z_CLIENT_AGGREGATE_TAG_CONDITION)
+const Z_CLIENT_CONDITIONAL_EXPRESSION_LIST_UNION = z.object({
+    type: z.literal("conditional-expression-list-union"),
+    expressionList: Z_EXPRESSION_LIST,
+    conditions: z.array(Z_EXPRESSION_LIST_CONDITION)
 });
-/** @typedef {z.infer<typeof Z_CLIENT_AGGREGATE_TAG>} ClientAggregateTag */
+/** @typedef {z.infer<typeof Z_CLIENT_CONDITIONAL_EXPRESSION_LIST_UNION>} ClientConditionalExpressionListUnion */
 
 /** @type {z.ZodAny} */
 const Z_SEARCH_QUERY = z.object({
-    type: z.literal("union"),
-    value: z.array(z.lazy(() => Z_SEARCH_QUERY))
+    type: z.literal("union").or(z.literal("intersect")),
+    expressions: z.array(z.lazy(() => Z_SEARCH_QUERY))
 }).or(z.object({
-    type: z.literal("intersect"),
-    value: z.array(z.lazy(() => Z_SEARCH_QUERY))
-})).or(z.object({
     type: z.literal("complement"),
-    value: z.lazy(() => Z_SEARCH_QUERY)  
+    expression: z.lazy(() => Z_SEARCH_QUERY)  
 }))
 .or(Z_CLIENT_SEARCH_TAG)
-.or(Z_CLIENT_AGGREGATE_TAG);
+.or(Z_CLIENT_CONDITIONAL_EXPRESSION_LIST_UNION);
 
 /**
  * @typedef {{
  *     type: "union" | "intersect",
- *     value: ClientSearchQuery[]
+ *     expressions: ClientSearchQuery[]
  * } | {
  *     type: "complement",
- *     value: ClientSearchQuery
- * } | ClientSearchTag | ClientAggregateTag} ClientSearchQuery
+ *     expression: ClientSearchQuery
+ * } | ClientSearchTag | ClientConditionalExpressionListUnion} ClientSearchQuery
  **/
 
 const Z_WANTED_CURSOR = z.literal("Taggable")
 .or(z.literal("File"));
 /** @typedef {z.infer<typeof Z_WANTED_CURSOR>} WantedCursor */
 
+/**
+ * @typedef {Object} SearchTag
+ * @property {"tag"} type
+ * @property {bigint} tagID
+ **/
+
+/**
+ * @typedef {Object} SearchTagUnion
+ * @property {"union"} type
+ * @property {SearchTag[]} expressions
+ **/
+
+/**
+ * @typedef {Object} SearchTaggableList
+ * @property {"taggable-list"} type
+ * @property {bigint[]} taggableIDs
+ * @property {string=} pseudoTagName
+ **/
 
 /**
  * @typedef {{
  *     type: "union" | "intersect",
- *     value: SearchQueryRecursive[]
+ *     expressions: SearchQueryRecursive[]
  * } | {
- *     type: "aggregateTag",
- *     tags: bigint[],
- *     conditions: AggregateTagCondition[]
+ *     type: "conditional-expression-list-union",
+ *     expressionList: SearchQueryRecursive[],
+ *     conditions: ExpressionListCondition[]
  * } | {
  *     type: "complement",
- *     value: SearchQueryRecursive
- * } | {
- *     type: "tag",
- *     tagID: bigint
- * }} SearchQueryRecursive
+ *     expression: SearchQueryRecursive
+ * } | SearchTag | SearchTaggableList} SearchQueryRecursive
  */
+
 
 /**
  * @typedef {SearchQueryRecursive | {type: "universe" | "complement-universe"}} SearchQuery
@@ -162,33 +168,15 @@ const Z_WANTED_CURSOR = z.literal("Taggable")
 /**
  * @typedef {{
  *     type: "union" | "intersect",
- *     value: PreSearchQuery[]
+ *     expressions: PreSearchQuery[]
  * } | {
- *     type: "tag-occurrences-compared-to-n-within-expression",
- *     comparator: ClientComparator
- *     occurrences: number,
- *     tags: bigint[],
- *     expression: PreSearchQuery
- * } | {
- *     type: "tag-occurrences-compared-to-n-percent-within-expression",
- *     comparator: ClientComparator
- *     percentage: number,
- *     tags: bigint[],
- *     expression: PreSearchQuery
- * } | {
- *     type: "filtered-tag-occurrences-compared-to-n-percent-within-expression",
- *     comparator: ClientComparator
- *     percentage: number,
- *     tags: bigint[],
- *     filteringExpression: PreSearchQuery,
- *     expression: PreSearchQuery
- * } | {
+ *     type: "conditional-expression-list-union",
+ *     expressionList: PreSearchQuery[],
+ *     conditions: ExpressionListCondition[]
+ * }| {
  *     type: "complement",
- *     value: PreSearchQuery
- * } | {
- *     type: "tag",
- *     tagID: bigint
- * } | {
+ *     expression: PreSearchQuery
+ * } | SearchTag | SearchTaggableList | {
  *     type: "universe" | "complement-universe"
  * }} PreSearchQuery
  */
@@ -200,24 +188,24 @@ const Z_WANTED_CURSOR = z.literal("Taggable")
  */
 function walkSearchQuery(searchQuery, callback) {
     if (searchQuery.type === "union" || searchQuery.type === "intersect") {
-        for (const innerClientSearchQuery of searchQuery.value) {
+        for (const innerClientSearchQuery of searchQuery.expressions) {
             walkSearchQuery(innerClientSearchQuery, callback);
         }
-    } else if (searchQuery.type === "aggregateTag") {
+    } else if (searchQuery.type === "conditional-expression-list-union") {
         for (const condition of searchQuery.conditions) {
-            if (condition.type === "tag-occurrences-compared-to-n-within-expression" || condition.type === "tag-occurrences-compared-to-n-percent-within-expression") {
-                walkSearchQuery(condition.expression, callback);
-            } else if (condition.type === "filtered-tag-occurrences-compared-to-n-percent-within-expression") {
+            if (condition.type === "expression-occurrences-compared-to-n-within-compare-expression" || condition.type === "expression-occurrences-compared-to-n-percent-within-compare-expression") {
+                walkSearchQuery(condition.compareExpression, callback);
+            } else if (condition.type === "filtered-expression-occurrences-compared-to-n-percent-within-compare-expression") {
                 walkSearchQuery(condition.filteringExpression, callback);
-                walkSearchQuery(condition.expression, callback);
-            } else if (condition.type === "is-not-in-tag-list") {
-                for (const clientTag of condition.list) {
-                    walkSearchQuery(clientTag, callback);
+                walkSearchQuery(condition.compareExpression, callback);
+            } else if (condition.type === "is-not-in-compare-list") {
+                for (const compareExpression of condition.compareList) {
+                    walkSearchQuery(compareExpression, callback);
                 }
             }
         }
     } else if (searchQuery.type === "complement") {
-        walkSearchQuery(searchQuery.value, callback);
+        walkSearchQuery(searchQuery.expression, callback);
     }
     callback(searchQuery);
 }
@@ -230,81 +218,38 @@ function isClientSearchTag(step) {
         || step.type === "tagByLookup"
         || step.type === "hasLocalMetricID"
         || step.type === "inLocalMetricServiceID"
-        || step.type === "appliedLocalMetric"
         || step.type === "localMetricComparison";
 }
 
 /**
- * @param {number} lhs 
- * @param {"<" | "<=" | ">" | ">="} comparator 
- * @param {number} rhs 
- */
-function dynamicComparison(lhs, comparator, rhs) {
-    if (comparator === "<") {
-        return lhs < rhs;
-    } else if (comparator === "<=") {
-        return lhs <= rhs;
-    } else if (comparator === ">") {
-        return lhs > rhs; 
-    } else if (comparator === ">=") {
-        return lhs >= rhs;
-    } else {
-        console.log(comparator);
-        throw "Unexpected comparator value";
-    }
-}
-
-/**
  * @param {ClientSearchTag} clientSearchTag 
- * @param {Map<number, bigint>} localTagsMap 
- * @param {Map<string, bigint[]>} tagLookupsMap 
- * @param {Map<number, DBPermissionedLocalMetricService>} localMetricServicesMap
- * @param {Map<number, bigint>} localMetricsMap
- * @param {Map<number, Map<number, bigint>>} appliedMetricsMap
+ * @param {Map<number, SearchTag>} localTagsMap 
+ * @param {Map<string, SearchTagUnion>} tagLookupsMap
+ * @param {Map<number, SearchTag>} localMetricServicesMap
+ * @param {Map<number, SearchTag>} localMetricsMap
+ * @param {Map<number, Map<ClientComparator, Map<number, SearchTagUnion>>>} localMetricComparisonsMap
  */
-function transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap) {
-    /** @type {bigint} */
-    let tagID;
+function transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, localMetricComparisonsMap) {
     if (clientSearchTag.type === "tagByLocalTagID") {
-        tagID = localTagsMap.get(clientSearchTag.localTagID)
+        return localTagsMap.get(clientSearchTag.localTagID)
     } else if (clientSearchTag.type === "tagByLookup") {
-        return {
-            type: "union",
-            value: tagLookupsMap.get(clientSearchTag.Lookup_Name).map(tag => ({
-                type: "tag",
-                tagID: tag
-            }))
-        };
+        const tagByLookup = tagLookupsMap.get(clientSearchTag.Lookup_Name);
+        if (tagByLookup !== undefined) {
+            return tagByLookup;
+        } else {
+            return /** @type {const} */ ({
+                type: "complement-universe"
+            });
+        }
     } else if (clientSearchTag.type === "hasLocalMetricID") {
-        tagID = localMetricsMap.get(clientSearchTag.Local_Metric_ID);
+        return localMetricsMap.get(clientSearchTag.Local_Metric_ID);
     } else if (clientSearchTag.type === "inLocalMetricServiceID") {
-        tagID = localMetricServicesMap.get(clientSearchTag.localMetricServiceID).Has_Metric_From_Local_Metric_Service_Tag.Tag_ID;
-    } else if (clientSearchTag.type === "appliedLocalMetric") {
-        tagID = appliedMetricsMap.get(clientSearchTag.Local_Metric_ID).get(clientSearchTag.Applied_Value);
+        return localMetricServicesMap.get(clientSearchTag.localMetricServiceID);
     } else if (clientSearchTag.type === "localMetricComparison") {
-        return {
-            type: "union",
-            value: [...appliedMetricsMap.get(clientSearchTag.Local_Metric_ID).entries()].filter(([appliedValue,]) => {
-                return dynamicComparison(appliedValue, clientSearchTag.comparator, clientSearchTag.metricComparisonValue);
-            }).map(([_, appliedMetricValueTagID]) => ({
-                type: "tag",
-                tagID: appliedMetricValueTagID
-            }))
-        };
+        return localMetricComparisonsMap.get(clientSearchTag.Local_Metric_ID).get(clientSearchTag.comparator).get(clientSearchTag.metricComparisonValue);
     } else {
         console.log(clientSearchTag);
         throw "Unrecognized client search tag type";
-    }
-
-    if (tagID === undefined) {
-        return {
-            type: "complement-universe"
-        };
-    } else {
-        return {
-            type: "tag",
-            tagID
-        };
     }
 }
 
@@ -313,9 +258,10 @@ function transformClientSearchTag(clientSearchTag, localTagsMap, tagLookupsMap, 
  * @param {Set<number>} allLocalTagIDs
  * @param {Set<number>} allLocalMetricIDs
  * @param {Set<number>} allLocalMetricServiceIDs
- * @param {Set<string>} allTagLookups 
+ * @param {Set<string>} allTagLookups
+ * @param {Map<number, Map<ClientComparator, Set<number>>>} allLocalMetricComparisons
  */
-function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs) {
+function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs, allLocalMetricComparisons) {
     if (clientSearchTag.type === "tagByLocalTagID") {
         allLocalTagIDs.add(clientSearchTag.localTagID);
     } else if (clientSearchTag.type === "tagByLookup") {
@@ -324,10 +270,8 @@ function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTag
         allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);
     } else if (clientSearchTag.type === "inLocalMetricServiceID") {
         allLocalMetricServiceIDs.add(clientSearchTag.localMetricServiceID);
-    } else if (clientSearchTag.type === "appliedLocalMetric") {
-        allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);
     } else if (clientSearchTag.type === "localMetricComparison") {
-        allLocalMetricIDs.add(clientSearchTag.Local_Metric_ID);
+        mapNullCoalesce(mapNullCoalesce(allLocalMetricComparisons, clientSearchTag.Local_Metric_ID, new Map()), clientSearchTag.comparator, new Set()).add(clientSearchTag.metricComparisonValue);
     } else {
         console.log(clientSearchTag);
         throw "Unrecognized client search tag type";
@@ -336,36 +280,47 @@ function addClientSearchTagToCollections(clientSearchTag, allLocalTagIDs, allTag
 
 /**
  * @param {ClientSearchQuery} clientSearchQuery 
- * @param {Map<number, bigint>} localTagsMap 
- * @param {Map<string, bigint[]>} tagLookupsMap
- * @param {Map<number, DBPermissionedLocalMetricService>} localMetricServicesMap
- * @param {Map<number, bigint>} localMetricsMap
- * @param {Map<number, Map<number, bigint>>} appliedMetricsMap
- * @param {Map<number, bigint[]>} tagsNamespacesMap
+ * @param {Map<number, SearchTag>} localTagsMap 
+ * @param {Map<string, SearchTagUnion>} tagLookupsMap
+ * @param {Map<number, SearchTag>} localMetricServicesMap
+ * @param {Map<number, SearchTag>} localMetricsMap
+ * @param {Map<number, Map<ClientComparator, Map<number, SearchTagUnion>>>} localMetricComparisonsMap
+ * @param {Map<number, SearchTag[]>} appliedMetricsMap
+ * @param {Map<number, SearchTag[]>} tagsNamespacesMap
  */
-function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap, tagsNamespacesMap) {
+function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, localMetricComparisonsMap, appliedMetricsMap, tagsNamespacesMap) {
     // transform client search query into pre search query
     walkSearchQuery(clientSearchQuery, step => {
         if (isClientSearchTag(step)) {
-            replaceObject(step, transformClientSearchTag(step, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, appliedMetricsMap));
-        } else if (step.type === "aggregateTag") {
-            /** @type {Set<bigint>} */
-            let tagsOfAggregate;
-            if (step.tagGroup.type === "applied-metrics") {
-                tagsOfAggregate = new Set(appliedMetricsMap.get(step.tagGroup.Local_Metric_ID).values());
-            } else if (step.tagGroup.type === "namespace") {
-                tagsOfAggregate = new Set(tagsNamespacesMap.get(step.tagGroup.namespaceID));
+            replaceObject(step, transformClientSearchTag(step, localTagsMap, tagLookupsMap, localMetricServicesMap, localMetricsMap, localMetricComparisonsMap));
+        } else if (step.type === "conditional-expression-list-union") {
+            /** @type {Map<bigint | string, SearchQueryRecursive>} */
+            let expressionList;
+            if (step.expressionList.type === "applied-metrics") {
+                expressionList = new Map(appliedMetricsMap.get(step.expressionList.Local_Metric_ID).map(tag => [
+                    tag.tagID,
+                    tag
+                ]));
+            } else if (step.expressionList.type === "namespace") {
+                expressionList = new Map(tagsNamespacesMap.get(step.expressionList.namespaceID).map(tag => [
+                    tag.tagID,
+                    tag
+                ]));
             }
 
             for (const condition of step.conditions) {
-                if (condition.type === "is-not-in-tag-list") {
-                    for (const transformedClientTag of condition.list) {
-                        if (transformedClientTag.value !== undefined) {
-                            for (const tag of transformedClientTag.value) {
-                                tagsOfAggregate.delete(tag.tagID);
+                if (condition.type === "is-not-in-compare-list") {
+                    /** @type {(ReturnType<typeof transformClientSearchTag> | ClientPseudoTag)[]} */
+                    const compareList = condition.compareList;
+                    for (const compareExpression of compareList) {
+                        if (compareExpression.type === "union") {
+                            for (const tag of compareExpression.expressions) {
+                                expressionList.delete(tag.tagID);
                             }
-                        } else {
-                            tagsOfAggregate.delete(transformedClientTag.tagID);
+                        } else if (compareExpression.type === "tag") {
+                            expressionList.delete(compareExpression.tagID);
+                        } else if (compareExpression.type === "pseudo-tag") {
+                            expressionList.delete(compareExpression.pseudoTagName);
                         }
                     }
                 }
@@ -374,17 +329,17 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
             /** @type {PreSearchQuery[]} */
             const additionalConditions = [];
             for (const condition of step.conditions) {
-                if (condition.type === "tag-occurrences-compared-to-n-within-expression"
-                 || condition.type === "tag-occurrences-compared-to-n-percent-within-expression"
-                 || condition.type === "filtered-tag-occurrences-compared-to-n-percent-within-expression"
+                if (condition.type === "expression-occurrences-compared-to-n-within-compare-expression"
+                 || condition.type === "expression-occurrences-compared-to-n-percent-within-compare-expression"
+                 || condition.type === "filtered-expression-occurrences-compared-to-n-percent-within-compare-expression"
                 ) {
                     additionalConditions.push(condition);
                 }
             }
 
             replaceObject(step, {
-                type: "aggregateTag",
-                tags: [...tagsOfAggregate],
+                type: "conditional-expression-list-union",
+                expressionList: [...expressionList.values()],
                 conditions: additionalConditions
             });
         }
@@ -397,42 +352,53 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
         performedSimplification = false;
         walkSearchQuery(preSearchQuery, step => {
             if (step.type === "complement") {
-                if (step.value.type === "complement-universe") {
+                if (step.expression.type === "complement-universe") {
                     replaceObject(step, {type: "universe"});
                     performedSimplification = true;
-                } else if (step.value.type === "universe") {
+                } else if (step.expression.type === "universe") {
                     replaceObject(step, {type: "complement-universe"});
                     performedSimplification = true;
-                } else if (step.value.type === "complement") {
-                    replaceObject(step, step.value.value);
+                } else if (step.expression.type === "complement") {
+                    replaceObject(step, step.expression.expression);
+                    performedSimplification = true;
+                }
+            } else if (step.type === "conditional-expression-list-union") {
+                if (step.conditions.length === 0) {
+                    replaceObject(step, {type: "union", expressions: step.expressionList});
                     performedSimplification = true;
                 }
             } else if (step.type === "union") {
-                if (step.value.find(unionItem => unionItem.type === "universe")) {
+                if (step.expressions.find(unionItem => unionItem.type === "universe")) {
                     replaceObject(step, {type: "universe"});
                     performedSimplification = true;
                 } else {
-                    const filteredValue = step.value.filter(unionItem => unionItem.type !== "complement-universe");
-                    if (filteredValue.length !== step.value.length) {
-                        step.value = filteredValue;
+                    const filteredValue = step.expressions.filter(unionItem => unionItem.type !== "complement-universe");
+                    if (filteredValue.length !== step.expressions.length) {
+                        step.expressions = filteredValue;
                         performedSimplification = true;
                     }
-                    if (step.value.length === 0) {
+                    if (step.expressions.length === 1) {
+                        replaceObject(step, step.expressions[0]);
+                        performedSimplification = true;
+                    } else if (step.expressions.length === 0) {
                         replaceObject(step, {type: "complement-universe"});
                         performedSimplification = true;
                     }
                 }
             } else if (step.type === "intersect") {
-                if (step.value.find(unionItem => unionItem.type === "complement-universe")) {
+                if (step.expressions.find(unionItem => unionItem.type === "complement-universe")) {
                     replaceObject(step, {type: "complement-universe"});
                     performedSimplification = true;
                 } else {
-                    const filteredValue = step.value.filter(unionItem => unionItem.type !== "universe");
-                    if (filteredValue.length !== step.value.length) {
-                        step.value = filteredValue;
+                    const filteredValue = step.expressions.filter(unionItem => unionItem.type !== "universe");
+                    if (filteredValue.length !== step.expressions.length) {
+                        step.expressions = filteredValue;
                         performedSimplification = true;
                     }
-                    if (step.value.length === 0) {
+                    if (step.expressions.length === 1) {
+                        replaceObject(step, step.expressions[0]);
+                        performedSimplification = true;
+                    } else if (step.expressions.length === 0) {
                         replaceObject(step, {type: "universe"});
                         performedSimplification = true;
                     }
@@ -451,37 +417,44 @@ function transformClientSearchQueryToSearchQuery(clientSearchQuery, localTagsMap
  */
 function constructSearchCriteriaFromRecursiveSearchQuery(recursiveSearchQuery) {
     if (recursiveSearchQuery.type === "union") {
-        return PerfTags.searchUnion(recursiveSearchQuery.value.map(constructSearchCriteriaFromRecursiveSearchQuery));
+        return PerfTags.searchUnion(recursiveSearchQuery.expressions.map(constructSearchCriteriaFromRecursiveSearchQuery));
     } else if (recursiveSearchQuery.type === "intersect") {
-        return PerfTags.searchIntersect(recursiveSearchQuery.value.map(constructSearchCriteriaFromRecursiveSearchQuery));
-    } else if (recursiveSearchQuery.type === "aggregateTag") {
-        return PerfTags.searchAggregateConditions(recursiveSearchQuery.tags, recursiveSearchQuery.conditions.map(condition => {
-            if (condition.type === "tag-occurrences-compared-to-n-within-expression") {
-                return PerfTags.aggregateConditionTagOccurrencesComparedToNWithinExpression(
-                    constructSearchCriteriaFromRecursiveSearchQuery(condition.expression),
-                    condition.comparator,
-                    condition.occurrences
-                );
-            } else if (condition.type === "tag-occurrences-compared-to-n-percent-within-expression") {
-                return PerfTags.aggregateConditionTagOccurrencesComparedToNPercentWithinExpression(
-                    constructSearchCriteriaFromRecursiveSearchQuery(condition.expression),
-                    condition.comparator,
-                    condition.percentage
-                );
-            } else if (condition.type === "filtered-tag-occurrences-compared-to-n-percent-within-expression") {
-                return PerfTags.aggregateConditionFilteredTagOccurrencesComparedToNPercentWithinExpression(
-                    constructSearchCriteriaFromRecursiveSearchQuery(condition.filteringExpression),
-                    constructSearchCriteriaFromRecursiveSearchQuery(condition.expression),
-                    condition.comparator,
-                    condition.percentage
-                );
-            }
-        }));
-            
+        return PerfTags.searchIntersect(recursiveSearchQuery.expressions.map(constructSearchCriteriaFromRecursiveSearchQuery));
+    } else if (recursiveSearchQuery.type === "conditional-expression-list-union") {
+        return PerfTags.searchConditionalExpressionListUnion(
+            recursiveSearchQuery.expressionList.map(constructSearchCriteriaFromRecursiveSearchQuery),
+            recursiveSearchQuery.conditions.map(condition => {
+                if (condition.type === "expression-occurrences-compared-to-n-within-compare-expression") {
+                    return PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNWithinCompareExpression(
+                        constructSearchCriteriaFromRecursiveSearchQuery(condition.compareExpression),
+                        condition.comparator,
+                        condition.occurrences
+                    );
+                } else if (condition.type === "expression-occurrences-compared-to-n-percent-within-compare-expression") {
+                    return PerfTags.searchExpressionListUnionConditionExpressionOccurrencesComparedToNPercentWithinCompareExpression(
+                        constructSearchCriteriaFromRecursiveSearchQuery(condition.compareExpression),
+                        condition.comparator,
+                        condition.percentage
+                    );
+                } else if (condition.type === "filtered-expression-occurrences-compared-to-n-percent-within-compare-expression") {
+                    return PerfTags.searchExpressionListUnionConditionFilteredExpressionOccurrencesComparedToNPercentWithinCompareExpression(
+                        constructSearchCriteriaFromRecursiveSearchQuery(condition.filteringExpression),
+                        constructSearchCriteriaFromRecursiveSearchQuery(condition.compareExpression),
+                        condition.comparator,
+                        condition.percentage
+                    )
+                } else {
+                    console.log(condition);
+                    throw "Irregular recursive search query conditional expression list union condition type was used ^";
+                }
+            })
+        );
     } else if (recursiveSearchQuery.type === "complement") {
-        return PerfTags.searchComplement(constructSearchCriteriaFromRecursiveSearchQuery(recursiveSearchQuery.value));
+        return PerfTags.searchComplement(constructSearchCriteriaFromRecursiveSearchQuery(recursiveSearchQuery.expression));
     } else if (recursiveSearchQuery.type === "tag") {
         return PerfTags.searchTag(recursiveSearchQuery.tagID)
+    } else if (recursiveSearchQuery.type === "taggable-list") {
+        return PerfTags.searchTaggableList(recursiveSearchQuery.taggableIDs);
     } else {
         console.log(recursiveSearchQuery);
         throw "Irregular recursive search query type was used ^";
@@ -524,44 +497,27 @@ export async function validate(dbs, req, res) {
     /** @type {Set<number>} */
     const allLocalMetricIDs = new Set();
     /** @type {Set<number>} */
+    const allAppliedMetricIDs = new Set();
+    /** @type {Set<number>} */
     const allLocalMetricServiceIDs = new Set();
+    /** @type {Map<number, Map<ClientComparator, Set<number>>>} */
+    const allLocalMetricComparisons = new Map();
 
     /** @type {Set<number>} */
     const allNamespaceIDs = new Set();
 
+
     walkSearchQuery(clientSearchQuery, step => {
         if (isClientSearchTag(step)) {
-            addClientSearchTagToCollections(step, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs);
-        } else if (step.type === "aggregateTag") {
-            if (step.tagGroup.type === "applied-metrics") {
-                allLocalMetricIDs.add(step.tagGroup.Local_Metric_ID);
-            } else if (step.tagGroup.type === "namespace") {
-                allNamespaceIDs.add(step.tagGroup.namespaceID);
+            addClientSearchTagToCollections(step, allLocalTagIDs, allTagLookups, allLocalMetricIDs, allLocalMetricServiceIDs, allLocalMetricComparisons);
+        } else if (step.type === "conditional-expression-list-union") {
+            if (step.expressionList.type === "applied-metrics") {
+                allAppliedMetricIDs.add(step.expressionList.Local_Metric_ID);
+            } else if (step.expressionList.type === "namespace") {
+                allNamespaceIDs.add(step.expressionList.namespaceID);
             }
         }
     });
-
-    const localMetricServicesToCheckFromLocalMetricIDs = await LocalMetricServices.selectManyByLocalMetricIDs(dbs, allLocalMetricIDs);
-    const localMetricServiceIDsToCheck = [...new Set([
-        ...localMetricServicesToCheckFromLocalMetricIDs.map(localMetricService => localMetricService.Local_Metric_Service_ID),
-        ...allLocalMetricServiceIDs
-    ])];
-    const localMetricServicesMap = new Map((await LocalMetricServices.userSelectManyByIDs(
-        dbs,
-        req.user,
-        PERMISSIONS.LOCAL_METRIC_SERVICES.READ_METRIC,
-        localMetricServiceIDsToCheck
-    )).map(localMetricService => [localMetricService.Local_Metric_Service_ID, localMetricService]));
-
-    if (localMetricServiceIDsToCheck.length !== localMetricServicesMap.size) {
-        return "User did not have permission to view all local metric services requested";
-    }
-
-    for (const localMetricServiceID of allLocalMetricServiceIDs) {
-        for (const localMetric of localMetricServicesMap.get(localMetricServiceID).Local_Metrics) {
-            allLocalMetricIDs.add(localMetric.Local_Metric_ID);
-        }
-    }
 
     return {
         clientSearchQuery,
@@ -571,7 +527,9 @@ export async function validate(dbs, req, res) {
         allLocalTagIDs: [...allLocalTagIDs],
         allTagLookups: [...allTagLookups],
         allLocalMetricIDs: [...allLocalMetricIDs],
-        localMetricServicesMap,
+        allAppliedMetricIDs: [...allAppliedMetricIDs],
+        allLocalMetricServiceIDs: [...allLocalMetricServiceIDs],
+        allLocalMetricComparisons,
         allNamespaceIDs: [...allNamespaceIDs]
     };
 }
@@ -583,7 +541,7 @@ export async function getPermissions(dbs, req, res) {
     if (req.body.allLocalTagIDs.length !== 0 || req.body.localTagServiceIDs.length !== 0) {
         permissions.push(PERMISSIONS.LOCAL_TAG_SERVICES.READ_TAGS);
     }
-    if (req.body.allLocalMetricIDs.length !== 0) {
+    if (req.body.allLocalMetricIDs.length !== 0 || req.body.allAppliedMetricIDs.length !== 0 || req.body.allLocalMetricServiceIDs.length !== 0) {
         permissions.push(PERMISSIONS.LOCAL_METRIC_SERVICES.READ_METRIC);
     }
 
@@ -592,50 +550,111 @@ export async function getPermissions(dbs, req, res) {
         objects: {
             Local_Tag_IDs: req.body.allLocalTagIDs,
             Local_Tag_Service_IDs: req.body.localTagServiceIDs,
-            Local_Metric_IDs: req.body.allLocalMetricIDs
+            Local_Metric_IDs: req.body.allLocalMetricIDs.concat(req.body.allAppliedMetricIDs),
+            Local_Metric_Service_IDs: req.body.allLocalMetricServiceIDs
         }
     };
 }
 
 /** @typedef {Cursor<"Taggable", DBTaggable[]>} DBTaggableCursor */
-/** @typedef {Cursor<"File", TaggableGroupedDBJoinedLocalFile[]>} DBFileCursor */
+/** @typedef {Cursor<"File", TaggableGroupedDBJoinedTaggableFile[]>} DBFileCursor */
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function get(dbs, req, res) {
-    const localTagsMap = new Map((await LocalTags.selectManyByIDs(dbs, req.body.allLocalTagIDs)).map(tag => [tag.Local_Tag_ID, tag.Tag_ID]));
-    if (localTagsMap.size !== req.body.allLocalTagIDs.length) {
-        return res.status(400).send("One of the local tag IDs sent in did not exist");
-    }
-    /** @type {Map<string, bigint[]>} */
-    const tagLookupsMap = new Map(req.body.allTagLookups.map(lookupName => [lookupName, []]));
+    const localTagsMap = new Map((await LocalTags.selectManyByIDs(dbs, req.body.allLocalTagIDs)).map(tag => [
+        tag.Local_Tag_ID, 
+        {
+            type: "tag",
+            tagID: tag.Tag_ID
+        }
+    ]));
+
+    /** @type {Map<string, SearchTagUnion>} */
+    const tagLookupsMap = new Map(req.body.allTagLookups.map(lookupName => [
+        lookupName,
+        {
+            type: "union",
+            expressions: []
+        }
+    ]));
     for (const dbLocalTag of await LocalTags.selectManyByLookupNames(dbs, req.body.allTagLookups, req.body.localTagServiceIDs)) {
-        tagLookupsMap.get(dbLocalTag.Lookup_Name).push(dbLocalTag.Tag_ID);
+        tagLookupsMap.get(dbLocalTag.Lookup_Name).expressions.push({
+            type: "tag",
+            tagID: dbLocalTag.Tag_ID
+        });
     }
+
+    const localMetricServicesMap = new Map((await LocalMetricServices.selectManyByIDs(dbs, req.body.allLocalMetricServiceIDs)).map(localMetricService => [
+        localMetricService.Local_Metric_Service_ID,
+        {
+            type: "tag",
+            tagID: localMetricService.Has_Metric_From_Local_Metric_Service_Tag.Tag_ID
+        }
+    ]));
 
     const localMetricsMap = new Map((await LocalMetrics.tagMapped(dbs, (await LocalMetrics.selectManyByIDs(dbs, req.body.allLocalMetricIDs)))).map(localMetric => [
         localMetric.Local_Metric_ID,
-        localMetric.Has_Local_Metric_Tag.Tag_ID
+        {
+            type: "tag",
+            tagID: localMetric.Has_Local_Metric_Tag.Tag_ID
+        }
     ]));
 
-    /** @type {Map<number, Map<number, bigint>>} */
-    const appliedMetricsMap = new Map(req.body.allLocalMetricIDs.map(localMetricID => [localMetricID, new Map()]));
-    const appliedMetrics = await AppliedMetrics.tagMapped(dbs, await AppliedMetrics.userSelectManyByLocalMetricIDs(dbs, req.user.id(), req.body.allLocalMetricIDs));
-    for (const appliedMetric of appliedMetrics) {
-        appliedMetricsMap.get(appliedMetric.Local_Metric_ID).set(appliedMetric.Applied_Value, appliedMetric.Local_Applied_Metric_Tag.Tag_ID);
+    /** @type {Map<number, Map<ClientComparator, Map<number, SearchTag>>>} */
+    const localMetricComparisonsMap = new Map([...req.body.allLocalMetricComparisons.keys()].map(localMetricID => [
+        localMetricID,
+        new Map()
+    ]));
+    for (const [localMetricID, rest] of req.body.allLocalMetricComparisons) {
+        /** @type {Map<ClientComparator, Map<number, SearchTag>>} */
+        const comparatorMap = new Map();
+        localMetricComparisonsMap.set(localMetricID, comparatorMap);
+        for (const [comparator, metricComparisonValues] of rest) {
+            /** @type {Map<number, SearchTag>} */
+            const metricComparisonValueMap = new Map();
+            comparatorMap.set(comparator, metricComparisonValueMap);
+            for (const metricComparisonValue of metricComparisonValues) {
+                metricComparisonValueMap.set(metricComparisonValue, {
+                    type: "union",
+                    expressions: (
+                        await AppliedMetrics.tagMapped(
+                            dbs,
+                            await AppliedMetrics.userSelectManyByComparison(dbs, req.user.id(), localMetricID, comparator, metricComparisonValue)
+                        )
+                    ).map(appliedMetric => ({
+                        type: "tag",
+                        tagID: appliedMetric.Local_Applied_Metric_Tag.Tag_ID
+                    }))
+                });
+            }
+        }
     }
 
-    /** @type {Map<number, bigint[]>} */
+    /** @type {Map<number, SearchTag[]>} */
+    const appliedMetricsMap = new Map(req.body.allAppliedMetricIDs.map(localMetricID => [
+        localMetricID,
+        new Map()
+    ]));
+    for (const appliedMetric of await AppliedMetrics.tagMapped(dbs, await AppliedMetrics.userSelectManyByLocalMetricIDs(dbs, req.user.id(), req.body.allAppliedMetricIDs))) {
+        mapNullCoalesce(appliedMetricsMap, appliedMetric.Local_Metric_ID, []).push(appliedMetric.Local_Applied_Metric_Tag.Tag_ID);
+    }
+
+    /** @type {Map<number, SearchTag[]>} */
     const tagsNamespacesMap = new Map(req.body.allNamespaceIDs.map(namespaceID => [namespaceID, []]));
     for (const tagNamespace of await TagsNamespaces.selectManyByNamespaceIDs(dbs, req.body.allNamespaceIDs)) {
-        tagsNamespacesMap.get(tagNamespace.Namespace_ID).push(tagNamespace.Tag_ID);
+        tagsNamespacesMap.get(tagNamespace.Namespace_ID).push({
+            type: "tag",
+            tagID: tagNamespace.Tag_ID
+        });
     }
 
     const searchQuery = transformClientSearchQueryToSearchQuery(
         req.body.clientSearchQuery,
         localTagsMap,
         tagLookupsMap,
-        req.body.localMetricServicesMap,
+        localMetricServicesMap,
         localMetricsMap,
+        localMetricComparisonsMap,
         appliedMetricsMap,
         tagsNamespacesMap
     );
@@ -665,8 +684,8 @@ export default async function get(dbs, req, res) {
         }
     } else if (req.body.wantedCursor === "File") {
         /** @type {DBFileCursor} */
-        const cursor = new Cursor({cursorType: "File", cursorValue: LocalFiles.groupLocalFilesTaggables(
-            await LocalFiles.selectManyByTaggableIDs(dbs, taggables.map(taggable => taggable.Taggable_ID))
+        const cursor = new Cursor({cursorType: "File", cursorValue: TaggableFiles.groupTaggableFilesTaggables(
+            await TaggableFiles.selectManyByTaggableIDs(dbs, taggables.map(taggable => taggable.Taggable_ID))
         )});
         dbs.cursorManager.addCursorToUser(req.user.id(), cursor);
 

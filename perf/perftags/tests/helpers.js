@@ -1,5 +1,5 @@
 import {deserializeUint64, serializeUint64} from "../../../src/client/js/client-util.js";
-import PerfTags from "../../../src/perf-tags-binding/perf-tags.js";
+import PerfTags from "../../../src/perf-binding/perf-tags.js";
 import { getAllFileEntries } from "../../../src/util.js";
 import {stat} from "fs/promises";
 /**

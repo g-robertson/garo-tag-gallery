@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { extractNthSecondWithFFMPEG, sha256, extractMetadataWithFFPROBE } from "../util.js";
+import { extractNthSecondWithFFMPEG, sha256, extractVideoMetadataWithFFProbe } from "../util.js";
 import shuffle from "knuth-shuffle-seeded";
 import path from "path";
 import { getMergedGroups, mergeExistingGroupsIntoGroupMap, randomID } from "../client/js/client-util.js";
@@ -85,7 +85,7 @@ async function blurHash_(imagePath, squaresDepth, squaresUsed, subsampleDepth, v
     } catch (e) {
         const uniqueID = randomID(8);
         const extractedFileName = path.join(TMP_FOLDER, `${path.basename(imagePath)}-${uniqueID}.png`);
-        const metadata = await extractMetadataWithFFPROBE(imagePath);
+        const metadata = await extractVideoMetadataWithFFProbe(imagePath);
         if (metadata.frames === 1) {
             await extractNthSecondWithFFMPEG(imagePath, 0, extractedFileName);
         } else {
@@ -292,7 +292,7 @@ export async function parametricCloseHash(imagePath, rangeCount, stepPercentage,
     } catch (e) {
         const uniqueID = randomID(8);
         const extractedFileName = path.join(TMP_FOLDER, `${path.basename(imagePath)}-${uniqueID}.jpg`);
-        const metadata = await extractMetadataWithFFPROBE(imagePath);
+        const metadata = await extractVideoMetadataWithFFProbe(imagePath);
         if (metadata.frames === 1) {
             await extractNthSecondWithFFMPEG(imagePath, 0, extractedFileName);
 
@@ -709,7 +709,7 @@ export async function weightedCloseHashDistances(dbs, toCompareHashes, weightArr
     }
     const missingEntryWeightEdited = missingEntryWeight * 2;
 
-    return (await dbs.perfHashCmp.compareHashes(distanceCutoff, missingEntryWeightEdited, mulWeights, powHundredthWeights, toCompareHashes)).comparisonsMade;
+    return (await dbs.perfImg.compareHashes(distanceCutoff, missingEntryWeightEdited, mulWeights, powHundredthWeights, toCompareHashes)).comparisonsMade;
 }
 
 /**

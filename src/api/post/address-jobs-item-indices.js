@@ -3,7 +3,6 @@
  */
 
 import { z } from "zod";
-import { PERMISSIONS } from "../../client/js/user.js";
 
 const Z_JOBS_ITEMS_INDICES = z.array(z.object({
     jobID: z.number(),

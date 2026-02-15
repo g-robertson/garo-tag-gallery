@@ -1,5 +1,5 @@
 import { getPairingsFromStrPairings, getStrPairingsFromPairings, TEST_DEFAULT_PERF_EXE, TEST_DEFAULT_PERF_TAGS_ARGS } from "./helpers.js";
-import PerfTags from "../../../src/perf-tags-binding/perf-tags.js"
+import PerfTags from "../../../src/perf-binding/perf-tags.js"
 import { existsSync } from "fs";
 /** @import {TestFunction} from "./helpers.js" */
 

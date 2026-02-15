@@ -1,14 +1,16 @@
 import sharp from "sharp";
-import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, IN_TRASH_TAG, IS_FILE_TAG, isURLAssociationTagLookupName, normalizeFileExtension,revertURLAssociationTagLookupName,SYSTEM_LOCAL_TAG_SERVICE } from "../client/js/tags.js";
+import { AUDIO_DIMENSIONS_METRIC, AUDIO_SAMPLE_RATE_METRIC, AUDIO_SIZE_METRIC, DURATION_METRIC, FILE_SIZE_METRIC, FRAME_COUNT_METRIC, HAS_EXIF_TAG, HAS_ICC_PROFILE_TAG, HAS_METADATA_TAG, HAS_TRANSPARENCY_TAG, HEIGHT_METRIC, IN_TRASH_TAG, IS_FILE_TAG, SYSTEM_LOCAL_TAG_SERVICE, VIDEO_SIZE_METRIC, WIDTH_METRIC } from "../client/js/defaults.js";
+import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, isURLAssociationTagLookupName, normalizeFileExtension,revertURLAssociationTagLookupName } from "../client/js/tags.js";
 import { PERMISSIONS } from "../client/js/user.js";
-import PerfTags from "../perf-tags-binding/perf-tags.js";
+import PerfTags from "../perf-binding/perf-tags.js";
 import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbtuples, dbvariablelist, TMP_FOLDER} from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
 import { LocalTags, UserFacingLocalTags } from "./tags.js";
-import { extractNthSecondWithFFMPEG, sha256 } from "../util.js";
+import { AppliedMetrics } from "./metrics.js";
+import { extractMetadataWithFFProbe, extractNthSecondWithFFMPEG, sha256 } from "../util.js";
 import { readFile, rm } from "fs/promises";
 import { createInLocalTaggableServiceLookupName, isInLocalTaggableServiceLookupName, revertInLocalTaggableServiceLookupName } from "../client/js/taggables.js";
-import { isAppliedMetricLookupName, revertAppliedMetricLookupName } from "../client/js/metrics.js";
+import { createSystemAppliedMetric, isAppliedMetricLookupName, revertAppliedMetricLookupName } from "../client/js/metrics.js";
 import path from "path";
 import { mapNullCoalesce } from "../client/js/client-util.js";
 
@@ -395,7 +397,7 @@ export class Taggables {
      * @param {Databases} dbs 
      * @param {Map<bigint, URLAssociation[]>} taggableURLAssociationPairings 
      */
-    static async upsertURLAssociations(dbs, taggableURLAssociationPairings) {
+    static async uniqueInsertURLAssociations(dbs, taggableURLAssociationPairings) {
         /** @type {Set<string>} */
         const allURLAssociationLookupNames = new Set();
         /** @type {Set<string>} */
@@ -406,8 +408,8 @@ export class Taggables {
                 allURLs.add(urlAssociation.URL);
             }
         }
-        const urlAssociationTagMap = new Map((await LocalTags.upsertManySystemTags(dbs, [...allURLAssociationLookupNames])).map(urlAssociationTag => [urlAssociationTag.Lookup_Name, urlAssociationTag]));
-        const urlMap = new Map((await LocalTags.upsertManySystemTags(dbs, [...allURLs].map(createHasURLTagLookupName))).map(tag => [tag.Lookup_Name, tag]));
+        const urlAssociationTagMap = new Map((await LocalTags.uniqueInsertManySystemTags(dbs, [...allURLAssociationLookupNames])).map(urlAssociationTag => [urlAssociationTag.Lookup_Name, urlAssociationTag]));
+        const urlMap = new Map((await LocalTags.uniqueInsertManySystemTags(dbs, [...allURLs].map(createHasURLTagLookupName))).map(tag => [tag.Lookup_Name, tag]));
 
         const taggableURLAssociationTagPairings = new Map([...taggableURLAssociationPairings.entries()].map(([taggableID, urlAssociations]) => [
             taggableID,
@@ -493,7 +495,7 @@ export class Taggables {
 
         dbs = await dbBeginTransaction(dbs);
 
-        await LocalFiles.deleteManyByTaggableIDs(dbs, taggableIDs);
+        await TaggableFiles.deleteManyByTaggableIDs(dbs, taggableIDs);
         await dbs.perfTags.deleteTaggables(taggableIDs, dbs.inTransaction);
         await dbrun(dbs, `DELETE FROM Taggables WHERE Taggable_ID IN ${dbvariablelist(taggableIDs.length)}`, taggableIDs.map(Number));
 
@@ -516,7 +518,7 @@ export class Taggables {
             return;
         }
 
-        await dbs.perfTags.insertTagPairings(new Map([[IN_TRASH_TAG.Tag_ID, taggableIDs]]));
+        await dbs.perfTags.insertTagPairings(new Map([[IN_TRASH_TAG.Tag_ID, taggableIDs]]), dbs.inTransaction);
         await dbrun(dbs, `
             UPDATE Taggables
             SET Taggable_Deleted_Date = unixepoch('now')
@@ -527,8 +529,8 @@ export class Taggables {
 }
 
 /**
- * @typedef {Object} DBUserFacingLocalFile
- * @property {number} Local_File_ID
+ * @typedef {Object} DBUserFacingTaggableFile
+ * @property {number} Taggable_File_ID
  * @property {string} File_Hash
  * @property {string} File_Extension
  * @property {bigint} Taggable_ID
@@ -545,18 +547,18 @@ export class Taggables {
 
 /**
  * @param {Databases} dbs
- * @param {Omit<DBUserFacingLocalFile, "Tags">[]} dbUserFacingLocalFiles
+ * @param {Omit<DBUserFacingTaggableFile, "Tags">[]} dbUserFacingTaggableFiles
  * @param {number} userID
  * @param {number[]} localTagServiceIDs
  * @param {DBPermissionedLocalMetricService[]} localMetricServices
  */
-async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, localTagServiceIDs, localMetricServices) {
-    dbUserFacingLocalFiles = dbUserFacingLocalFiles.map(dbUserFacingLocalFile => ({
-        ...dbUserFacingLocalFile,
-        Taggable_ID: BigInt(dbUserFacingLocalFile.Taggable_ID)
+async function mapDBUserFacingTaggableFiles(dbs, dbUserFacingTaggableFiles, userID, localTagServiceIDs, localMetricServices) {
+    dbUserFacingTaggableFiles = dbUserFacingTaggableFiles.map(dbUserFacingTaggableFile => ({
+        ...dbUserFacingTaggableFile,
+        Taggable_ID: BigInt(dbUserFacingTaggableFile.Taggable_ID)
     }));
 
-    const taggableIDs = dbUserFacingLocalFiles.map(dbUserFacingLocalFile => dbUserFacingLocalFile.Taggable_ID);
+    const taggableIDs = dbUserFacingTaggableFiles.map(dbUserFacingTaggableFile => dbUserFacingTaggableFile.Taggable_ID);
     const taggablesTags = await UserFacingLocalTags.selectMappedByTaggableIDs(
         dbs,
         taggableIDs,
@@ -613,37 +615,37 @@ async function mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, lo
         taggablesTags.set(taggableID, filteredTagGroups);
     }
 
-    return dbUserFacingLocalFiles.map(dbUserFacingLocalFile => ({
-        ...dbUserFacingLocalFile,
-        Local_Taggable_Service_ID:  taggableLocalTaggableServiceID.get(dbUserFacingLocalFile.Taggable_ID),
-        URL_Associations: taggableURLAssociations.get(dbUserFacingLocalFile.Taggable_ID) ?? [],
-        Tag_Groups: taggablesTags.get(dbUserFacingLocalFile.Taggable_ID) ?? [],
-        Metrics: taggableAppliedMetrics.get(dbUserFacingLocalFile.Taggable_ID) ?? []
+    return dbUserFacingTaggableFiles.map(dbUserFacingTaggableFile => ({
+        ...dbUserFacingTaggableFile,
+        Local_Taggable_Service_ID:  taggableLocalTaggableServiceID.get(dbUserFacingTaggableFile.Taggable_ID),
+        URL_Associations: taggableURLAssociations.get(dbUserFacingTaggableFile.Taggable_ID) ?? [],
+        Tag_Groups: taggablesTags.get(dbUserFacingTaggableFile.Taggable_ID) ?? [],
+        Metrics: taggableAppliedMetrics.get(dbUserFacingTaggableFile.Taggable_ID) ?? []
     }));
 }
 
-export class UserFacingLocalFiles {
+export class UserFacingTaggableFiles {
     /**
      * @param {Databases} dbs 
      * @param {bigint[]} taggableIDs 
-     * @param {Omit<DBUserFacingLocalFile, "Tags">[]} dbUserFacingLocalFiles
+     * @param {Omit<DBUserFacingTaggableFile, "Tags">[]} dbUserFacingTaggableFiles
      * @param {number} userID
      * @param {number[]} localTagServiceIDs
      * @param {DBPermissionedLocalMetricService[]} localMetricServices
-     * @returns {Promise<DBUserFacingLocalFile[]>}
+     * @returns {Promise<DBUserFacingTaggableFile[]>}
      */
     static async selectManyByTaggableIDs(dbs, taggableIDs, userID, localTagServiceIDs, localMetricServices) {
         if (taggableIDs.length === 0) {
             return [];
         }
         if (taggableIDs.length > 10000) {
-            const slices = await asyncDataSlicer(taggableIDs, 10000, (sliced) => UserFacingLocalFiles.selectManyByTaggableIDs(dbs, sliced, userID, localTagServiceIDs, localMetricServices));
+            const slices = await asyncDataSlicer(taggableIDs, 10000, (sliced) => UserFacingTaggableFiles.selectManyByTaggableIDs(dbs, sliced, userID, localTagServiceIDs, localMetricServices));
             return slices.flat();
         }
 
-        /** @type {Omit<DBUserFacingLocalFile, "Tags">[]} */
-        const dbUserFacingLocalFiles = await dballselect(dbs, `
-            SELECT LF.Local_File_ID,
+        /** @type {Omit<DBUserFacingTaggableFile, "Tags">[]} */
+        const dbUserFacingTaggableFiles = await dballselect(dbs, `
+            SELECT TF.Taggable_File_ID,
                    LOWER(HEX(F.File_Hash)) AS File_Hash,
                    F.File_Extension,
                    T.Taggable_ID,
@@ -653,13 +655,13 @@ export class UserFacingLocalFiles {
                    T.Taggable_Last_Viewed_Date,
                    T.Taggable_Deleted_Date
               FROM Taggables T
-              JOIN Local_Files LF ON T.Taggable_ID = LF.Taggable_ID
-              JOIN Files F ON LF.File_ID = F.File_ID
-                AND LF.Taggable_ID IN ${dbvariablelist(taggableIDs.length)};
+              JOIN Taggable_Files TF ON T.Taggable_ID = TF.Taggable_ID
+              JOIN Files F ON TF.File_ID = F.File_ID
+                AND TF.Taggable_ID IN ${dbvariablelist(taggableIDs.length)};
         `, [...taggableIDs.map(taggableID => Number(taggableID))]
         );
 
-        return await mapDBUserFacingLocalFiles(dbs, dbUserFacingLocalFiles, userID, localTagServiceIDs, localMetricServices);
+        return await mapDBUserFacingTaggableFiles(dbs, dbUserFacingTaggableFiles, userID, localTagServiceIDs, localMetricServices);
     }
 }
 
@@ -683,7 +685,20 @@ export class UserFacingLocalFiles {
  * @property {Buffer} Exact_Bitmap_Hash
  * @property {string?} Prethumbnail_Hash
  * @property {string?} Thumbnail_Hash
- */
+ * @property {number} File_Size
+ * @property {number} Video_Size
+ * @property {number} Frame_Count
+ * @property {number=} Width
+ * @property {number=} Height
+ * @property {number=} Duration
+ * @property {number} Audio_Size
+ * @property {number=} Audio_Dimensions
+ * @property {number=} Audio_Sample_Rate
+ * @property {number} Has_Transparency
+ * @property {number} Has_Metadata
+ * @property {number} Has_ICC_Profile
+ * @property {number} Has_EXIF
+ **/
 
 export class Files {
     /**
@@ -767,65 +782,147 @@ export class Files {
 
         dbs = await dbBeginTransaction(dbs);
 
-        /** @type {{fileLocation: string, hash: Buffer}[]} */
-        const thumbnailsGenerated = [];
-        const prethumbnailHashes = [];
+        /**
+         * @type {{
+         *     thumbnailLocation: string,
+         *     Thumbnail_Hash: Buffer,
+         *     Prethumbnail_Hash: Buffer,
+         *     File_Size: number,
+         *     Video_Size: number
+         *     Width?: number
+         *     Height?: number
+         *     Frame_Count: number
+         *     Duration?: number
+         *     Audio_Size: number
+         *     Audio_Dimensions?: number
+         *     Audio_Sample_Rate?: number
+         *     Has_Transparency: boolean
+         *     Has_Metadata: boolean
+         *     Has_ICC_Profile: boolean
+         *     Has_EXIF: boolean
+         * }[]}
+         **/
+        const extraFileInfos = [];
         sharp.cache({files: 0});
-        const thumbnailPromises = [];
+        const extraFileInfoPromises = [];
         for (let i = 0; i < files.length; ++i) {
-            thumbnailPromises.push((async () => {
+            extraFileInfoPromises.push((async () => {
+                extraFileInfos[i] = {};
                 const file = files[i];
 
                 const sourceLocation = fileToSourceLocationMap.get(file.File_Hash.toString("hex"));
                 let sourceBaseName = path.basename(sourceLocation);
                 const sharpOutputLocation = path.join(TMP_FOLDER, `${sourceBaseName}.thumb.jpg`);
 
-                const createThumbnail = async (sharpSourceLocation) => {
-                    await sharp(sharpSourceLocation)
-                    .resize(300, 200, {fit: "inside"})
+                const sourceFileContents = await readFile(sourceLocation);
+                extraFileInfos[i].File_Size = sourceFileContents.byteLength;
+
+                const ffprobeMetadata = await extractMetadataWithFFProbe(sourceLocation);
+                extraFileInfos[i].Video_Size = ffprobeMetadata.videoSize;
+                extraFileInfos[i].Frame_Count = ffprobeMetadata.frames;
+                extraFileInfos[i].Width = ffprobeMetadata.width;
+                extraFileInfos[i].Height = ffprobeMetadata.height;
+                extraFileInfos[i].Duration = ffprobeMetadata.duration;
+                extraFileInfos[i].Audio_Size = ffprobeMetadata.audioSize;
+                extraFileInfos[i].Audio_Dimensions = ffprobeMetadata.channelCount;
+                extraFileInfos[i].Audio_Sample_Rate = ffprobeMetadata.sampleRate;
+
+                extraFileInfos[i].Has_Transparency = false;
+                extraFileInfos[i].Has_Metadata = false;
+                extraFileInfos[i].Has_ICC_Profile = false;
+                extraFileInfos[i].Has_EXIF = false;
+
+                const createSharpData = async (sharpInput) => {
+                    const sharpImage = sharp(sharpInput);
+
+                    const sharpMetadata = await sharpImage.metadata();
+                    if (sharpMetadata !== undefined) {
+                        extraFileInfos[i].Has_Metadata = true;
+                        extraFileInfos[i].Has_ICC_Profile = sharpMetadata.icc !== undefined;
+                        extraFileInfos[i].Has_EXIF = sharpMetadata.exif !== undefined;
+                        if (sharpMetadata.hasAlpha) {
+                            const pixels = await sharpImage.raw().toBuffer();
+                            for (let i = 3; i < pixels.byteLength; i += 4) {
+                                if (pixels[i] < 255) {
+                                    extraFileInfos[i].Has_Transparency = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+
+                    await sharpImage.resize(300, 200, {fit: "inside"})
                     .jpeg({force: true})
                     .toFile(sharpOutputLocation);
-                    const fileContents = await readFile(sharpOutputLocation);
+                    const thumbnailFileContents = await readFile(sharpOutputLocation);
 
-                    thumbnailsGenerated[i] = {
-                        fileLocation: sharpOutputLocation,
-                        hash: sha256(fileContents)
-                    };
+                    extraFileInfos[i].thumbnailLocation = sharpOutputLocation;
+                    extraFileInfos[i].Thumbnail_Hash = sha256(thumbnailFileContents);
                 };
 
                 try {
-                    await createThumbnail(sourceLocation);
+                    await createSharpData(sourceFileContents);
                 } catch {
                     const preThumbnailLocation = path.join(TMP_FOLDER, `/${sourceBaseName}.prethumb.jpg`);
                     const success = await extractNthSecondWithFFMPEG(sourceLocation, 0, preThumbnailLocation);
                     if (success) {
-                        prethumbnailHashes[i] = sha256(await readFile(preThumbnailLocation));
+                        extraFileInfos[i].Prethumbnail_Hash = sha256(await readFile(preThumbnailLocation));
                         // no try block, cause this should not fail, if it does fail I want a crash
-                        await createThumbnail(preThumbnailLocation);
+                        await createSharpData(preThumbnailLocation);
                         await rm(preThumbnailLocation, {force: true});
                     }
                 }
             })());
         }
 
-        await Promise.all(thumbnailPromises);
+        await Promise.all(extraFileInfoPromises);
 
         const fileInsertionParams = [];
         for (let i = 0; i < files.length; ++i) {
             fileInsertionParams.push(files[i].File_Hash);
-            fileInsertionParams.push(thumbnailsGenerated[i].hash);
-            fileInsertionParams.push(prethumbnailHashes[i]);
             fileInsertionParams.push(files[i].File_Extension);
+            fileInsertionParams.push(extraFileInfos[i].Thumbnail_Hash);
+            fileInsertionParams.push(extraFileInfos[i].Prethumbnail_Hash);
+            fileInsertionParams.push(extraFileInfos[i].File_Size);
+            fileInsertionParams.push(extraFileInfos[i].Video_Size);
+            fileInsertionParams.push(extraFileInfos[i].Frame_Count);
+            fileInsertionParams.push(extraFileInfos[i].Width);
+            fileInsertionParams.push(extraFileInfos[i].Height);
+            fileInsertionParams.push(extraFileInfos[i].Duration);
+            fileInsertionParams.push(extraFileInfos[i].Audio_Size);
+            fileInsertionParams.push(extraFileInfos[i].Audio_Dimensions);
+            fileInsertionParams.push(extraFileInfos[i].Audio_Sample_Rate);
+            fileInsertionParams.push(extraFileInfos[i].Has_Transparency);
+            fileInsertionParams.push(extraFileInfos[i].Has_Metadata);
+            fileInsertionParams.push(extraFileInfos[i].Has_ICC_Profile);
+            fileInsertionParams.push(extraFileInfos[i].Has_EXIF);
         }
 
         /** @type {DBFile[]} */
         const insertedDBFiles = await dball(dbs, `
             INSERT INTO Files(
                 File_Hash,
+                File_Extension,
                 Thumbnail_Hash,
                 Prethumbnail_Hash,
-                File_Extension
-            ) VALUES ${dbtuples(files.length, 4)} RETURNING *;
+                
+                File_Size,
+                Video_Size,
+                Frame_Count,
+                Width,
+                Height,
+                Duration,
+                Audio_Size,
+                Audio_Dimensions,
+                Audio_Sample_Rate,
+
+                Has_Transparency,
+
+                Has_Metadata,
+                Has_ICC_Profile,
+                Has_EXIF
+            ) VALUES ${dbtuples(files.length, 17)} RETURNING *;
             `, fileInsertionParams
         );
 
@@ -847,8 +944,10 @@ export class Files {
                         `${insertedDBFile.File_Hash.toString("hex")}${fileExtension}`,
                         insertedDBFile.File_Hash
                     );
-                    if (thumbnailsGenerated[i] !== undefined) {
-                        await dbs.fileStorage.move(`${thumbnailsGenerated[i].fileLocation}`,
+
+                    const thumbnailLocation = extraFileInfos[i].thumbnailLocation;
+                    if (thumbnailLocation !== undefined) {
+                        await dbs.fileStorage.move(`${thumbnailLocation}`,
                             `${insertedDBFile.File_Hash.toString("hex")}.thumb.jpg`,
                             insertedDBFile.File_Hash
                         );
@@ -862,7 +961,7 @@ export class Files {
      * @param {Databases} dbs 
      * @param {PreInsertFile[]} files 
      */
-    static async upsertMany(dbs, files) {
+    static async uniqueInsertMany(dbs, files) {
         if (files.length === 0) {
             return {
                 dbFiles: [],
@@ -886,98 +985,106 @@ export class Files {
 }
 
 /**
- * @typedef {PreInsertFile & {Taggable_Name: string}} PreInsertLocalFile
- * @typedef {PreInsertLocalFile & DBFile} PreparedPreInsertLocalFile
+ * @typedef {PreInsertFile & {Taggable_Name: string}} PreInsertTaggableFile
+ * @typedef {PreInsertTaggableFile & DBFile} PreparedPreInsertTaggableFile
  */
 
 /**
- * @param {PreInsertLocalFile} preInsertLocalFile 
+ * @param {PreInsertTaggableFile} preInsertTaggableFile 
  * @param {DBFile} dbFile 
  */
-function preparePreInsertLocalFile(preInsertLocalFile, dbFile) {
+function preparePreInsertTaggableFile(preInsertTaggableFile, dbFile) {
     return {
-        ...preInsertLocalFile,
+        ...preInsertTaggableFile,
         ...dbFile
     };
 }
 
 
 /**
- * @typedef {Object} DBLocalFile
- * @property {number} Local_File_ID
+ * @typedef {Object} DBTaggableFile
+ * @property {number} Taggable_File_ID
  * @property {number} File_ID
  * @property {bigint} Taggable_ID
  */
 
 /**
- * @typedef {DBFile & DBLocalFile} DBJoinedLocalFile
+ * @typedef {DBFile & DBTaggableFile} DBJoinedTaggableFile
  */
-/** @typedef {Omit<DBJoinedLocalFile, "Taggable_ID"> & {Taggable_ID: bigint[]}} TaggableGroupedDBJoinedLocalFile */
+/** @typedef {Omit<DBJoinedTaggableFile, "Taggable_ID"> & {Taggable_IDs: bigint[]}} TaggableGroupedDBJoinedTaggableFile */
 
 /**
- * @param {DBLocalFile} dbLocalFile 
+ * @param {DBTaggableFile} dbTaggableFile 
  * @param {DBFile} dbFile
  */
-function mapDBLocalFile(dbLocalFile, dbFile) {
+function mapDBTaggableFile(dbTaggableFile, dbFile) {
     return {
-        ...dbLocalFile,
+        ...dbTaggableFile,
         ...dbFile,
-        Taggable_ID: BigInt(dbLocalFile.Taggable_ID)
+        Taggable_ID: BigInt(dbTaggableFile.Taggable_ID)
     };
 }
 
-export class LocalFiles {
+export class TaggableFiles {
     /**
-     * @param {DBJoinedLocalFile[]} localFiles 
+     * @param {DBJoinedTaggableFile[]} taggableFiles 
      */
-    static groupLocalFilesTaggables(localFiles) {
-        /** @type {Map<number, TaggableGroupedDBJoinedLocalFile>} */
-        let files = new Map();
-        for (const file of localFiles) {
-            const mapFile = mapNullCoalesce(files, file.File_ID, {
-                ...file,
-                Taggable_ID: []
+    static groupTaggableFilesTaggables(taggableFiles) {
+        /** @type {Map<number, TaggableGroupedDBJoinedTaggableFile>} */
+        let taggableFilesMap = new Map();
+        for (const taggableFile of taggableFiles) {
+            const mapFile = mapNullCoalesce(taggableFilesMap, taggableFile.File_ID, {
+                ...taggableFile,
+                Taggable_IDs: []
             });
-            mapFile.Taggable_ID.push(file.Taggable_ID);
+            mapFile.Taggable_IDs.push(taggableFile.Taggable_ID);
         }
-        return [...files.values()];
+        return [...taggableFilesMap.values()];
     }
 
     /**
      * @param {Databases} dbs
-     * @param {PreparedPreInsertLocalFile[]} localFiles
+     * @param {PreparedPreInsertTaggableFile[]} taggableFiles
      * @param {bigint} inLocalTaggableServiceTagID
      */
-    static async selectMany(dbs, localFiles, inLocalTaggableServiceTagID) {
-        const hasFileHashTags = await LocalTags.selectManySystemTagsByLookupNames(dbs, localFiles.map(localFile => createHasFileHashLookupName(localFile.File_Hash.toString("hex"))));
+    static async selectMany(dbs, taggableFiles, inLocalTaggableServiceTagID) {
+        if (taggableFiles.length === 0) {
+            return [];
+        }
+
+        const hasFileHashTags = await LocalTags.selectManySystemTagsByLookupNames(dbs, taggableFiles.map(taggableFile => createHasFileHashLookupName(taggableFile.File_Hash.toString("hex"))));
 
         const {taggables} = await dbs.perfTags.search(PerfTags.searchIntersect([
             PerfTags.searchTag(inLocalTaggableServiceTagID),
             PerfTags.searchUnion(hasFileHashTags.map(hasFileHashTag => PerfTags.searchTag(hasFileHashTag.Tag_ID)))
         ]), dbs.inTransaction);
 
-        const dbFileMap = new Map(localFiles.map(dbFile => [dbFile.File_ID, dbFile]));
+        const dbFileMap = new Map(taggableFiles.map(dbFile => [dbFile.File_ID, dbFile]));
 
-        /** @type {DBLocalFile[]} */
-        const dbLocalFiles = await dballselect(dbs, `SELECT * FROM Local_Files WHERE Taggable_ID IN ${dbvariablelist(taggables.length)}`, taggables);
+        /** @type {DBTaggableFile[]} */
+        const dbTaggableFiles = await dballselect(dbs, `SELECT * FROM Taggable_Files WHERE Taggable_ID IN ${dbvariablelist(taggables.length)}`, taggables);
 
-        return dbLocalFiles.map(dbLocalFile => mapDBLocalFile(dbLocalFile, dbFileMap.get(dbLocalFile.File_ID)));
+        return dbTaggableFiles.map(dbTaggableFile => mapDBTaggableFile(dbTaggableFile, dbFileMap.get(dbTaggableFile.File_ID)));
     }
 
     /**
      * @param {Databases} dbs
-     * @param {string[]} localFileHashes
+     * @param {string[]} taggableFileHashes
      * @param {bigint} inLocalTaggableServiceTagID
      */
-    static async selectManyByHashes(dbs, localFileHashes, inLocalTaggableServiceTagID) {
-        const hasFileHashTags = await LocalTags.selectManySystemTagsByLookupNames(dbs, localFileHashes.map(localFileHash => createHasFileHashLookupName(localFileHash)));
+    static async selectManyByHashes(dbs, taggableFileHashes, inLocalTaggableServiceTagID) {
+        if (taggableFileHashes.length === 0) {
+            return [];
+        }
+
+        const hasFileHashTags = await LocalTags.selectManySystemTagsByLookupNames(dbs, taggableFileHashes.map(taggableFileHash => createHasFileHashLookupName(taggableFileHash)));
 
         const {taggables} = await dbs.perfTags.search(PerfTags.searchIntersect([
             PerfTags.searchTag(inLocalTaggableServiceTagID),
             PerfTags.searchUnion(hasFileHashTags.map(hasFileHashTag => PerfTags.searchTag(hasFileHashTag.Tag_ID)))
         ]), dbs.inTransaction);
 
-        return await LocalFiles.selectManyByTaggableIDs(taggables);
+        return await TaggableFiles.selectManyByTaggableIDs(taggables);
     }
 
     /**
@@ -985,15 +1092,19 @@ export class LocalFiles {
      * @param {number[]} fileIDs
      */
     static async selectManyByFileIDs(dbs, fileIDs) {
-        /** @type {DBJoinedLocalFile[]} */
-        const dbJoinedLocalFiles = await dballselect(dbs, `
-            SELECT LF.*, F.*
-              FROM Local_Files LF
-              JOIN Files F ON LF.File_ID = F.File_ID
+        if (fileIDs.length === 0) {
+            return [];
+        }
+
+        /** @type {DBJoinedTaggableFile[]} */
+        const dbJoinedTaggableFiles = await dballselect(dbs, `
+            SELECT TF.*, F.*
+              FROM Taggable_Files TF
+              JOIN Files F ON TF.File_ID = F.File_ID
               WHERE F.File_ID IN ${dbvariablelist(fileIDs.length)}
         `, fileIDs.map(Number));
 
-        return dbJoinedLocalFiles.map(dbJoinedLocalFile => mapDBLocalFile(dbJoinedLocalFile, dbJoinedLocalFile));
+        return dbJoinedTaggableFiles.map(dbJoinedTaggableFile => mapDBTaggableFile(dbJoinedTaggableFile, dbJoinedTaggableFile));
     }
 
     /**
@@ -1001,94 +1112,101 @@ export class LocalFiles {
      * @param {bigint[]} taggableIDs
      */
     static async selectManyByTaggableIDs(dbs, taggableIDs) {
-        /** @type {DBJoinedLocalFile[]} */
-        const dbJoinedLocalFiles = await dballselect(dbs, `
-            SELECT LF.*, F.*
-              FROM Local_Files LF
-              JOIN Files F ON LF.File_ID = F.File_ID
+        if (taggableIDs.length === 0) {
+            return [];
+        }
+
+        /** @type {DBJoinedTaggableFile[]} */
+        const dbJoinedTaggableFiles = await dballselect(dbs, `
+            SELECT TF.*, F.*
+              FROM Taggable_Files TF
+              JOIN Files F ON TF.File_ID = F.File_ID
               WHERE Taggable_ID IN ${dbvariablelist(taggableIDs.length)}
         `, taggableIDs.map(Number));
 
-        return dbJoinedLocalFiles.map(dbJoinedLocalFile => mapDBLocalFile(dbJoinedLocalFile, dbJoinedLocalFile));
+        return dbJoinedTaggableFiles.map(dbJoinedTaggableFile => mapDBTaggableFile(dbJoinedTaggableFile, dbJoinedTaggableFile));
     }
 
     /**
      * @param {Databases} dbs
-     * @param {PreparedPreInsertLocalFile[]} localFiles
+     * @param {PreparedPreInsertTaggableFile[]} taggableFiles
      * @param {bigint} inLocalTaggableServiceTagID
      */
-    static async insertMany(dbs, localFiles, inLocalTaggableServiceTagID) {
-        if (localFiles.length === 0) {
+    static async insertMany(dbs, taggableFiles, inLocalTaggableServiceTagID) {
+        if (taggableFiles.length === 0) {
             return [];
         }
 
         dbs = await dbBeginTransaction(dbs);
 
-        const insertedTaggables = await Taggables.insertMany(dbs, localFiles.map(file => file.Taggable_Name));
+        const insertedTaggables = await Taggables.insertMany(dbs, taggableFiles.map(taggableFile => taggableFile.Taggable_Name));
 
-        const localFileInsertionParams = [];
-        for (let i = 0; i < localFiles.length; ++i) {
-            localFileInsertionParams.push(localFiles[i].File_ID);
-            localFileInsertionParams.push(Number(insertedTaggables[i].Taggable_ID));
+        const taggableFileInsertionParams = [];
+        for (let i = 0; i < taggableFiles.length; ++i) {
+            taggableFileInsertionParams.push(taggableFiles[i].File_ID);
+            taggableFileInsertionParams.push(Number(insertedTaggables[i].Taggable_ID));
         }
 
-        /** @type {DBLocalFile[]} */
-        const insertedDBLocalFiles = await dball(dbs, `
-            INSERT INTO Local_Files(
+        /** @type {DBTaggableFile[]} */
+        const insertedDBTaggableFiles = await dball(dbs, `
+            INSERT INTO Taggable_Files(
                 File_ID,
                 Taggable_ID
-            ) VALUES ${dbtuples(localFiles.length, 2)} RETURNING *;
-            `, localFileInsertionParams
+            ) VALUES ${dbtuples(taggableFiles.length, 2)} RETURNING *;
+            `, taggableFileInsertionParams
         );
-        const mappedInsertedDBLocalFiles = insertedDBLocalFiles.map((dbLocalFile, i) => mapDBLocalFile(dbLocalFile, localFiles[i]));
-
-        const fileExtensionLookupNames = new Set();
-        for (const localFile of localFiles) {
-            fileExtensionLookupNames.add(createFileExtensionLookupName(normalizeFileExtension(localFile.File_Extension)));
-        }
-        const fileExtensionTags = new Map((await LocalTags.upsertManySystemTags(dbs, [...fileExtensionLookupNames])).map(tag => [tag.Lookup_Name, tag]),);
-
-        const hasFileHashTags = new Map((await LocalTags.upsertManySystemTags(dbs, localFiles.map(localFile => createHasFileHashLookupName(localFile.File_Hash.toString("hex"))))).map(tag => 
-            [tag.Lookup_Name, tag]
-        ));
+        const mappedInsertedDBTaggableFiles = insertedDBTaggableFiles.map((dbTaggableFile, i) => mapDBTaggableFile(dbTaggableFile, taggableFiles[i]));
 
         await dbs.perfTags.insertTagPairings(new Map([
-            [inLocalTaggableServiceTagID, mappedInsertedDBLocalFiles.map(dbLocalFile => dbLocalFile.Taggable_ID)],
-            [IS_FILE_TAG.Tag_ID, mappedInsertedDBLocalFiles.map(dbLocalFile => dbLocalFile.Taggable_ID)],
-            ...localFiles.map((localFile, i) => [fileExtensionTags.get(createFileExtensionLookupName(normalizeFileExtension(localFile.File_Extension))).Tag_ID, [insertedTaggables[i].Taggable_ID]]),
-            ...localFiles.map((localFile, i) => [hasFileHashTags.get(createHasFileHashLookupName(localFile.File_Hash.toString("hex"))).Tag_ID, [insertedTaggables[i].Taggable_ID]])
+            [inLocalTaggableServiceTagID, mappedInsertedDBTaggableFiles.map(taggableFile => taggableFile.Taggable_ID)],
+            [IS_FILE_TAG.Tag_ID, mappedInsertedDBTaggableFiles.map(taggableFile => taggableFile.Taggable_ID)],
+            [HAS_TRANSPARENCY_TAG.Tag_ID, mappedInsertedDBTaggableFiles.filter(taggableFile => taggableFile.Has_Transparency !== 0).map(taggableFile => taggableFile.Taggable_ID)],
+            [HAS_METADATA_TAG.Tag_ID, mappedInsertedDBTaggableFiles.filter(taggableFile => taggableFile.Has_Metadata !== 0).map(taggableFile => taggableFile.Taggable_ID)],
+            [HAS_ICC_PROFILE_TAG.Tag_ID, mappedInsertedDBTaggableFiles.filter(taggableFile => taggableFile.Has_ICC_Profile !== 0).map(taggableFile => taggableFile.Taggable_ID)],
+            [HAS_EXIF_TAG.Tag_ID, mappedInsertedDBTaggableFiles.filter(taggableFile => taggableFile.Has_EXIF !== 0).map(taggableFile => taggableFile.Taggable_ID)],
+            ...(await LocalTags.createTagPairingsFromTaggableToSystemTagLookupNameMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createFileExtensionLookupName(normalizeFileExtension(taggableFile.File_Extension))])))),
+            ...(await LocalTags.createTagPairingsFromTaggableToSystemTagLookupNameMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createHasFileHashLookupName(taggableFile.File_Hash.toString("hex"))])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(FILE_SIZE_METRIC, taggableFile.File_Size)])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(VIDEO_SIZE_METRIC, taggableFile.Video_Size)])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(FRAME_COUNT_METRIC, taggableFile.Frame_Count)])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(WIDTH_METRIC, taggableFile.Width)])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(HEIGHT_METRIC, taggableFile.Height)])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(DURATION_METRIC, taggableFile.Duration)])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(AUDIO_SIZE_METRIC, taggableFile.Audio_Size)])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(AUDIO_DIMENSIONS_METRIC, taggableFile.Audio_Dimensions)])))),
+            ...(await AppliedMetrics.createTagPairingsFromTaggableToAppliedSystemMetricMap(dbs, new Map(mappedInsertedDBTaggableFiles.map(taggableFile => [taggableFile.Taggable_ID, createSystemAppliedMetric(AUDIO_SAMPLE_RATE_METRIC, taggableFile.Audio_Sample_Rate)])))),
         ]), dbs.inTransaction);
 
         await dbEndTransaction(dbs);
 
-        return mappedInsertedDBLocalFiles;
+        return mappedInsertedDBTaggableFiles;
     }
 
     /**
      * @param {Databases} dbs
-     * @param {PreInsertLocalFile[]} preInsertLocalFiles
+     * @param {PreInsertTaggableFile[]} preInsertTaggableFiles
      * @param {bigint} inLocalTaggableServiceTagID
      */
-    static async upsertMany(dbs, preInsertLocalFiles, inLocalTaggableServiceTagID) {
-        if (preInsertLocalFiles.length === 0) {
+    static async uniqueInsertMany(dbs, preInsertTaggableFiles, inLocalTaggableServiceTagID) {
+        if (preInsertTaggableFiles.length === 0) {
             return {
-                dbLocalFiles: [],
+                dbTaggableFiles: [],
                 finalizeFileMove: async () => {}
             };
         }
         // dedupe
-        preInsertLocalFiles = [...(new Map(preInsertLocalFiles.map(localFile => [localFile.File_Hash.toString("hex"), localFile]))).values()];
-        const {dbFiles, finalizeFileMove} = await Files.upsertMany(dbs, preInsertLocalFiles);
+        preInsertTaggableFiles = [...(new Map(preInsertTaggableFiles.map(taggableFile => [taggableFile.File_Hash.toString("hex"), taggableFile]))).values()];
+        const {dbFiles, finalizeFileMove} = await Files.uniqueInsertMany(dbs, preInsertTaggableFiles);
         const dbFilesHashMap = new Map(dbFiles.map(dbFile => [dbFile.File_Hash.toString("hex"), dbFile]));
-        const preparedLocalFiles = preInsertLocalFiles.map(preInsertLocalFile => preparePreInsertLocalFile(preInsertLocalFile, dbFilesHashMap.get(preInsertLocalFile.File_Hash.toString("hex"))));
+        const preparedTaggableFiles = preInsertTaggableFiles.map(preInsertTaggableFile => preparePreInsertTaggableFile(preInsertTaggableFile, dbFilesHashMap.get(preInsertTaggableFile.File_Hash.toString("hex"))));
         
-        const dbLocalFiles = await LocalFiles.selectMany(dbs, preparedLocalFiles, inLocalTaggableServiceTagID);
-        const dbLocalFilesExisting = new Set(dbLocalFiles.map(dbLocalFile => dbLocalFile.File_Hash.toString("hex")));
-        const preparedLocalFilesToInsert = preparedLocalFiles.filter(localFile => !dbLocalFilesExisting.has(localFile.File_Hash.toString("hex")));
-        const dbLocalFilesInserted = await LocalFiles.insertMany(dbs, preparedLocalFilesToInsert, inLocalTaggableServiceTagID);
+        const dbTaggableFiles = await TaggableFiles.selectMany(dbs, preparedTaggableFiles, inLocalTaggableServiceTagID);
+        const dbTaggableFilesExisting = new Set(dbTaggableFiles.map(dbTaggableFile => dbTaggableFile.File_Hash.toString("hex")));
+        const preparedTaggableFilesToInsert = preparedTaggableFiles.filter(taggableFile => !dbTaggableFilesExisting.has(taggableFile.File_Hash.toString("hex")));
+        const dbTaggableFilesInserted = await TaggableFiles.insertMany(dbs, preparedTaggableFilesToInsert, inLocalTaggableServiceTagID);
 
         return {
-            dbLocalFiles: dbLocalFiles.concat(dbLocalFilesInserted),
+            dbTaggableFiles: dbTaggableFiles.concat(dbTaggableFilesInserted),
             finalizeFileMove
         };
     }
@@ -1098,6 +1216,6 @@ export class LocalFiles {
      * @param {bigint[]} taggableIDs 
      */
     static async deleteManyByTaggableIDs(dbs, taggableIDs) {
-        await dbrun(dbs, `DELETE FROM Local_Files WHERE Taggable_ID IN ${dbvariablelist(taggableIDs.length)}`, taggableIDs.map(Number));
+        await dbrun(dbs, `DELETE FROM Taggable_Files WHERE Taggable_ID IN ${dbvariablelist(taggableIDs.length)}`, taggableIDs.map(Number));
     }
 }

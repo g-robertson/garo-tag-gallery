@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { PERMISSIONS } from "../../client/js/user.js";
 import { UserFacingLocalTags } from "../../db/tags.js";
-import PerfTags from "../../perf-tags-binding/perf-tags.js";
+import PerfTags from "../../perf-binding/perf-tags.js";
 import { getCursorAsTaggableIDs } from "../../db/cursor-manager.js";
 import { Z_USER_LOCAL_TAG_SERVICE_ID } from "../zod-types.js";
 

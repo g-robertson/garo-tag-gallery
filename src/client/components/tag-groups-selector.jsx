@@ -7,7 +7,7 @@ import MultiSelect from "./multi-select.jsx";
 
 /** @import {DBNamespace} from "../../db/tags.js" */
 /** @import {DBLocalMetric} from "../../db/metrics.js" */
-/** @import {ClientTagGroup} from "../../api/post/search-taggables.js" */
+/** @import {ClientExpressionList} from "../../api/post/search-taggables.js" */
 
 /**
  * @typedef {{
@@ -15,13 +15,13 @@ import MultiSelect from "./multi-select.jsx";
  *         localMetric?: DBLocalMetric
  *         namespace?: DBNamespace
  *     }
- * } & ClientTagGroup} DisplayClientTagGroup
+ * } & ClientExpressionList} DisplayClientExpressionList
  */
 
 /**
  * @param {{
  *  multiSelect?: boolean
- *  onTagGroupsSelected?: (tagGroups: DisplayClientTagGroup[]) => void
+ *  onTagGroupsSelected?: (tagGroups: DisplayClientExpressionList[]) => void
  * }} param0
  */
 const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
@@ -36,12 +36,12 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
     const namespacesState = new State([]);
     const tagGroupsConstState = State.tupleTransform([selectedTagGroupOptionsState, namespacesState], () => {
         const selectedTagGroupOptions = selectedTagGroupOptionsState.get();
-        /** @type {DisplayClientTagGroup[]} */
+        /** @type {DisplayClientExpressionList[]} */
         let tagGroups = [];
         if (selectedTagGroupOptions.has(METRIC_RATINGS_SELECTED)) {
             tagGroups = tagGroups.concat(User.Global().localMetricServices().map(localMetricService => localMetricService.Local_Metrics).flat().map(localMetric => ({
                 type: "applied-metrics",
-                displayName: `aggregate metric:${localMetric.Local_Metric_Name}`,
+                displayName: `metric:${localMetric.Local_Metric_Name}`,
                 Local_Metric_ID: localMetric.Local_Metric_ID,
                 extraInfo: {
                     localMetric
@@ -51,7 +51,7 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
         if (selectedTagGroupOptions.has(NAMESPACES_SELECTED)) {
             tagGroups = tagGroups.concat(namespacesState.get().map(namespace => ({
                 type: "namespace",
-                displayName: `aggregate namespace:${namespace.Namespace_Name}`,
+                displayName: `namespace:${namespace.Namespace_Name}`,
                 namespaceID: namespace.Namespace_ID,
                 extraInfo: {
                     namespace

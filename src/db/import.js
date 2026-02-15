@@ -3,9 +3,9 @@ import { extractWith7Z, getAllFileEntries, sha256 } from "../util.js";
 import { dbBeginTransaction, dbEndTransaction } from "./db-util.js";
 import { LocalTags, TagsNamespaces, Tags, LocalTagServices } from "./tags.js";
 import { localTagsPKHash } from "../client/js/tags.js";
-import { Files, LocalFiles, LocalTaggableServices, Taggables } from "./taggables.js";
+import { Files, TaggableFiles, LocalTaggableServices, Taggables } from "./taggables.js";
 import { addNotesToTaggables } from "./notes.js";
-import PerfTags from "../perf-tags-binding/perf-tags.js";
+import PerfTags from "../perf-binding/perf-tags.js";
 import { Job } from "./job-manager.js";
 import { readFile } from "fs/promises";
 import { z } from "zod";
@@ -15,7 +15,7 @@ import { AppliedMetrics, appliedMetricsPKHash, LocalMetrics, LocalMetricServices
  * @import {Databases} from "./db-util.js"
  * @import {URLAssociation} from "../client/js/tags.js"
  * @import {PreInsertLocalTag, DBLocalTag, DBJoinedLocalTagService} from "./tags.js"
- * @import {PreInsertLocalFile, DBJoinedLocalFile, TagMappedDBJoinedLocalTaggableService} from "./taggables.js"
+ * @import {PreInsertTaggableFile, DBJoinedTaggableFile, TagMappedDBJoinedLocalTaggableService} from "./taggables.js"
  * @import {DBLocalMetric, PreInsertAppliedMetric, TagMappedDBAppliedMetric, DBJoinedLocalMetricService} from "./metrics.js"
  * @import {PreInsertNote} from "./notes.js"
  */
@@ -101,14 +101,14 @@ export async function importChunks(dbs, importables) {
 
     /** @type {Map<number, (PreInsertLocalTag & {Namespaces: string[]})[]>} */
     const localTagServiceToAllTags = new Map();
-    /** @type {Map<bigint, PreInsertLocalFile[]>} */
-    const localTaggableServiceToPreInsertLocalFiles = new Map();
+    /** @type {Map<bigint, PreInsertTaggableFile[]>} */
+    const localTaggableServiceToPreInsertTaggableFiles = new Map();
     /** @type {PreInsertAppliedMetric[]} */
     const allPreInsertAppliedMetrics = [];
     for (const importable of importables) {
         if (importable.Source_Location !== undefined) {
-            const localTaggableServicePreInsertLocalFiles = mapNullCoalesce(localTaggableServiceToPreInsertLocalFiles, importable.Local_Taggable_Service_Tag_ID, []);
-            localTaggableServicePreInsertLocalFiles.push({
+            const localTaggableServicePreInsertTaggableFiles = mapNullCoalesce(localTaggableServiceToPreInsertTaggableFiles, importable.Local_Taggable_Service_Tag_ID, []);
+            localTaggableServicePreInsertTaggableFiles.push({
                 File_Hash: importable.File_Hash,
                 File_Extension: importable.File_Extension,
                 Taggable_Name: importable.Taggable_Name ?? importable.File_Hash.toString("hex"),
@@ -131,37 +131,36 @@ export async function importChunks(dbs, importables) {
         }
     }
 
-    // upsert file info
-    /** @type {Map<string, DBJoinedLocalFile>} */
-    const dbLocalFilesMap = new Map();
+    // uniqueInsert file info
+    /** @type {Map<string, DBJoinedTaggableFile>} */
+    const dbTaggableFilesMap = new Map();
     /** @type {(() => Promise<void>)[]} */
     const finalizeFileMoves = [];
-    for (const [localTaggableServiceTagID, preInsertLocalFiles] of localTaggableServiceToPreInsertLocalFiles) {
-        const {dbLocalFiles, finalizeFileMove} = await LocalFiles.upsertMany(dbs, preInsertLocalFiles, localTaggableServiceTagID);
+    for (const [localTaggableServiceTagID, preInsertTaggableFiles] of localTaggableServiceToPreInsertTaggableFiles) {
+        const {dbTaggableFiles, finalizeFileMove} = await TaggableFiles.uniqueInsertMany(dbs, preInsertTaggableFiles, localTaggableServiceTagID);
         finalizeFileMoves.push(finalizeFileMove);
-        for (const dbLocalFile of dbLocalFiles) {
-            dbLocalFilesMap.set(dbLocalFile.File_Hash.toString("hex"), dbLocalFile);
+        for (const dbTaggableFile of dbTaggableFiles) {
+            dbTaggableFilesMap.set(dbTaggableFile.File_Hash.toString("hex"), dbTaggableFile);
         }
     }
     
-    // upsert tags
+    // uniqueInsert tags
     /** @type {Map<number, Map<string, DBLocalTag>>} */
     const dbLocalTagsMap = new Map();
-    // upsert tags namespaces
+    // uniqueInsert tags namespaces
     /** @type {Map<bigint, Set<string>>} */
     const tagsNamespaces = new Map();
     for (const [localTagServiceID, allTags] of localTagServiceToAllTags) {
-        const dbLocalTagServiceLocalTagsMap = new Map((await LocalTags.upsertMany(dbs, allTags, localTagServiceID)).map(dbTag => [dbTag.Local_Tags_PK_Hash, dbTag]));
+        const dbLocalTagServiceLocalTagsMap = new Map((await LocalTags.uniqueInsertMany(dbs, allTags, localTagServiceID)).map(dbTag => [dbTag.Local_Tags_PK_Hash, dbTag]));
         dbLocalTagsMap.set(localTagServiceID, dbLocalTagServiceLocalTagsMap);
         for (const tag of allTags) {
             const dbTag = dbLocalTagServiceLocalTagsMap.get(localTagsPKHash(tag.Lookup_Name, tag.Source_Name));
             tagsNamespaces.set(dbTag.Tag_ID, new Set(tag.Namespaces));
         }
     }
-    await TagsNamespaces.upsertMany(dbs, tagsNamespaces);
-
-    // upsert applied metrics
-    const appliedMetricsMap = new Map((await AppliedMetrics.tagMapped(dbs, await AppliedMetrics.upsertMany(dbs, allPreInsertAppliedMetrics))).map(appliedMetric => [
+    await TagsNamespaces.uniqueInsertMany(dbs, tagsNamespaces);
+    // uniqueInsert applied metrics
+    const appliedMetricsMap = new Map((await AppliedMetrics.tagMapped(dbs, await AppliedMetrics.uniqueInsertMany(dbs, allPreInsertAppliedMetrics))).map(appliedMetric => [
         appliedMetric.Local_Applied_Metric_PK_Hash,
         appliedMetric
     ]));
@@ -169,7 +168,7 @@ export async function importChunks(dbs, importables) {
     // insert notes
     /** @type {Map<bigint, PreInsertNote[]>} */
     const notePairings = new Map();
-    // upsert urls to taggables
+    // uniqueInsert urls to taggables
     /** @type {Map<bigint, URLAssociation[]>} */
     const taggableURLAssociationPairings = new Map();
     // insert dates
@@ -181,31 +180,39 @@ export async function importChunks(dbs, importables) {
     const lastViewedDatePairings = new Map();
     /** @type {Map<bigint, number>} */
     const deletedDatePairings = new Map();
-    // upsert tags to taggables
+    // uniqueInsert tags to taggables
     /** @type {Map<bigint, bigint[]>} */
     const taggablePairings = new Map();
-    // upsert metrics to taggables
+    // uniqueInsert metrics to taggables
     /** @type {Map<bigint, TagMappedDBAppliedMetric[]>} */
     const taggableMetricPairings = new Map();
     for (const importable of importables) {
-        const importableTaggableID = dbLocalFilesMap.get(importable.File_Hash.toString("hex")).Taggable_ID;
+        const importableTaggableID = dbTaggableFilesMap.get(importable.File_Hash.toString("hex")).Taggable_ID;
         notePairings.set(importableTaggableID, importable.Notes);
         taggableURLAssociationPairings.set(importableTaggableID, importable.URL_Associations);
-        createdDatePairings.set(importableTaggableID, importable.Taggable_Created_Date);
-        lastModifiedDatePairings.set(importableTaggableID, importable.Taggable_Last_Modified_Date);
-        lastViewedDatePairings.set(importableTaggableID, importable.Taggable_Last_Viewed_Date);
-        deletedDatePairings.set(importableTaggableID, importable.Taggable_Deleted_Date);
+        if (importable.Taggable_Created_Date !== undefined) {
+            createdDatePairings.set(importableTaggableID, importable.Taggable_Created_Date);
+        }
+        if (importable.Taggable_Last_Modified_Date !== undefined) {
+            lastModifiedDatePairings.set(importableTaggableID, importable.Taggable_Last_Modified_Date);
+        }
+        if (importable.Taggable_Last_Viewed_Date !== undefined) {
+            lastViewedDatePairings.set(importableTaggableID, importable.Taggable_Last_Viewed_Date);
+        }
+        if (importable.Taggable_Deleted_Date !== undefined) {
+            deletedDatePairings.set(importableTaggableID, importable.Taggable_Deleted_Date);
+        }
         taggablePairings.set(importableTaggableID, importable.Tags.map(tag => dbLocalTagsMap.get(tag.Local_Tag_Service_ID).get(localTagsPKHash(tag.Lookup_Name, tag.Source_Name)).Tag_ID));
         taggableMetricPairings.set(importableTaggableID, importable.Metrics.map(metric => appliedMetricsMap.get(appliedMetricsPKHash(metric))));
     }
 
     await addNotesToTaggables(dbs, notePairings);
-    await Taggables.upsertURLAssociations(dbs, taggableURLAssociationPairings);
+    await Taggables.uniqueInsertURLAssociations(dbs, taggableURLAssociationPairings);
     await Taggables.updateManyCreatedDates(dbs, createdDatePairings);
     await Taggables.updateManyLastModifiedDates(dbs, lastModifiedDatePairings);
     await Taggables.updateManyLastViewedDates(dbs, lastViewedDatePairings);
     await Taggables.updateManyDeletedDates(dbs, deletedDatePairings);
-    await Tags.upsertTagPairingsToTaggables(dbs, PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
+    await Tags.uniqueInsertTagPairingsToTaggables(dbs, PerfTags.getTagPairingsFromTaggablePairings(taggablePairings));
     await AppliedMetrics.applyManyMappedToTaggables(dbs, taggableMetricPairings);
     for (const finalizeFileMove of finalizeFileMoves) {
         await finalizeFileMove();
@@ -223,7 +230,6 @@ export async function importChunks(dbs, importables) {
 export function importFilesFromHydrusJob(dbs, partialUploadFolder, partialFilePaths, localTagServiceID, localTaggableServiceID) {
     return new Job({durationBetweenTasks: 250, jobName: "Importing files from Hydrus"}, async function*() {
         yield {upcomingSubtasks: 1, upcomingTaskName: "Extracting ZIP file"};
-        console.log("started job");
 
         let leadFilePath;
         if (partialFilePaths.length === 1) {

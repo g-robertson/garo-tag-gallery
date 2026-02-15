@@ -6,9 +6,11 @@ import { ConstState, PersistentState, State } from "../js/state.js";
 import { Modals } from '../modal/modals.js';
 import { ImagePreloader } from '../js/client-exclusive-util.js';
 import DialogBox from '../modal/modals/dialog-box.jsx';
+import commitFileRelations from '../../api/client-get/commit-file-relations.js';
 
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
 /** @import {DBFile} from "../../db/taggables.js" */
+/** @import {FileRelation} from "../../api/zod-types.js" */
 
 /**
  * @typedef {{
@@ -31,7 +33,8 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
     const ActiveFile = ReferenceableReact();
     const imagePreloader = new ImagePreloader();
 
-    const visibleIndexState = persistentState.registerState("visibleIndex", new State(initialFileComparisonIndex ?? 0), {isSaved: true, addToCleanup, name: "LazyDedupeGallery.visibleIndexState"})
+    const visibleIndexState = persistentState.registerState("visibleIndex", new State(initialFileComparisonIndex ?? 0), {isSaved: true, addToCleanup, name: "LazyDedupeGallery.visibleIndexState"});
+    /** @type {State<Record<number, FileRelation>>} */
     const fileComparisonsEvaluatedState = persistentState.registerState("fileComparisonsEvaluated", new State({}), {isSaved: true, addToCleanup, name: "LazyDedupeGallery.fileComparisonsEvaluatedState"});
 
     const selectorIncrementerState = new State(0, {name: "LazyDedupeGallery.selectorIncrementerState"});
@@ -90,7 +93,7 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
     };
 
     const commitChanges = async () => {
-        console.log(fileComparisonsEvaluatedState.get());
+        await commitFileRelations(Object.values(fileComparisonsEvaluatedState.get()));
         persistentState.clear();
         Modals.Global().popModal();
     };
@@ -159,24 +162,22 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
                     </div>
                     <div style={{position: "absolute", top: "3vh", right: "4px", flexDirection: "column"}}>
                         <input type="button" value="Current is better, trash other" onClick={() => {
+                            const Better_File_ID = realizedValue[activeFileState.get()].File_ID;
                             fileComparisonsEvaluated[index] = {
-                                type: "duplicates",
-                                File_ID_1: realizedValue.File_ID_1,
-                                File_ID_2: realizedValue.File_ID_2,
-                                Better_File_ID: realizedValue[activeFileState.get()].File_ID,
-                                trashWorse: true
+                                type: "duplicates-with-better-trash-worse",
+                                Better_File_ID,
+                                Worse_File_ID: realizedValue.File_ID_1 === Better_File_ID ? realizedValue.File_ID_2 : realizedValue.File_ID_1
                             };
                             fileComparisonsEvaluatedState.forceUpdate();
                             selectorIncrementerState.set(1);
                             activeFileState.set("File_1");
                         }} />
                         <input type="button" value="Current is better" onClick={() => {
+                            const Better_File_ID = realizedValue[activeFileState.get()].File_ID;
                             fileComparisonsEvaluated[index] = {
-                                type: "duplicates",
-                                File_ID_1: realizedValue.File_ID_1,
-                                File_ID_2: realizedValue.File_ID_2,
-                                Better_File_ID: realizedValue[activeFileState.get()].File_ID,
-                                trashWorse: false
+                                type: "duplicates-with-better",
+                                Better_File_ID,
+                                Worse_File_ID: realizedValue.File_ID_1 === Better_File_ID ? realizedValue.File_ID_2 : realizedValue.File_ID_1
                             };
                             fileComparisonsEvaluatedState.forceUpdate();
                             selectorIncrementerState.set(1);
@@ -184,11 +185,9 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
                         }} />
                         <input type="button" value="Same quality, trash larger" onClick={() => {
                             fileComparisonsEvaluated[index] = {
-                                type: "duplicates",
+                                type: "duplicates-with-same-quality-trash-larger",
                                 File_ID_1: realizedValue.File_ID_1,
-                                File_ID_2: realizedValue.File_ID_2,
-                                Better_File_ID: null,
-                                trashWorse: true
+                                File_ID_2: realizedValue.File_ID_2
                             };
                             fileComparisonsEvaluatedState.forceUpdate();
                             selectorIncrementerState.set(1);
@@ -196,18 +195,16 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
                         }} />
                         <input type="button" value="Same quality" onClick={() => {
                             fileComparisonsEvaluated[index] = {
-                                type: "duplicates",
+                                type: "duplicates-with-same-quality",
                                 File_ID_1: realizedValue.File_ID_1,
-                                File_ID_2: realizedValue.File_ID_2,
-                                Better_File_ID: null,
-                                trashWorse: false
+                                File_ID_2: realizedValue.File_ID_2
                             };
                             fileComparisonsEvaluatedState.forceUpdate();
                             selectorIncrementerState.set(1);
                             activeFileState.set("File_1");
                         }} />
                         <input type="button" value="Alternates" onClick={() => {
-                            fileComparisonsEvaluatedState[index] = {
+                            fileComparisonsEvaluated[index] = {
                                 type: "alternates",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2
@@ -217,8 +214,8 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
                             activeFileState.set("File_1");
                         }} />
                         <input type="button" value="False positives" onClick={() => {
-                            fileComparisonsEvaluatedState[index] = {
-                                type: "false-positive",
+                            fileComparisonsEvaluated[index] = {
+                                type: "false-positives",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2
                             };

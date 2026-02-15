@@ -9,13 +9,13 @@ const THUMB_WIDTH = 150;
 const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH);
 
 /** @import {ConstState} from "../js/state.js" */
-/** @import {DBUserFacingLocalFile} from "../../db/taggables.js" */
+/** @import {DBUserFacingTaggableFile} from "../../db/taggables.js" */
 
 /**
  * @param {{
  *  taggableIDsConstState: ConstState<number[]>
- *  onValuesSelected?: (valuesSelected: DBUserFacingLocalFile[], indices: number[]) => void
- *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingLocalFile[], indices: number[], indexClicked: number) => void
+ *  onValuesSelected?: (valuesSelected: DBUserFacingTaggableFile[], indices: number[]) => void
+ *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingTaggableFile[], indices: number[], indexClicked: number) => void
  * }} param0
  */
 const LazyThumbnailGallery = ({taggableIDsConstState, onValuesSelected, onValuesDoubleClicked}) => {
@@ -36,7 +36,7 @@ const LazyThumbnailGallery = ({taggableIDsConstState, onValuesSelected, onValues
                 method: "POST"
             });
         
-            /** @type {DBUserFacingLocalFile[]} */
+            /** @type {DBUserFacingTaggableFile[]} */
             const taggablesResponse = await fbjsonParse(response);
             const taggablesResponseMap = new Map(taggablesResponse.map(taggable => [Number(taggable.Taggable_ID), taggable]));
             for (const taggableResponse of taggablesResponse) {

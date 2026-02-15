@@ -85,27 +85,27 @@ export async function saveOrTag(driver) {
     await driver.findElement(xpathHelper({type: "input", attrEq: {"value": "Select OR Group"}})).click();
 }
 
-export const AGGREGATE_TAG_TYPES = /** @type {const} */ ({
-    NAMESPACE: "aggregate namespace",
-    METRIC: "aggregate metric"
+export const CONDITIONAL_EXPRESSION_LIST_UNION_TYPES = /** @type {const} */ ({
+    NAMESPACE: "namespace",
+    METRIC: "metric"
 });
 
-/** @typedef {(typeof AGGREGATE_TAG_TYPES)[keyof typeof AGGREGATE_TAG_TYPES]} AggregateTagType */
+/** @typedef {(typeof CONDITIONAL_EXPRESSION_LIST_UNION_TYPES)[keyof typeof CONDITIONAL_EXPRESSION_LIST_UNION_TYPES]} ConditionalExpressionListUnionType */
 
 /**
- * @typedef {Object} AggregateTag
- * @property {AggregateTagType} type
+ * @typedef {Object} ConditionalExpressionListUnionType
+ * @property {ConditionalExpressionListUnionType} type
  * @property {string} item
  **/
 
-export const AGGREGATE_CONDITION_TYPES = /** @type {const} */ ({
+export const EXPRESSION_LIST_UNION_CONDITION_TYPES = /** @type {const} */ ({
     NOT_IN_LIST: "not-in-list-condition",
     COUNT_MATCHING: "count-matching-query-condition",
     PERCENTAGE_MATCHING: "percentage-matching-query-condition",
     PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY: "percentage-of-subquery-matching-query-condition"
 });
 
-/** @typedef {(typeof AGGREGATE_CONDITION_TYPES)[keyof typeof AGGREGATE_CONDITION_TYPES]} AggregateConditionType */
+/** @typedef {(typeof EXPRESSION_LIST_UNION_CONDITION_TYPES)[keyof typeof EXPRESSION_LIST_UNION_CONDITION_TYPES]} ExpressionListUnionConditionType */
 
 export const COMPARATORS = /** @type {const} */ ({
     LT: "<",
@@ -117,8 +117,8 @@ export const COMPARATORS = /** @type {const} */ ({
 /** @typedef {(typeof COMPARATORS)[keyof typeof COMPARATORS]} Comparator */
 
 /** 
- * @typedef {Object} AggregateCondition
- * @property {AggregateConditionType} type
+ * @typedef {Object} ExpressionListUnionCondition
+ * @property {ExpressionListUnionConditionType} type
  * @property {Comparator=} comparator
  * @property {number} value
  * @property {string[]} query1
@@ -128,15 +128,15 @@ export const COMPARATORS = /** @type {const} */ ({
 /**
  * 
  * @param {ThenableWebDriver} driver 
- * @param {AggregateTag} aggregateTag 
- * @param {AggregateCondition[]} conditions 
+ * @param {ConditionalExpressionListUnionType} conditionalExpressionListUnionType
+ * @param {ExpressionListUnionCondition[]} conditions 
  */
-export async function addAggregateTag(driver, aggregateTag, conditions) {
-    await selectTagFromLocalTagSelector(driver, "system:aggregate tags");
-    const aggregateTagElement = await driver.findElement(xpathHelper({attrEq: {"title": `${aggregateTag.type}:${aggregateTag.item}`}}));
-    await doubleClick(driver, aggregateTagElement);
+export async function addConditionalExpressionListUnionType(driver, conditionalExpressionListUnionType, conditions) {
+    await selectTagFromLocalTagSelector(driver, "system:advanced tag search");
+    const conditionalExpressionListUnionTypeElement = await driver.findElement(xpathHelper({attrEq: {"title": `${conditionalExpressionListUnionType.type}:${conditionalExpressionListUnionType.item}`}}));
+    await doubleClick(driver, conditionalExpressionListUnionTypeElement);
     for (const condition of conditions) {
-        if (condition.type === AGGREGATE_CONDITION_TYPES.NOT_IN_LIST) {
+        if (condition.type === EXPRESSION_LIST_UNION_CONDITION_TYPES.NOT_IN_LIST) {
             const specifyTagsButton = await driver.findElement(xpathHelper({type: "input", attrEq: {"value": "Specify tags"}}));
             await specifyTagsButton.click();
             for (const tag of condition.query1) {
@@ -146,9 +146,9 @@ export async function addAggregateTag(driver, aggregateTag, conditions) {
             const selectQueryButton = await driver.findElement(xpathHelper({attrContains: {"class": "select-from-list-of-tags-modal"}, descendent: {type: "input", attrEq: {"type": "button"}}}));
             await selectQueryButton.click();
         } else if (
-            condition.type === AGGREGATE_CONDITION_TYPES.COUNT_MATCHING
-         || condition.type === AGGREGATE_CONDITION_TYPES.PERCENTAGE_MATCHING
-         || condition.type === AGGREGATE_CONDITION_TYPES.PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY) {
+            condition.type === EXPRESSION_LIST_UNION_CONDITION_TYPES.COUNT_MATCHING
+         || condition.type === EXPRESSION_LIST_UNION_CONDITION_TYPES.PERCENTAGE_MATCHING
+         || condition.type === EXPRESSION_LIST_UNION_CONDITION_TYPES.PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY) {
             await driver.findElement(xpathHelper({attrEq: {"class": condition.type}, descendent: {attrContains: {"text": condition.comparator}, descendent: {type: "input"}}})).click();
 
             const valueElement = await driver.findElement(xpathHelper({attrEq: {"class": condition.type}, descendent: {type: "input", attrEq: {"type": "text"}}}));
@@ -163,7 +163,7 @@ export async function addAggregateTag(driver, aggregateTag, conditions) {
             }
             await driver.findElement(xpathHelper({attrEq: {"class": "tag-selector-modal"}, descendent: {type: "input", attrEq: {"type": "button"}, attrContains: {"value": "Select"}}})).click();
 
-            if (condition.type === AGGREGATE_CONDITION_TYPES.PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY) {
+            if (condition.type === EXPRESSION_LIST_UNION_CONDITION_TYPES.PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY) {
                 for (const tag of condition.query2) {
                     await selectTagFromLocalTagSelector(driver, tag, {parentHasClass: "tag-selector-modal"});
                 }
@@ -172,7 +172,7 @@ export async function addAggregateTag(driver, aggregateTag, conditions) {
         }
     }
 
-    await driver.findElement(xpathHelper({attrEq: {"value": "Create Aggregate Tag"}})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Create Conditional List Expression Union"}})).click();
 }
 
 export const METRIC_TAG_SEARCH_TYPES = /** @type {const} */ ({
@@ -363,6 +363,18 @@ export async function assignMetricStar(driver, metricName, starCount) {
 export async function beginDatabaseProcessingFiles(driver) {
     await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Begin database processing files"}})).click();
 }
+
+/**
+ * 
+ * @param {ThenableWebDriver} driver 
+ * @param {number} distance 
+ */
+export async function adjustDuplicateSearchDistance(driver, distance) {
+    const duplicateSearchDistanceElement = await driver.findElement(xpathHelper({type: "input", attrContains: {"class": "duplicate-search-distance"}}));
+    await realClear(duplicateSearchDistanceElement);
+    await duplicateSearchDistanceElement.sendKeys(distance);
+}
+
 
 /**
  * @param {ThenableWebDriver} driver 

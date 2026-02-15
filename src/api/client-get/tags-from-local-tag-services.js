@@ -1,6 +1,6 @@
 import { fbjsonParse } from "../../client/js/client-util.js";
-import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
-import CreateAggregateTag from "../../client/modal/modals/create-aggregate-tag.jsx";
+import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/defaults.js";
+import CreateConditionalExpressionListUnionType from "../../client/modal/modals/create-aggregate-tag.jsx";
 import CreateMetricTag from "../../client/modal/modals/create-metric-tag.jsx";
 
 /** @import {Modal} from "../../client/modal/modals.js" */
@@ -42,7 +42,7 @@ function modalSystemClientQueryTag(displayName, modal) {
 }
 
 const SYSTEM_CLIENT_TAGS = [
-    modalSystemClientQueryTag("aggregate tags", CreateAggregateTag),
+    modalSystemClientQueryTag("advanced tag search", CreateConditionalExpressionListUnionType),
     modalSystemClientQueryTag("metric", CreateMetricTag)
 ];
 

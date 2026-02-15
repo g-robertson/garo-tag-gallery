@@ -1,9 +1,9 @@
 import {dbGenerateAccessKey, dbsqlcommand} from "../../db/db-util.js"
 import { DEFAULT_ADMINISTRATOR_PERMISSION_ID, DEFAULT_ADMINISTRATOR_USER_ID } from "../../db/user.js";
-import { insertsystemtag } from "../../db/tags.js";
-import { DEFAULT_LOCAL_TAG_SERVICE, HAS_NOTES_TAG, HAS_URL_TAG, IN_TRASH_TAG, IS_FILE_TAG, IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG, LAST_SYSTEM_TAG, SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
-import { DEFAULT_LOCAL_TAGGABLE_SERVICE } from "../../client/js/taggables.js";
+import { insertSystemTag } from "../../db/tags.js";
+import { DEFAULT_LOCAL_TAG_SERVICE, DEFAULT_LOCAL_TAGGABLE_SERVICE, SYSTEM_LOCAL_TAG_SERVICE, DEFAULT_TAGS, DEFAULT_LOCAL_METRICS } from "../../client/js/defaults.js";
 import { PERMISSIONS } from "../../client/js/user.js";
+import { insertSystemMetric } from "../../db/metrics.js";
 
 const accessKey = dbGenerateAccessKey();
 
@@ -164,8 +164,7 @@ export const MIGRATION = {
                 Display_Name TEXT NOT NULL
             );
         `),
-        // used to reserve first 65535 tags for system usage
-        ...insertsystemtag(LAST_SYSTEM_TAG),
+        ...DEFAULT_TAGS.map(insertSystemTag).flat(),
         dbsqlcommand(`
             CREATE TABLE Namespaces(
                 Namespace_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,14 +180,12 @@ export const MIGRATION = {
                 Tags_Namespaces_PK_Hash TEXT NOT NULL
             ); 
         `),
-        ...insertsystemtag(HAS_URL_TAG),
         dbsqlcommand(`
             CREATE TABLE Local_Taggable_Services(
                 Local_Taggable_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Service_ID INTEGER NOT NULL
             );
         `),
-        ...insertsystemtag(IN_DEFAULT_LOCAL_TAGGABLE_SERVICE_TAG),
         dbsqlcommand(`INSERT INTO Services(
                 Service_ID,
                 Service_Name
@@ -231,7 +228,6 @@ export const MIGRATION = {
                 Taggable_Note_Deleted_Date INTEGER
             );
         `),
-        ...insertsystemtag(HAS_NOTES_TAG),
         dbsqlcommand(`
             CREATE TABLE Files(
                 File_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -241,7 +237,22 @@ export const MIGRATION = {
                 Exact_Bitmap_Hash BLOB,
                 Prethumbnail_Hash BLOB,
                 Thumbnail_Hash BLOB,
-                File_Extension TEXT
+                File_Extension TEXT,
+
+                File_Size INTEGER NOT NULL,
+                Video_Size INTEGER NOT NULL,
+                Frame_Count INTEGER NOT NULL,
+                Width INTEGER,
+                Height INTEGER,
+                Duration REAL,
+                Audio_Size INTEGER NOT NULL,
+                Audio_Dimensions INTEGER,
+                Audio_Sample_Rate INTEGER,
+
+                Has_Transparency INTEGER NOT NULL,
+                Has_Metadata INTEGER NOT NULL,
+                Has_ICC_Profile INTEGER NOT NULL,
+                Has_EXIF INTEGER NOT NULL
             );
         `),
         dbsqlcommand(`
@@ -250,35 +261,44 @@ export const MIGRATION = {
                 File_Comparisons_Made_PK_Hash TEXT NOT NULL,
                 File_ID_1 INTEGER NOT NULL,
                 File_ID_2 INTEGER NOT NULL,
-                Comparison_Is_Checked INTEGER NOT NULL DEFAULT 0,
                 Perceptual_Hash_Distance INTEGER NOT NULL
             );
         `),
         dbsqlcommand(`
-            CREATE TABLE Duplicate_Files(
-                File_ID_1 INTEGER NOT NULL,
-                File_ID_2 INTEGER NOT NULL,
-                Better_File_ID INTEGER
-            );
-        `),
-        dbsqlcommand(`
-            CREATE TABLE Alternate_File_Groups(
-                Alternate_File_Group_ID INTEGER PRIMARY KEY AUTOINCREMENT
-            ); 
-        `),
-        dbsqlcommand(`
-            CREATE TABLE Alternate_File_Groups_Files(
-                Alternate_File_Group_ID INTEGER NOT NULL,
-                File_ID INTEGER NOT NULL
-            );
-        `),
-        ...insertsystemtag(IS_FILE_TAG),
-        dbsqlcommand(`
-            CREATE TABLE Local_Files(
-                Local_File_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE Taggable_Files(
+                Taggable_File_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 File_ID INTEGER NOT NULL,
                 Taggable_ID INTEGER NOT NULL
             );    
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Transitive_File_Relation_Groups(
+                Transitive_File_Relation_Groups_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                File_Relation_Type INTEGER NOT NULL
+            ); 
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Transitive_File_Relation_Groups_Files(
+                Transitive_File_Relation_Groups_ID INTEGER NOT NULL,
+                File_ID INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Nontransitive_File_Relations(
+                Nontransitive_File_Relations_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Nontransitive_File_Relations_PK_Hash TEXT NOT NULL,
+                File_Relation_Type INTEGER NOT NULL,
+                File_ID_1 INTEGER NOT NULL,
+                File_ID_2 INTEGER NOT NULL
+            ); 
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Better_Duplicate_File_Relations(
+                Better_Duplicate_File_Relations_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Better_Duplicate_File_Relations_PK_Hash TEXT NOT NULL,
+                Better_File_ID INTEGER NOT NULL,
+                Worse_File_ID INTEGER NOT NULL
+            );
         `),
         dbsqlcommand(`
             CREATE TABLE Services_Users_Permissions(
@@ -309,12 +329,13 @@ export const MIGRATION = {
         dbsqlcommand(`
             CREATE TABLE Local_Applied_Metrics(
                 Local_Applied_Metric_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_Applied_Metric_PK_Hash TEXT NOT NULL,
                 Local_Metric_ID INTEGER NOT NULL,
                 User_ID INTEGER,
-                Applied_Value REAL NOT NULL,
-                Local_Applied_Metric_PK_Hash TEXT NOT NULL
+                Applied_Value REAL NOT NULL
             );
         `),
+        ...DEFAULT_LOCAL_METRICS.map(insertSystemMetric).flat(),
         dbsqlcommand(`
             CREATE TABLE Local_URL_Generator_Services(
                 Local_URL_Generator_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -329,7 +350,6 @@ export const MIGRATION = {
                 LocaL_URL_Generator_JSON TEXT NOT NULL
             );
         `),
-        ...insertsystemtag(IN_TRASH_TAG),
         dbsqlcommand(`
             CREATE TABLE Local_URL_Classifier_Services(
                 Local_URL_Classifier_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,

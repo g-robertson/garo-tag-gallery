@@ -1,6 +1,6 @@
 import { Key, until } from "selenium-webdriver";
 import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, FINISH_HYDRUS_JOB_TIMEOUT, modClick, modDoubleClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, UNTIL_JOB_BEGIN, UNTIL_JOB_END, UNTIL_MODAL_CLOSE, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
-import { addAggregateTag, AGGREGATE_CONDITION_TYPES, AGGREGATE_TAG_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, enterTagFilter, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveModifyTaggablesChanges, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../../functionality/pages-functionality.js";
+import { addConditionalExpressionListUnionType, EXPRESSION_LIST_UNION_CONDITION_TYPES, CONDITIONAL_EXPRESSION_LIST_UNION_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, enterTagFilter, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveModifyTaggablesChanges, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../../functionality/pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../../../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../../functionality/metrics-functionality.js";
 import { BUG_IMPACTS, BUG_NOTICES, BUG_PRIORITIES, IMPLEMENTATION_DIFFICULTIES } from "../../../unimplemented-test-info.js";
@@ -187,20 +187,16 @@ export const FILE_SEARCH_PAGE_TESTS = [
             await selectPage(driver, 0);
             await selectTagFromTagSearchQuery(driver, TEST_TAG_1);
         }},
-        {name: "TagSearchPersistsUponPageSwitch", tests: [
-            {name: "Setup", isSetup: true, tests: async (driver) => {
-                await createNewFileSearchPage(driver);
-            }},
-            {name: "Teardown", isTeardown: true, tests: async (driver) => {
-                await closePage(driver, 1);
-            }},
-            {name: "TagSearchPersistsUponPageSwitchWorks", tests: async (driver) => {
-                await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
-                await selectPage(driver, 0);
-                await selectPage(driver, 1);
-                await driver.wait(until.elementLocated(BySearchTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
-            }}
-        ]},
+        {name: "TagSearchPersistsUponPageSwitch", tests: async (driver) => {
+            await createNewFileSearchPage(driver);
+
+            await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
+            await selectPage(driver, 0);
+            await selectPage(driver, 1);
+            await driver.wait(until.elementLocated(BySearchTag(TEST_TAG_1)), DEFAULT_TIMEOUT_TIME);
+
+            await closePage(driver, 1);
+        }},
         {name: "TagSelectionUpdatesSearchQuery", tests: async (driver) => {
             await applyTagFilter(driver, "CLEAR SELECTION");
             await applyTagFilter(driver, "");
@@ -270,6 +266,12 @@ export const FILE_SEARCH_PAGE_TESTS = [
             await applyTagFilter(driver, "");
             await driver.wait(until.elementsLocated(BySelectableTag(TEST_TAG_5)), DEFAULT_TIMEOUT_TIME);
         }},
+        {name: "TagFilterShouldStayConsistentBetweenPageSwitch", tests: {
+            expectedDifficulty: "0 - Under an hour",
+            "impact": "1 - Cosmetic",
+            "noticeability": "1 - Minor",
+            "priority": "2 - Next Work"
+        }},
         {name: "OrGroupsWork", tests: [
             {name: "DoesOrGroupModalWork", tests: async (driver) => {
                 await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
@@ -286,41 +288,41 @@ export const FILE_SEARCH_PAGE_TESTS = [
                 await selectTagFromTagSearchQuery(driver, `(${TEST_TAG_1} OR ${TEST_TAG_2} OR ${TEST_TAG_3})`);
             }}
         ]},
-        {name: "AggregateTag", tests: [
-            {name: "DoesAggregateTagModalWork", tests: async (driver) => {
-                await selectTagFromLocalTagSelector(driver, "system:aggregate tags");
+        {name: "ConditionalExpressionListUnionType", tests: [
+            {name: "DoesConditionalExpressionListUnionTypeModalWork", tests: async (driver) => {
+                await selectTagFromLocalTagSelector(driver, "system:advanced tag search");
                 await closeModal(driver);
             }},
-            {name: "DoesAggregateTagFunctionalityWork", tests: async (driver) => {
-                await addAggregateTag(driver, {
-                    type: AGGREGATE_TAG_TYPES.NAMESPACE,
+            {name: "DoesConditionalExpressionListUnionTypeFunctionalityWork", tests: async (driver) => {
+                await addConditionalExpressionListUnionType(driver, {
+                    type: CONDITIONAL_EXPRESSION_LIST_UNION_TYPES.NAMESPACE,
                     item: "series"
                 }, [
                     {
-                        type: AGGREGATE_CONDITION_TYPES.NOT_IN_LIST,
+                        type: EXPRESSION_LIST_UNION_CONDITION_TYPES.NOT_IN_LIST,
                         query1: [SERIES_TAG_1]
                     },
                     {
-                        type: AGGREGATE_CONDITION_TYPES.COUNT_MATCHING,
+                        type: EXPRESSION_LIST_UNION_CONDITION_TYPES.COUNT_MATCHING,
                         value: 1,
                         comparator: COMPARATORS.GT,
                         query1: [TEST_TAG_1]
                     },
                     {
-                        type: AGGREGATE_CONDITION_TYPES.PERCENTAGE_MATCHING,
+                        type: EXPRESSION_LIST_UNION_CONDITION_TYPES.PERCENTAGE_MATCHING,
                         value: 1,
                         comparator: COMPARATORS.GT,
                         query1: [TEST_TAG_1]
                     },
                     {
-                        type: AGGREGATE_CONDITION_TYPES.PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY,
+                        type: EXPRESSION_LIST_UNION_CONDITION_TYPES.PERCENTAGE_OF_SUBQUERY_MATCHING_QUERY,
                         value: 10,
                         comparator: COMPARATORS.GT,
                         query1: [TEST_TAG_1],
                         query2: [TEST_TAG_1]
                     }
                 ]);
-                const RESULTANT_TAG = "system:aggregate tag with group:aggregate namespace:series WHERE is not in tags:series:toaru majutsu no index AND must have >1 taggables match the query (1girl) AND must have >1% of taggables match the query (1girl) AND must have >10% of taggables that match the query (1girl) also match the query (1girl)";
+                const RESULTANT_TAG = "system:conditional namespace:series union WHERE is not in list:series:toaru majutsu no index AND must have >1 taggables match the query (1girl) AND must have >1% of taggables match the query (1girl) AND must have >10% of taggables that match the query (1girl) also match the query (1girl)";
                 await selectTagFromTagSearchQuery(driver, RESULTANT_TAG);
             }}
         ]},

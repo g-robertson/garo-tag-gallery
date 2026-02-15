@@ -1,7 +1,7 @@
 /** @import {ClientSearchQuery, WantedCursor, SearchWantedField} from "../post/search-taggables.js" */
 
 import { fbjsonParse } from "../../client/js/client-util.js";
-import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/tags.js";
+import { SYSTEM_LOCAL_TAG_SERVICE } from "../../client/js/defaults.js";
 
 
 /**
