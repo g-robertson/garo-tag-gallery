@@ -1,5 +1,4 @@
 opencv-4.13.0/.cache
-opencv-4.13.0/build/*
 opencv-4.13.0/**/README*
 opencv-4.13.0/**/CONTRIBUTING*
 opencv-4.13.0/**/docs/*
@@ -8,5 +7,8 @@ opencv-4.13.0/**/samples/*
 opencv-4.13.0/**/test/*
 opencv-4.13.0/**/perf/*
 opencv-4.13.0/**/.github/*
-!opencv-4.13.0/build/3rdparty/lib/*
-!opencv-4.13.0/build/lib/*
+opencv-4.13.0/build/*
+!opencv-4.13.0/build/lib/
+!opencv-4.13.0/build/3rdparty/
+opencv-4.13.0/build/3rdparty/*
+!opencv-4.13.0/build/3rdparty/lib/
