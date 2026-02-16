@@ -1,5 +1,6 @@
 import { mapNullCoalesce } from "../client/js/client-util.js";
 import { CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE } from "../client/js/duplicates.js";
+import { HASH_ALGORITHMS } from "../perf-binding/perf-img.js";
 import { closeHash, closeHashDistances, exactDuplicateHash } from "../server/duplicates.js";
 import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
 import { Job } from "./job-manager.js";
@@ -53,10 +54,13 @@ async function compareFiles(dbs, existingPHashedFilesExactBitmapHashMap, existin
         }
     }
 
-    const hashComparisons = await closeHashDistances(dbs, filesToCompare.map(file => file.Perceptual_Hash), MAX_PERCEPTUAL_HASH_DISTANCE);
+    await dbs.perfImg.assignHashes(HASH_ALGORITHMS.MY_SHAPE_HASH, new Map(filesToCompare.map(file => [
+        file.File_ID, file.Perceptual_Hash
+    ])));
+    const hashComparisons = await closeHashDistances(dbs, MAX_PERCEPTUAL_HASH_DISTANCE);
     for (const hashComparison of hashComparisons) {
-        const file1 = existingPHashedFiles[hashComparison.hash1Index];
-        const file2 = existingPHashedFiles[hashComparison.hash2Index];
+        const file1 = existingPHashedFiles.find(file => file.File_ID === hashComparison.hash1FileID);
+        const file2 = existingPHashedFiles.find(file => file.File_ID === hashComparison.hash2FileID);
         if (file1.Exact_Bitmap_Hash !== null && file2.Exact_Bitmap_Hash !== null && file1.Exact_Bitmap_Hash.toString("hex") === file2.Exact_Bitmap_Hash.toString("hex")) {
             continue;
         }
@@ -129,9 +133,15 @@ export class FileComparisons {
         }, async function*() {
             // Get all already hashed files
             const existingPHashedFiles = await Files.selectAllWithPerceptualHashVersion(dbs, CURRENT_PERCEPTUAL_HASH_VERSION);
-            // Set them as already hashed within perf hash cmp
-            await dbs.perfImg.setAlreadyComparedHashes(existingPHashedFiles.map(file => file.Perceptual_Hash));
+            // Assign the hashes to perfimg
+
+            await dbs.perfImg.assignHashes(HASH_ALGORITHMS.MY_SHAPE_HASH, new Map(existingPHashedFiles.map(file => [
+                file.File_ID,
+                file.Perceptual_Hash
+            ])));
             const existingPHashedFileIDs = new Set(existingPHashedFiles.map(file => file.File_ID));
+            // Set the hashes as already compared in perfimg
+            await dbs.perfImg.setComparedFiles(HASH_ALGORITHMS.MY_SHAPE_HASH, [...existingPHashedFileIDs]);
             /** @type {Map<string, DBFile[]>} */
             const existingPHashedFilesExactBitmapHashMap = new Map();
             for (const file of existingPHashedFiles) {

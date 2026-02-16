@@ -85,10 +85,10 @@ export default class PerfTags {
 
     constructor(path, writeInputFileName, writeOutputFileName, readInputFileName, readOutputFileName, databaseDirectory, archiveDirectory) {
         this.#path = path ?? `./${PerfTags.EXE_NAME}`;
-        this.#writeInputFileName = writeInputFileName ?? "perf-write-input.txt";
-        this.#writeOutputFileName = writeOutputFileName ?? "perf-write-output.txt";
-        this.#readInputFileName = readInputFileName ?? "perf-read-input.txt";
-        this.#readOutputFileName = readOutputFileName ?? "perf-read-output.txt";
+        this.#writeInputFileName = writeInputFileName ?? "perftags-write-input.txt";
+        this.#writeOutputFileName = writeOutputFileName ?? "perftags-write-output.txt";
+        this.#readInputFileName = readInputFileName ?? "perftags-read-input.txt";
+        this.#readOutputFileName = readOutputFileName ?? "perftags-read-output.txt";
         this.#databaseDirectory = databaseDirectory ?? "database/tag-pairings";
         this.#archiveDirectory = archiveDirectory;
 

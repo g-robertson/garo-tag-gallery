@@ -6,6 +6,7 @@ import { getMergedGroups, mergeExistingGroupsIntoGroupMap, randomID } from "../c
 import { rm } from "fs/promises";
 import { DATABASE_DIR, TMP_FOLDER } from "../db/db-util.js";
 import { appendFileSync } from "fs";
+import { HASH_ALGORITHMS } from "../perf-binding/perf-img.js";
 
 /** @import {Databases} from "../db/db-util.js" */
 
@@ -694,12 +695,11 @@ export function hammingDistance(hash1, hash2) {
 const CLOSE_HASH_WEIGHTS_FILTERED = Object.values(CLOSE_HASH_WEIGHTS).filter(weight => weight.multiplier !== 0);
 /**
  * @param {Databases} dbs
- * @param {Buffer[]} toCompareHashes
  * @param {typeof CLOSE_HASH_WEIGHTS_FILTERED} weightArray
  * @param {number} missingEntryWeight
  * @param {number=} distanceCutoff
  */
-export async function weightedCloseHashDistances(dbs, toCompareHashes, weightArray, missingEntryWeight, distanceCutoff) {
+export async function weightedCloseHashDistances(dbs, weightArray, missingEntryWeight, distanceCutoff) {
     distanceCutoff ??= 0xFFFFFFFF;
     const mulWeights = [];
     const powHundredthWeights = [];
@@ -707,18 +707,22 @@ export async function weightedCloseHashDistances(dbs, toCompareHashes, weightArr
        mulWeights.push(Math.round(weight.multiplier * 2));
        powHundredthWeights.push(weight.powHundredths);
     }
+
     const missingEntryWeightEdited = missingEntryWeight * 2;
 
-    return (await dbs.perfImg.compareHashes(distanceCutoff, missingEntryWeightEdited, mulWeights, powHundredthWeights, toCompareHashes)).comparisonsMade;
+    return (await dbs.perfImg.compareHashes(HASH_ALGORITHMS.MY_SHAPE_HASH, distanceCutoff, {
+        missingEntryWeight: missingEntryWeightEdited,
+        mulWeights,
+        powHundredthWeights
+    })).comparisonsMade;
 }
 
 /**
  * @param {Databases} dbs
- * @param {Buffer[]} toCompareHashes
- * @param {number=} cutoffDistance
+ * @param {number=} distanceCutoff
  */
-export function closeHashDistances(dbs, toCompareHashes, cutoffDistance) {
-    return weightedCloseHashDistances(dbs, toCompareHashes, CLOSE_HASH_WEIGHTS_FILTERED, MISSING_ENTRY_WEIGHT, cutoffDistance);
+export function closeHashDistances(dbs, distanceCutoff) {
+    return weightedCloseHashDistances(dbs, CLOSE_HASH_WEIGHTS_FILTERED, MISSING_ENTRY_WEIGHT, distanceCutoff);
 }
 
 export async function closeHash(imagePath) {

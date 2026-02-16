@@ -1,8 +1,14 @@
 import { spawn } from 'child_process';
 import path from 'path';
-import { mapNullCoalesce, serializeUint32, T_MINUTE } from '../client/js/client-util.js';
+import { serializeUint32, T_MINUTE } from '../client/js/client-util.js';
 import { Mutex } from 'async-mutex';
 import { mkdir, readFile, writeFile } from 'fs/promises';
+
+export const HASH_ALGORITHMS = /** @type {const} */ ({
+    MY_SHAPE_HASH: 'S'
+});
+
+/** @typedef {(typeof HASH_ALGORITHMS)[keyof typeof HASH_ALGORITHMS]} HashAlgorithmType */
 
 /**
  * @import {Databases} from "../db/db-util.js"
@@ -144,49 +150,81 @@ export default class PerfImg {
     }
 
     /**
-     * @param {Buffer[]} alreadyComparedHashes
+     * @param {HashAlgorithmType} hashAlgorithm 
+     * @param {number[]} fileIDs
      */
-    async setAlreadyComparedHashes(alreadyComparedHashes) {
-        let hashComparisonString = serializeUint32(alreadyComparedHashes.length);
-        for (const hash of alreadyComparedHashes) {
-            hashComparisonString += `${serializeUint32(hash.length)}${hash.toString("binary")}`;
+    async setComparedFiles(hashAlgorithm, fileIDs) {
+        let comparedFileIDsString = `${hashAlgorithm}${serializeUint32(fileIDs.length)}`;
+        for (const fileID of fileIDs) {
+            comparedFileIDsString += serializeUint32(fileID);
         }
 
-        await this.__writeToWriteInputFile(Buffer.from(hashComparisonString, 'binary'));
-        await this.__writeLineToStdin("set_already_compared");
+        await this.__writeToWriteInputFile(Buffer.from(comparedFileIDsString, 'binary'));
+        await this.__writeLineToStdin("set_compared_files");
+        const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
+    }
+
+    /**
+     * @param {HashAlgorithmType} hashAlgorithm
+     * @param {Map<number, Buffer>} fileIDToHashMap 
+     */
+    async assignHashes(hashAlgorithm, fileIDToHashMap) {
+        let assignedHashesString = `${hashAlgorithm}${serializeUint32(fileIDToHashMap.size)}`;
+        for (const [fileID, hash] of fileIDToHashMap) {
+            assignedHashesString += serializeUint32(fileID);
+            assignedHashesString += serializeUint32(hash.length);
+            assignedHashesString += hash.toString("binary");
+        }
+
+        await this.__writeToWriteInputFile(Buffer.from(assignedHashesString, 'binary'));
+        await this.__writeLineToStdin("assign_hashes");
         const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
     }
     
     /**
-     * @param {number} distanceCutoff
-     * @param {number} missingEntryWeight 
-     * @param {number[]} mulWeights 
-     * @param {number[]} powHundredthWeights
-     * @param {Buffer[]} toCompareHashes
+     * 
+     * @param {{
+     *     missingEntryWeight: number
+     *     mulWeights: number[]
+     *     powHundredthWeights: number[]
+     * }} specificParams 
      */
-    async compareHashes(distanceCutoff, missingEntryWeight, mulWeights, powHundredthWeights, toCompareHashes) {
-        await this.#writeMutex.acquire();
-        const distanceCutoffStr = serializeUint32(distanceCutoff);
-        const missingEntryWeightStr = serializeUint32(missingEntryWeight);
-        const weightsStr = `${serializeUint32(mulWeights.length)}${PerfImg.#serializeSingles(mulWeights)}${PerfImg.#serializeSingles(powHundredthWeights)}`;
-        let hashComparisonString = `${distanceCutoffStr}${missingEntryWeightStr}${weightsStr}${serializeUint32(toCompareHashes.length)}`;
-        
-        for (const hash of toCompareHashes) {
-            hashComparisonString += `${serializeUint32(hash.length)}${hash.toString("binary")}`;
+    static myShapeHashSpecificParamsSerializer(specificParams) {
+        let serializedParams = serializeUint32(specificParams.missingEntryWeight);
+        serializedParams += serializeUint32(specificParams.mulWeights.length);
+        for (let i = 0; i < specificParams.mulWeights.length; ++i) {
+            serializedParams += `${serializeUint32(specificParams.mulWeights[i])}${serializeUint32(specificParams.powHundredthWeights[i])}`;
         }
-        await this.__writeToWriteInputFile(Buffer.from(hashComparisonString, 'binary'));
+        return serializedParams;
+    }
+
+
+    static ALGORITHM_TYPE_TO_SPECIFIC_PARAMS_SERIALIZER = {
+        [HASH_ALGORITHMS.MY_SHAPE_HASH]: PerfImg.myShapeHashSpecificParamsSerializer
+    }
+
+    /**
+     * @param {HashAlgorithmType} hashAlgorithm
+     * @param {number} distanceCutoff
+     * @param {any} specificParams
+     */
+    async compareHashes(hashAlgorithm, distanceCutoff, specificParams) {
+        await this.#writeMutex.acquire();
+        let compareHashesString = `${hashAlgorithm}${serializeUint32(distanceCutoff)}${PerfImg.ALGORITHM_TYPE_TO_SPECIFIC_PARAMS_SERIALIZER[hashAlgorithm](specificParams)}`
+
+        await this.__writeToWriteInputFile(Buffer.from(compareHashesString, 'binary'));
         await this.__writeLineToStdin("compare_hashes");
         const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
 
-        /** @type {{hash1Index: number, hash2Index: number, distance: number}[]} */
+        /** @type {{hash1FileID: number, hash2FileID: number, distance: number}[]} */
         const comparisonsMade = [];
         let hashDistancesStr = await this.__readFromOutputFile();
         for (let i = 0; i < hashDistancesStr.length; i += 12) {
-            const hash1Index = hashDistancesStr.readInt32BE(i);
-            const hash2Index = hashDistancesStr.readInt32BE(i + 4);
+            const hash1FileID = hashDistancesStr.readInt32BE(i);
+            const hash2FileID = hashDistancesStr.readInt32BE(i + 4);
             const distance = hashDistancesStr.readInt32BE(i + 8);
             comparisonsMade.push({
-                hash1Index, hash2Index, distance
+                hash1FileID, hash2FileID, distance
             });
         }
         this.#writeMutex.release();

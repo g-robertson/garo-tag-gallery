@@ -19,7 +19,7 @@ export async function deleteBackupedFiles() {
     await rm(path.join(process.env.DATABASE_DIR, "garo.db"), {force: true});
     await rm(path.join(process.env.DATABASE_DIR, "garo.db-shm"), {force: true});
     await rm(path.join(process.env.DATABASE_DIR, "garo.db-wal"), {force: true});
-    await rm(path.join(process.env.DATABASE_DIR, "perf-tags"), {force: true, recursive: true});
+    await rm(path.join(process.env.DATABASE_DIR, "perftags"), {force: true, recursive: true});
 }
 /** @type {ReturnType<typeof spawn>} */
 let server;

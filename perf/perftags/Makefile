@@ -4,11 +4,11 @@ perftags:
 		-Wshadow \
 		-Wno-unused-function \
 		main.cpp \
-		util.cpp \
 		atomic-ofstream.cpp \
 		tag-file-maintainer.cpp \
 		id-pair-container.cpp \
 		set-evaluation.cpp \
+		../common/util.cpp \
 		-o perftags
 
 test:
@@ -18,10 +18,10 @@ test:
 		-Wshadow \
 		-Wno-unused-function \
 		main.cpp \
-		util.cpp \
 		atomic-ofstream.cpp \
 		tag-file-maintainer.cpp \
 		tests/test-tag-file-maintainer.cpp \
 		id-pair-container.cpp \
 		set-evaluation.cpp \
+		../common/util.cpp \
 		-o perftags-test

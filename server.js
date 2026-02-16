@@ -40,14 +40,14 @@ async function main() {
         }),
         sqlMutex: new Mutex(),
         sqlTransactionMutex: new Mutex(),
-        // .\perf\perftags\perftags.exe database/perf-write-input.txt database/perf-write-output.txt database/perf-read-input.txt database/perf-read-output.txt database/perf-tags
+        // .\perf\perftags\perftags.exe database/perftags-write-input.txt database/perftags-write-output.txt database/perftags-read-input.txt database/perftags-read-output.txt database/perftags
         perfTags: new PerfTags(
             `perf/perftags/${PerfTags.EXE_NAME}`,
-            path.join(DATABASE_DIR, "perf-write-input.txt"),
-            path.join(DATABASE_DIR, "perf-write-output.txt"),
-            path.join(DATABASE_DIR, "perf-read-input.txt"),
-            path.join(DATABASE_DIR, "perf-read-output.txt"),
-            path.join(DATABASE_DIR, "perf-tags"),
+            path.join(DATABASE_DIR, "perftags-write-input.txt"),
+            path.join(DATABASE_DIR, "perftags-write-output.txt"),
+            path.join(DATABASE_DIR, "perftags-read-input.txt"),
+            path.join(DATABASE_DIR, "perftags-read-output.txt"),
+            path.join(DATABASE_DIR, "perftags"),
             "archive-commands"
         ),
         perfImg: new PerfImg(
@@ -61,11 +61,11 @@ async function main() {
     };
 
     dbs.perfTags.__addStderrListener((data) => {
-        appendFileSync(path.join(DATABASE_DIR, "perf-tags-stderr.log"), data);
+        appendFileSync(path.join(DATABASE_DIR, "perftags-stderr.log"), data);
     });
     dbs.perfImg.__addStderrListener((data) => {
-        appendFileSync(path.join(DATABASE_DIR, "perf-img-stderr.log"), data);
-    })
+        appendFileSync(path.join(DATABASE_DIR, "perfimg-stderr.log"), data);
+    });
     //await dbs.fileStorage.extractAllTo(path.join(PARTIAL_ZIPS_FOLDER, "hydrus import from laptop/export-path/hydrus export"));
     //await dbs.fileStorage.extractAllTo(path.join(PARTIAL_ZIPS_FOLDER, "hydrus import small/export-path/hydrus export 1024"));
 

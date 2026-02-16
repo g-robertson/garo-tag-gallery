@@ -14,7 +14,7 @@ async function runInPracticeSuite(perfTags, directory) {
         .filter(practiceSuiteEntry => practiceSuiteEntry.startsWith("command"))
         .sort()
         .map(commandEntry => readFileSync(path.join(directory, commandEntry)).toString());
-    const practiceSuiteInputs = practiceSuiteEntries.filter(practiceSuiteEntry => practiceSuiteEntry.startsWith("perf-write-input") || practiceSuiteEntry.startsWith("perf-read-input")).sort();
+    const practiceSuiteInputs = practiceSuiteEntries.filter(practiceSuiteEntry => practiceSuiteEntry.startsWith("perftags-write-input") || practiceSuiteEntry.startsWith("perftags-read-input")).sort();
     mkdirSync(dirname(TEST_DEFAULT_PERF_WRITE_INPUT), {recursive: true});
     for (let i = 0; i < practiceSuiteCommands.length; ++i) {
         const command = practiceSuiteCommands[i];
@@ -22,13 +22,13 @@ async function runInPracticeSuite(perfTags, directory) {
             await perfTags.reopen();
             continue;
         }
-        if (practiceSuiteInputs[i].startsWith("perf-write-input")) {
+        if (practiceSuiteInputs[i].startsWith("perftags-write-input")) {
             copyFileSync(path.join(directory, practiceSuiteInputs[i]), TEST_DEFAULT_PERF_WRITE_INPUT);
         } else {
             copyFileSync(path.join(directory, practiceSuiteInputs[i]), TEST_DEFAULT_PERF_READ_INPUT);
         }
         perfTags.__writeToStdin(command.replaceAll("\r\n", PerfTags.NEWLINE));
-        if (practiceSuiteInputs[i].startsWith("perf-write-input")) {
+        if (practiceSuiteInputs[i].startsWith("perftags-write-input")) {
             await perfTags.__dataOrTimeout(PerfTags.WRITE_OK_RESULT, 60000);
         } else {
             await perfTags.__dataOrTimeout(PerfTags.READ_OK_RESULT, 60000);

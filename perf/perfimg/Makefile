@@ -4,5 +4,27 @@ perfimg:
 		-Wall \
 		-Wshadow \
 		-Wno-unused-function \
+		-I../extern/opencv-4.13.0/build \
+		-I../extern/opencv-4.13.0/modules/core/include \
+		-I../extern/opencv-4.13.0/modules/imgproc/include \
+		-I../extern/opencv-4.13.0/modules/imgcodecs/include \
+		-I../extern/opencv-4.13.0/opencv_contrib-4.13.0/modules/img_hash/include \
 		main.cpp \
+		hasher.cpp \
+		hash-comparer.cpp \
+		hashes/ocv.cpp \
+		hashes/my-shape-hash.cpp \
+		../common/util.cpp \
+		../extern/opencv-4.13.0/build/lib/libopencv_imgcodecs4130.a \
+		../extern/opencv-4.13.0/build/lib/libopencv_img_hash4130.a \
+		../extern/opencv-4.13.0/build/lib/libopencv_imgproc4130.a \
+		../extern/opencv-4.13.0/build/lib/libopencv_core4130.a \
+		../extern/opencv-4.13.0/build/3rdparty/lib/liblibjpeg-turbo.a \
+		../extern/opencv-4.13.0/build/3rdparty/lib/liblibopenjp2.a \
+		../extern/opencv-4.13.0/build/3rdparty/lib/liblibpng.a \
+		../extern/opencv-4.13.0/build/3rdparty/lib/liblibtiff.a \
+		../extern/opencv-4.13.0/build/3rdparty/lib/liblibwebp.a \
+		../extern/opencv-4.13.0/build/3rdparty/lib/libIlmImf.a \
+		../extern/opencv-4.13.0/build/3rdparty/lib/libzlib.a \
+		-lole32 \
 		-o perfimg

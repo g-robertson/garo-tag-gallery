@@ -24,8 +24,8 @@ unsigned short wantedBucketCount() {
 }
 
 namespace {
-    std::string Write_Output_File_Name = "perf-write-output.txt";
-    std::string Read_Output_File_Name = "perf-read-output.txt";
+    std::string Write_Output_File_Name = "perftags-write-output.txt";
+    std::string Read_Output_File_Name = "perftags-read-output.txt";
     void writeOutputFileWriter(const std::string& outputData) {
         util::writeFile(Write_Output_File_Name, outputData);
     }
@@ -42,8 +42,8 @@ namespace {
 #endif
 
 int main(int argc, const char** argv) {
-    std::string writeInputFileName = "perf-write-input.txt";
-    std::string readInputFileName = "perf-read-input.txt";
+    std::string writeInputFileName = "perftags-write-input.txt";
+    std::string readInputFileName = "perftags-read-input.txt";
     std::string dataStorageDirectory = "tag-pairings";
     if (argc > 1) {
         writeInputFileName = argv[1];

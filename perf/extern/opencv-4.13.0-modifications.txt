@@ -1,0 +1,8 @@
+DELETED docs, samples, apps, all unused modules from both opencv-4.13.0 and opencv_contrib-4.13.0
+DELETED all test,perf(test),doc,samples folders from modules from both opencv-4.13.0 and opencv_contrib-4.13.0
+changed CMakeLists.txt to not add_subdirectory() docs, apps, samples, and data
+added 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+to opencv-4.13.0\modules\imgproc\src\shapedescr.cpp

@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-#include "util.hpp"
+#include "../common/util.hpp"
 
 IdPairDiffContainer::IdPairDiffContainer(std::unordered_map<uint64_t, std::unordered_set<uint64_t>> container)
     : contents_(std::move(container))

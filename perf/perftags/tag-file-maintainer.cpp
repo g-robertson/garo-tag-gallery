@@ -5,7 +5,7 @@
 #include <algorithm>
 
 #include "atomic-ofstream.hpp"
-#include "util.hpp"
+#include "../common/util.hpp"
 
 const int TagFileMaintainer::VERSION = 1;
 

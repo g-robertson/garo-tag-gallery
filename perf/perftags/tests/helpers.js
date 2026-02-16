@@ -14,15 +14,15 @@ import {stat} from "fs/promises";
  */
 
 export const TEST_DEFAULT_PERF_EXE = `./perftags-test${PerfTags.EXE_NAME.slice("perftags".length)}`;
-export const TEST_DEFAULT_PERF_WRITE_INPUT = "test-dir/perf-write-input.txt";
-export const TEST_DEFAULT_PERF_READ_INPUT = "test-dir/perf-read-input.txt";
+export const TEST_DEFAULT_PERF_WRITE_INPUT = "test-dir/perftags-write-input.txt";
+export const TEST_DEFAULT_PERF_READ_INPUT = "test-dir/perftags-read-input.txt";
 export const TEST_DEFAULT_DATABASE_DIR = "test-dir/database-dir";
 export const TEST_DEFAULT_PERF_TAGS_ARGS = [
     TEST_DEFAULT_PERF_EXE,
     TEST_DEFAULT_PERF_WRITE_INPUT,
-    "test-dir/perf-write-output.txt",
+    "test-dir/perftags-write-output.txt",
     TEST_DEFAULT_PERF_READ_INPUT,
-    "test-dir/perf-read-output.txt",
+    "test-dir/perftags-read-output.txt",
     TEST_DEFAULT_DATABASE_DIR,
     "test-dir/archive"
 ];
