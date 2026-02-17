@@ -54,6 +54,8 @@ int main(int argc, const char** argv) {
             hasher.assignHashes(inputSV);
         } else if (op == "perform_hashes") {
             hasher.performHashes(inputSV);
+        } else if (op == "perform_and_get_hashes") {
+            hasher.performAndGetHashes(inputSV, writeOutputFileWriter);
         } else if (op == "exit") {
         } else {
             std::cout << "BAD COMMAND!" << std::endl;

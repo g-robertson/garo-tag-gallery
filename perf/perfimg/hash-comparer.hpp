@@ -15,6 +15,10 @@ struct HashComparisonParams {
     void* specificParams;
 };
 
+namespace CommonHashComparisons {
+    double hammingDistanceCompare(const std::vector<unsigned char>& a, const std::vector<unsigned char>& b, const void*, double);
+}
+
 class HashComparer {
     public:
         HashComparer();

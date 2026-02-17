@@ -303,13 +303,13 @@ export async function extractMetadataWithFFProbe(inputFileName, ffprobeExecutabl
     };
 }
 
-const SERIALIZATION_BUF = Buffer.allocUnsafe(4);
+const FLOAT_SERIALIZATION_BUF = Buffer.allocUnsafe(4);
 /**
  * @param {number} float
  */
 export function serializeFloat(float) {
-    SERIALIZATION_BUF.writeFloatLE(float);
-    return SERIALIZATION_BUF.toString("binary");
+    FLOAT_SERIALIZATION_BUF.writeFloatLE(float);
+    return FLOAT_SERIALIZATION_BUF.toString("binary");
 }
 
 /**
@@ -317,6 +317,22 @@ export function serializeFloat(float) {
  */
 export function deserializeFloat(buffer) {
     return buffer.readFloatLE();
+}
+
+const DOUBLE_SERIALIZATION_BUF = Buffer.allocUnsafe(8);
+/**
+ * @param {number} float
+ */
+export function serializeDouble(float) {
+    DOUBLE_SERIALIZATION_BUF.writeDoubleLE(float);
+    return DOUBLE_SERIALIZATION_BUF.toString("binary");
+}
+
+/**
+ * @param {Buffer} buffer 
+ */
+export function deserializeDouble(buffer) {
+    return buffer.readDoubleLE();
 }
 
 /**

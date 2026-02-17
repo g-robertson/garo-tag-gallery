@@ -3,10 +3,9 @@
  */
 
 import { z } from "zod";
-import { PERMISSIONS } from "../../client/js/user.js";
 import { getCursorAsFileIDs } from "../../db/cursor-manager.js";
 import { FileComparisons } from "../../db/duplicates.js";
-import { USER_PERCEPTUAL_HASH_MULTIPLIER } from "../../client/js/duplicates.js";
+import { USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER } from "../../client/js/duplicates.js";
 
 /**
  * @param {Parameters<APIValidationFunction>[0]} dbs 
@@ -26,7 +25,7 @@ export async function validate(dbs, req, res) {
 
     return {
         fileIDs,
-        maxPerceptualHashDistance: maxPerceptualHashDistance.data / USER_PERCEPTUAL_HASH_MULTIPLIER
+        maxPerceptualHashDistance: maxPerceptualHashDistance.data / USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER
     };
 }
 

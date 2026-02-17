@@ -162,7 +162,7 @@ export default class PerfTags {
                 throw `number provided to serializeSingles logged above was not a bigint`;
             }
 
-            offset = buffer.writeBigUInt64BE(number, offset);
+            offset = buffer.writeBigUInt64LE(number, offset);
         }
         return buffer.toString("binary");
     }
@@ -233,10 +233,10 @@ export default class PerfTags {
         let offset = 0;
         for (const [tag, taggableSet] of tagPairings.entries()) {
 
-            offset = buffer.writeBigUInt64BE(tag, offset);
-            offset = buffer.writeBigUInt64BE(BigInt(taggableSet.length), offset);
+            offset = buffer.writeBigUInt64LE(tag, offset);
+            offset = buffer.writeBigUInt64LE(BigInt(taggableSet.length), offset);
             for (const taggable of taggableSet) {
-                offset = buffer.writeBigUInt64BE(taggable, offset);
+                offset = buffer.writeBigUInt64LE(taggable, offset);
             }
         }
         return buffer;
@@ -398,7 +398,7 @@ export default class PerfTags {
         /** @type {number[]} */
         const tagGroupsTaggableCounts = [];
         for (let i = 0; i < tagsTaggableCountsStr.length;) {
-            const taggableGroupCount = Number(tagsTaggableCountsStr.readBigUInt64BE(i));
+            const taggableGroupCount = Number(tagsTaggableCountsStr.readBigUInt64LE(i));
             i += 8;
             tagGroupsTaggableCounts.push(taggableGroupCount);
         }
@@ -420,13 +420,13 @@ export default class PerfTags {
         /** @type {Map<bigint, bigint[]>} */
         const taggablePairings = new Map();
         for (let i = 0; i < taggablesTagsStr.length;) {
-            const taggable = taggablesTagsStr.readBigUInt64BE(i);
+            const taggable = taggablesTagsStr.readBigUInt64LE(i);
             i += 8;
-            const tagCount = taggablesTagsStr.readBigUInt64BE(i);
+            const tagCount = taggablesTagsStr.readBigUInt64LE(i);
             i += 8;
             const tags = [];
             for (let j = 0; j < tagCount; ++j) {
-                const tag = taggablesTagsStr.readBigUInt64BE(i);
+                const tag = taggablesTagsStr.readBigUInt64LE(i);
                 i += 8;
 
                 tags.push(tag);
@@ -451,13 +451,13 @@ export default class PerfTags {
         /** @type {Map<bigint, bigint[]>} */
         const taggablePairings = new Map();
         for (let i = 0; i < taggablesTagsStr.length;) {
-            const taggable = taggablesTagsStr.readBigUInt64BE(i);
+            const taggable = taggablesTagsStr.readBigUInt64LE(i);
             i += 8;
-            const tagCount = taggablesTagsStr.readBigUInt64BE(i);
+            const tagCount = taggablesTagsStr.readBigUInt64LE(i);
             i += 8;
             const tags = [];
             for (let j = 0; j < tagCount; ++j) {
-                const tag = taggablesTagsStr.readBigUInt64BE(i);
+                const tag = taggablesTagsStr.readBigUInt64LE(i);
                 i += 8;
 
                 tags.push(tag);
@@ -483,7 +483,7 @@ export default class PerfTags {
         /** @type {bigint[]} */
         const taggables = [];
         for (let i = 0; i  < taggablesStr.length; i += 8) {
-            taggables.push(taggablesStr.readBigUInt64BE(i));
+            taggables.push(taggablesStr.readBigUInt64LE(i));
         }
 
         this.#readMutex.release();

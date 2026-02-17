@@ -3,8 +3,16 @@ import path from 'path';
 import { serializeUint32, T_MINUTE } from '../client/js/client-util.js';
 import { Mutex } from 'async-mutex';
 import { mkdir, readFile, writeFile } from 'fs/promises';
+import { deserializeDouble, serializeDouble } from '../util.js';
 
 export const HASH_ALGORITHMS = /** @type {const} */ ({
+    OCV_AVERAGE_HASH: 'A',
+    OCV_BLOCK_MEAN_HASH_0: 'b',
+    OCV_BLOCK_MEAN_HASH_1: 'B',
+    OCV_COLOR_MOMENT_HASH: 'C',
+    OCV_MARR_HILDRETH_HASH: 'M',
+    OCV_PHASH: 'P',
+    OCV_RADIAL_VARIANCE_HASH: 'R',
     MY_SHAPE_HASH: 'S'
 });
 
@@ -144,7 +152,7 @@ export default class PerfImg {
         let offset = 0;
         let buffer = Buffer.allocUnsafe(numbers.length * 4);
         for (const number of numbers) {
-            offset = buffer.writeUint32BE(number, offset);
+            offset = buffer.writeUint32LE(number, offset);
         }
         return buffer.toString("binary");
     }
@@ -166,9 +174,69 @@ export default class PerfImg {
 
     /**
      * @param {HashAlgorithmType} hashAlgorithm
+     * @param {Map<number, string>} fileIDToFileName
+     */
+    async performHashes(hashAlgorithm, fileIDToFileName) {
+        await this.#writeMutex.acquire();
+
+        let performHashesString = `${hashAlgorithm}${serializeUint32(fileIDToFileName.size)}`;
+        for (const [fileID, fileName] of fileIDToFileName) {
+            performHashesString += serializeUint32(fileID);
+            performHashesString += serializeUint32(fileName.length);
+            performHashesString += fileName.toString("binary");
+        }
+
+        await this.__writeToWriteInputFile(Buffer.from(performHashesString, 'binary'));
+        await this.__writeLineToStdin("perform_hashes");
+        const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
+        
+        this.#writeMutex.release();
+    }
+
+    /**
+     * @param {HashAlgorithmType} hashAlgorithm
+     * @param {Map<number, string>} fileIDToFileName
+     */
+    async performAndGetHashes(hashAlgorithm, fileIDToFileName) {
+        await this.#writeMutex.acquire();
+
+        let performAndGetHashesString = `${hashAlgorithm}${serializeUint32(fileIDToFileName.size)}`;
+        for (const [fileID, fileName] of fileIDToFileName) {
+            performAndGetHashesString += serializeUint32(fileID);
+            performAndGetHashesString += serializeUint32(fileName.length);
+            performAndGetHashesString += fileName.toString("binary");
+        }
+
+        await this.__writeToWriteInputFile(Buffer.from(performAndGetHashesString, 'binary'));
+        await this.__writeLineToStdin("perform_and_get_hashes");
+        const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
+        
+        let location = 0;
+        /** @type {Map<number, Buffer>} */
+        const hashMap = new Map();
+        let performAndGetHashesReturnString = await this.__readFromOutputFile();
+        for (let i = 0; i < fileIDToFileName.size; ++i) {
+            const fileID = performAndGetHashesReturnString.readInt32LE(location);
+            location += 4;
+            const hashLength = performAndGetHashesReturnString.readInt32LE(location);
+            location += 4;
+            const hash = performAndGetHashesReturnString.subarray(location, location + hashLength);
+            location += hashLength;
+            hashMap.set(fileID, hash);
+        }
+
+        this.#writeMutex.release();
+
+        return {ok, hashMap};
+    }
+
+    /**
+     * @param {HashAlgorithmType} hashAlgorithm
      * @param {Map<number, Buffer>} fileIDToHashMap 
      */
     async assignHashes(hashAlgorithm, fileIDToHashMap) {
+        await this.#writeMutex.acquire();
+
         let assignedHashesString = `${hashAlgorithm}${serializeUint32(fileIDToHashMap.size)}`;
         for (const [fileID, hash] of fileIDToHashMap) {
             assignedHashesString += serializeUint32(fileID);
@@ -179,8 +247,14 @@ export default class PerfImg {
         await this.__writeToWriteInputFile(Buffer.from(assignedHashesString, 'binary'));
         await this.__writeLineToStdin("assign_hashes");
         const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
+
+        this.#writeMutex.release();
     }
     
+    static noParamsSerializer() {
+        return "";
+    }
+
     /**
      * 
      * @param {{
@@ -200,17 +274,25 @@ export default class PerfImg {
 
 
     static ALGORITHM_TYPE_TO_SPECIFIC_PARAMS_SERIALIZER = {
+        [HASH_ALGORITHMS.OCV_AVERAGE_HASH]: PerfImg.noParamsSerializer,
+        [HASH_ALGORITHMS.OCV_BLOCK_MEAN_HASH_0]: PerfImg.noParamsSerializer,
+        [HASH_ALGORITHMS.OCV_BLOCK_MEAN_HASH_1]: PerfImg.noParamsSerializer,
+        [HASH_ALGORITHMS.OCV_COLOR_MOMENT_HASH]: PerfImg.noParamsSerializer,
+        [HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH]: PerfImg.noParamsSerializer,
+        [HASH_ALGORITHMS.OCV_PHASH]: PerfImg.noParamsSerializer,
+        [HASH_ALGORITHMS.OCV_RADIAL_VARIANCE_HASH]: PerfImg.noParamsSerializer,
         [HASH_ALGORITHMS.MY_SHAPE_HASH]: PerfImg.myShapeHashSpecificParamsSerializer
     }
 
     /**
      * @param {HashAlgorithmType} hashAlgorithm
-     * @param {number} distanceCutoff
      * @param {any} specificParams
+     * @param {number=} distanceCutoff
      */
-    async compareHashes(hashAlgorithm, distanceCutoff, specificParams) {
+    async compareHashes(hashAlgorithm, specificParams, distanceCutoff) {
+        distanceCutoff ??= Number.MAX_VALUE;
         await this.#writeMutex.acquire();
-        let compareHashesString = `${hashAlgorithm}${serializeUint32(distanceCutoff)}${PerfImg.ALGORITHM_TYPE_TO_SPECIFIC_PARAMS_SERIALIZER[hashAlgorithm](specificParams)}`
+        let compareHashesString = `${hashAlgorithm}${serializeDouble(distanceCutoff)}${PerfImg.ALGORITHM_TYPE_TO_SPECIFIC_PARAMS_SERIALIZER[hashAlgorithm](specificParams)}`
 
         await this.__writeToWriteInputFile(Buffer.from(compareHashesString, 'binary'));
         await this.__writeLineToStdin("compare_hashes");
@@ -219,10 +301,10 @@ export default class PerfImg {
         /** @type {{hash1FileID: number, hash2FileID: number, distance: number}[]} */
         const comparisonsMade = [];
         let hashDistancesStr = await this.__readFromOutputFile();
-        for (let i = 0; i < hashDistancesStr.length; i += 12) {
-            const hash1FileID = hashDistancesStr.readInt32BE(i);
-            const hash2FileID = hashDistancesStr.readInt32BE(i + 4);
-            const distance = hashDistancesStr.readInt32BE(i + 8);
+        for (let i = 0; i < hashDistancesStr.length; i += 16) {
+            const hash1FileID = hashDistancesStr.readInt32LE(i);
+            const hash2FileID = hashDistancesStr.readInt32LE(i + 4);
+            const distance = deserializeDouble(hashDistancesStr.subarray(i + 8));
             comparisonsMade.push({
                 hash1FileID, hash2FileID, distance
             });

@@ -1,7 +1,7 @@
 import { mapNullCoalesce } from "../client/js/client-util.js";
-import { CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE } from "../client/js/duplicates.js";
+import { CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE,  MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE } from "../client/js/duplicates.js";
 import { HASH_ALGORITHMS } from "../perf-binding/perf-img.js";
-import { closeHash, closeHashDistances, exactDuplicateHash } from "../server/duplicates.js";
+import { exactDuplicateHash } from "../server/duplicates.js";
 import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
 import { Job } from "./job-manager.js";
 import { Files } from "./taggables.js";
@@ -22,13 +22,18 @@ async function compareFiles(dbs, existingPHashedFilesExactBitmapHashMap, existin
     /** @type {PreInsertFileComparison[]} */
     const fileComparisonsToAdd = [];
 
+    const filesToCompareMap = new Map(filesToCompare.map(file => [
+        file.File_ID, Files.getLocation(dbs, file)
+    ]));
+
+    const {hashMap} = await dbs.perfImg.performAndGetHashes(HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH, filesToCompareMap);
+
     for (const fileToCompare of filesToCompare) {
-        const fileName = Files.getLocation(dbs, fileToCompare);
         try {
             fileToCompare.Exact_Bitmap_Hash = await exactDuplicateHash(fileName);
         // Empty catch, some files just cant be exact compared (videos, mainly)
         } catch {}
-        fileToCompare.Perceptual_Hash = await closeHash(fileName);
+        fileToCompare.Perceptual_Hash = hashMap.get(fileToCompare.File_ID);
         fileToCompare.Perceptual_Hash_Version = CURRENT_PERCEPTUAL_HASH_VERSION;
 
         await dbrun(dbs, `
@@ -54,11 +59,8 @@ async function compareFiles(dbs, existingPHashedFilesExactBitmapHashMap, existin
         }
     }
 
-    await dbs.perfImg.assignHashes(HASH_ALGORITHMS.MY_SHAPE_HASH, new Map(filesToCompare.map(file => [
-        file.File_ID, file.Perceptual_Hash
-    ])));
-    const hashComparisons = await closeHashDistances(dbs, MAX_PERCEPTUAL_HASH_DISTANCE);
-    for (const hashComparison of hashComparisons) {
+    const {comparisonsMade} = await dbs.perfImg.compareHashes(HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH, null, MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE);
+    for (const hashComparison of comparisonsMade) {
         const file1 = existingPHashedFiles.find(file => file.File_ID === hashComparison.hash1FileID);
         const file2 = existingPHashedFiles.find(file => file.File_ID === hashComparison.hash2FileID);
         if (file1.Exact_Bitmap_Hash !== null && file2.Exact_Bitmap_Hash !== null && file1.Exact_Bitmap_Hash.toString("hex") === file2.Exact_Bitmap_Hash.toString("hex")) {
@@ -135,13 +137,13 @@ export class FileComparisons {
             const existingPHashedFiles = await Files.selectAllWithPerceptualHashVersion(dbs, CURRENT_PERCEPTUAL_HASH_VERSION);
             // Assign the hashes to perfimg
 
-            await dbs.perfImg.assignHashes(HASH_ALGORITHMS.MY_SHAPE_HASH, new Map(existingPHashedFiles.map(file => [
+            await dbs.perfImg.assignHashes(HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH, new Map(existingPHashedFiles.map(file => [
                 file.File_ID,
                 file.Perceptual_Hash
             ])));
             const existingPHashedFileIDs = new Set(existingPHashedFiles.map(file => file.File_ID));
             // Set the hashes as already compared in perfimg
-            await dbs.perfImg.setComparedFiles(HASH_ALGORITHMS.MY_SHAPE_HASH, [...existingPHashedFileIDs]);
+            await dbs.perfImg.setComparedFiles(HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH, [...existingPHashedFileIDs]);
             /** @type {Map<string, DBFile[]>} */
             const existingPHashedFilesExactBitmapHashMap = new Map();
             for (const file of existingPHashedFiles) {

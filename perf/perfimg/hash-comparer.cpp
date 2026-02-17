@@ -1,5 +1,5 @@
 #include "hash-comparer.hpp"
-#include "hashes/my-shape-hash.hpp"
+#include "hashes/ocv.hpp"
 #include "../common/util.hpp"
 
 #include <bit>
@@ -7,28 +7,25 @@
 #include <cmath>
 #include <iostream>
 
-namespace {
-    std::size_t hammingDistance(const std::vector<unsigned char>& a, const std::vector<unsigned char>& b) {
-        std::size_t distance = 0;
-        if (a.size() != b.size()) {
-            throw "Tried to compute hamming distance between two differently sized strings";
-        }
 
-        std::size_t i = 0;
-        // TODO: This needs measured if it is making an impact
-        for (; i + 8 < a.size(); i += 8) {
-            distance += std::popcount((*reinterpret_cast<const uint64_t*>(a.data() + i)) ^ (*reinterpret_cast<const uint64_t*>(b.data() + i)));
-        }
-
-        for (; i < a.size(); ++i) {
-            distance += std::popcount(static_cast<unsigned char>(a[i] ^ b[i]));
-        }
+double CommonHashComparisons::hammingDistanceCompare(const std::vector<unsigned char>& a, const std::vector<unsigned char>& b, const void*, double) {
+    unsigned int distance = 0;
+    if (a.size() != b.size()) {
+        throw std::logic_error("Tried to compute hamming distance between two differently sized strings");
     }
+    
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        distance += std::popcount(static_cast<unsigned char>(a[i] ^ b[i]));
+        
+    }
+    return static_cast<double>(distance);
+}
 
+namespace {
     struct ComparisonMade {
         unsigned int firstFile;
         unsigned int secondFile;
-        unsigned int distance;
+        double distance;
     };
 
     HashComparisonParams NO_PARAMS(std::string_view) {
@@ -38,11 +35,11 @@ namespace {
         };
     }
     HashComparisonParams UNIMPL_PARAMS(std::string_view) {
-        throw "Hash comparison params have not been implemented for this algorithm";
+        throw std::logic_error("Hash comparison params have not been implemented for this algorithm");
     }
 
-    unsigned int UNIMPL_HASH_COMPARE(const std::vector<unsigned char>&, const std::vector<unsigned char>&, const void*, unsigned int) {
-        throw "Hash compare has not been implemented for this algorithm";
+    double UNIMPL_HASH_COMPARE(const std::vector<unsigned char>&, const std::vector<unsigned char>&, const void*, double) {
+        throw std::logic_error("Hash compare has not been implemented for this algorithm");
     }
 
     auto HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DESERIALIZER = std::unordered_map<Hasher::Algorithm, HashComparisonParams(*)(std::string_view)>({
@@ -52,24 +49,19 @@ namespace {
         {Hasher::Algorithm::OCV_COLOR_MOMENT_HASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_PHASH, NO_PARAMS},
-        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS},
-        {Hasher::Algorithm::MY_SHAPE_HASH, MyShapeHash::deserializeComparisonParams}
+        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS}
     });
     
-    auto HASH_ALGORITHM_TO_HASH_COMPARE = std::unordered_map<Hasher::Algorithm, unsigned int(*)(const std::vector<unsigned char>&, const std::vector<unsigned char>&, const void*, unsigned int)>({
-        {Hasher::Algorithm::OCV_AVERAGE_HASH, UNIMPL_HASH_COMPARE},
-        {Hasher::Algorithm::OCV_BLOCK_MEAN_HASH_0, UNIMPL_HASH_COMPARE},
-        {Hasher::Algorithm::OCV_BLOCK_MEAN_HASH_1, UNIMPL_HASH_COMPARE},
-        {Hasher::Algorithm::OCV_COLOR_MOMENT_HASH, UNIMPL_HASH_COMPARE},
-        {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, UNIMPL_HASH_COMPARE},
-        {Hasher::Algorithm::OCV_PHASH, UNIMPL_HASH_COMPARE},
-        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, UNIMPL_HASH_COMPARE},
-        {Hasher::Algorithm::MY_SHAPE_HASH, MyShapeHash::hashCompare}
+    auto HASH_ALGORITHM_TO_HASH_COMPARE = std::unordered_map<Hasher::Algorithm, double(*)(const std::vector<unsigned char>&, const std::vector<unsigned char>&, const void*, double)>({
+        {Hasher::Algorithm::OCV_AVERAGE_HASH, OCVHashes::averageHashCompare},
+        {Hasher::Algorithm::OCV_BLOCK_MEAN_HASH_0, OCVHashes::blockMeanHashCompare},
+        {Hasher::Algorithm::OCV_BLOCK_MEAN_HASH_1, OCVHashes::blockMeanHashCompare},
+        {Hasher::Algorithm::OCV_COLOR_MOMENT_HASH, OCVHashes::colorMomentHashCompare},
+        {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, OCVHashes::marrHildrethHashCompare},
+        {Hasher::Algorithm::OCV_PHASH, OCVHashes::pHashCompare},
+        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, OCVHashes::radialVarianceHashCompare}
     });
-
 };
-    
-
 
 HashComparer::HashComparer() {
     for (const auto& hashAlgorithmToCompare : HASH_ALGORITHM_TO_HASH_COMPARE) {
@@ -102,8 +94,8 @@ void HashComparer::compareHashes(std::string_view input, void (*writer)(const st
     auto& comparedFiles = comparedFileBuckets.at(hashAlgorithm);
     auto hashCompare = HASH_ALGORITHM_TO_HASH_COMPARE.at(hashAlgorithm);
 
-    unsigned int distanceCutoff = util::deserializeUInt32(input);
-    input = input.substr(4);
+    double distanceCutoff = util::deserializeDouble(input);
+    input = input.substr(8);
 
     auto hashComparisonParams = HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DESERIALIZER.at(hashAlgorithm)(input);
     input = input.substr(hashComparisonParams.deserializationLength);
@@ -142,14 +134,11 @@ void HashComparer::compareHashes(std::string_view input, void (*writer)(const st
 
     std::string output;
     std::size_t outputLocation = 0;
-    output.reserve(comparisonsMade.size() * 12);
+    output.reserve(comparisonsMade.size() * 16);
     for (const auto& comparisonMade : comparisonsMade) {
-        util::serializeUInt32(comparisonMade.firstFile, output, outputLocation);
-        outputLocation += 4;
-        util::serializeUInt32(comparisonMade.secondFile, output, outputLocation);
-        outputLocation += 4;
-        util::serializeUInt32(comparisonMade.distance, output, outputLocation);
-        outputLocation += 4;
+        outputLocation = util::serializeUInt32(comparisonMade.firstFile, output, outputLocation);
+        outputLocation = util::serializeUInt32(comparisonMade.secondFile, output, outputLocation);
+        outputLocation = util::serializeDouble(comparisonMade.distance, output, outputLocation);
     }
 
     writer(output);

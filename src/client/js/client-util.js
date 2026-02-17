@@ -198,10 +198,10 @@ export function replaceObject(objDest, objSrc) {
  */
 export function serializeUint32(num) {
     let serialized = "";
-    serialized += String.fromCharCode(Number((num >> 24) & 0xFF));
+    serialized += String.fromCharCode(Number((num >> 0) & 0xFF));
+    serialized += String.fromCharCode(Number((num >> 8) & 0xFF));
     serialized += String.fromCharCode(Number((num >> 16) & 0xFF));
-    serialized += String.fromCharCode(Number((num >>  8) & 0xFF));
-    serialized += String.fromCharCode(Number((num >>  0) & 0xFF));
+    serialized += String.fromCharCode(Number((num >> 24) & 0xFF));
     return serialized;
 }
 /**
@@ -221,14 +221,14 @@ export function deserializeUint32(str) {
  */
 export function serializeUint64(num) {
     let serialized = "";
-    serialized += String.fromCharCode(Number((num >> 56n) & 0xFFn));
-    serialized += String.fromCharCode(Number((num >> 48n) & 0xFFn));
-    serialized += String.fromCharCode(Number((num >> 40n) & 0xFFn));
-    serialized += String.fromCharCode(Number((num >> 32n) & 0xFFn));
-    serialized += String.fromCharCode(Number((num >> 24n) & 0xFFn));
-    serialized += String.fromCharCode(Number((num >> 16n) & 0xFFn));
-    serialized += String.fromCharCode(Number((num >>  8n) & 0xFFn));
     serialized += String.fromCharCode(Number((num >>  0n) & 0xFFn));
+    serialized += String.fromCharCode(Number((num >>  8n) & 0xFFn));
+    serialized += String.fromCharCode(Number((num >> 16n) & 0xFFn));
+    serialized += String.fromCharCode(Number((num >> 24n) & 0xFFn));
+    serialized += String.fromCharCode(Number((num >> 32n) & 0xFFn));
+    serialized += String.fromCharCode(Number((num >> 40n) & 0xFFn));
+    serialized += String.fromCharCode(Number((num >> 48n) & 0xFFn));
+    serialized += String.fromCharCode(Number((num >> 56n) & 0xFFn));
     return serialized;
 }
 /**
@@ -236,13 +236,13 @@ export function serializeUint64(num) {
  */
 export function deserializeUint64(str) {
     let num = 0n;
-    num += BigInt(str.charCodeAt(0)) << 56n;
-    num += BigInt(str.charCodeAt(1)) << 48n;
-    num += BigInt(str.charCodeAt(2)) << 40n;
-    num += BigInt(str.charCodeAt(3)) << 32n;
-    num += BigInt(str.charCodeAt(4)) << 24n;
-    num += BigInt(str.charCodeAt(5)) << 16n;
-    num += BigInt(str.charCodeAt(6)) << 8n;
+    num += BigInt(str.charCodeAt(0)) <<  0n;
+    num += BigInt(str.charCodeAt(1)) <<  8n;
+    num += BigInt(str.charCodeAt(2)) << 16n;
+    num += BigInt(str.charCodeAt(3)) << 24n;
+    num += BigInt(str.charCodeAt(4)) << 32n;
+    num += BigInt(str.charCodeAt(5)) << 40n;
+    num += BigInt(str.charCodeAt(6)) << 48n;
     num += BigInt(str.charCodeAt(7));
     return num;
 }
@@ -275,6 +275,30 @@ export function mapNullCoalesce(map, key, value) {
         map.set(key, mapValue);
     }
     return mapValue;
+}
+
+/**
+ * @template {Map} T
+ * @param {T} map 
+ * @param {number} chunkSize
+ */
+export function chunkifyMap(map, chunkSize) {
+    /** @type {T[]} */
+    const mapChunks = [];
+    let mapChunk = new Map();
+    for (const [k, v] of map) {
+        mapChunk.set(k, v);
+        if (mapChunk.size === chunkSize) {
+            mapChunks.push(mapChunk);
+            mapChunk = new Map();
+        }
+    }
+    
+   if (mapChunk.size > 0) {
+       mapChunks.push(mapChunk);
+   }
+
+   return mapChunks;
 }
 
 /**

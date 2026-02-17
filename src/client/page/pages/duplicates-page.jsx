@@ -3,12 +3,12 @@ import '../../global.css';
 
 import NumericInput from '../../components/numeric-input.jsx';
 import HoverInfo from '../../components/hover-info.jsx';
-import { ALT_LIKELY_PERCEPTUAL_HASH_DISTANCE, CURRENT_PERCEPTUAL_HASH_VERSION, DUP_LIKELY_PERCEPTUAL_HASH_DISTANCE, IS_EXACT_DUPLICATE_DISTANCE, MAX_PERCEPTUAL_HASH_DISTANCE, REASONABLE_PERCEPTUAL_HASH_DISTANCE, USER_PERCEPTUAL_HASH_MULTIPLIER } from '../../js/duplicates.js';
+import { ALT_LIKELY_SIMILAR_PERCEPTUAL_HASH_DISTANCE, CURRENT_PERCEPTUAL_HASH_VERSION, DUP_LIKELY_SIMILAR_PERCEPTUAL_HASH_DISTANCE, IS_EXACT_DUPLICATE_DISTANCE, MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE, REASONABLE_SIMILAR_PERCEPTUAL_HASH_DISTANCE, USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER } from '../../js/duplicates.js';
 import compareFilesForDuplicates from '../../../api/client-get/compare-files-for-duplicates.js';
 import LazyDedupePreviewGallery from '../../components/lazy-dedupe-preview-gallery.jsx';
 import DedupeGalleryModal from '../../modal/modals/dedupe-gallery.jsx';
 import DialogBox from '../../modal/modals/dialog-box.jsx';
-import { executeFunctions, mergeGroups, ReferenceableReact } from '../../js/client-util.js';
+import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 import { Modals } from '../../modal/modals.js';
 import { Jobs } from '../../jobs.js';
 import { Page} from "../pages.js";
@@ -61,7 +61,7 @@ const DuplicatesProcessingPage = ({page}) => {
     const PotentialDuplicateFileCount = ReferenceableReact();
 
     const dedupeGalleryState = page.persistentState.registerState("dedupeGallery", new PersistentState(), {addToCleanup, name: "DuplicatesProcessingPage.dedupeGalleryState"});
-    const maxSearchDistanceState = page.persistentState.registerState("maxSearchDistance", new State(REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER), {isSaved: true, addToCleanup, name: "DuplicatesProcessingPage.maxSearchDistanceState"});
+    const maxSearchDistanceState = page.persistentState.registerState("maxSearchDistance", new State(REASONABLE_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER), {isSaved: true, addToCleanup, name: "DuplicatesProcessingPage.maxSearchDistanceState"});
     
     const clientSearchQueryState = new State(null, {name: "DuplicatesProcessingPage.clientSearchQueryState"});
     /** @type {State<number[]>} */
@@ -239,18 +239,18 @@ const DuplicatesProcessingPage = ({page}) => {
             <div style={{width: "auto", flex: 3, flexDirection: "column", height: "100%"}}>
                 <div style={{marginTop: 4}}>
                     Maximum <HoverInfo hoverText={"A metric representing how different images are:\n"
-                                                + `0-${DUP_LIKELY_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER}`
+                                                + `0-${DUP_LIKELY_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER}`
                                                 + " will be near identical\n"
-                                                + `${DUP_LIKELY_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER}-${ALT_LIKELY_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER}`
+                                                + `${DUP_LIKELY_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER}-${ALT_LIKELY_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER}`
                                                 + " are almost certain to be alternates, but can also include duplicates\n"
-                                                + `${ALT_LIKELY_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER}-${REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER}`
+                                                + `${ALT_LIKELY_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER}-${REASONABLE_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER}`
                                                 + " are probably going to be alternates of eachother, but can include false positives\n"
-                                                + `${REASONABLE_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER}-${MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER}`
+                                                + `${REASONABLE_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER}-${MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER}`
                                                 + " will almost always be just false positives\n"
-                                                + `Maximum value allowed for input is ${MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} as higher values would just cause lower performance for no more similar images`
+                                                + `Maximum value allowed for input is ${MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER} as higher values would just cause lower performance for no more similar images`
                     }>search distance</HoverInfo> of pairs:
                     <div style={{marginLeft: 4}}>
-                        <NumericInput className="duplicate-search-distance" selectedNumberState={maxSearchDistanceState} minValue={0} maxValue={MAX_PERCEPTUAL_HASH_DISTANCE * USER_PERCEPTUAL_HASH_MULTIPLIER} />
+                        <NumericInput className="duplicate-search-distance" selectedNumberState={maxSearchDistanceState} minValue={0} maxValue={MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE * USER_SIMILAR_PERCEPTUAL_HASH_MULTIPLIER} />
                     </div>
                 </div>
                 <div style={{marginTop: 4}}>Taggables included in query: {TaggablesIncludedInDisplayCount.react(<span></span>)}</div>

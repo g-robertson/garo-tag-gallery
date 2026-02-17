@@ -26,7 +26,6 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
         await createNewDuplicatesProcessingPage(driver);
         await createNewFileSearchPage(driver);
         await selectPage(driver, 0);
-        await adjustDuplicateSearchDistance(driver, 80);
     }},
     {name: "Teardown", isTeardown: true, tests: async (driver) => {
         await closePage(driver);

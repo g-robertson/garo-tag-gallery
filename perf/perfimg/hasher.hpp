@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -15,11 +16,11 @@ class Hasher {
             OCV_COLOR_MOMENT_HASH = 'C',
             OCV_MARR_HILDRETH_HASH = 'M',
             OCV_PHASH = 'P',
-            OCV_RADIAL_VARIANCE_HASH = 'R',
-            MY_SHAPE_HASH = 'S'
+            OCV_RADIAL_VARIANCE_HASH = 'R'
         };
         void assignHashes(std::string_view input);
-        void performHashes(std::string_view input);
+        std::vector<std::pair<unsigned int, const std::vector<unsigned char>*>> performHashes(std::string_view input);
+        void performAndGetHashes(std::string_view input, void (*writer)(const std::string&));
 
         const std::unordered_map<unsigned int, std::vector<unsigned char>>& getHashesForAlgorithm(Algorithm algorithm) const;
     private:

@@ -8,10 +8,14 @@ namespace util {
     uint32_t deserializeUInt32(std::string_view str);
     std::size_t serializeUInt64(const uint64_t& i, std::string& str, std::size_t location);
     uint64_t deserializeUInt64(std::string_view str);
+    std::size_t serializeFloat(const float& i, std::string& str, std::size_t location);
     float deserializeFloat(std::string_view str);
+    std::size_t serializeDouble(const double& i, std::string& str, std::size_t location);
+    double deserializeDouble(std::string_view str);
     void serializeChar(char c, std::string& str, std::size_t& location);
     char deserializeChar(std::string_view str);
     std::string deserializeString(std::string_view str, std::size_t length);
+    std::size_t serializeUCharVector(const std::vector<unsigned char>& ucharVector, std::string& str, std::size_t location);
     std::vector<unsigned char> deserializeUCharVector(std::string_view str, std::size_t length);
     std::string_view deserializeStringView(std::string_view str, std::size_t length);
     void writeFile(const std::filesystem::path& filePath, std::string_view data);

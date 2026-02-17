@@ -867,7 +867,7 @@ void PairingBucket::insertComplement(uint64_t second) {
 
 void PairingBucket::deleteComplement(uint64_t second) {
     if (secondUniverse_->contains(second)) {
-        throw "Second universe contains item we are deleting complement of";
+        throw std::logic_error("Second universe contains item we are deleting complement of");
     }
     if (startingComplementCount_ != 0) {
         diffContentsIsDirty_ = true;
