@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import path from 'path';
-import { serializeUint32, T_MINUTE } from '../client/js/client-util.js';
+import { serializeUint16, serializeUint32, T_MINUTE } from '../client/js/client-util.js';
 import { Mutex } from 'async-mutex';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { deserializeDouble, serializeDouble } from '../util.js';
@@ -13,10 +13,18 @@ export const HASH_ALGORITHMS = /** @type {const} */ ({
     OCV_MARR_HILDRETH_HASH: 'M',
     OCV_PHASH: 'P',
     OCV_RADIAL_VARIANCE_HASH: 'R',
-    MY_SHAPE_HASH: 'S'
+    OCV_SIFT_HASH: 'S',
+    EDGE_HASH: 'E'
 });
 
 /** @typedef {(typeof HASH_ALGORITHMS)[keyof typeof HASH_ALGORITHMS]} HashAlgorithmType */
+
+/**
+ * @typedef {Object} EdgeHashParams
+ * @property {number} minEdgeThreshold
+ * @property {number} maxEdgeThreshold
+ * @property {number} edgeSizeThreshold
+ */
 
 /**
  * @import {Databases} from "../db/db-util.js"
@@ -172,14 +180,47 @@ export default class PerfImg {
         const ok = await this.__dataOrTimeout(PerfImg.OK_RESULT, THIRTY_MINUTES);
     }
 
+    static #noHashParamsSerializer() {
+        return "";
+    }
+
+    static #unimplHashParamsSerializer() {
+        throw "Compare params serializer is unimplemented";
+    }
+
+    /**
+     * @param {EdgeHashParams} params 
+     */
+    static #edgeHashParamsSerializer(params) {
+        let paramsStr = "";
+        paramsStr += serializeDouble(params.minEdgeThreshold);
+        paramsStr += serializeDouble(params.maxEdgeThreshold);
+        paramsStr += serializeDouble(params.edgeSizeThreshold);
+        return paramsStr;
+    }
+
+    static #ALGORITHM_TYPE_TO_HASH_PARAMS_SERIALIZER = {
+        [HASH_ALGORITHMS.OCV_AVERAGE_HASH]: PerfImg.#noHashParamsSerializer,
+        [HASH_ALGORITHMS.OCV_BLOCK_MEAN_HASH_0]: PerfImg.#noHashParamsSerializer,
+        [HASH_ALGORITHMS.OCV_BLOCK_MEAN_HASH_1]: PerfImg.#noHashParamsSerializer,
+        [HASH_ALGORITHMS.OCV_COLOR_MOMENT_HASH]: PerfImg.#noHashParamsSerializer,
+        [HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH]: PerfImg.#noHashParamsSerializer,
+        [HASH_ALGORITHMS.OCV_PHASH]: PerfImg.#noHashParamsSerializer,
+        [HASH_ALGORITHMS.OCV_RADIAL_VARIANCE_HASH]: PerfImg.#noHashParamsSerializer,
+        [HASH_ALGORITHMS.OCV_SIFT_HASH]: PerfImg.#noHashParamsSerializer,
+        [HASH_ALGORITHMS.EDGE_HASH]: PerfImg.#edgeHashParamsSerializer
+    }
+
     /**
      * @param {HashAlgorithmType} hashAlgorithm
      * @param {Map<number, string>} fileIDToFileName
+     * @param {any=} hashParams
      */
-    async performHashes(hashAlgorithm, fileIDToFileName) {
+    async performHashes(hashAlgorithm, fileIDToFileName, hashParams) {
+        hashParams ??= {};
         await this.#writeMutex.acquire();
 
-        let performHashesString = `${hashAlgorithm}${serializeUint32(fileIDToFileName.size)}`;
+        let performHashesString = `${hashAlgorithm}${PerfImg.#ALGORITHM_TYPE_TO_HASH_PARAMS_SERIALIZER[hashAlgorithm](hashParams)}${serializeUint32(fileIDToFileName.size)}`;
         for (const [fileID, fileName] of fileIDToFileName) {
             performHashesString += serializeUint32(fileID);
             performHashesString += serializeUint32(fileName.length);
@@ -196,11 +237,13 @@ export default class PerfImg {
     /**
      * @param {HashAlgorithmType} hashAlgorithm
      * @param {Map<number, string>} fileIDToFileName
+     * @param {any=} hashParams
      */
-    async performAndGetHashes(hashAlgorithm, fileIDToFileName) {
+    async performAndGetHashes(hashAlgorithm, fileIDToFileName, hashParams) {
+        hashParams ??= {};
         await this.#writeMutex.acquire();
 
-        let performAndGetHashesString = `${hashAlgorithm}${serializeUint32(fileIDToFileName.size)}`;
+        let performAndGetHashesString = `${hashAlgorithm}${PerfImg.#ALGORITHM_TYPE_TO_HASH_PARAMS_SERIALIZER[hashAlgorithm](hashParams)}${serializeUint32(fileIDToFileName.size)}`;
         for (const [fileID, fileName] of fileIDToFileName) {
             performAndGetHashesString += serializeUint32(fileID);
             performAndGetHashesString += serializeUint32(fileName.length);
@@ -251,48 +294,35 @@ export default class PerfImg {
         this.#writeMutex.release();
     }
     
-    static noParamsSerializer() {
+    static #noCompareParamsSerializer() {
         return "";
     }
 
-    /**
-     * 
-     * @param {{
-     *     missingEntryWeight: number
-     *     mulWeights: number[]
-     *     powHundredthWeights: number[]
-     * }} specificParams 
-     */
-    static myShapeHashSpecificParamsSerializer(specificParams) {
-        let serializedParams = serializeUint32(specificParams.missingEntryWeight);
-        serializedParams += serializeUint32(specificParams.mulWeights.length);
-        for (let i = 0; i < specificParams.mulWeights.length; ++i) {
-            serializedParams += `${serializeUint32(specificParams.mulWeights[i])}${serializeUint32(specificParams.powHundredthWeights[i])}`;
-        }
-        return serializedParams;
+    static #unimplCompareParamsSerializer() {
+        throw "Compare params serializer is unimplemented";
     }
 
-
-    static ALGORITHM_TYPE_TO_SPECIFIC_PARAMS_SERIALIZER = {
-        [HASH_ALGORITHMS.OCV_AVERAGE_HASH]: PerfImg.noParamsSerializer,
-        [HASH_ALGORITHMS.OCV_BLOCK_MEAN_HASH_0]: PerfImg.noParamsSerializer,
-        [HASH_ALGORITHMS.OCV_BLOCK_MEAN_HASH_1]: PerfImg.noParamsSerializer,
-        [HASH_ALGORITHMS.OCV_COLOR_MOMENT_HASH]: PerfImg.noParamsSerializer,
-        [HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH]: PerfImg.noParamsSerializer,
-        [HASH_ALGORITHMS.OCV_PHASH]: PerfImg.noParamsSerializer,
-        [HASH_ALGORITHMS.OCV_RADIAL_VARIANCE_HASH]: PerfImg.noParamsSerializer,
-        [HASH_ALGORITHMS.MY_SHAPE_HASH]: PerfImg.myShapeHashSpecificParamsSerializer
-    }
+    static #ALGORITHM_TYPE_TO_COMPARE_PARAMS_SERIALIZER = {
+        [HASH_ALGORITHMS.OCV_AVERAGE_HASH]: PerfImg.#noCompareParamsSerializer,
+        [HASH_ALGORITHMS.OCV_BLOCK_MEAN_HASH_0]: PerfImg.#noCompareParamsSerializer,
+        [HASH_ALGORITHMS.OCV_BLOCK_MEAN_HASH_1]: PerfImg.#noCompareParamsSerializer,
+        [HASH_ALGORITHMS.OCV_COLOR_MOMENT_HASH]: PerfImg.#noCompareParamsSerializer,
+        [HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH]: PerfImg.#noCompareParamsSerializer,
+        [HASH_ALGORITHMS.OCV_PHASH]: PerfImg.#noCompareParamsSerializer,
+        [HASH_ALGORITHMS.OCV_RADIAL_VARIANCE_HASH]: PerfImg.#noCompareParamsSerializer,
+        [HASH_ALGORITHMS.OCV_SIFT_HASH]: PerfImg.#noCompareParamsSerializer,
+        [HASH_ALGORITHMS.EDGE_HASH]: PerfImg.#unimplCompareParamsSerializer
+    };
 
     /**
      * @param {HashAlgorithmType} hashAlgorithm
-     * @param {any} specificParams
+     * @param {any} compareParams
      * @param {number=} distanceCutoff
      */
-    async compareHashes(hashAlgorithm, specificParams, distanceCutoff) {
+    async compareHashes(hashAlgorithm, compareParams, distanceCutoff) {
         distanceCutoff ??= Number.MAX_VALUE;
         await this.#writeMutex.acquire();
-        let compareHashesString = `${hashAlgorithm}${serializeDouble(distanceCutoff)}${PerfImg.ALGORITHM_TYPE_TO_SPECIFIC_PARAMS_SERIALIZER[hashAlgorithm](specificParams)}`
+        let compareHashesString = `${hashAlgorithm}${serializeDouble(distanceCutoff)}${PerfImg.#ALGORITHM_TYPE_TO_COMPARE_PARAMS_SERIALIZER[hashAlgorithm](compareParams)}`
 
         await this.__writeToWriteInputFile(Buffer.from(compareHashesString, 'binary'));
         await this.__writeLineToStdin("compare_hashes");

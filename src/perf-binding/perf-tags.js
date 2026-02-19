@@ -232,7 +232,6 @@ export default class PerfTags {
         let buffer = Buffer.allocUnsafe(bufSize);
         let offset = 0;
         for (const [tag, taggableSet] of tagPairings.entries()) {
-
             offset = buffer.writeBigUInt64LE(tag, offset);
             offset = buffer.writeBigUInt64LE(BigInt(taggableSet.length), offset);
             for (const taggable of taggableSet) {

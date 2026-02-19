@@ -321,10 +321,10 @@ export function deserializeFloat(buffer) {
 
 const DOUBLE_SERIALIZATION_BUF = Buffer.allocUnsafe(8);
 /**
- * @param {number} float
+ * @param {number} double
  */
-export function serializeDouble(float) {
-    DOUBLE_SERIALIZATION_BUF.writeDoubleLE(float);
+export function serializeDouble(double) {
+    DOUBLE_SERIALIZATION_BUF.writeDoubleLE(double);
     return DOUBLE_SERIALIZATION_BUF.toString("binary");
 }
 

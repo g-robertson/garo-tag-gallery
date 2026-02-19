@@ -84,7 +84,7 @@ class TagFileMaintainer {
         std::string priorCacheFile = "";
         void writePriorCacheFile();
         void writeCacheFile();
-        std::pair<std::string_view, SetEvaluation> search_(std::string_view input);
+        SetEvaluation search_(std::string_view input, std::size_t& inputOffset);
         unsigned short getBucketIndex(uint64_t item) const;
         const PairingBucket& getTagBucket(uint64_t tag) const;
         PairingBucket& getTagBucket(uint64_t tag);

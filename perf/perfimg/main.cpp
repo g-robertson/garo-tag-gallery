@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <iostream>
 
+#include "hashes/edge-hash.hpp"
 #include "hasher.hpp"
 #include "hash-comparer.hpp"
 #include "../common/util.hpp"
@@ -33,7 +34,6 @@ int main(int argc, const char** argv) {
     HashComparer hashComparer;
 
     Hasher hasher;
-
 
     std::string op;
     while (op != "exit") {

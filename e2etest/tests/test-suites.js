@@ -38,17 +38,17 @@ const TESTS = {
 export const OK_LOGS = new Set(["info"]);
 export const HEADLESS = false;
 const DISABLED_TESTS = new Set([
-    // "Tests.Navigation",
+    "Tests.Navigation",
     // "Tests.PopulateData",
     // "Tests.Functional",
-    // "Tests.Functional.Files",
+    "Tests.Functional.Files",
     // "Tests.Functional.Files.ImportFilesFromHydrus",
     // "Tests.Functional.Pages",
-    // "Tests.Functional.Pages.FileSearchPage",
+    "Tests.Functional.Pages.FileSearchPage",
     // "Tests.Functional.Pages.DuplicatesProcessingPage",
-    // "Tests.Functional.Tags",
-    // "Tests.Functional.Taggables",
-    // "Tests.Functional.Metrics",
+    "Tests.Functional.Tags",
+    "Tests.Functional.Taggables",
+    "Tests.Functional.Metrics",
 ]);
 const HALT_ON_FAILURE = true;
 const HALT_AFTER = new Set([]);

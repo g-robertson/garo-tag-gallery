@@ -5,6 +5,11 @@
 #include <unordered_map>
 #include <vector>
 
+struct HashParams {
+    std::size_t deserializationLength;
+    void* specificParams;
+};
+
 class Hasher {
     public:
         Hasher();
@@ -16,7 +21,9 @@ class Hasher {
             OCV_COLOR_MOMENT_HASH = 'C',
             OCV_MARR_HILDRETH_HASH = 'M',
             OCV_PHASH = 'P',
-            OCV_RADIAL_VARIANCE_HASH = 'R'
+            OCV_RADIAL_VARIANCE_HASH = 'R',
+            OCV_SIFT_HASH = 'S',
+            EDGE_HASH = 'E'
         };
         void assignHashes(std::string_view input);
         std::vector<std::pair<unsigned int, const std::vector<unsigned char>*>> performHashes(std::string_view input);

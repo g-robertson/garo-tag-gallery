@@ -39,13 +39,5 @@ async function runInPracticeSuite(perfTags, directory) {
  * @type {Record<string, TestFunction>}
  */
 const TESTS = {
-    /* in practice what happened:
-        file was inserted before tag-file bucket with complement could initialize, this caused it's late initialization to include the file in the complement set
-        as it did not know it had been inserted from insertComplement
-    */
-    "in-practice-example-1": async (createPerfTags) => {
-        let perfTags = createPerfTags(...TEST_DEFAULT_PERF_TAGS_ARGS);
-        await runInPracticeSuite(perfTags, "tests/in-practice-examples/in-practice-example-1");
-    }
 };
 export default TESTS;

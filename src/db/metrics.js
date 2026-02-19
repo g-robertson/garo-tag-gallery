@@ -407,11 +407,10 @@ export class AppliedMetrics {
      */
     static async userSelectMappedByTaggableIDsByLocalMetricID(dbs, userID, localMetricID, taggableIDs) {
         const appliedMetrics = await AppliedMetrics.tagMapped(dbs, await dballselect(dbs,
-            `SELECT * FROM Local_Applied_Metrics WHERE (User_ID = ? OR (User_ID IS NULL AND ? = NULL)) AND Local_Metric_ID = ?`,
+            `SELECT * FROM Local_Applied_Metrics WHERE (User_ID = ? OR (User_ID IS NULL AND ? IS NULL)) AND Local_Metric_ID = ?`,
             [userID, userID, localMetricID]
         ));
         const appliedMetricsTagMap = new Map(appliedMetrics.map(appliedMetric => [appliedMetric.Local_Applied_Metric_Tag.Tag_ID, appliedMetric]));
-
         const {taggablePairings} = await dbs.perfTags.readTaggablesSpecifiedTags(taggableIDs, [...appliedMetricsTagMap.keys()], dbs.inTransaction);
         return new Map([...taggablePairings].map(([taggableID, [tag]]) => [taggableID, appliedMetricsTagMap.get(tag)]));
     }

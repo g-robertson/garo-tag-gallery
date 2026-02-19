@@ -15,12 +15,13 @@ namespace {
 
     template <class T>
     void processSingles(std::string_view str, T callback) {
+        std::size_t inputOffset = 0;
+
         if (str.size() % 8 != 0) {
             throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
         }
-        while (str.size() > 0) {
-            uint64_t single = util::deserializeUInt64(str);
-            str = str.substr(8);
+        while (inputOffset < str.size()) {
+            uint64_t single = util::deserializeUInt64(str, inputOffset);
             callback(single);
         }
     }

@@ -28,13 +28,14 @@ namespace {
         double distance;
     };
 
-    HashComparisonParams NO_PARAMS(std::string_view) {
-        return HashComparisonParams {
-            .deserializationLength = 0,
-            .specificParams = nullptr
-        };
+    void NO_PARAMS_DELETER(void*) {}
+    void UNIMPL_PARAMS_DELETER(void*) {
+        throw std::logic_error("Hash comparison params deleter has not been implemented for this algorithm");
     }
-    HashComparisonParams UNIMPL_PARAMS(std::string_view) {
+    void* NO_PARAMS(std::string_view, std::size_t&) {
+        return nullptr;
+    }
+    void* UNIMPL_PARAMS(std::string_view, std::size_t&) {
         throw std::logic_error("Hash comparison params have not been implemented for this algorithm");
     }
 
@@ -42,14 +43,28 @@ namespace {
         throw std::logic_error("Hash compare has not been implemented for this algorithm");
     }
 
-    auto HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DESERIALIZER = std::unordered_map<Hasher::Algorithm, HashComparisonParams(*)(std::string_view)>({
+    auto HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DESERIALIZER = std::unordered_map<Hasher::Algorithm, void*(*)(std::string_view, std::size_t&)>({
         {Hasher::Algorithm::OCV_AVERAGE_HASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_BLOCK_MEAN_HASH_0, NO_PARAMS},
         {Hasher::Algorithm::OCV_BLOCK_MEAN_HASH_1, NO_PARAMS},
         {Hasher::Algorithm::OCV_COLOR_MOMENT_HASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_PHASH, NO_PARAMS},
-        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS}
+        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS},
+        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS},
+        {Hasher::Algorithm::EDGE_HASH, UNIMPL_PARAMS}
+    });
+    
+    auto HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DELETER = std::unordered_map<Hasher::Algorithm, void(*)(void*)>({
+        {Hasher::Algorithm::OCV_AVERAGE_HASH, NO_PARAMS_DELETER},
+        {Hasher::Algorithm::OCV_BLOCK_MEAN_HASH_0, NO_PARAMS_DELETER},
+        {Hasher::Algorithm::OCV_BLOCK_MEAN_HASH_1, NO_PARAMS_DELETER},
+        {Hasher::Algorithm::OCV_COLOR_MOMENT_HASH, NO_PARAMS_DELETER},
+        {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, NO_PARAMS_DELETER},
+        {Hasher::Algorithm::OCV_PHASH, NO_PARAMS_DELETER},
+        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS_DELETER},
+        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS_DELETER},
+        {Hasher::Algorithm::EDGE_HASH, UNIMPL_PARAMS_DELETER}
     });
     
     auto HASH_ALGORITHM_TO_HASH_COMPARE = std::unordered_map<Hasher::Algorithm, double(*)(const std::vector<unsigned char>&, const std::vector<unsigned char>&, const void*, double)>({
@@ -59,7 +74,9 @@ namespace {
         {Hasher::Algorithm::OCV_COLOR_MOMENT_HASH, OCVHashes::colorMomentHashCompare},
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, OCVHashes::marrHildrethHashCompare},
         {Hasher::Algorithm::OCV_PHASH, OCVHashes::pHashCompare},
-        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, OCVHashes::radialVarianceHashCompare}
+        {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, OCVHashes::radialVarianceHashCompare},
+        {Hasher::Algorithm::OCV_SIFT_HASH, OCVHashes::siftCompare},
+        {Hasher::Algorithm::EDGE_HASH, UNIMPL_HASH_COMPARE}
     });
 };
 
@@ -70,23 +87,23 @@ HashComparer::HashComparer() {
 }
 
 void HashComparer::setComparedFiles(std::string_view input) {
-    auto hashAlgorithm = static_cast<Hasher::Algorithm>(input[0]);
-    input = input.substr(1);
+    std::size_t inputOffset = 0;
+
+    auto hashAlgorithm = static_cast<Hasher::Algorithm>(util::deserializeChar(input, inputOffset));
     auto& comparedFiles = comparedFileBuckets.at(hashAlgorithm);
     comparedFiles.clear();
 
-    auto comparedFileCount = util::deserializeUInt32(input);
-    input = input.substr(4);
+    auto comparedFileCount = util::deserializeUInt32(input, inputOffset);
     for (std::size_t i = 0; i < comparedFileCount; ++i) {
-        auto comparedFile = util::deserializeUInt32(input);
-        input = input.substr(4);
+        auto comparedFile = util::deserializeUInt32(input, inputOffset);
         comparedFiles.insert(comparedFile);
     }
 }
 
 void HashComparer::compareHashes(std::string_view input, void (*writer)(const std::string&), const Hasher& hasher) {
-    auto hashAlgorithm = static_cast<Hasher::Algorithm>(input[0]);
-    input = input.substr(1);
+    std::size_t inputOffset = 0;
+    
+    auto hashAlgorithm = static_cast<Hasher::Algorithm>(util::deserializeChar(input, inputOffset));
     if (!comparedFileBuckets.contains(hashAlgorithm)) {
         throw std::runtime_error(std::string("Compared file buckets did not have the algorithm \"") + static_cast<char>(hashAlgorithm) + "\" requested");
     }
@@ -94,13 +111,10 @@ void HashComparer::compareHashes(std::string_view input, void (*writer)(const st
     auto& comparedFiles = comparedFileBuckets.at(hashAlgorithm);
     auto hashCompare = HASH_ALGORITHM_TO_HASH_COMPARE.at(hashAlgorithm);
 
-    double distanceCutoff = util::deserializeDouble(input);
-    input = input.substr(8);
+    double distanceCutoff = util::deserializeDouble(input, inputOffset);
 
-    auto hashComparisonParams = HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DESERIALIZER.at(hashAlgorithm)(input);
-    input = input.substr(hashComparisonParams.deserializationLength);
+    auto* genericHashComparisonParams = HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DESERIALIZER.at(hashAlgorithm)(input, inputOffset);
 
-    const void* specificComparisonParams = hashComparisonParams.specificParams;
     const auto& toCompareHashes = hasher.getHashesForAlgorithm(hashAlgorithm);
 
     auto comparisonsMade = std::vector<ComparisonMade>();
@@ -113,7 +127,7 @@ void HashComparer::compareHashes(std::string_view input, void (*writer)(const st
         for (auto comparedFile : comparedFiles) {
             const auto& comparedHash = toCompareHashes.at(comparedFile);
 
-            auto distance = hashCompare(toCompareHash.second, comparedHash, specificComparisonParams, distanceCutoff);
+            auto distance = hashCompare(toCompareHash.second, comparedHash, genericHashComparisonParams, distanceCutoff);
             if (distance > distanceCutoff) {
                 continue;
             }
@@ -140,6 +154,8 @@ void HashComparer::compareHashes(std::string_view input, void (*writer)(const st
         outputLocation = util::serializeUInt32(comparisonMade.secondFile, output, outputLocation);
         outputLocation = util::serializeDouble(comparisonMade.distance, output, outputLocation);
     }
+
+    HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DELETER.at(hashAlgorithm)(genericHashComparisonParams);
 
     writer(output);
 }

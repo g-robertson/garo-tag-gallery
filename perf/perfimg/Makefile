@@ -5,18 +5,24 @@ perfimg:
 		-Wshadow \
 		-Wno-unused-function \
 		-I../extern/opencv-4.13.0/build \
-		-I../extern/opencv-4.13.0/modules/core/include \
-		-I../extern/opencv-4.13.0/modules/imgproc/include \
 		-I../extern/opencv-4.13.0/modules/imgcodecs/include \
 		-I../extern/opencv-4.13.0/opencv_contrib-4.13.0/modules/img_hash/include \
+		-I../extern/opencv-4.13.0/modules/imgproc/include \
+		-I../extern/opencv-4.13.0/modules/features2d/include \
+		-I../extern/opencv-4.13.0/modules/flann/include \
+		-I../extern/opencv-4.13.0/modules/core/include \
 		main.cpp \
 		hasher.cpp \
 		hash-comparer.cpp \
+		ocv-util.cpp \
 		hashes/ocv.cpp \
+		hashes/edge-hash.cpp \
 		../common/util.cpp \
 		../extern/opencv-4.13.0/build/lib/libopencv_imgcodecs4130.a \
 		../extern/opencv-4.13.0/build/lib/libopencv_img_hash4130.a \
+		../extern/opencv-4.13.0/build/lib/libopencv_features2d4130.a \
 		../extern/opencv-4.13.0/build/lib/libopencv_imgproc4130.a \
+		../extern/opencv-4.13.0/build/lib/libopencv_flann4130.a \
 		../extern/opencv-4.13.0/build/lib/libopencv_core4130.a \
 		../extern/opencv-4.13.0/build/3rdparty/lib/liblibjpeg-turbo.a \
 		../extern/opencv-4.13.0/build/3rdparty/lib/liblibopenjp2.a \

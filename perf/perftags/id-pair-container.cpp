@@ -40,21 +40,20 @@ std::string IdPairDiffContainer::serialize() const {
 }
 
 IdPairDiffContainer IdPairDiffContainer::deserialize(std::string_view str, const std::unordered_set<uint64_t>* secondUniverse) {
+    std::size_t inputOffset = 0;
+
     if (str.size() % 8 != 0) {
         throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
     }
 
     auto output = std::unordered_map<uint64_t, std::unordered_set<uint64_t>>();
-    while (str.size() > 0) {
-        uint64_t first = util::deserializeUInt64(str);
-        str = str.substr(8);
-        uint64_t count = util::deserializeUInt64(str);
-        str = str.substr(8);
+    while (inputOffset < str.size()) {
+        uint64_t first = util::deserializeUInt64(str, inputOffset);
+        uint64_t count = util::deserializeUInt64(str, inputOffset);
         
         auto secondItems = std::unordered_set<uint64_t>();
         for (std::size_t i = 0; i < count; ++i) {
-            uint64_t secondItem = util::deserializeUInt64(str);
-            str = str.substr(8);
+            uint64_t secondItem = util::deserializeUInt64(str, inputOffset);
             secondItems.insert(secondItem);
         }
 
@@ -423,7 +422,7 @@ std::string IdPairContainer::serialize() const {
         // {first}
         location = util::serializeUInt64(pair.first, pairingsStr, location);
         // {complement}
-        util::serializeChar(pair.second.complementIndicator(), pairingsStr, location);
+        location = util::serializeChar(pair.second.complementIndicator(), pairingsStr, location);
         if (pair.second.complementIndicator() == IdPairSecond::IS_COMPLEMENT) {
             ++complementsSerialized;
         }
@@ -442,19 +441,17 @@ std::string IdPairContainer::serialize() const {
 }
 
 IdPairContainer IdPairContainer::deserialize(std::string_view str, const std::unordered_set<uint64_t>* secondUniverse) {
+    std::size_t inputOffset = 0;
+
     auto output = std::unordered_map<uint64_t, IdPairSecond>();
-    while (str.size() > 0) {
-        uint64_t first = util::deserializeUInt64(str);
-        str = str.substr(8);
-        bool isComplement = util::deserializeChar(str) == IdPairSecond::IS_COMPLEMENT;
-        str = str.substr(1);
-        uint64_t count = util::deserializeUInt64(str);
-        str = str.substr(8);
+    while (inputOffset < str.size()) {
+        uint64_t first = util::deserializeUInt64(str, inputOffset);
+        bool isComplement = util::deserializeChar(str, inputOffset) == IdPairSecond::IS_COMPLEMENT;
+        uint64_t count = util::deserializeUInt64(str, inputOffset);
         
         auto secondItems = std::unordered_set<uint64_t>();
         for (std::size_t i = 0; i < count; ++i) {
-            uint64_t secondItem = util::deserializeUInt64(str);
-            str = str.substr(8);
+            uint64_t secondItem = util::deserializeUInt64(str, inputOffset);
             secondItems.insert(secondItem);
         }
         output.insert({first, IdPairSecond(secondUniverse, isComplement, std::move(secondItems))});

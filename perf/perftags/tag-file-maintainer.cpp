@@ -24,12 +24,13 @@ namespace {
 
     template <class T>
     void processSingles(std::string_view str, T callback) {
+        std::size_t inputOffset = 0;
+
         if (str.size() % 8 != 0) {
             throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
         }
-        while (str.size() > 0) {
-            uint64_t single = util::deserializeUInt64(str);
-            str = str.substr(8);
+        while (inputOffset < str.size()) {
+            uint64_t single = util::deserializeUInt64(str, inputOffset);
             callback(single);
         }
     }
@@ -268,18 +269,17 @@ void TagFileMaintainer::readTags(void (*writer)(const std::string&)) {
 #include <iostream>
 
 void TagFileMaintainer::modifyPairings(std::string_view input, void (PairingBucket::*callback)(std::pair<uint64_t, uint64_t>)) {
+    std::size_t inputOffset = 0;
+
     if (input.size() % 8 != 0) {
         throw std::logic_error("Pairing input was not a multiple of 8");
     }
 
-    while (input.size() != 0) {
-        auto tag = util::deserializeUInt64(input);
-        input = input.substr(8);
-        auto taggableCount = util::deserializeUInt64(input);
-        input = input.substr(8);
+    while (inputOffset < input.size()) {
+        auto tag = util::deserializeUInt64(input, inputOffset);
+        auto taggableCount = util::deserializeUInt64(input, inputOffset);
         for (std::size_t i = 0; i < taggableCount; ++i) {
-            auto taggable = util::deserializeUInt64(input);
-            input = input.substr(8);
+            auto taggable = util::deserializeUInt64(input, inputOffset);
             (getTagBucket(tag).*callback)(std::pair<uint64_t, uint64_t>(tag, taggable));
             (getTaggableBucket(taggable).*callback)(std::pair<uint64_t, uint64_t>(taggable, tag));
         }
@@ -309,20 +309,18 @@ void TagFileMaintainer::deletePairings(std::string_view input) {
 }
 
 void TagFileMaintainer::readTagGroupsTaggableCountsWithSearch(std::string_view input, void (*writer)(const std::string&)) {
-    uint64_t tagGroupCount = util::deserializeUInt64(input);
-    input = input.substr(8);
+    std::size_t inputOffset = 0;
+
+    uint64_t tagGroupCount = util::deserializeUInt64(input, inputOffset);
     std::vector<uint64_t> tagGroupsTaggableCounts;
     tagGroupsTaggableCounts.resize(tagGroupCount, 0);
     std::unordered_map<uint64_t, std::vector<std::size_t>> tagToTagGroupIndices;
     tagToTagGroupIndices.reserve(tagGroupCount);
 
     for (std::size_t i = 0; i < tagGroupCount; ++i) {
-        auto tagCount = util::deserializeUInt64(input);
-        input = input.substr(8);
-
+        auto tagCount = util::deserializeUInt64(input, inputOffset);
         for (std::size_t j = 0; j < tagCount; ++j) {
-            auto tag = util::deserializeUInt64(input);
-            input = input.substr(8);
+            auto tag = util::deserializeUInt64(input, inputOffset);
             auto tagGroupIndices = tagToTagGroupIndices.find(tag);
             if (tagGroupIndices == tagToTagGroupIndices.end()) {
                 tagGroupIndices = tagToTagGroupIndices.insert({tag, std::vector<std::size_t>()}).first;
@@ -331,8 +329,8 @@ void TagFileMaintainer::readTagGroupsTaggableCountsWithSearch(std::string_view i
         }
     }
 
-    auto search = search_(input);
-    auto result = search.second.releaseResult();
+    auto search = search_(input, inputOffset);
+    auto result = search.releaseResult();
 
     std::unordered_set<std::size_t> tagGroupIndicesToAddTo;
     auto gatherTagGroupIndices = [&tagToTagGroupIndices, &tagGroupIndicesToAddTo](uint64_t tag) {
@@ -365,15 +363,16 @@ void TagFileMaintainer::readTagGroupsTaggableCountsWithSearch(std::string_view i
 }
 
 void TagFileMaintainer::readTaggablesTags(std::string_view input, void (*writer)(const std::string&)) {
+    std::size_t inputOffset = 0;
+
     std::string output;
     std::size_t location = 0;
     
     if (input.size() % 8 != 0) {
         throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
     }
-    while (input.size() > 0) {
-        uint64_t taggable = util::deserializeUInt64(input);
-        input = input.substr(8);
+    while (inputOffset < input.size()) {
+        uint64_t taggable = util::deserializeUInt64(input, inputOffset);
         auto& taggableBucket = getTaggableBucket(taggable);
         const auto* taggableTags = taggableBucket.firstContents(taggable);
         if (taggableTags != nullptr) {
@@ -395,28 +394,26 @@ void TagFileMaintainer::readTaggablesTags(std::string_view input, void (*writer)
 
 // format is {tags count}{tags}{taggables count}{taggables}
 void TagFileMaintainer::readTaggablesSpecifiedTags(std::string_view input, void (*writer)(const std::string&)) {
+    std::size_t inputOffset = 0;
+
     std::string output;
     std::size_t location = 0;
     
     if (input.size() % 8 != 0) {
         throw std::logic_error(std::string("Input is malformed, not an even interval of 8"));
     }
-    uint64_t tagCount = util::deserializeUInt64(input);
-    input = input.substr(8);
+    uint64_t tagCount = util::deserializeUInt64(input, inputOffset);
     std::unordered_set<uint64_t> tagsSpecified;
     tagsSpecified.reserve(tagCount);
     for (std::size_t i = 0; i < tagCount; ++i) {
-        uint64_t tag = util::deserializeUInt64(input);
-        input = input.substr(8);
+        uint64_t tag = util::deserializeUInt64(input, inputOffset);
         tagsSpecified.insert(tag);
     }
 
-    uint64_t taggableCount = util::deserializeUInt64(input);
-    input = input.substr(8);
+    uint64_t taggableCount = util::deserializeUInt64(input, inputOffset);
     std::vector<uint64_t> tagsToWrite;
     for (std::size_t i = 0; i < taggableCount; ++i) {
-        uint64_t taggable = util::deserializeUInt64(input);
-        input = input.substr(8);
+        uint64_t taggable = util::deserializeUInt64(input, inputOffset);
         auto& taggableBucket = getTaggableBucket(taggable);
         const auto* taggableTags = taggableBucket.firstContents(taggable);
         if (taggableTags != nullptr) {
@@ -482,8 +479,9 @@ namespace {
 }
 
 void TagFileMaintainer::search(std::string_view input, void (*writer)(const std::string&)) {
-    auto setEval = search_(input);
-    auto taggables = setEval.second.releaseResult();
+    std::size_t inputOffset = 0;
+    auto setEval = search_(input, inputOffset);
+    auto taggables = setEval.releaseResult();
     writer(serializeSingles(taggables));
 }
 
@@ -550,76 +548,65 @@ namespace {
     }
 }
 
-std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::string_view input) {
+SetEvaluation TagFileMaintainer::search_(std::string_view input, std::size_t& inputOffset) {
+    
     static auto EMPTY_TAGGABLES = IdPairSecond(&taggableBucket_->contents());
     const auto* universe = &taggableBucket_->contents();
     auto context = SetEvaluation(false, universe, universe);
     char op = FIRST_OP;
-    while (input.size() != 0) {
+    while (inputOffset < input.size()) {
         if (op == FIRST_OP) {
             op = RIGHT_HAND_SIDE_OP;
         } else {
-            op = input[0];
-            input = input.substr(1);
+            op = util::deserializeChar(input, inputOffset);
         }
 
         if (op == CLOSE_GROUP) {
-            return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
+            return context;
         }
             
+        char selection = util::deserializeChar(input, inputOffset);
         bool isComplement = false;
-        if (input[0] == COMPLEMENT_OP) {
+        if (selection == COMPLEMENT_OP) {
             isComplement = true;
-            input = input.substr(1);
+            selection = util::deserializeChar(input, inputOffset);
         }
 
-        if (input[0] == TAG_TAGGABLE_LIST) {
-            input = input.substr(1);
-            auto tag = util::deserializeUInt64(input);
-            input = input.substr(8);
+        if (selection == TAG_TAGGABLE_LIST) {
+            auto tag = util::deserializeUInt64(input, inputOffset);
             const auto* taggables = getTagBucket(tag).firstContents(tag);
             if (taggables == nullptr) {
                 taggables = &EMPTY_TAGGABLES;
             }
             context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(taggables->isComplement() ^ isComplement, universe, &taggables->physicalContents()));
-        } else if (input[0] == TAGGABLE_LIST) {
-            input = input.substr(1);
-            auto taggableCount = util::deserializeUInt64(input);
-            input = input.substr(8);
+        } else if (selection == TAGGABLE_LIST) {
+            auto taggableCount = util::deserializeUInt64(input, inputOffset);
             std::unordered_set<uint64_t> taggables;
             for (std::size_t i = 0; i < taggableCount; ++i) {
-                taggables.insert(util::deserializeUInt64(input));
-                input = input.substr(8);
+                taggables.insert(util::deserializeUInt64(input, inputOffset));
             }
             context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, std::move(taggables)));
-        } else if (input[0] == CONDITIONAL_EXPRESSION_LIST_UNION) {
-            input = input.substr(1);
+        } else if (selection == CONDITIONAL_EXPRESSION_LIST_UNION) {
             // Conditional Expression List Union Operations looks like X{expression count}{expressions}{many conditions})
             char expressionListOp = 0;
-            auto expressionCount = util::deserializeUInt64(input);
-            input = input.substr(8);
+            auto expressionCount = util::deserializeUInt64(input, inputOffset);
             std::vector<SetEvaluation> expressions;
             for (std::size_t i = 0; i < expressionCount; ++i) {
-                auto expression = search_(input);
-                input = expression.first;
-                expressions.push_back(std::move(expression.second));
+                auto expression = search_(input, inputOffset);
+                expressions.push_back(std::move(expression));
             }
 
-            while (input.size() != 0 && expressionListOp != CLOSE_GROUP) {
-                expressionListOp = input[0];
-                input = input.substr(1);
+            while (inputOffset < input.size() && expressionListOp != CLOSE_GROUP) {
+                expressionListOp = util::deserializeChar(input, inputOffset);
 
                 if (expressionListOp == COUNT_OP) {
                     // Count Operation looks like C{comparator}{occurrences}{compareExpression})
                     // Restricts {expressions} to where the expression is represented with {comparator} {occurrences} within {compareExpression}
-                    std::string_view comparator = input.substr(0, 2);
-                    input = input.substr(2);
-                    auto occurrences = util::deserializeUInt64(input);
-                    input = input.substr(8);
+                    std::string_view comparator = util::deserializeFixedLengthStringView(input, 2, inputOffset);
+                    auto occurrences = util::deserializeUInt64(input, inputOffset);
                     
-                    auto compareExpressionContext = search_(input);
-                    input = compareExpressionContext.first;
-                    const auto& immutableCompareExpressionContext = compareExpressionContext.second;
+                    auto compareExpressionContext = search_(input, inputOffset);
+                    const auto& immutableCompareExpressionContext = compareExpressionContext;
 
                     std::vector<std::size_t> expressionIndicesToRemove;
                     for (std::size_t i = 0; i < expressions.size(); ++i) {
@@ -644,14 +631,11 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
                 } else if (expressionListOp == PERCENTAGE_OP) {
                     // Percentage Operation looks like {LHS}P{comparator}{percentage}{expression})
                     // Restricts {tags} to where the tag is represented with {comparator} {percentage} within {LHS}
-                    std::string_view comparator = input.substr(0, 2);
-                    input = input.substr(2);
-                    auto percentage = util::deserializeFloat(input);
-                    input = input.substr(4);
+                    std::string_view comparator = util::deserializeFixedLengthStringView(input, 2, inputOffset);
+                    auto percentage = util::deserializeFloat(input, inputOffset);
                     
-                    auto compareExpressionContext = search_(input);
-                    input = compareExpressionContext.first;
-                    const auto& immutableCompareExpressionContext = compareExpressionContext.second;
+                    auto compareExpressionContext = search_(input, inputOffset);
+                    const auto& immutableCompareExpressionContext = compareExpressionContext;
 
                     std::vector<std::size_t> expressionIndicesToRemove;
                     for (std::size_t i = 0; i < expressions.size(); ++i) {
@@ -673,18 +657,14 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
                 } else if (expressionListOp == FILTERED_PERCENTAGE_OP) {
                     // Count Operation looks like P{comparator}{percentage}{filteringExpression}){expression})
                     // Gets a union of all {tags} where the tag's taggables that are filtered by {LHS} are represented with {comparator} {percentage} within {expression}
-                    std::string_view comparator = input.substr(0, 2);
-                    input = input.substr(2);
-                    auto percentage = util::deserializeFloat(input);
-                    input = input.substr(4);
+                    std::string_view comparator = util::deserializeFixedLengthStringView(input, 2, inputOffset);
+                    auto percentage = util::deserializeFloat(input, inputOffset);
+
+                    auto filteringContext = search_(input, inputOffset);
+                    const auto& immutableFilteringContext = filteringContext;
                 
-                    auto filteringContext = search_(input);
-                    input = filteringContext.first;
-                    const auto& immutableFilteringContext = filteringContext.second;
-                
-                    auto representationContext = search_(input);
-                    input = representationContext.first;
-                    const auto& immutableRepresentationContext = representationContext.second;
+                    auto representationContext = search_(input, inputOffset);
+                    const auto& immutableRepresentationContext = representationContext;
                 
                     std::vector<std::size_t> expressionIndicesToRemove;
                     for (std::size_t i = 0; i < expressions.size(); ++i) {
@@ -716,24 +696,20 @@ std::pair<std::string_view, SetEvaluation> TagFileMaintainer::search_(std::strin
             }
 
             context = SET_OPERATIONS.at(op)(std::move(context), std::move(unionExpressionList));
-        } else if (input[0] == OPEN_GROUP) {
-            input = input.substr(1);
-            auto subSearch = search_(input);
-            input = subSearch.first;
+        } else if (selection == OPEN_GROUP) {
+            auto subSearch = search_(input, inputOffset);
             if (isComplement) {
-                subSearch.second.complement();
+                subSearch.complement();
             }
-            context = SET_OPERATIONS.at(op)(std::move(context), std::move(subSearch.second));
-        } else if (input[0] == UNIVERSE_SET) {
-            input = input.substr(1);
+            context = SET_OPERATIONS.at(op)(std::move(context), std::move(subSearch));
+        } else if (selection == UNIVERSE_SET) {
             context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, universe));
-        } else if (input[0] == EMPTY_SET) {
-            input = input.substr(1);
+        } else if (selection == EMPTY_SET) {
             context = SET_OPERATIONS.at(op)(std::move(context), SetEvaluation(isComplement, universe, &EMPTY_TAGGABLES.physicalContents()));
         }
     }
 
-    return std::pair<std::string_view, SetEvaluation>(input, std::move(context));
+    return context;
 }
 
 void TagFileMaintainer::flushFiles() {

@@ -194,7 +194,17 @@ export function replaceObject(objDest, objSrc) {
 }
 
 /**
- * @param {bigint} num 
+ * @param {number} num 
+ */
+export function serializeUint16(num) {
+    let serialized = "";
+    serialized += String.fromCharCode(Number((num >> 0) & 0xFF));
+    serialized += String.fromCharCode(Number((num >> 8) & 0xFF));
+    return serialized;
+}
+
+/**
+ * @param {number} num 
  */
 export function serializeUint32(num) {
     let serialized = "";
@@ -209,10 +219,10 @@ export function serializeUint32(num) {
  */
 export function deserializeUint32(str) {
     let num = 0;
-    num += str.charCodeAt(4) << 24;
-    num += str.charCodeAt(5) << 16;
-    num += str.charCodeAt(6) << 8;
-    num += str.charCodeAt(7);
+    num += str.charCodeAt(0) << 24;
+    num += str.charCodeAt(1) << 16;
+    num += str.charCodeAt(2) << 8;
+    num += str.charCodeAt(3);
     return num;
 }
 
@@ -243,7 +253,7 @@ export function deserializeUint64(str) {
     num += BigInt(str.charCodeAt(4)) << 32n;
     num += BigInt(str.charCodeAt(5)) << 40n;
     num += BigInt(str.charCodeAt(6)) << 48n;
-    num += BigInt(str.charCodeAt(7));
+    num += BigInt(str.charCodeAt(7)) << 56n;
     return num;
 }
 
