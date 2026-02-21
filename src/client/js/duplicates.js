@@ -15,7 +15,8 @@ export const TRANSITIVE_FILE_RELATION_TYPES = /** @type {const} */ ({
 /** @typedef {(typeof TRANSITIVE_FILE_RELATION_TYPES)[keyof typeof TRANSITIVE_FILE_RELATION_TYPES]} TransitiveFileRelationType */
 
 export const NONTRANSITIVE_FILE_RELATION_TYPES = /** @type {const} */ ({
-    FALSE_POSITIVES: 1
+    ALTERNATES: 2,
+    FALSE_POSITIVES: 3
 });
 /** @typedef {(typeof NONTRANSITIVE_FILE_RELATION_TYPES)[keyof typeof NONTRANSITIVE_FILE_RELATION_TYPES]} NontransitiveFileRelationType */
 

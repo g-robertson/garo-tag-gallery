@@ -1,5 +1,5 @@
 import { mapNullCoalesce, TransitiveRelationGroups } from "../client/js/client-util.js";
-import { CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE,  MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE } from "../client/js/duplicates.js";
+import { CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE,  MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE, TRANSITIVE_FILE_RELATION_TYPES } from "../client/js/duplicates.js";
 import { HASH_ALGORITHMS } from "../perf-binding/perf-img.js";
 import { exactDuplicateHash } from "../server/duplicates.js";
 import { dball, dballselect, dbBeginTransaction, dbEndTransaction, dbrun, dbtuples, dbvariablelist } from "./db-util.js";
@@ -212,7 +212,8 @@ export class FileComparisons {
                     NOT EXISTS (
                         SELECT COUNT(1)
                         FROM Transitive_File_Relation_Groups_Files TFRGF
-                        WHERE TFRGF.File_ID IN (FCR.File_ID_1, FCR.File_ID_2)
+                        JOIN Transitive_File_Relation_Groups TFRG ON TFRGF.Transitive_File_Relation_Groups_ID = TFRG.Transitive_File_Relation_Groups_ID
+                        WHERE TFRGF.File_ID IN (FCR.File_ID_1, FCR.File_ID_2) AND TFRG.File_Relation_Type = ?
                         GROUP BY TFRGF.Transitive_File_Relation_Groups_ID
                         HAVING COUNT(1) = 2
                     )
@@ -227,7 +228,7 @@ export class FileComparisons {
             AND (FCR.File_ID_1 IN ${dbvariablelist(fileIDs.length)}
              AND FCR.File_ID_2 IN ${dbvariablelist(fileIDs.length)}
             );
-        `, [maxPerceptualHashDistance, ...fileIDs, ...fileIDs]);
+        `, [TRANSITIVE_FILE_RELATION_TYPES.DUPLICATES, maxPerceptualHashDistance, ...fileIDs, ...fileIDs]);
 
         return fileComparisons;
     }

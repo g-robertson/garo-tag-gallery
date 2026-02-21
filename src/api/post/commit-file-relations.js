@@ -85,6 +85,10 @@ async function transformClientFileRelationsToDatabaseObjects(dbs, clientFileRela
                 ...clientFileRelation,
                 File_Relation_Type: TRANSITIVE_FILE_RELATION_TYPES.ALTERNATES
             });
+            nontransitiveFileRelations.push({
+                ...clientFileRelation,
+                File_Relation_Type: NONTRANSITIVE_FILE_RELATION_TYPES.ALTERNATES
+            });
         } else if (clientFileRelation.type === "false-positives") {
             nontransitiveFileRelations.push({
                 ...clientFileRelation,

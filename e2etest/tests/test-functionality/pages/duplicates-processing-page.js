@@ -18,6 +18,7 @@ const TEST_TAG_ALTERNATE = "alternate-test";
 const TEST_TAG_FALSE_POSITIVE = "false-positive-test";
 
 const TEST_TAG_DUPLICATE_IS_TRANSITIVE = "duplicate-is-transitive-test";
+const TEST_TAG_ALTERNATE_SHOULD_NOT_BE_MARKED_AS_COMPARED = "transitive-alternates-should-not-be-marked-compared-test";
 
 /** @type {TestSuite[]} */
 export const DUPLICATES_PROCESSING_PAGE_TESTS = [
@@ -44,8 +45,8 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
         {name: "Teardown", isTeardown: true, tests: {
             expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
             priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
+            impact: BUG_IMPACTS.DEV_IMPEDIMENT,
             noticeability: BUG_NOTICES.MEDIUM,
-            impact: BUG_IMPACTS.DEV_IMPEDIMENT
         }},
         {name: "TestTagSearchWorks", tests: async (driver) => {
             await applyTagFilter(driver, TEST_TAG_UNMARKED_PAIR);
@@ -179,13 +180,13 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
             {name: "DedupeGalleryAlternateIsTransitive", tests: {
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
                 priority: BUG_PRIORITIES.CURRENT_WORK,
-                impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
+                impact: BUG_IMPACTS.ASSUMED_WORKING,
                 noticeability: BUG_NOTICES.MINOR
             }},
             {name: "DedupeGalleryAlternateIsTransitiveThroughDuplicate", tests: {
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
                 priority: BUG_PRIORITIES.CURRENT_WORK,
-                impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
+                impact: BUG_IMPACTS.ASSUMED_WORKING,
                 noticeability: BUG_NOTICES.MINOR
             }},
             {name: "DedupeGalleryTransitivityWorksThroughNonSelectedFileComparisons", tests: {
@@ -194,11 +195,18 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
                 impact: BUG_IMPACTS.COSMETIC,
                 noticeability: BUG_NOTICES.MINOR
             }},
-            {name: "DedupeGalleryTransitiveAlternatesShouldNotBeMarkedAsCompared", tests: {
-                expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-                priority: BUG_PRIORITIES.CURRENT_WORK,
-                impact: BUG_IMPACTS.CORRUPTS_DATA,
-                noticeability: BUG_NOTICES.MAJOR
+            {name: "DedupeGalleryTransitiveAlternatesShouldNotBeMarkedAsCompared", tests: async (driver) => {
+                await applyTagFilter(driver, TEST_TAG_ALTERNATE_SHOULD_NOT_BE_MARKED_AS_COMPARED);
+                await selectTagFromLocalTagSelector(driver, TEST_TAG_ALTERNATE_SHOULD_NOT_BE_MARKED_AS_COMPARED);
+                await driver.wait(untilCountElementsLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE, 3), DEFAULT_TIMEOUT_TIME);
+                await beginFilteringPotentialDuplicates(driver);
+                await duplicateAlternates(driver);
+                await duplicateAlternates(driver);
+                await duplicateCommitChanges(driver);
+
+                await driver.wait(untilCountElementsLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE, 1), DEFAULT_TIMEOUT_TIME);
+
+                await selectTagFromTagSearchQuery(driver, TEST_TAG_ALTERNATE_SHOULD_NOT_BE_MARKED_AS_COMPARED);
             }},
             {name: "DedupeGallerySkipAndGoBackShouldWork", tests: async (driver) => {
                 await beginFilteringPotentialDuplicates(driver);
