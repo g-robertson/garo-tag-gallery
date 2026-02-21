@@ -3,15 +3,15 @@ import { OnFormSubmit } from '../../components/on-form-submit.jsx';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
 
-export default function CreateURLGeneratorService() {
+export default function CreateLocalDownloaderService() {
     return {
         component: (
             <div>
-                <form action="/api/post/create-url-generator-service" target="frame" method="POST">
+                <form action="/api/post/create-local-downloader-service" target="frame" method="POST">
                     <div style={{marginLeft: "8px"}}>
                         <div style={{margin: "2px 0 2px 0"}}>
-                            <span>Choose a name for your URL generator service: </span>
-                            <input name="serviceName" value="My URL Generator service" type="text" />
+                            <span>Choose a name for your local downloader service: </span>
+                            <input name="serviceName" value="My local downloader service" type="text" />
                         </div>
                     </div>
                     <div style={{marginLeft: "8px"}}>
@@ -24,6 +24,6 @@ export default function CreateURLGeneratorService() {
                 }} />
             </div>
         ),
-        displayName: "Create URL Generator Service"
+        displayName: "Create Local Downloader Service"
     };
 };

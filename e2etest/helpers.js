@@ -13,12 +13,7 @@ export const DEFAULT_TIMEOUT_TIME = Number(process.env.DEFAULT_TIMEOUT_TIME);
 export const DEFAULT_SLEEP_TIME = Number(process.env.DEFAULT_SLEEP_TIME);
 export const DOWNLOAD_DIRECTORY = path.resolve(path.join(process.env.DATABASE_DIR, "e2e-downloads"));
 
-/**
- * @param {ThenableWebDriver} driver 
- */
-export async function findModals(driver) {
-    return await driver.findElements(By.className("modal"));
-}
+export const ByModal = By.className("modal");
 
 /**
  * @param {ThenableWebDriver} driver 
@@ -29,8 +24,8 @@ export async function closeModal(driver) {
     await lastModalCancel.click();
 }
 
-export const UNTIL_MODAL_OPEN = until.elementsLocated(By.className("modal"));
-export const UNTIL_MODAL_CLOSE = untilElementsNotLocated(By.className("modal"));
+export const UNTIL_MODAL_OPEN = until.elementsLocated(ByModal);
+export const UNTIL_MODAL_CLOSE = untilElementsNotLocated(ByModal);
 
 export const UNTIL_GALLERY_OPEN = until.elementsLocated(By.className("gallery-item"));
 

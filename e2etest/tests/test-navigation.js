@@ -1,10 +1,12 @@
 import { createNewFileSearchPage } from "../functionality/pages-functionality.js";
-import { closeModal, closePage, findModals, findPages, rmDownloadedFile, selectPage, xpathHelper } from "../helpers.js";
+import { ByModal, closeModal, closePage, DEFAULT_TIMEOUT_TIME, findPages, rmDownloadedFile, selectPage, xpathHelper } from "../helpers.js";
 import { navigateToBackup, navigateToHydrusImport, navigateToImportMappingsFromBackup } from "../navigation/file-navigation.js";
 import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
 import { navigateToDuplicatesProcessingPage, navigateToFileSearchPage } from "../navigation/pages-navigation.js";
+import { navigateToCreateLocalDownloaderService } from "../navigation/parsers-navigation.js";
 import { navigateToCreateTaggableService, navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
 import { navigateToCreateTagService, navigateToModifyTagServices } from "../navigation/tags-navigation.js";
+import { until } from "selenium-webdriver";
 
 /** @import {ThenableWebDriver} from "selenium-webdriver" */
 /** @import {TestSuite} from "./test-suites.js" */
@@ -14,16 +16,12 @@ import { navigateToCreateTagService, navigateToModifyTagServices } from "../navi
 export const NAVIGATE_FILES_MENU_TESTS = [
     {name: "NavigateToHydrusImport", tests: async (driver) => {
         await navigateToHydrusImport(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to import files from hydrus";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
     {name: "NavigateToImportMappingsFromBackup", tests: async (driver) => {
         await navigateToImportMappingsFromBackup(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to import files from hydrus";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
     {name: "NavigateToBackup", tests: async (driver) => {
@@ -48,16 +46,12 @@ export const NAVIGATE_PAGES_MENU_TESTS = [
 export const NAVIGATE_TAGS_MENU_TESTS = [
     {name: "NavigateToCreateTagService", tests: async (driver) => {
         await navigateToCreateTagService(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to create new tag service";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
     {name: "NavigateToModifyTagServices", tests: async (driver) => {
         await navigateToModifyTagServices(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to modify tag service";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
 ];
@@ -66,16 +60,12 @@ export const NAVIGATE_TAGS_MENU_TESTS = [
 export const NAVIGATE_TAGGABLES_MENU_TESTS = [
     {name: "NavigateToCreateTaggableService", tests: async (driver) => {
         await navigateToCreateTaggableService(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to create new taggable service";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
     {name: "NavigateToModifyTaggableServices", tests: async (driver) => {
         await navigateToModifyTaggableServices(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to modify taggable service";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
 ];
@@ -84,50 +74,36 @@ export const NAVIGATE_TAGGABLES_MENU_TESTS = [
 export const NAVIGATE_METRICS_MENU_TESTS = [
     {name: "NavigateToCreateMetricService", tests: async (driver) => {
         await navigateToCreateMetricService(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to create new metric service";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
     {name: "NavigateToModifyMetricServices", tests: async (driver) => {
         await navigateToModifyMetricServices(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to modify metric service";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
     {name: "NavigateToCreateNewMetric", tests: async (driver) => {
         await navigateToCreateNewMetric(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to create new metric";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
     {name: "NavigateToModifyMetric", tests: async (driver) => {
         await navigateToModifyMetric(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to modify metric";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
     {name: "NavigateToChangeTagToMetric", tests: async (driver) => {
         await navigateToChangeTagToMetric(driver);
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to change tag to metric";
-        }
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }}
 ];
 
 /** @type {TestSuite[]} */
 export const NAVIGATE_PARSERS_MENU_TESTS = [
-    {name: "NavigateToCreateNewURLGeneratorService", tests: async (driver) => {
-        await driver.findElement(xpathHelper({attrContains: {"text": "Parsers", "class": "topbar-dropdown-title"}})).click();
-
-        await driver.findElement(xpathHelper({attrContains: {"text": "Create new URL generator service", "class": "topbar-dropdown-option"}})).click();
-        if ((await findModals(driver)).length === 0) {
-            throw "Modal not visible after navigating to create new URL generator service";
-        }
+    {name: "NavigateToCreateNewLocalDownloaderService", tests: async (driver) => {
+        await navigateToCreateLocalDownloaderService(driver);
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},
 ];

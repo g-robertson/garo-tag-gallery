@@ -3,7 +3,7 @@ import { dballselect, dbget, dbgetselect, dbrun, dbvariablelist } from "./db-uti
 import { LocalTagServices } from "./tags.js";
 import { LocalTaggableServices } from "./taggables.js";
 import { LocalMetricServices } from "./metrics.js";
-import { LocalURLGeneratorServices } from "./url-generators.js";
+import { LocalDownloaderServices } from "./downloaders.js";
 import { LRUCache } from "./lru-cache.js";
 
 /**
@@ -11,7 +11,7 @@ import { LRUCache } from "./lru-cache.js";
  * @import {DBPermissionedLocalTagService} from "./tags.js"
  * @import {DBPermissionedLocalTaggableService} from "./taggables.js"
  * @import {DBPermissionedLocalMetricService} from "./metrics.js"
- * @import {DBPermissionedLocalURLGeneratorService} from "./url-generators.js"
+ * @import {DBPermissionedLocalDownloaderService} from "./downloaders.js"
  * @import {PageType} from "../client/page/page.jsx"
  */
 export const DEFAULT_ADMINISTRATOR_USER_ID = 0;
@@ -42,7 +42,7 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  *              Local_Tag_Services: DBPermissionedLocalTagService[],
  *              Local_Taggable_Services: DBPermissionedLocalTaggableService[],
  *              Local_Metric_Services: DBPermissionedLocalMetricService[],
- *              Local_URL_Generator_Services: DBPermissionedLocalURLGeneratorService[]
+ *              Local_Downloader_Services: DBPermissionedLocalDownloaderService[]
  *          }
  * } DBJoinedUser
  */
@@ -132,7 +132,7 @@ export class Users {
         user.setLocalTagServices(await LocalTagServices.userSelectAll(dbs, user));
         user.setLocalTaggableServices(await LocalTaggableServices.userSelectAll(dbs, user));
         user.setLocalMetricServices(await LocalMetricServices.userSelectAll(dbs, user));
-        user.setLocalURLGeneratorServices(await LocalURLGeneratorServices.userSelectAll(dbs, user));
+        user.setLocalDownloaderServices(await LocalDownloaderServices.userSelectAll(dbs, user));
 
         return user;
     }

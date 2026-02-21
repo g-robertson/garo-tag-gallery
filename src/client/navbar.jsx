@@ -3,7 +3,7 @@ import ImportFilesFromHydrus from './modal/modals/import-files-from-hydrus.jsx';
 import CreateLocalMetric from './modal/modals/create-local-metric.jsx';
 import ChangeTagToMetricModal from './modal/modals/change-tag-to-metric.jsx';
 import { FILE_SEARCH_PAGE_NAME, FILE_SEARCH_PAGE_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
-import CreateURLGeneratorService from './modal/modals/create-url-generator-service.jsx';
+import CreateLocalDownloaderService from './modal/modals/create-local-downloader-service.jsx';
 import ImportMappingsFromBackup from './modal/modals/import-mappings-from-backup.jsx';
 import UpdateLocalMetricService from './modal/modals/update-local-metric-service.jsx';
 import CreateLocalMetricService from './modal/modals/create-local-metric-service.jsx';
@@ -131,8 +131,8 @@ const Navbar = () => {
                 {MENUS.Parsers.react(<div className="topbar-dropdown-options" style={{display: "none"}}>
                     <div className="topbar-dropdown-option" onClick={() => {
                         setMenuOpened(null);
-                        Modals.Global().pushModal(CreateURLGeneratorService());
-                    }}>Create new URL generator service</div>
+                        Modals.Global().pushModal(CreateLocalDownloaderService());
+                    }}>Create new downloader service</div>
                     
                 </div>)}
             </div>

@@ -331,45 +331,26 @@ export const MIGRATION = {
         `),
         ...DEFAULT_LOCAL_METRICS.map(insertSystemMetric).flat(),
         dbsqlcommand(`
-            CREATE TABLE Local_URL_Generator_Services(
-                Local_URL_Generator_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE Local_Downloader_Services(
+                Local_Downloader_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Service_ID INTEGER NOT NULL
+            );
+        `),
+        dbsqlcommand(`
+            CREATE TABLE Local_URL_Parsers(
+                Local_URL_Parsers_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_Downloader_Service_ID INTEGER NOT NULL,
+                Local_URL_Parser_Name TEXT NOT NULL,
+                LocaL_URL_Parser_URL_Classifier_JSON TEXT NOT NULL,
+                LocaL_URL_Parser_Content_Parser_JSON TEXT NOT NULL
             );
         `),
         dbsqlcommand(`
             CREATE TABLE Local_URL_Generators(
-                Local_URL_Generator_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Local_URL_Generator_Service_ID INTEGER NOT NULL,
+                Local_URL_Generators_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_Downloader_Service_ID INTEGER NOT NULL,
                 Local_URL_Generator_Name TEXT NOT NULL,
-                LocaL_URL_Generator_JSON TEXT NOT NULL
-            );
-        `),
-        dbsqlcommand(`
-            CREATE TABLE Local_URL_Classifier_Services(
-                Local_URL_Classifier_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Service_ID INTEGER NOT NULL
-            );
-        `),
-        dbsqlcommand(`
-            CREATE TABLE Local_URL_Classifiers(
-                Local_URL_Classifier_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Local_URL_Classifier_Service_ID INTEGER NOT NULL,
-                Local_URL_Classifier_Name TEXT NOT NULL,
-                LocaL_URL_Classifier_JSON TEXT NOT NULL
-            );
-        `),
-        dbsqlcommand(`
-            CREATE TABLE Local_Parser_Services(
-                Local_Parser_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Service_ID INTEGER NOT NULL
-            );
-        `),
-        dbsqlcommand(`
-            CREATE TABLE Local_Parsers(
-                Local_Parser_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Local_Parser_Service_ID INTEGER NOT NULL,
-                Local_Parser_Name TEXT NOT NULL,
-                LocaL_Parser_JSON TEXT NOT NULL
+                LocaL_URL_Generator_URL_Pattern_JSON TEXT NOT NULL
             );
         `)
     ]

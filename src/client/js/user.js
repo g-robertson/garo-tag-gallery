@@ -150,7 +150,7 @@ export class User {
     #localTagServices = new State();
     /** @type {State<DBJoinedUser['Local_Taggable_Services']} */
     #localTaggableServices = new State();
-    #localURLGeneratorServices;
+    #localDownloaderServices;
     /** @type {State<DBJoinedUser['Local_Metric_Services']} */
     #localMetricServices = new State();
 
@@ -171,7 +171,7 @@ export class User {
         this.#localTagServices.set(json.Local_Tag_Services ?? []);
         this.#localTaggableServices.set(json.Local_Taggable_Services ?? []);
         this.#localMetricServices.set(json.Local_Metric_Services ?? []);
-        this.#localURLGeneratorServices = json.Local_URL_Generator_Services ?? [];
+        this.#localDownloaderServices = json.Local_Downloader_Services ?? [];
 
         this.#pages = json.JSON_Pages;
         this.#permissions = new Set(json.Permissions);
@@ -294,15 +294,15 @@ export class User {
         this.#localMetricServices.set(localMetricServices);
     }
 
-    localURLGeneratorServices() {
-        return this.#localURLGeneratorServices;
+    localDownloaderServices() {
+        return this.#localDownloaderServices;
     }
 
     /**
-     * @param {ReturnType<typeof this.localURLGeneratorServices>} localURLGeneratorServices 
+     * @param {ReturnType<typeof this.localDownloaderServices>} localDownloaderServices 
      */
-    setLocalURLGeneratorServices(localURLGeneratorServices) {
-        this.#localURLGeneratorServices = localURLGeneratorServices;
+    setLocalDownloaderServices(localDownloaderServices) {
+        this.#localDownloaderServices = localDownloaderServices;
     }
 
     pages() {
@@ -354,7 +354,7 @@ export class User {
             Local_Tag_Services: this.#localTagServices.get(),
             Local_Taggable_Services: this.#localTaggableServices,
             Local_Metric_Services: this.#localMetricServices.get(),
-            Local_URL_Generator_Services: this.#localURLGeneratorServices,
+            Local_Downloader_Services: this.#localDownloaderServices,
 
             JSON_Pages: this.#pages,
             Permissions: [...this.#permissions]

@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { PERMISSIONS } from "../../client/js/user.js";
-import { LocalURLGeneratorServices } from "../../db/url-generators.js";
+import { LocalDownloaderServices } from "../../db/downloaders.js";
 
 export async function validate(dbs, req, res) {
     const serviceName = z.string().nonempty().max(200).safeParse(req?.body?.serviceName, {path: "serviceName"});
@@ -25,6 +25,6 @@ export async function getPermissions(dbs, req, res) {
 
 /** @type {APIFunction<Awaited<ReturnType<typeof validate>>>} */
 export default async function post(dbs, req, res) {
-    await LocalURLGeneratorServices.userInsert(dbs, req.user, req.body.serviceName);
+    await LocalDownloaderServices.userInsert(dbs, req.user, req.body.serviceName);
     res.status(200).send("Metric service created");
 }
