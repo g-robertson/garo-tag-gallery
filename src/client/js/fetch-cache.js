@@ -7,7 +7,7 @@ import { State, ConstState } from "../js/state.js";
 import { RealizationMap } from "./client-util.js";
 import { User } from "./user.js";
 
-const ResettableCacheTypes = /** @type {const} */ (["tags", "taggables", "files", "user", "metrics"]);
+const ResettableCacheTypes = /** @type {const} */ (["tags", "taggables", "files", "user", "metrics", "downloaders"]);
 
 /** @typedef {(typeof ResettableCacheTypes)[number]} ResettableCacheType */
 /**

@@ -12,7 +12,7 @@ export default function CreateLocalMetric() {
                 <LocalMetricServiceSelector />
                 <LocalMetricModifications />
                 <div style={{marginLeft: "8px"}}>
-                    <input type="submit" value="Submit" />
+                    <input type="submit" value="Create metric" />
                 </div>
                 <OnFormSubmit onFormSubmit={async () => {
                     User.refreshGlobal();

@@ -3,7 +3,7 @@ import { ByModal, closeModal, closePage, DEFAULT_TIMEOUT_TIME, findPages, rmDown
 import { navigateToBackup, navigateToHydrusImport, navigateToImportMappingsFromBackup } from "../navigation/file-navigation.js";
 import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
 import { navigateToDuplicatesProcessingPage, navigateToFileSearchPage } from "../navigation/pages-navigation.js";
-import { navigateToCreateLocalDownloaderService } from "../navigation/parsers-navigation.js";
+import { navigateToCreateLocalDownloaderService, navigateToCreateNewURLParser, navigateToModifyLocalDownloaderServices, navigateToModifyURLParser } from "../navigation/parsers-navigation.js";
 import { navigateToCreateTaggableService, navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
 import { navigateToCreateTagService, navigateToModifyTagServices } from "../navigation/tags-navigation.js";
 import { until } from "selenium-webdriver";
@@ -103,6 +103,21 @@ export const NAVIGATE_METRICS_MENU_TESTS = [
 export const NAVIGATE_PARSERS_MENU_TESTS = [
     {name: "NavigateToCreateNewLocalDownloaderService", tests: async (driver) => {
         await navigateToCreateLocalDownloaderService(driver);
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
+        await closeModal(driver);
+    }},
+    {name: "NavigateToModifyLocalDownloaderService", tests: async (driver) => {
+        await navigateToModifyLocalDownloaderServices(driver);
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
+        await closeModal(driver);
+    }},
+    {name: "NavigateToCreateNewURLParser", tests: async (driver) => {
+        await navigateToCreateNewURLParser(driver);
+        await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
+        await closeModal(driver);
+    }},
+    {name: "NavigateToModifyURLParser", tests: async (driver) => {
+        await navigateToModifyURLParser(driver);
         await driver.wait(until.elementLocated(ByModal), DEFAULT_TIMEOUT_TIME);
         await closeModal(driver);
     }},

@@ -11,7 +11,7 @@ export default function CreateLocalMetricService() {
             <form action="/api/post/create-local-metric-service" target="frame" method="POST">
                 <LocalMetricServiceModifications />
                 <div style={{marginLeft: "8px"}}>
-                    <input type="submit" value="Submit" />
+                    <input type="submit" value="Create metric service" />
                 </div>
             </form>
             <OnFormSubmit onFormSubmit={async () => {

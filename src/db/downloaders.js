@@ -11,7 +11,7 @@ import { LocalTags } from "./tags.js";
 /**
  * @typedef {Object} DBLocalDownloaderService
  * @property {number} Local_Downloader_Service_ID
- * @property {bigint} From_Local_URL_Generator_Tag_ID
+ * @property {bigint} From_Local_LOCAL_DOWNLOADER_Tag_ID
  */
 
 /**
@@ -152,7 +152,7 @@ export class LocalDownloaderServices {
         dbs = await dbBeginTransaction(dbs);
 
         const serviceID = await Services.insert(dbs, serviceName);
-        await ServicesUsersPermissions.insertMany(dbs, serviceID, user.id(), Object.values(PERMISSIONS.LOCAL_URL_GENERATOR_SERVICES).map(permission => permission.name));
+        await ServicesUsersPermissions.insertMany(dbs, serviceID, user.id(), Object.values(PERMISSIONS.LOCAL_DOWNLOADER_SERVICES).map(permission => permission.name));
 
         /** @type {number} */
         const localDownloaderServiceID = (await dbget(dbs, `
@@ -171,20 +171,20 @@ export class LocalDownloaderServices {
 
 /**
  * @typedef {Object} PreInsertLocalDownloader
- * @property {string} Local_URL_Generator_Name
- * @property {string} Local_URL_Generator_JSON
+ * @property {string} Local_LOCAL_DOWNLOADER_Name
+ * @property {string} Local_LOCAL_DOWNLOADER_JSON
  */
 
 export class LocalDownloader {
     static async update(dbs, localDownloaderID, preInsertLocalDownloader) {
         await dbrun(dbs, `
-            UPDATE Local_URL_Generators
-               SET Local_URL_Generator_Name = ?,
-                   Local_URL_Generator_JSON = ?
-             WHERE Local_URL_Generator_ID = ?;
+            UPDATE Local_LOCAL_DOWNLOADERs
+               SET Local_LOCAL_DOWNLOADER_Name = ?,
+                   Local_LOCAL_DOWNLOADER_JSON = ?
+             WHERE Local_LOCAL_DOWNLOADER_ID = ?;
         `, [
-            preInsertLocalDownloader.Local_URL_Generator_Name,
-            preInsertLocalDownloader.Local_URL_Generator_JSON,
+            preInsertLocalDownloader.Local_LOCAL_DOWNLOADER_Name,
+            preInsertLocalDownloader.Local_LOCAL_DOWNLOADER_JSON,
             localDownloaderID
         ])
     }
@@ -199,20 +199,20 @@ export class LocalDownloader {
 
         /** @type {number} */
         const localDownloaderID = (await dbget(dbs, `
-            INSERT INTO Local_URL_Generators(
+            INSERT INTO Local_LOCAL_DOWNLOADERs(
                 Local_Downloader_Service_ID,
-                Local_URL_Generator_Name,
-                Local_URL_Generator_JSON
+                Local_LOCAL_DOWNLOADER_Name,
+                Local_LOCAL_DOWNLOADER_JSON
             ) VALUES (
                 $localDownloaderServiceID,
                 $localDownloaderName,
                 $localDownloaderJSON
-            ) RETURNING Local_URL_Generator_ID;
+            ) RETURNING Local_LOCAL_DOWNLOADER_ID;
         `, [
-            preInsertLocalDownloader.Local_URL_Generator_Name,
-            preInsertLocalDownloader.Local_URL_Generator_JSON,
+            preInsertLocalDownloader.Local_LOCAL_DOWNLOADER_Name,
+            preInsertLocalDownloader.Local_LOCAL_DOWNLOADER_JSON,
             localDownloaderServiceID,
-        ])).Local_URL_Generator_ID;
+        ])).Local_LOCAL_DOWNLOADER_ID;
         
         await LocalTags.insertSystemTag(dbs, createFromLocalDownloaderLookupName(localDownloaderID));
 

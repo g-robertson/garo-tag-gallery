@@ -42,7 +42,7 @@ export const MIGRATION = {
             ...Object.values(PERMISSIONS.LOCAL_TAG_SERVICES),
             ...Object.values(PERMISSIONS.LOCAL_TAGGABLE_SERVICES),
             ...Object.values(PERMISSIONS.LOCAL_METRIC_SERVICES),
-            ...Object.values(PERMISSIONS.LOCAL_URL_GENERATOR_SERVICES),
+            ...Object.values(PERMISSIONS.LOCAL_DOWNLOADER_SERVICES),
         ].map(permission => dbsqlcommand(`
                 INSERT INTO Permission_Sets_Permissions(
                     Permission_Set_ID,
@@ -346,11 +346,11 @@ export const MIGRATION = {
             );
         `),
         dbsqlcommand(`
-            CREATE TABLE Local_URL_Generators(
-                Local_URL_Generators_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE Local_LOCAL_DOWNLOADERs(
+                Local_LOCAL_DOWNLOADERs_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Local_Downloader_Service_ID INTEGER NOT NULL,
-                Local_URL_Generator_Name TEXT NOT NULL,
-                LocaL_URL_Generator_URL_Pattern_JSON TEXT NOT NULL
+                Local_LOCAL_DOWNLOADER_Name TEXT NOT NULL,
+                LocaL_LOCAL_DOWNLOADER_URL_Pattern_JSON TEXT NOT NULL
             );
         `)
     ]

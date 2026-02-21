@@ -1,17 +1,17 @@
 import '../../global.css';
 import { OnFormSubmit } from '../../components/on-form-submit.jsx';
-import LocalTagServiceModifications from '../../components/local-tag-service-modifications.jsx';
 import { User } from '../../js/user.js';
 import { Modals } from '../../modal/modals.js';
+import LocalTaggableServiceModifications from '../../components/local-taggable-service-modifications.jsx';
 
-export default function CreateLocalTagService() {
+export default function CreateLocalTaggableService() {
     return {
         component: (
             <div>
-                <form action="/api/post/create-local-tag-service" target="frame" method="POST">
-                    <LocalTagServiceModifications />
+                <form action="/api/post/create-local-taggable-service" target="frame" method="POST">
+                    <LocalTaggableServiceModifications />
                     <div style={{marginLeft: "8px"}}>
-                        <input type="submit" value="Submit" />
+                        <input type="submit" value="Create taggable service" />
                     </div>
                 </form>
                 <OnFormSubmit onFormSubmit={async () => {
@@ -20,6 +20,6 @@ export default function CreateLocalTagService() {
                 }} />
             </div>
         ),
-        displayName: "Create Local Tag Service"
+        displayName: "Create Local Taggable Service"
     };
 };

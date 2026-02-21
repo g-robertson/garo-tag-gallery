@@ -3,7 +3,7 @@ import { executeFunctions } from '../js/client-util.js';
 import { User } from '../js/user.js';
 import { State } from '../js/state.js';
 
-/** @import {DBPermissionedLocalMetricService} from "../../db/tags.js" */
+/** @import {DBPermissionedLocalMetricService} from "../../db/metrics.js" */
 /** @import {State} from '../js/state.js' */
 
 /**

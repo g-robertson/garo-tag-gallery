@@ -8,7 +8,7 @@ export const SCOPES = /** @type {const} */ ({
     LOCAL_TAG_SERVICES: "LTS",
     LOCAL_TAGGABLE_SERVICES: "LTgbS",
     LOCAL_METRIC_SERVICES: "LMS",
-    LOCAL_URL_GENERATOR_SERVICES: "LUGS"
+    LOCAL_DOWNLOADER_SERVICES: "LDS"
 });
 /** @typedef {(typeof SCOPES)[keyof typeof SCOPES]} PermissionObjectScope */
 
@@ -58,16 +58,16 @@ export const PERMISSIONS = /** @type {const} */ ({
             name: "A.DLMS",
             objectScopes: []
         },
-        CREATE_URL_GENERATOR_SERVICE: {
-            name: "A.CUGS",
+        CREATE_LOCAL_DOWNLOADER_SERVICE: {
+            name: "A.CLDS",
             objectScopes: []
         },
-        UPDATE_URL_GENERATOR_SERVICE: {
-            name: "A.UUGS",
+        UPDATE_LOCAL_DOWNLOADER_SERVICE: {
+            name: "A.ULDS",
             objectScopes: []
         },
-        DELETE_URL_GENERATOR_SERVICE: {
-            name: "A.DUGS",
+        DELETE_LOCAL_DOWNLOADER_SERVICE: {
+            name: "A.DLDS",
             objectScopes: []
         },
         IMPORT: {
@@ -133,10 +133,10 @@ export const PERMISSIONS = /** @type {const} */ ({
             objectScopes: [SCOPES.LOCAL_METRIC_SERVICES]
         },
     },
-    LOCAL_URL_GENERATOR_SERVICES: {
-        CREATE_URL_GENERATOR: {
-            name: "LUGS.CUG",
-            objectScopes: [SCOPES.LOCAL_URL_GENERATOR_SERVICES]
+    LOCAL_DOWNLOADER_SERVICES: {
+        CREATE_URL_PARSER: {
+            name: "LDS.CUP",
+            objectScopes: [SCOPES.LOCAL_DOWNLOADER_SERVICES]
         }
     }
 });

@@ -16,7 +16,7 @@ export async function createNewMetricService(driver, name) {
     await realClear(serviceName);
     await serviceName.sendKeys(name);
 
-    await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Create metric service"}})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 
@@ -104,7 +104,7 @@ export async function createNewMetric(driver, metric) {
     await driver.findElement(By.name("metricType")).click();
     await driver.findElement(xpathHelper({type: "option", attrContains: {"text": metric.type}})).click();
 
-    await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Create metric"}})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 

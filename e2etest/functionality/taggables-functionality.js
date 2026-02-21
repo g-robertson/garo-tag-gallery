@@ -15,7 +15,7 @@ export async function createNewTaggableService(driver, name) {
     await realClear(serviceName);
     await serviceName.sendKeys(name);
 
-    await driver.findElement(xpathHelper({attrEq: {"value": "Submit"}})).click();
+    await driver.findElement(xpathHelper({attrEq: {"value": "Create taggable service"}})).click();
     await driver.wait(UNTIL_MODAL_CLOSE);
 }
 

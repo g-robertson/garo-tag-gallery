@@ -1,21 +1,24 @@
 import './global.css';
 import ImportFilesFromHydrus from './modal/modals/import-files-from-hydrus.jsx';
-import CreateLocalMetric from './modal/modals/create-local-metric.jsx';
 import ChangeTagToMetricModal from './modal/modals/change-tag-to-metric.jsx';
 import { FILE_SEARCH_PAGE_NAME, FILE_SEARCH_PAGE_DEFAULT_DISPLAY_NAME } from './page/pages/file-search-page.jsx';
-import CreateLocalDownloaderService from './modal/modals/create-local-downloader-service.jsx';
 import ImportMappingsFromBackup from './modal/modals/import-mappings-from-backup.jsx';
-import UpdateLocalMetricService from './modal/modals/update-local-metric-service.jsx';
-import CreateLocalMetricService from './modal/modals/create-local-metric-service.jsx';
-import UpdateLocalTagService from './modal/modals/update-local-tag-service.jsx';
-import UpdateLocalTaggableService from './modal/modals/update-local-taggable-service.jsx';
-import UpdateLocalMetric from './modal/modals/update-local-metric.jsx';
-import CreateLocalTagService from './modal/modals/create-local-tag-service.jsx';
+import CreateLocalMetricService from './modal/modals/crud-create-local-metric-service.jsx';
+import UpdateLocalMetricService from './modal/modals/crud-update-local-metric-service.jsx';
+import CreateLocalTagService from './modal/modals/crud-create-local-tag-service.jsx';
+import UpdateLocalTagService from './modal/modals/crud-update-local-tag-service.jsx';
+import CreateLocalTaggableService from './modal/modals/crud-create-local-taggable-service.jsx';
+import UpdateLocalTaggableService from './modal/modals/crud-update-local-taggable-service.jsx';
+import CreateLocalMetric from './modal/modals/crud-create-local-metric.jsx';
+import UpdateLocalMetric from './modal/modals/crud-update-local-metric.jsx';
+import CreateLocalDownloaderService from './modal/modals/crud-create-local-downloader-service.jsx';
+import UpdateLocalDownloaderService from './modal/modals/crud-update-local-downloader-service.jsx';
 import { DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME, DUPLICATES_PROCESSING_PAGE_NAME } from './page/pages/duplicates-page.jsx';
 import {Page, Pages} from './page/pages.js'
 import { Modals } from './modal/modals.js';
 import { ReferenceableReact } from './js/client-util.js';
-import CreateLocalTaggableService from './modal/modals/create-local-taggable-service.jsx';
+import CreateURLParser from './modal/modals/crud-create-url-parser.jsx';
+import UpdateURLParser from './modal/modals/crud-update-url-parser.jsx';
 
 const MENUS = {
     File: ReferenceableReact(),
@@ -133,7 +136,18 @@ const Navbar = () => {
                         setMenuOpened(null);
                         Modals.Global().pushModal(CreateLocalDownloaderService());
                     }}>Create new downloader service</div>
-                    
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                        Modals.Global().pushModal(UpdateLocalDownloaderService());
+                    }}>Update/delete existing downloader service</div>
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                        Modals.Global().pushModal(CreateURLParser());
+                    }}>Create new URL parser</div>
+                    <div className="topbar-dropdown-option" onClick={() => {
+                        setMenuOpened(null);
+                        Modals.Global().pushModal(UpdateURLParser());
+                    }}>Update/delete existing URL parser</div>
                 </div>)}
             </div>
         </nav>
