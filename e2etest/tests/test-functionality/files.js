@@ -26,7 +26,7 @@ const SINGLE_IMAGE_IMPORT = "./e2etest/data/single-image-test.zip";
 const TEST_PAGE_UPDATE_TAG_SERVICE = "TEST PAGE UPDATE TAG SERVICE";
 const TEST_SERVER_REFRESH_TAG_SERVICE = "TEST SERVER REFRESH TAG SERVICE";
 const TEST_PAGE_UPDATE_TAG = "1girl";
-const TEST_SERVER_REFRESH_TAG = "1girl";
+const TEST_SERVER_REFRESH_TAG = "test-server-refresh";
 
 /** @type {TestSuite[]} */
 const IMPORT_FILES_FROM_HYDRUS_TESTS = [

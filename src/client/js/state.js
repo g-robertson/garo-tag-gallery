@@ -632,6 +632,18 @@ export class PersistentState {
     get(key) {
         return this.#states.get(key);
     }
+
+    /**
+     * @param {string} key  
+     */
+    getVal(key) {
+        const state = this.#states.get(key);
+        if (state !== undefined) {
+            return state.get();
+        } else {
+            return this.#priorState[key];
+        }
+    }
     
     toJSON() {
         const jsonState = this.#priorState;

@@ -462,6 +462,123 @@ export function setToggle(set, item) {
     }
 }
 
+/** @template ItemType */
+export class TransitiveRelationGroups {
+    #nextGroupID = 0;
+    #maxConstructorGroupID = -1;
+    /** @type {Map<number, number>} */
+    #constructorGroupIDSizes = new Map();
+
+    /** @type {Map<number, Set<ItemType>} */
+    #groupIDsToItemsMap = new Map();
+    /** @type {Map<ItemType, number>} */
+    #itemToGroupIDMap = new Map();
+
+    /**
+     * @param {Map<number, Iterable<ItemType>>} map 
+     */
+    constructor(map) {
+        map ??= new Map();
+        for (const [groupID, items] of map) {
+            const groupItems = new Set(items);
+            this.#groupIDsToItemsMap.set(groupID, groupItems);
+            this.#constructorGroupIDSizes.set(groupID, groupItems.size);
+
+            this.#maxConstructorGroupID = Math.max(this.#maxConstructorGroupID, groupID);
+            for (const item of items) {
+                ++groupItemCount;
+                if (this.#itemToGroupIDMap.has(item)) {
+                    throw "Initializing TransitiveRelationGroup with Map that has one Item corresponding to multiple groups, this cannot happen within a set of transitive groups";
+                }
+                this.#itemToGroupIDMap.set(item, groupID);
+            }
+        }
+        this.#nextGroupID = this.#maxConstructorGroupID + 1;
+    }
+
+    /**
+     * 
+     * @param {ItemType} item1 
+     * @param {ItemType} item2 
+     */
+    addRelation(item1, item2) {
+        const item1Group = this.#itemToGroupIDMap.get(item1);
+        const item2Group = this.#itemToGroupIDMap.get(item2);
+
+        if (item1Group === undefined) {
+            if (item2Group === undefined) {
+                // new group needed
+                const newGroup = this.#nextGroupID;
+                ++this.#nextGroupID;
+
+                this.#itemToGroupIDMap.set(item1, newGroup);
+                this.#itemToGroupIDMap.set(item2, newGroup);
+                this.#groupIDsToItemsMap.set(newGroup, new Set([item1, item2]));
+            } else {
+                this.#itemToGroupIDMap.set(item1, item2Group);
+                this.#groupIDsToItemsMap.get(item2Group).add(item1);
+            }
+        } else {
+            if (item2Group === undefined) {
+                this.#itemToGroupIDMap.set(item2, item1Group);
+                this.#groupIDsToItemsMap.get(item1Group).add(item2);
+            } else {
+                if (item1Group !== item2Group) {
+                    // merge groups needed
+                    // choose least expensive group to delete
+                    let sourceGroup = item1Group;
+                    let targetGroup = item2Group;
+                    if (item1Group > this.#maxConstructorGroupID) {
+                        sourceGroup = item1Group;
+                        targetGroup = item2Group;
+                    } else if (item2Group > this.#maxConstructorGroupID) {
+                        sourceGroup = item2Group;
+                        targetGroup = item1Group;
+                    } else if (this.#constructorGroupIDSizes.get(item1Group) > this.#constructorGroupIDSizes.get(item2Group)) {
+                        sourceGroup = item2Group;
+                        targetGroup = item1Group;
+                    } else {
+                        sourceGroup = item1Group;
+                        targetGroup = item2Group;
+                    }
+
+                    // merge the group in
+                    for (const item of this.#groupIDsToItemsMap.get(sourceGroup)) {
+                        this.#itemToGroupIDMap.set(item, targetGroup);
+                        this.#groupIDsToItemsMap.get(targetGroup).add(item);
+                    }
+                    // delete the group
+                    this.#groupIDsToItemsMap.delete(sourceGroup);
+                }
+            }
+        }
+    }
+
+    hasRelation(item1, item2) {
+        const item1Group = this.#itemToGroupIDMap.get(item1);
+        if (item1Group === undefined) {
+            return false;
+        }
+        return this.#groupIDsToItemsMap.get(item1Group).has(item2);
+    }
+
+    groupIDs() {
+        return this.#groupIDsToItemsMap.keys();
+    }
+
+    groups() {
+        return this.#groupIDsToItemsMap.values();
+    }
+
+    entries() {
+        return this.#groupIDsToItemsMap.entries();
+    }
+
+    [Symbol.iterator]() {
+        return this.#groupIDsToItemsMap[Symbol.iterator]();
+    }
+}
+
 /**
  * @template T, G
  * @param {T[]} groupableItems 
@@ -587,6 +704,8 @@ export function getMergedGroups(groupMap) {
 
     return [...mergedGroupMap.values()];
 }
+
+
 
 /**
  * @template K, V, [V2=V]

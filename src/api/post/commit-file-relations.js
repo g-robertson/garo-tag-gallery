@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { PERMISSIONS, SYSTEM_USER_ID } from "../../client/js/user.js";
 import { BetterDuplicateFileRelations, NontransitiveFileRelations, TransitiveFileRelations } from "../../db/duplicates.js";
-import { NONTRANSITIVE_FILE_RELATION_TYPES, TRANSITIVE_FILE_RELATION_TYPES } from "../../client/js/duplicates.js";
+import { getFileRelationsFiles, NONTRANSITIVE_FILE_RELATION_TYPES, TRANSITIVE_FILE_RELATION_TYPES } from "../../client/js/duplicates.js";
 import { TaggableFiles, Taggables } from "../../db/taggables.js";
 import { AppliedMetrics } from "../../db/metrics.js";
 import { FILE_SIZE_METRIC } from "../../client/js/defaults.js";
@@ -14,20 +14,6 @@ import { Z_FILE_RELATION } from "../zod-types.js";
 
 /** @import {FileRelation} from "../zod-types.js" */
 
-/**
- * 
- * @param {FileRelation} fileRelation 
- */
-function getFileRelationsFiles(fileRelation) {
-    const {type} = fileRelation;
-    if (type === "duplicates-with-better-trash-worse" || type === "duplicates-with-better") {
-        return [fileRelation.Better_File_ID, fileRelation.Worse_File_ID];
-    } else if (type === "duplicates-with-same-quality" || type === "duplicates-with-same-quality-trash-larger" || type === "alternates" || type === "false-positives") {
-        return [fileRelation.File_ID_1, fileRelation.File_ID_2]
-    } else {
-        throw "Unrecognized file relation type to extract file ids from";
-    }
-}
 
 /**
  * @param {Parameters<APIValidationFunction>[0]} dbs 
@@ -104,6 +90,9 @@ async function transformClientFileRelationsToDatabaseObjects(dbs, clientFileRela
                 ...clientFileRelation,
                 File_Relation_Type: NONTRANSITIVE_FILE_RELATION_TYPES.FALSE_POSITIVES
             });
+        } else if (clientFileRelation.type === "implied") {
+        } else {
+            throw `Unexpected file relation type found: ${clientFileRelation.type}`
         }
 
         if (clientFileRelation.type === "duplicates-with-better-trash-worse") {

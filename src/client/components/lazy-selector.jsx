@@ -93,8 +93,9 @@ function LazySelector({
     allowKeyboardInput,
     externalIncrementerConstState
 }) {
+    let isDisposed = false;
     /** @type {(() => void)[]} */
-    const addToCleanup = [];
+    const addToCleanup = [() => { isDisposed = true; }];
 
     onValuesDoubleClicked ??= () => {};
     onValuesSelected ??= () => {};
@@ -244,7 +245,7 @@ function LazySelector({
             }
         }
 
-        if (localValuesRealizationSyncState === valuesRealizationSyncState.get()) {
+        if (localValuesRealizationSyncState === valuesRealizationSyncState.get() && !isDisposed) {
             realizedValuesState.set(realizedValues);
             return true;
         } else {
@@ -558,14 +559,16 @@ function LazySelector({
          */
         const lastClickedIndexIncrement = (changeAmount) => {
             const lastClickedIndex = lastClickedIndexState.get() ?? 0;
-            const newIndex = clamp(lastClickedIndex + changeAmount, 0, valuesConstState.get().length - 1);
+            const attemptedNewIndex = lastClickedIndex + changeAmount;
+            const newIndex = clamp(attemptedNewIndex, 0, valuesConstState.get().length - 1);
             if (newIndex !== lastClickedIndex) {
                 lastClickedIndexState.set(newIndex);
                 const selectedIndices = selectedIndicesState.get();
                 selectedIndices.clear();
                 selectedIndices.add(newIndex);
                 selectedIndicesState.forceUpdate();
-            } else if (changeAmount > 0) {
+            }
+            if (attemptedNewIndex > newIndex) {
                 onSelectedPastEnd();        
             }
         }

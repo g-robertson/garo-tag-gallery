@@ -64,5 +64,9 @@ const Z_BETTER_DUPLICATE_FILE_RELATION = z.object({
     }
 );
 
-export const Z_FILE_RELATION = Z_GENERIC_FILE_RELATION.or(Z_BETTER_DUPLICATE_FILE_RELATION);
+const Z_IMPLIED_FILE_RELATION = z.object({
+    type: z.literal("implied")
+});
+
+export const Z_FILE_RELATION = Z_GENERIC_FILE_RELATION.or(Z_BETTER_DUPLICATE_FILE_RELATION).or(Z_IMPLIED_FILE_RELATION);
 /** @typedef {z.infer<typeof Z_FILE_RELATION} FileRelation */

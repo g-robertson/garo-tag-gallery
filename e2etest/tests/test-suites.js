@@ -37,19 +37,35 @@ const TESTS = {
 
 export const OK_LOGS = new Set(["info"]);
 export const HEADLESS = false;
+
+// Tests that need to execute no matter what, ie for data population
+const REQUIRED_TESTS = new Set([
+    "Tests.PopulateData"
+]);
+
+// Test categories in this 
 const DISABLED_TESTS = new Set([
-    "Tests.Navigation",
-    // "Tests.PopulateData",
+    // "Tests.Navigation",
     // "Tests.Functional",
-    "Tests.Functional.Files",
+    // "Tests.Functional.Files",
     // "Tests.Functional.Files.ImportFilesFromHydrus",
     // "Tests.Functional.Pages",
-    "Tests.Functional.Pages.FileSearchPage",
+    // "Tests.Functional.Pages.FileSearchPage",
     // "Tests.Functional.Pages.DuplicatesProcessingPage",
-    "Tests.Functional.Tags",
-    "Tests.Functional.Taggables",
-    "Tests.Functional.Metrics",
+    // "Tests.Functional.Tags",
+    // "Tests.Functional.Taggables",
+    // "Tests.Functional.Metrics",
 ]);
+
+const ONLY_ENABLE_TESTS = new Set([
+    // "Tests.Functional.Files.ImportFilesFromHydrus",
+    // "Tests.Functional.Pages.FileSearchPage",
+    "Tests.Functional.Pages.DuplicatesProcessingPage",
+    // "Tests.Functional.Tags",
+    // "Tests.Functional.Taggables",
+    // "Tests.Functional.Metrics",
+]);
+
 const HALT_ON_FAILURE = true;
 const HALT_AFTER = new Set([]);
 const DISPLAY_PRIORITY_ITEMS = 0;
@@ -66,9 +82,17 @@ const unimplementedTests = [];
  * @param {TestSuite} testSuite 
  * @param {string} previousContext
  * @param {ThenableWebDriver} driver
- * @param {boolean} skippingTests
+ * @param {boolean} required
+ * @param {boolean} enabled
+ * @param {boolean} disabled
+ * @param {boolean} performedBefore
  */
-async function executeTestSuite_(testSuite, previousContext, driver, skippingTests) {
+async function executeTestSuite_(testSuite, previousContext, driver, required, enabled, disabled, performedBefore) {
+    required ??= false;
+    enabled ??= ONLY_ENABLE_TESTS.size === 0 ? true : false;
+    disabled ??= false;
+    performedBefore ??= true;
+
     if (testsHalted) {
         return;
     }
@@ -78,15 +102,28 @@ async function executeTestSuite_(testSuite, previousContext, driver, skippingTes
     if (previousContext !== "") {
         currentContext = `${previousContext}.${testSuite.name}`;
     }
-    if (DISABLED_TESTS.has(currentContext)) {
-        console.log(`Skipping tests: ${currentContext}`);
-        skippingTests = true;
+    if (REQUIRED_TESTS.has(currentContext)) {
+        required = true;
     }
+    if (DISABLED_TESTS.has(currentContext)) {
+        disabled = true;
+    }
+    if (ONLY_ENABLE_TESTS.size > 0) {
+        if (ONLY_ENABLE_TESTS.has(currentContext)) {
+            enabled = true;
+        }
+    }
+
+    const performTest = required || (enabled && !disabled);
+    if (!performTest && performedBefore) {
+        console.log(`Skipping tests: ${currentContext}`);
+    }
+    performedBefore = performTest;
 
     /** @type {TestSuite[]} */
     let teardowns = [];
     if (typeof testSuite.tests === "function") {
-        if (skippingTests) {
+        if (!performTest) {
             return;
         }
         console.log(`Executing tests: ${currentContext}`);
@@ -107,7 +144,7 @@ async function executeTestSuite_(testSuite, previousContext, driver, skippingTes
             if (test.isTeardown ?? false) {
                 teardowns.push(test);
             } else {
-                await executeTestSuite_(test, currentContext, driver, skippingTests);
+                await executeTestSuite_(test, currentContext, driver, required, enabled, disabled, performedBefore);
             }
         }
     } else {
@@ -119,7 +156,7 @@ async function executeTestSuite_(testSuite, previousContext, driver, skippingTes
     }
 
     for (const teardown of teardowns) {
-        await executeTestSuite_(teardown, currentContext, driver, skippingTests);
+        await executeTestSuite_(teardown, currentContext, driver, required, enabled, disabled, performedBefore);
     }
 
     if (HALT_AFTER.has(currentContext)) {

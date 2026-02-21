@@ -1,12 +1,13 @@
 import '../global.css';
-import { executeFunctions, ReferenceableReact, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
+import { executeFunctions, ReferenceableReact, TransitiveRelationGroups, VIDEO_FILE_EXTENSIONS } from '../js/client-util.js';
 import LazySelector from './lazy-selector.jsx';
 import selectFiles from '../../api/client-get/select-files.js';
 import { ConstState, PersistentState, State } from "../js/state.js";
 import { Modals } from '../modal/modals.js';
 import { ImagePreloader } from '../js/client-exclusive-util.js';
-import DialogBox from '../modal/modals/dialog-box.jsx';
+import DialogBox, { YES_BUTTON, YES_NO_BUTTONS } from '../modal/modals/dialog-box.jsx';
 import commitFileRelations from '../../api/client-get/commit-file-relations.js';
+import { getFileRelationsFiles, isFileRelationDuplicate } from '../js/duplicates.js';
 
 /** @import {DBFileComparison} from "../../db/duplicates.js" */
 /** @import {DBFile} from "../../db/taggables.js" */
@@ -18,6 +19,26 @@ import commitFileRelations from '../../api/client-get/commit-file-relations.js';
  *     File_2: DBFile
  * } & DBFileComparison} LazyDedupeGalleryRealizedValue
  **/
+
+/**
+ * @param {PersistentState} persistentState 
+ */
+export function dedupeGalleryStateHasComparisons(persistentState) {
+    if (persistentState.isClear()) {
+        return false;
+    }
+
+    return Object.keys(persistentState.getVal("fileComparisonsEvaluated")).length !== 0;
+}
+
+/**
+ * @param {PersistentState} persistentState 
+ */
+export async function commitDedupeGalleryState(persistentState) {
+    const fileComparisonsEvaluated = persistentState.getVal("fileComparisonsEvaluated");
+    await commitFileRelations(Object.values(fileComparisonsEvaluated));
+    persistentState.clear();
+}
 
 /**
  * @param {{
@@ -92,10 +113,49 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
         return () => executeFunctions(addToCleanup);
     };
 
-    const commitChanges = async () => {
-        await commitFileRelations(Object.values(fileComparisonsEvaluatedState.get()));
-        persistentState.clear();
-        Modals.Global().popModal();
+    /** @type {TransitiveRelationGroups<number>} */
+    const transitiveDuplicateRelationGroups = new TransitiveRelationGroups();
+    
+    /**
+     * @param {number} index
+     * @param {FileRelation} relation
+     */
+    const addRelation = (index, relation) => {
+        const fileComparisonsEvaluated = fileComparisonsEvaluatedState.get();
+        const existingRelation = fileComparisonsEvaluated[index];
+        if (existingRelation !== undefined && isFileRelationDuplicate(existingRelation)) {
+            const fileIDs = getFileRelationsFiles(existingRelation);
+            transitiveDuplicateRelationGroups.removeRelation(fileIDs[0], fileIDs[1]);
+        }
+        if (isFileRelationDuplicate(relation)) {
+            const fileIDs = getFileRelationsFiles(relation);
+            transitiveDuplicateRelationGroups.addRelation(fileIDs[0], fileIDs[1]);
+        }
+
+        fileComparisonsEvaluated[index] = relation;
+        // no forceUpdate, moveToNextNonImpliedComparison will update it
+    };
+
+    /**
+     * @param {number} index 
+     */
+    const isComparisonImplied = (index) => {
+        const comparison = fileComparisons[index];
+        return transitiveDuplicateRelationGroups.hasRelation(comparison.File_ID_1, comparison.File_ID_2);
+    }
+
+    const moveToNextNonImpliedComparison = () => {
+        const fileComparisonsEvaluated = fileComparisonsEvaluatedState.get();
+        const visibleIndex = visibleIndexState.get()
+        let increment = 1;
+        while(visibleIndex + increment < fileComparisons.length && isComparisonImplied(visibleIndex + increment)) {
+            fileComparisonsEvaluated[visibleIndex + increment] = {type: "implied"};
+            ++increment;
+        }
+
+        fileComparisonsEvaluatedState.forceUpdate();
+        selectorIncrementerState.set(increment);
+        activeFileState.set("File_1");
     };
 
     return <div onAdd={onAdd} style={{width: "100%", height: "100%"}}>
@@ -144,84 +204,84 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
                 }));
 
                 if (optionSelected === OPTION_COMMIT_CHANGES) {
-                    commitChanges();
+                    await commitDedupeGalleryState(persistentState);
+                    Modals.Global().popModal();
                 }
             }}
             customItemComponent={({realizedValue, index}) => {
+                const addToCleanupCIC = [];
+                const ComparisonsMadeCount = ReferenceableReact();
+
                 visibleIndexState.set(index);
                 const fileComparisonsEvaluated = fileComparisonsEvaluatedState.get();
             
                 return <div onAdd={() => {
                     realizedValueState.set(realizedValue);
+
+                    const onFileComparisonsEvaluatedUpdate = () => {
+                        ComparisonsMadeCount.dom.textContent = Object.keys(fileComparisonsEvaluatedState.get()).length
+                    };
+
+                    fileComparisonsEvaluatedState.addOnUpdateCallback(onFileComparisonsEvaluatedUpdate, addToCleanupCIC);
+
+                    return () => executeFunctions(addToCleanupCIC);
                 }} style={{width: "100%", height: "100%", justifyContent: "center"}}>
                     <div style={{position: "absolute", bottom: "20px", left: "4px"}}>
-                        <span className="dedupe-gallery-current-file-index">{index + 1}</span> / {fileComparisons.length}
+                        <span className="dedupe-gallery-current-file-index">{index + 1}</span>/{fileComparisons.length}
                     </div>
                     <div style={{position: "absolute", bottom: "4px", left: "4px"}}>
-                        Comparisons made: {Object.keys(fileComparisonsEvaluated).length} / <span className="dedupe-gallery-total-file-comparisons">{fileComparisons.length}</span>
+                        Comparisons made: {ComparisonsMadeCount.react(<span className="dedupe-gallery-evaluated-file-comparisons">{Object.keys(fileComparisonsEvaluated).length}</span>)}/<span className="dedupe-gallery-total-file-comparisons">{fileComparisons.length}</span>
                     </div>
                     <div style={{position: "absolute", top: "3vh", right: "4px", flexDirection: "column"}}>
                         <input type="button" value="Current is better, trash other" onClick={() => {
                             const Better_File_ID = realizedValue[activeFileState.get()].File_ID;
-                            fileComparisonsEvaluated[index] = {
+                            addRelation(index, {
                                 type: "duplicates-with-better-trash-worse",
                                 Better_File_ID,
                                 Worse_File_ID: realizedValue.File_ID_1 === Better_File_ID ? realizedValue.File_ID_2 : realizedValue.File_ID_1
-                            };
-                            fileComparisonsEvaluatedState.forceUpdate();
-                            selectorIncrementerState.set(1);
-                            activeFileState.set("File_1");
+                            });
+                            moveToNextNonImpliedComparison();
                         }} />
                         <input type="button" value="Current is better" onClick={() => {
                             const Better_File_ID = realizedValue[activeFileState.get()].File_ID;
-                            fileComparisonsEvaluated[index] = {
+                            addRelation(index, {
                                 type: "duplicates-with-better",
                                 Better_File_ID,
                                 Worse_File_ID: realizedValue.File_ID_1 === Better_File_ID ? realizedValue.File_ID_2 : realizedValue.File_ID_1
-                            };
-                            fileComparisonsEvaluatedState.forceUpdate();
-                            selectorIncrementerState.set(1);
-                            activeFileState.set("File_1");
+                            });
+                            moveToNextNonImpliedComparison();
                         }} />
                         <input type="button" value="Same quality, trash larger" onClick={() => {
-                            fileComparisonsEvaluated[index] = {
+                            addRelation(index, {
                                 type: "duplicates-with-same-quality-trash-larger",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2
-                            };
-                            fileComparisonsEvaluatedState.forceUpdate();
-                            selectorIncrementerState.set(1);
-                            activeFileState.set("File_1");
+                            });
+                            moveToNextNonImpliedComparison();
                         }} />
                         <input type="button" value="Same quality" onClick={() => {
-                            fileComparisonsEvaluated[index] = {
+                            addRelation(index, {
                                 type: "duplicates-with-same-quality",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2
-                            };
-                            fileComparisonsEvaluatedState.forceUpdate();
-                            selectorIncrementerState.set(1);
-                            activeFileState.set("File_1");
+                            });
+                            moveToNextNonImpliedComparison();
                         }} />
                         <input type="button" value="Alternates" onClick={() => {
-                            fileComparisonsEvaluated[index] = {
+                            addRelation(index, {
                                 type: "alternates",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2
-                            };
-                            fileComparisonsEvaluatedState.forceUpdate();
-                            selectorIncrementerState.set(1);
-                            activeFileState.set("File_1");
+                            });
+                            moveToNextNonImpliedComparison();
                         }} />
                         <input type="button" value="False positives" onClick={() => {
-                            fileComparisonsEvaluated[index] = {
+                            addRelation(index, {
                                 type: "false-positives",
                                 File_ID_1: realizedValue.File_ID_1,
                                 File_ID_2: realizedValue.File_ID_2
-                            };
-                            fileComparisonsEvaluatedState.forceUpdate();
-                            selectorIncrementerState.set(1);
-                            activeFileState.set("File_1");
+                            });
+                            moveToNextNonImpliedComparison();
                         }} />
                         <input type="button" value="Skip" onClick={() => {
                             selectorIncrementerState.set(1);
@@ -253,7 +313,21 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
         />
     
         <div style={{position: "absolute", bottom: "4px", right: "4px", flexDirection: "column"}}>
-            <input type="button" value="Commit" onClick={commitChanges} />
+            <input type="button" value="Commit" onClick={async () => {
+                await commitDedupeGalleryState(persistentState);
+                Modals.Global().popModal();
+            }} />
+            <input type="button" value="Discard ALL changes" onClick={async () => {
+                const optionSelected = await Modals.Global().pushModal(DialogBox({
+                    displayName: "WARNING: Discard ALL Changes?",
+                    promptText: "WARNING: Are you sure you want to discard all of your file relations from this session?",
+                    optionButtons: YES_NO_BUTTONS
+                }));
+                if (optionSelected === YES_BUTTON.value) {
+                    persistentState.clear();
+                    Modals.Global().popModal();
+                }
+            }} />
         </div>
     </div>
 };

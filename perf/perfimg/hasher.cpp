@@ -1,7 +1,6 @@
 #include "hasher.hpp"
 #include "../common/util.hpp"
 #include "hashes/ocv.hpp"
-#include "hashes/edge-hash.hpp"
 
 #include <string>
 #include <iostream>
@@ -24,8 +23,7 @@ namespace {
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_PHASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS},
-        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS},
-        {Hasher::Algorithm::EDGE_HASH, EdgeHash::deserializeHashParams}
+        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS}
     });
     
     auto HASH_ALGORITHM_TO_HASH_PARAMS_DELETER = std::unordered_map<Hasher::Algorithm, void(*)(void*)>({
@@ -36,8 +34,7 @@ namespace {
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, NO_PARAMS_DELETER},
         {Hasher::Algorithm::OCV_PHASH, NO_PARAMS_DELETER},
         {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS_DELETER},
-        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS_DELETER},
-        {Hasher::Algorithm::EDGE_HASH, EdgeHash::deleteHashParams}
+        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS_DELETER}
     });
 
     auto HASH_ALGORITHM_TO_HASHER = std::unordered_map<Hasher::Algorithm, std::vector<unsigned char>(*)(cv::Mat&, const void*)>({
@@ -48,8 +45,7 @@ namespace {
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, OCVHashes::marrHildrethHash},
         {Hasher::Algorithm::OCV_PHASH, OCVHashes::pHash},
         {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, OCVHashes::radialVarianceHash},
-        {Hasher::Algorithm::OCV_SIFT_HASH, OCVHashes::siftHash},
-        {Hasher::Algorithm::EDGE_HASH, EdgeHash::hash}
+        {Hasher::Algorithm::OCV_SIFT_HASH, OCVHashes::siftHash}
     });
 };
 
@@ -91,6 +87,10 @@ std::vector<std::pair<unsigned int, const std::vector<unsigned char>*>> Hasher::
         auto fileNumber = util::deserializeUInt32(input, inputOffset);
         auto path = util::deserializeString(input, inputOffset);
         auto image = cv::imread(path);
+        // read failed, user may have input a .txt, or .webm..
+        if (image.size().empty()) {
+            continue;
+        }
 
         auto hash = hasher(image, genericHashParams);
         auto it = computedPHashes.insert({fileNumber, hash});
@@ -107,6 +107,7 @@ void Hasher::performAndGetHashes(std::string_view input, void (*writer)(const st
     std::size_t outputLocation = 0;
 
     auto performedHashes = performHashes(input);
+    outputLocation = util::serializeUInt32(performedHashes.size(), output, outputLocation);
     for (const auto& fileHashPair : performedHashes) {
         outputLocation = util::serializeUInt32(fileHashPair.first, output, outputLocation);
         outputLocation = util::serializeUCharSpan(*fileHashPair.second, output, outputLocation);

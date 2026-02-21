@@ -258,7 +258,9 @@ export default class PerfImg {
         /** @type {Map<number, Buffer>} */
         const hashMap = new Map();
         let performAndGetHashesReturnString = await this.__readFromOutputFile();
-        for (let i = 0; i < fileIDToFileName.size; ++i) {
+        const hashCount = performAndGetHashesReturnString.readInt32LE(location);
+        location += 4;
+        for (let i = 0; i < hashCount; ++i) {
             const fileID = performAndGetHashesReturnString.readInt32LE(location);
             location += 4;
             const hashLength = performAndGetHashesReturnString.readInt32LE(location);

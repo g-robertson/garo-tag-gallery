@@ -384,6 +384,17 @@ export async function beginFilteringPotentialDuplicates(driver) {
     await driver.wait(until.elementLocated(xpathHelper({type: "input", attrEq: {value: "Skip"}, or: {type: "input", attrEq: {value: "Discard"}}})), DEFAULT_TIMEOUT_TIME);
 }
 
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateReopenUncommitted(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Reopen"}})).click();
+    await driver.wait(until.elementLocated(xpathHelper({type: "input", attrEq: {value: "Skip"}})), DEFAULT_TIMEOUT_TIME);
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
 export async function duplicateDiscardUncommitted(driver) {
     await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Discard"}})).click();
     await driver.wait(until.elementLocated(xpathHelper({type: "input", attrEq: {value: "Skip"}})), DEFAULT_TIMEOUT_TIME);
@@ -448,13 +459,21 @@ export async function duplicateGoBack(driver) {
 /**
  * @param {ThenableWebDriver} driver 
  */
-export async function commitDuplicates(driver) {
+export async function duplicateCommitChanges(driver) {
     await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Commit"}})).click();
 }
 
 /**
  * @param {ThenableWebDriver} driver 
  */
-export async function commitDuplicatesFromDialog(driver) {
+export async function duplicateDiscardChanges(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Discard ALL changes"}})).click();
+    await pressDialogBoxOption(driver, "Yes");
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function duplicateCommitChangesFromDialog(driver) {
     await pressDialogBoxOption(driver, "Commit");
 }

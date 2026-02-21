@@ -1,4 +1,4 @@
-import { mapNullCoalesce } from "../client/js/client-util.js";
+import { mapNullCoalesce, TransitiveRelationGroups } from "../client/js/client-util.js";
 import { CURRENT_PERCEPTUAL_HASH_VERSION, IS_EXACT_DUPLICATE_DISTANCE,  MAX_SIMILAR_PERCEPTUAL_HASH_DISTANCE } from "../client/js/duplicates.js";
 import { HASH_ALGORITHMS } from "../perf-binding/perf-img.js";
 import { exactDuplicateHash } from "../server/duplicates.js";
@@ -502,83 +502,24 @@ export class TransitiveFileRelations {
         const fileIDs = [...new Set(transitiveFileRelations.flatMap(fileRelation => [fileRelation.File_ID_1, fileRelation.File_ID_2]))];
         const transitiveFileRelationGroups = await TransitiveFileRelations.selectManyGroupsByFileIDsWithRelationType(dbs, fileIDs, fileRelationType);
         const beforeGroupIDToFileIDs = new Map(transitiveFileRelationGroups.map(group => [group.Transitive_File_Relation_Groups_ID, new Set(group.File_IDs)]));
-        const afterGroupIDToFileIDs = new Map(transitiveFileRelationGroups.map(group => [group.Transitive_File_Relation_Groups_ID, new Set(group.File_IDs)]));
-        /** @type {Map<number, number>} */
-        const afterFileIDsToGroupID = new Map();
-        for (const fileRelationGroup of transitiveFileRelationGroups) {
-            for (const fileID of fileRelationGroup.File_IDs) {
-                afterFileIDsToGroupID.set(fileID, fileRelationGroup.Transitive_File_Relation_Groups_ID);
-            }
-        }
 
-        // Not a fun implementation, all groups that dont yet exist but need transitivity will be represented starting at MAX_SAFE_INTEGER going downwards, we cannot make them preemptively as we cannot know how many are needed
-        let nextNewGroupFakeID = Number.MAX_SAFE_INTEGER;
-
+        const afterGroups = new TransitiveRelationGroups(new Map(transitiveFileRelationGroups.map(group => [group.Transitive_File_Relation_Groups_ID, new Set(group.File_IDs)])));
         for (const fileRelation of transitiveFileRelations) {
-            const fileID1Group = afterFileIDsToGroupID.get(fileRelation.File_ID_1);
-            const fileID2Group = afterFileIDsToGroupID.get(fileRelation.File_ID_2);
-
-            if (fileID1Group === undefined) {
-                if (fileID2Group === undefined) {
-                    // new group needed
-                    const newGroup = nextNewGroupFakeID;
-                    --nextNewGroupFakeID;
-
-                    afterFileIDsToGroupID.set(fileRelation.File_ID_1, newGroup);
-                    afterFileIDsToGroupID.set(fileRelation.File_ID_2, newGroup);
-                    afterGroupIDToFileIDs.set(newGroup, new Set([fileRelation.File_ID_1, fileRelation.File_ID_2]));
-                } else {
-                    afterFileIDsToGroupID.set(fileRelation.File_ID_1, fileID2Group);
-                    afterGroupIDToFileIDs.get(fileID2Group).add(fileRelation.File_ID_1);
-                }
-            } else {
-                if (fileID2Group === undefined) {
-                    afterFileIDsToGroupID.set(fileRelation.File_ID_2, fileID1Group);
-                    afterGroupIDToFileIDs.get(fileID1Group).add(fileRelation.File_ID_2);
-                } else {
-                    if (fileID1Group !== fileID2Group) {
-                        // merge groups needed
-                        // choose least expensive group to delete
-                        let sourceGroup = fileID1Group;
-                        let targetGroup = fileID2Group;
-                        if (fileID1Group > nextNewGroupFakeID) {
-                            sourceGroup = fileID1Group;
-                            targetGroup = fileID2Group;
-                        } else if (fileID2Group > nextNewGroupFakeID) {
-                            sourceGroup = fileID2Group;
-                            targetGroup = fileID1Group;
-                        } else if (beforeGroupIDToFileIDs.get(fileID1Group).size > beforeGroupIDToFileIDs.get(fileID2Group).size) {
-                            sourceGroup = fileID2Group;
-                            targetGroup = fileID1Group;
-                        } else {
-                            sourceGroup = fileID1Group;
-                            targetGroup = fileID2Group;
-                        }
-
-                        // merge the group in
-                        for (const fileID of afterGroupIDToFileIDs.get(sourceGroup)) {
-                            afterFileIDsToGroupID.set(fileID, targetGroup);
-                            afterGroupIDToFileIDs.get(targetGroup).add(fileID);
-                        }
-                        // delete the group
-                        afterGroupIDToFileIDs.delete(sourceGroup);
-                    }
-                }
-            }
+            afterGroups.addRelation(fileRelation.File_ID_1, fileRelation.File_ID_2);
         }
 
         dbs = await dbBeginTransaction(dbs);
-        const newGroupsNeeded = [...afterGroupIDToFileIDs.keys()].filter(groupID => groupID > nextNewGroupFakeID);
+        const newGroupsNeeded = [...afterGroups.groupIDs()].filter(groupID => !beforeGroupIDToFileIDs.has(groupID));
         const newGroups = await TransitiveFileRelations.insertManyGroups(dbs, newGroupsNeeded.map(_ => fileRelationType));
         const fakeIDToNewGroupsMap = new Map(newGroups.map((group, i) => [newGroupsNeeded[i], group]));
 
-        const deleteGroupsNeeded = [...beforeGroupIDToFileIDs.keys()].filter(groupID => !afterGroupIDToFileIDs.has(groupID));
+        const deleteGroupsNeeded = [...beforeGroupIDToFileIDs.keys()].filter(groupID => !afterGroups.has(groupID));
         await TransitiveFileRelations.deleteManyGroupsByID(dbs, deleteGroupsNeeded);
 
         /** @type {DBTransitiveFileRelation[]} */
         const dbTransitiveFileRelations = [];
-        for (let [groupID, afterFileIDs] of afterGroupIDToFileIDs) {
-            if (groupID > nextNewGroupFakeID) {
+        for (let [groupID, afterFileIDs] of afterGroups) {
+            if (!beforeGroupIDToFileIDs.has(groupID)) {
                 groupID = fakeIDToNewGroupsMap.get(groupID).Transitive_File_Relation_Groups_ID;
             }
             const beforeFileIDs = beforeGroupIDToFileIDs.get(groupID) ?? new Set();

@@ -22,8 +22,7 @@ class Hasher {
             OCV_MARR_HILDRETH_HASH = 'M',
             OCV_PHASH = 'P',
             OCV_RADIAL_VARIANCE_HASH = 'R',
-            OCV_SIFT_HASH = 'S',
-            EDGE_HASH = 'E'
+            OCV_SIFT_HASH = 'S'
         };
         void assignHashes(std::string_view input);
         std::vector<std::pair<unsigned int, const std::vector<unsigned char>*>> performHashes(std::string_view input);

@@ -14,6 +14,7 @@ import { Jobs } from '../../jobs.js';
 import { Page} from "../pages.js";
 import { ConstState, PersistentState, State } from '../../js/state.js';
 import { FetchCache } from '../../js/fetch-cache.js';
+import { commitDedupeGalleryState, dedupeGalleryStateHasComparisons } from '../../components/lazy-dedupe-gallery.jsx';
 
 /** @import {DBFileComparison} from "../../../db/duplicates.js" */
 /** @import {SearchObject} from "../../components/tags-selector.jsx" */
@@ -94,28 +95,6 @@ const DuplicatesProcessingPage = ({page}) => {
         .filter(fileComparison => !fileComparison.Comparison_Is_Checked)
         .sort((a, b) => a.Perceptual_Hash_Distance - b.Perceptual_Hash_Distance)
     ), addToCleanup, {name: "DuplicatesProcessingPage.potentialDuplicateFileComparisonsPendingConstState"});
-    // const potentialDuplicateFileComparisonsPendingMergedGroups = mergeGroups(potentialDuplicateFileComparisonsPending, fileComparisonPending => [fileComparisonPending.File_ID_1, fileComparisonPending.File_ID_2]);
-    // const MAX_SUBGROUP_SIZE = 5;
-    // const potentialDuplicateFileComparisonsPendingSubgroups = potentialDuplicateFileComparisonsPendingMergedGroups.flatMap(group => {
-    //     /** @type {{constituents: DBFileComparison[], fileIDs: Set<number>}[]} */
-    //     const subgroups = [];
-    //     let currentSubgroup = [];
-    //     let currentSubgroupFileIDs = new Set();
-    //     for (const constituent of group.constituents) {
-    //         if (!currentSubgroupFileIDs.has(constituent.File_ID_1) || !currentSubgroupFileIDs.has(constituent.File_ID_2)) {
-    //             currentSubgroup.push(constituent);
-    //             currentSubgroupFileIDs.add(constituent.File_ID_1);
-    //             currentSubgroupFileIDs.add(constituent.File_ID_2);
-    // 
-    //             if (currentSubgroupFileIDs.size >= MAX_SUBGROUP_SIZE) {
-    //                 subgroups.push({
-    //                     constituents: currentSubgroup,
-    //                     fileIDs: currentSubgroupFileIDs
-    //                 });
-    //             }
-    //         }
-    //     }
-    // })
 
     const onAdd = () => {
         const onFilesUpdated = () => {
@@ -177,10 +156,9 @@ const DuplicatesProcessingPage = ({page}) => {
         if (fileComparisonIndices.length > 1) {
             fileComparisons = fileComparisonIndices.map(index => fileComparisons[index]);
         }
-        if (!dedupeGalleryState.isClear()) {
+        if (dedupeGalleryStateHasComparisons(dedupeGalleryState)) {
             const REOPEN_BUTTON = 0;
-            const COMMIT_BUTTON = 1;
-            const DISCARD_BUTTON = 2;
+            const DISCARD_BUTTON = 1;
 
             const optionSelected = await Modals.Global().pushModal(DialogBox({
                 displayName: "Uncommitted Dedupe Gallery",
@@ -191,10 +169,6 @@ const DuplicatesProcessingPage = ({page}) => {
                         text: "Reopen"
                     },
                     {
-                        value: COMMIT_BUTTON,
-                        text: "Commit"
-                    },
-                    {
                         value: DISCARD_BUTTON,
                         text: "Discard"
                     }
@@ -202,14 +176,12 @@ const DuplicatesProcessingPage = ({page}) => {
             }));
             if (optionSelected === REOPEN_BUTTON) {
                 Modals.Global().pushModal(DedupeGalleryModal({
+                    fileComparisons,
                     persistentState: dedupeGalleryState
                 }));
                 return;
             }
-            if (optionSelected === COMMIT_BUTTON) {
-
-                // dedupeGalleryState.clear();
-            } else if (optionSelected === DISCARD_BUTTON) {
+            if (optionSelected === DISCARD_BUTTON) {
                 dedupeGalleryState.clear();
             } else {
                 return;

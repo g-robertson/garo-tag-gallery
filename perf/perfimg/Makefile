@@ -16,7 +16,6 @@ perfimg:
 		hash-comparer.cpp \
 		ocv-util.cpp \
 		hashes/ocv.cpp \
-		hashes/edge-hash.cpp \
 		../common/util.cpp \
 		../extern/opencv-4.13.0/build/lib/libopencv_imgcodecs4130.a \
 		../extern/opencv-4.13.0/build/lib/libopencv_img_hash4130.a \

@@ -39,6 +39,10 @@ export class ImagePreloader {
             element.style.position = "absolute";
             element.style.width = "100vw";
             element.style.height = "100vh";
+            if (this.#referenceableReact.dom === null) {
+                throw "ImagePreloader was used after it has been disposed";
+            }
+
             this.#referenceableReact.dom.appendChild(element);
             this.#preloadedImages.set(image, element);
         }

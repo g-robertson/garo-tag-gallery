@@ -8,6 +8,17 @@ import { Modals } from '../../modal/modals.js';
  * @property {string} text
  */
 
+export const YES_BUTTON = {
+    value: 0,
+    text: "Yes"
+};
+export const NO_BUTTON = {
+    value: 1,
+    text: "No"
+}
+
+export const YES_NO_BUTTONS = [YES_BUTTON, NO_BUTTON];
+
 /** 
  * @template T
  * @param {{

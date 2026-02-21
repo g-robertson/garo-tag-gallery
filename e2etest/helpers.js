@@ -24,8 +24,9 @@ export async function findModals(driver) {
  * @param {ThenableWebDriver} driver 
  */
 export async function closeModal(driver) {
-    const modalCancel = await driver.findElement(By.className("modal-cancel"));
-    await modalCancel.click();
+    const modalCancels = await driver.findElements(By.className("modal-cancel"));
+    const lastModalCancel = modalCancels[modalCancels.length - 1];
+    await lastModalCancel.click();
 }
 
 export const UNTIL_MODAL_OPEN = until.elementsLocated(By.className("modal"));
@@ -96,7 +97,7 @@ export const BY_DEDUPE_PREVIEW_GALLERY_IMAGE = xpathHelper({attrContains: {"clas
  * @param {ThenableWebDriver} driver 
  * @param {number=} imageNumber
  */
-export async function findDedupePreviewGalleryImages(driver) {
+async function findDedupePreviewGalleryImages(driver) {
     return await driver.findElements(BY_DEDUPE_PREVIEW_GALLERY_IMAGE);
 }
 
@@ -185,6 +186,13 @@ export const UNTIL_JOB_ERROR = until.elementLocated(By.className("job-error"));
  */
 export async function pressDialogBoxOption(driver, option) {
     await driver.findElement(xpathHelper({attrContains: {"class": "dialog-box-modal"}, descendent: {type: "input", attrEq: {value: option}}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
+export async function closeDialog(driver) {
+    await closeModal(driver);
 }
 
 /**

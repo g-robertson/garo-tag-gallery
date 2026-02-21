@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <iostream>
 
-#include "hashes/edge-hash.hpp"
 #include "hasher.hpp"
 #include "hash-comparer.hpp"
 #include "../common/util.hpp"

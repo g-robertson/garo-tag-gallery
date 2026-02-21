@@ -51,8 +51,7 @@ namespace {
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_PHASH, NO_PARAMS},
         {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS},
-        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS},
-        {Hasher::Algorithm::EDGE_HASH, UNIMPL_PARAMS}
+        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS}
     });
     
     auto HASH_ALGORITHM_TO_HASH_COMPARISON_PARAMS_DELETER = std::unordered_map<Hasher::Algorithm, void(*)(void*)>({
@@ -63,8 +62,7 @@ namespace {
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, NO_PARAMS_DELETER},
         {Hasher::Algorithm::OCV_PHASH, NO_PARAMS_DELETER},
         {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, NO_PARAMS_DELETER},
-        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS_DELETER},
-        {Hasher::Algorithm::EDGE_HASH, UNIMPL_PARAMS_DELETER}
+        {Hasher::Algorithm::OCV_SIFT_HASH, NO_PARAMS_DELETER}
     });
     
     auto HASH_ALGORITHM_TO_HASH_COMPARE = std::unordered_map<Hasher::Algorithm, double(*)(const std::vector<unsigned char>&, const std::vector<unsigned char>&, const void*, double)>({
@@ -75,8 +73,7 @@ namespace {
         {Hasher::Algorithm::OCV_MARR_HILDRETH_HASH, OCVHashes::marrHildrethHashCompare},
         {Hasher::Algorithm::OCV_PHASH, OCVHashes::pHashCompare},
         {Hasher::Algorithm::OCV_RADIAL_VARIANCE_HASH, OCVHashes::radialVarianceHashCompare},
-        {Hasher::Algorithm::OCV_SIFT_HASH, OCVHashes::siftCompare},
-        {Hasher::Algorithm::EDGE_HASH, UNIMPL_HASH_COMPARE}
+        {Hasher::Algorithm::OCV_SIFT_HASH, OCVHashes::siftCompare}
     });
 };
 
