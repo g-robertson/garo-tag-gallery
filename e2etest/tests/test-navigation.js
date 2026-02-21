@@ -2,7 +2,7 @@ import { createNewFileSearchPage } from "../functionality/pages-functionality.js
 import { ByModal, closeModal, closePage, DEFAULT_TIMEOUT_TIME, findPages, rmDownloadedFile, selectPage, xpathHelper } from "../helpers.js";
 import { navigateToBackup, navigateToHydrusImport, navigateToImportMappingsFromBackup } from "../navigation/file-navigation.js";
 import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
-import { navigateToDuplicatesProcessingPage, navigateToFileSearchPage } from "../navigation/pages-navigation.js";
+import { navigateToDownloaderPage, navigateToDuplicatesProcessingPage, navigateToFileSearchPage } from "../navigation/pages-navigation.js";
 import { navigateToCreateLocalDownloaderService, navigateToCreateNewURLParser, navigateToModifyLocalDownloaderServices, navigateToModifyURLParser } from "../navigation/parsers-navigation.js";
 import { navigateToCreateTaggableService, navigateToModifyTaggableServices } from "../navigation/taggables-navigation.js";
 import { navigateToCreateTagService, navigateToModifyTagServices } from "../navigation/tags-navigation.js";
@@ -34,6 +34,10 @@ export const NAVIGATE_FILES_MENU_TESTS = [
 export const NAVIGATE_PAGES_MENU_TESTS = [
     {name: "NavigateToFileSearchPage", tests: async (driver) => {
         await navigateToFileSearchPage(driver);
+        await closePage(driver);
+    }},
+    {name: "NavigateToDownloaderPage", tests: async (driver) => {
+        await navigateToDownloaderPage(driver);
         await closePage(driver);
     }},
     {name: "NavigateToDuplicatesProcessingPage", tests: async (driver) => {

@@ -14,6 +14,15 @@ export async function navigateToFileSearchPage(driver) {
 /**
  * @param {ThenableWebDriver} driver 
  */
+export async function navigateToDownloaderPage(driver) {
+    await driver.findElement(xpathHelper({attrContains: {"text": "Page", "class": "topbar-dropdown-title"}})).click();
+    
+    await driver.findElement(xpathHelper({attrContains: {"text": "New downloader page", "class": "topbar-dropdown-option"}})).click();
+}
+
+/**
+ * @param {ThenableWebDriver} driver 
+ */
 export async function navigateToDuplicatesProcessingPage(driver) {
     await driver.findElement(xpathHelper({attrContains: {"text": "Page", "class": "topbar-dropdown-title"}})).click();
     

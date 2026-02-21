@@ -16,7 +16,7 @@ import { FetchCache } from '../../js/fetch-cache.js';
  *  page: Page
  * }}
 */
-const FileSearchPageElement = ({page}) => {
+const DownloaderPageElement = ({page}) => {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
@@ -111,6 +111,6 @@ const FileSearchPageElement = ({page}) => {
     );
 };
 
-export default FileSearchPageElement;
-export const FILE_SEARCH_PAGE_NAME = "file-search-page";
-export const FILE_SEARCH_PAGE_DEFAULT_DISPLAY_NAME = "New file search page";
+export default DownloaderPageElement;
+export const DOWNLOADER_PAGE_NAME = "downloader-page";
+export const DOWNLOADER_PAGE_DEFAULT_DISPLAY_NAME = "New downloader page";

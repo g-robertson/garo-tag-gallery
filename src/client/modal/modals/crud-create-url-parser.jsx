@@ -20,6 +20,6 @@ export default function CreateURLParser() {
                 }} />
             </form>
         </div>,
-        displayName: "Create Local Metric"
+        displayName: "Create URL Parser"
     };
 };

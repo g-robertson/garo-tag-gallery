@@ -267,8 +267,5 @@ const DuplicatesProcessingPage = ({page}) => {
 };
 
 export default DuplicatesProcessingPage;
-
-export const PAGE_NAME = "duplicates-processing-page";
-export const DUPLICATES_PROCESSING_PAGE_NAME = PAGE_NAME;
-export const PAGE_DEFAULT_DISPLAY_NAME = "New duplicates processing page";
-export const DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME = PAGE_DEFAULT_DISPLAY_NAME;
+export const DUPLICATES_PROCESSING_PAGE_NAME = "duplicates-processing-page";
+export const DUPLICATES_PROCESSING_PAGE_DEFAULT_DISPLAY_NAME = "New duplicates processing page";

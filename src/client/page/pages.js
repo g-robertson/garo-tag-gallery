@@ -13,6 +13,7 @@ import { asDom } from "../js/client-exclusive-util.js";
 import { PersistentState } from "../js/state.js";
 import DuplicatesProcessingPage, { DUPLICATES_PROCESSING_PAGE_NAME } from "./pages/duplicates-page.jsx";
 import FileSearchPageElement, { FILE_SEARCH_PAGE_NAME } from "./pages/file-search-page.jsx";
+import DownloaderPageElement, { DOWNLOADER_PAGE_NAME } from "./pages/downloader-page.jsx";
 
 export class Page {
     #pageType;
@@ -65,6 +66,8 @@ export class Page {
             this.#dom = asDom(FileSearchPageElement({page: this}));
         } else if (this.pageType === DUPLICATES_PROCESSING_PAGE_NAME) {
             this.#dom = asDom(DuplicatesProcessingPage({page: this}));
+        } else if (this.pageType === DOWNLOADER_PAGE_NAME) {
+            this.#dom = asDom(DownloaderPageElement({page: this}));
         }
 
         return this.#dom;
