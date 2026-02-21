@@ -14,7 +14,10 @@ function NumericInput({selectedNumberState, minValue, maxValue, className}) {
     maxValue ??= Infinity;
     className ??= "";
 
-    return <input className={className} type="text" value={selectedNumberState.get().toString()} onBlur={e => {
+    /**
+     * @param {Event} e 
+     */
+    const onUpdate = (e) => {
         let newNumericValue = Number(e.currentTarget.value);
         if (Number.isFinite(newNumericValue)) {
             if (newNumericValue < minValue) {
@@ -27,6 +30,12 @@ function NumericInput({selectedNumberState, minValue, maxValue, className}) {
             e.currentTarget.value = newNumericValue.toString();
         } else {
             e.currentTarget.value = selectedNumberState.get().toString();
+        }
+    }
+
+    return <input className={className} type="text" value={selectedNumberState.get().toString()} onBlur={onUpdate} onKeyUp={(e) => {
+        if (e.key === "Enter") {
+            onUpdate(e);
         }
     }} />
 }

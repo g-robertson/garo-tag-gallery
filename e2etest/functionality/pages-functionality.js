@@ -365,6 +365,15 @@ export async function beginDatabaseProcessingFiles(driver) {
 }
 
 /**
+ * @param {ThenableWebDriver} driver 
+ * @param {number} distance 
+ */
+export async function getDuplicateSearchDistance(driver) {
+    const duplicateSearchDistanceElement = await driver.findElement(xpathHelper({type: "input", attrContains: {"class": "duplicate-search-distance"}}));
+    return await duplicateSearchDistanceElement.getAttribute("value");
+}
+
+/**
  * 
  * @param {ThenableWebDriver} driver 
  * @param {number} distance 
@@ -373,6 +382,7 @@ export async function adjustDuplicateSearchDistance(driver, distance) {
     const duplicateSearchDistanceElement = await driver.findElement(xpathHelper({type: "input", attrContains: {"class": "duplicate-search-distance"}}));
     await realClear(duplicateSearchDistanceElement);
     await duplicateSearchDistanceElement.sendKeys(distance);
+    await duplicateSearchDistanceElement.sendKeys(Key.ENTER);
 }
 
 export async function duplicateSetAllSmallerExactDuplicatesAsBetter(driver) {

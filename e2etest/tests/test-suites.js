@@ -60,7 +60,7 @@ const DISABLED_TESTS = new Set([
 const ONLY_ENABLE_TESTS = new Set([
     // "Tests.Functional.Files.ImportFilesFromHydrus",
     // "Tests.Functional.Pages.FileSearchPage",
-    "Tests.Functional.Pages.DuplicatesProcessingPage",
+    // "Tests.Functional.Pages.DuplicatesProcessingPage",
     // "Tests.Functional.Tags",
     // "Tests.Functional.Taggables",
     // "Tests.Functional.Metrics",
@@ -179,7 +179,7 @@ export async function executeTestSuite(driver, logs) {
         console.log(log);
     }
     if (logs.length === 0 && testFailCount === 0) {
-        console.log("E2E testing passed");
+        console.log(`E2E testing passed ${testCount} test cases`);
     } else {
         console.log(`E2E testing failed, only ${testCount - testFailCount}/${testCount} tests passed`);
     }

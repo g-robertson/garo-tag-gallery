@@ -246,7 +246,7 @@ const DuplicatesProcessingPage = ({page}) => {
                     }}/>
                 </div>
                 <div style={{marginTop: 4}}>
-                    Potential duplicate pairs processed: {PotentialDuplicateComparisonsMadeCount.react(<span></span>)}/{PotentialDuplicateFileCount.react(<span></span>)}
+                    Potential duplicate pairs processed: {PotentialDuplicateComparisonsMadeCount.react(<span></span>)}/{PotentialDuplicateFileCount.react(<span className="total-potential-duplicate-pairs"></span>)}
                     <input type="button" value="Begin filtering potential duplicates" style={{marginLeft: 4, marginTop: -2}} onClick={() => {
                         openNewDedupeGallery();
                     }} />

@@ -1,5 +1,5 @@
 import { Key, until } from "selenium-webdriver";
-import { adjustDuplicateSearchDistance, applyTagFilter, beginDatabaseProcessingFiles, beginFilteringPotentialDuplicates, duplicateCommitChanges, duplicateCommitChangesFromDialog, createNewDuplicatesProcessingPage, createNewFileSearchPage, duplicateAlternates, duplicateCurrentIsBetter, duplicateCurrentIsBetterTrashOther, duplicateDiscardUncommitted, duplicateFalsePositive, duplicateGoBack, duplicateReopenUncommitted, duplicateSameQuality, duplicateSameQualityTrashLarger, duplicateSkip, selectTagFromLocalTagSelector, selectTagFromTagSearchQuery, duplicateDiscardChanges, duplicateSetAllSmallerExactDuplicatesAsBetter } from "../../../functionality/pages-functionality.js";
+import { adjustDuplicateSearchDistance, applyTagFilter, beginDatabaseProcessingFiles, beginFilteringPotentialDuplicates, duplicateCommitChanges, duplicateCommitChangesFromDialog, createNewDuplicatesProcessingPage, createNewFileSearchPage, duplicateAlternates, duplicateCurrentIsBetter, duplicateCurrentIsBetterTrashOther, duplicateDiscardUncommitted, duplicateFalsePositive, duplicateGoBack, duplicateReopenUncommitted, duplicateSameQuality, duplicateSameQualityTrashLarger, duplicateSkip, selectTagFromLocalTagSelector, selectTagFromTagSearchQuery, duplicateDiscardChanges, duplicateSetAllSmallerExactDuplicatesAsBetter, getDuplicateSearchDistance } from "../../../functionality/pages-functionality.js";
 import { BY_DEDUPE_PREVIEW_GALLERY_IMAGE, BY_THUMBNAIL_GALLERY_IMAGE, closeDialog, closeModal, closePage, DEFAULT_TIMEOUT_TIME, findDedupeGalleryImage, findDedupePreviewGalleryImage, modClick, scroll, selectPage, sendKeys, UNTIL_JOB_BEGIN, UNTIL_JOB_END, untilCountElementsLocated, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
 import { BUG_IMPACTS, BUG_NOTICES, BUG_PRIORITIES, IMPLEMENTATION_DIFFICULTIES } from "../../../unimplemented-test-info.js";
 import { importFilesFromHydrus } from "../../../functionality/file-functionality.js";
@@ -56,11 +56,13 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
             await selectTagFromTagSearchQuery(driver, TEST_TAG_UNMARKED_PAIR);
             await applyTagFilter(driver, "");
         }},
-        {name: "AdjustingSearchDistanceWorks", tests: {
-            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-            priority: BUG_PRIORITIES.NEXT_WORK,
-            impact: BUG_IMPACTS.ASSUMED_WORKING,
-            noticeability: BUG_NOTICES.ONLY_DEV
+        {name: "AdjustingSearchDistanceWorks", tests: async (driver) => {
+            const currentDistance = Number(await getDuplicateSearchDistance(driver));
+            const currentPotentialDuplicatePairs = await (await driver.findElement(xpathHelper({attrEq: {"class": "total-potential-duplicate-pairs"}}))).getText();
+            await adjustDuplicateSearchDistance(driver, currentDistance * 10);
+            await driver.wait(untilElementsNotLocated(xpathHelper({attrEq: {"class": "total-potential-duplicate-pairs", text: currentPotentialDuplicatePairs}})), DEFAULT_TIMEOUT_TIME);
+            await adjustDuplicateSearchDistance(driver, currentDistance);
+            await driver.wait(until.elementLocated(xpathHelper({attrEq: {"class": "total-potential-duplicate-pairs", text: currentPotentialDuplicatePairs}})), DEFAULT_TIMEOUT_TIME);
         }},
         {name: "SetAllSmallerExactPixelDuplicatesAsBetterWorks", tests: async (driver) => {
             await applyTagFilter(driver, TEST_TAG_EXACT_DUPLICATES);
@@ -184,19 +186,19 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
             }},
             {name: "DedupeGalleryAlternateIsTransitive", tests: {
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-                priority: BUG_PRIORITIES.CURRENT_WORK,
+                priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
                 impact: BUG_IMPACTS.ASSUMED_WORKING,
                 noticeability: BUG_NOTICES.ONLY_DEV
             }},
             {name: "DedupeGalleryAlternateIsTransitiveThroughDuplicate", tests: {
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-                priority: BUG_PRIORITIES.CURRENT_WORK,
+                priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
                 impact: BUG_IMPACTS.ASSUMED_WORKING,
                 noticeability: BUG_NOTICES.ONLY_DEV
             }},
             {name: "DedupeGalleryTransitivityWorksThroughNonSelectedFileComparisons", tests: {
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
-                priority: BUG_PRIORITIES.CURRENT_WORK,
+                priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
                 impact: BUG_IMPACTS.COSMETIC,
                 noticeability: BUG_NOTICES.ONLY_DEV
             }},
