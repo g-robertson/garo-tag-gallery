@@ -127,8 +127,8 @@ export class LocalURLGeneratorServices {
                     SELECT LUGS.Local_URL_Generator_Service_ID, SUP.Permission
                       FROM Local_URL_Generator_Services LUGS
                       JOIN Services_Users_Permissions SUP ON LUGS.Service_ID = SUP.Service_ID
-                     WHERE SUP.User_ID = $userID;
-                `, {$userID: user.id()});
+                     WHERE SUP.User_ID = ?;
+                `, [user.id()]);
             },
             "Local_URL_Generator_Service_ID",
             permissionsToCheck
@@ -151,11 +151,9 @@ export class LocalURLGeneratorServices {
             INSERT INTO Local_URL_Generator_Services(
                 Service_ID
             ) VALUES (
-                $serviceID
+                ?
             ) RETURNING Local_URL_Generator_Service_ID;
-        `, {
-            $serviceID: serviceID
-        })).Local_URL_Generator_Service_ID;
+        `, [serviceID])).Local_URL_Generator_Service_ID;
         
         await LocalTags.insertSystemTag(dbs, createFromLocalURLGeneratorServiceLookupName(localURLGeneratorServiceID));
 
@@ -173,14 +171,14 @@ export class URLGenerator {
     static async update(dbs, localURLGeneratorID, preInsertURLGenerator) {
         await dbrun(dbs, `
             UPDATE Local_URL_Generators
-               SET Local_URL_Generator_Name = $localURLGeneratorName,
-                   Local_URL_Generator_JSON = $localURLGeneratorJSON
-             WHERE Local_URL_Generator_ID = $localURLGeneratorID;
-        `, {
-            $localURLGeneratorID: localURLGeneratorID,
-            $localURLGeneratorName: preInsertURLGenerator.Local_URL_Generator_Name,
-            $localURLGeneratorJSON: preInsertURLGenerator.Local_URL_Generator_JSON
-        })
+               SET Local_URL_Generator_Name = ?,
+                   Local_URL_Generator_JSON = ?
+             WHERE Local_URL_Generator_ID = ?;
+        `, [
+            preInsertURLGenerator.Local_URL_Generator_Name,
+            preInsertURLGenerator.Local_URL_Generator_JSON,
+            localURLGeneratorID
+        ])
     }
 
     /**
@@ -202,11 +200,11 @@ export class URLGenerator {
                 $localURLGeneratorName,
                 $localURLGeneratorJSON
             ) RETURNING Local_URL_Generator_ID;
-        `, {
-            $localURLGeneratorServiceID: localURLGeneratorServiceID,
-            $localURLGeneratorName: preInsertURLGenerator.Local_URL_Generator_Name,
-            $localURLGeneratorJSON: preInsertURLGenerator.Local_URL_Generator_JSON
-        })).Local_URL_Generator_ID;
+        `, [
+            preInsertURLGenerator.Local_URL_Generator_Name,
+            preInsertURLGenerator.Local_URL_Generator_JSON,
+            localURLGeneratorServiceID,
+        ])).Local_URL_Generator_ID;
         
         await LocalTags.insertSystemTag(dbs, createFromLocalURLGeneratorLookupName(localURLGeneratorID));
 

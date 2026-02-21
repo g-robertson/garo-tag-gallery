@@ -69,7 +69,7 @@ export class Services {
             ) VALUES (
                 ?
             ) RETURNING Service_ID;
-        `, serviceName)).Service_ID;
+        `, [serviceName])).Service_ID;
 
         return serviceID;
     }
@@ -82,9 +82,9 @@ export class Services {
     static async update(dbs, serviceID, serviceName) {
         await dbrun(dbs, `
             UPDATE Services
-               SET Service_Name = $serviceName
-             WHERE Service_ID = $serviceID;    
-        `, {$serviceID: serviceID, $serviceName: serviceName});
+               SET Service_Name = ?
+             WHERE Service_ID = ?;    
+        `, [serviceName, serviceID]);
     }
 
     /**
@@ -94,7 +94,7 @@ export class Services {
     static async deleteByID(dbs, serviceID) {
         dbs = await dbBeginTransaction(dbs);
         await ServicesUsersPermissions.deleteByServiceID(dbs, serviceID);
-        await dbrun(dbs, "DELETE FROM Services WHERE Service_ID = $serviceID;", { $serviceID: serviceID });
+        await dbrun(dbs, "DELETE FROM Services WHERE Service_ID = ?;", [serviceID]);
 
         await dbEndTransaction(dbs);
     }
@@ -118,15 +118,15 @@ export class ServicesUsersPermissions {
                 User_ID,
                 Permission
             ) VALUES (
-                $serviceID,
-                $userID,
-                $permission
+                ?,
+                ?,
+                ?
             );
-        `, {
-            $serviceID: serviceID,
-            $userID: userID,
-            $permission: permission
-        });
+        `, [
+            serviceID,
+            userID,
+            permission
+        ]);
     }
     
     /**
@@ -146,7 +146,7 @@ export class ServicesUsersPermissions {
      * @param {number} serviceID 
      */
     static async deleteByServiceID(dbs, serviceID) {
-        await dbrun(dbs, "DELETE FROM Services_Users_Permissions WHERE Service_ID = $serviceID;", { $serviceID: serviceID });
+        await dbrun(dbs, "DELETE FROM Services_Users_Permissions WHERE Service_ID = ?;", [serviceID]);
     }
 };
 

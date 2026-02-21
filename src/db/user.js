@@ -52,6 +52,10 @@ export const DEFAULT_ADMINISTRATOR_PERMISSION_ID = 0;
  * @param {DBUser[]} dbUsers
  */
 async function mapDBUsers(dbs, dbUsers) {
+    if (dbUsers.length === 0) {
+        return [];
+    }
+
     const permissionSetIDs = new Set(dbUsers.map(dbUser => dbUser.Permission_Set_ID));
 
     /** @type {{Permission_Set_ID: number, Permission: string}[]} */
@@ -88,12 +92,12 @@ export class Users {
     static async setPagesJSON(dbs, accessKey, pages) {
         await dbrun(dbs, `
             UPDATE Users
-            SET JSON_Pages = $pagesJSON
-            WHERE Access_Key = $accessKey
-        `, {
-            $pagesJSON: JSON.stringify(pages),
-            $accessKey: accessKey
-        });
+            SET JSON_Pages = ?
+            WHERE Access_Key = ?
+        `, [
+            JSON.stringify(pages),
+            accessKey
+        ]);
         Users.#accessKeyToUserLRUCache.get(accessKey).setPages(pages);
     }
 
@@ -102,6 +106,10 @@ export class Users {
      * @param {number[]} userIDs
      */
     static async selectManyByIDs(dbs, userIDs) {
+        if (userIDs.length === 0) {
+            return [];
+        }
+
         /** @type {DBUser[]} */
         const dbUsers = (await dballselect(dbs, `SELECT * FROM Users WHERE User_ID IN ${dbvariablelist(userIDs.length)};`, userIDs));
 

@@ -234,8 +234,8 @@ export class LocalTaggableServices {
                     SELECT LTS.Local_Taggable_Service_ID, SUP.Permission
                       FROM Local_Taggable_Services LTS
                       JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
-                     WHERE SUP.User_ID = $userID;
-                `, {$userID: user.id()});
+                     WHERE SUP.User_ID = ?;
+                `, [user.id()]);
             },
             "Local_Taggable_Service_ID",
             permissionsToCheck
@@ -258,11 +258,9 @@ export class LocalTaggableServices {
             INSERT INTO Local_Taggable_Services(
                 Service_ID
             ) VALUES (
-                $serviceID
+                ?
             ) RETURNING Local_Taggable_Service_ID;
-        `, {
-            $serviceID: serviceID
-        })).Local_Taggable_Service_ID;
+        `, [serviceID])).Local_Taggable_Service_ID;
         
         await LocalTags.insertSystemTag(dbs, createInLocalTaggableServiceLookupName(localTaggableServiceID));
 
@@ -296,7 +294,7 @@ export class LocalTaggableServices {
         const localTaggableServiceTaggables = await Taggables.search(dbs, "", [localTaggableService.In_Local_Taggable_Service_Tag.Tag_ID]);
         await Taggables.deleteManyByIDs(dbs, localTaggableServiceTaggables.map(taggable => taggable.Taggable_ID));
         await LocalTags.deleteSystemTag(dbs, createInLocalTaggableServiceLookupName(localTaggableServiceID));
-        await dbrun(dbs, "DELETE FROM Local_Taggable_Services WHERE Local_Taggable_Service_ID = $localTaggableServiceID;", { $localTaggableServiceID: localTaggableServiceID });
+        await dbrun(dbs, "DELETE FROM Local_Taggable_Services WHERE Local_Taggable_Service_ID = ?;", [localTaggableServiceID]);
 
         await dbEndTransaction(dbs);
     }
@@ -1058,6 +1056,10 @@ export class TaggableFiles {
             PerfTags.searchTag(inLocalTaggableServiceTagID),
             PerfTags.searchUnion(hasFileHashTags.map(hasFileHashTag => PerfTags.searchTag(hasFileHashTag.Tag_ID)))
         ]), dbs.inTransaction);
+
+        if (taggables.length === 0) {
+            return [];
+        }
 
         const dbFileMap = new Map(taggableFiles.map(dbFile => [dbFile.File_ID, dbFile]));
 

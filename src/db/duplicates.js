@@ -407,6 +407,10 @@ export class TransitiveFileRelations {
      * @param {number[]} groupIDs 
      */
     static async selectManyFileRelationsByGroupIDs(dbs, groupIDs) {
+        if (groupIDs.length === 0) {
+            return [];
+        }
+
         /** @type {DBTransitiveFileRelation[]} */
         const dbTransitiveFileRelations = await dballselect(dbs, `
             SELECT *

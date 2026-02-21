@@ -36,7 +36,7 @@ export default async function migrate(dbs) {
                 throw `Error while migrating database on command ${command.sql}: ${err.message}`;
             }
         }
-        await dbrun(dbs, "INSERT INTO Migrations_Applied(Name, Applied_Date) VALUES (?, unixepoch('now'));", migration.name);
+        await dbrun(dbs, "INSERT INTO Migrations_Applied(Name, Applied_Date) VALUES (?, unixepoch('now'));", [migration.name]);
         await dbEndTransaction(dbs);
     }
 }

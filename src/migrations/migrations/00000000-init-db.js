@@ -32,13 +32,10 @@ export const MIGRATION = {
                 Permission_Set_ID,
                 Permission_Set_Name
             ) VALUES (
-                $defaultAdminPermissionId, /* ID */
+                ?,
                 'Default Administrator Permission Set'
             );
-            `,
-            {
-                $defaultAdminPermissionId: DEFAULT_ADMINISTRATOR_PERMISSION_ID
-            }
+            `, [DEFAULT_ADMINISTRATOR_PERMISSION_ID]
         ),
         ...[
             ...Object.values(PERMISSIONS.ADMINISTRATIVE),
@@ -51,14 +48,14 @@ export const MIGRATION = {
                     Permission_Set_ID,
                     Permission
                 ) VALUES (
-                    $defaultAdminPermissionId,
-                    $permission
+                    ?,
+                    ?
                 );
             `,
-            {
-                $defaultAdminPermissionId: DEFAULT_ADMINISTRATOR_PERMISSION_ID,
-                $permission: permission.name
-            }
+            [
+                DEFAULT_ADMINISTRATOR_PERMISSION_ID,
+                permission.name
+            ]
         )),
         dbsqlcommand(`
             CREATE TABLE Users(
@@ -74,24 +71,24 @@ export const MIGRATION = {
         `),
         dbsqlcommand(`
             INSERT INTO Users(
-                User_ID,
                 User_Name,
                 Is_Administrator,
-                Access_Key,
-                Permission_Set_ID
+                User_ID,
+                Permission_Set_ID,
+                Access_Key
             ) VALUES (
-                $defaultAdminUserId,
                 'Admin',
                 TRUE,
-                $accessKey,
-                $defaultAdminPermissionId
+                ?,
+                ?,
+                ?
             );
             `,
-            {
-                $accessKey: accessKey,
-                $defaultAdminUserId: DEFAULT_ADMINISTRATOR_USER_ID,
-                $defaultAdminPermissionId: DEFAULT_ADMINISTRATOR_PERMISSION_ID
-            }
+            [
+                DEFAULT_ADMINISTRATOR_USER_ID,
+                DEFAULT_ADMINISTRATOR_PERMISSION_ID,
+                accessKey
+            ]
         ),
         dbsqlcommand(`
             CREATE TABLE Services(
@@ -111,42 +108,42 @@ export const MIGRATION = {
                 Service_ID,
                 Service_Name
             ) VALUES (
-                $systemLocalTagServiceID,
-                $systemLocalTagServiceName
+                ?,
+                ?
             ), (
-                $defaultLocalTagServiceID,
-                $defaultLocalTagServiceName
+                ?,
+                ?
             ), (
-                $reservedServiceID,
+                ?,
                 'system:reserved:user should not see'
             );
-        `, {
-            $systemLocalTagServiceID: SYSTEM_LOCAL_TAG_SERVICE.Service_ID,
-            $systemLocalTagServiceName: SYSTEM_LOCAL_TAG_SERVICE.Service_Name,
-            $defaultLocalTagServiceID: DEFAULT_LOCAL_TAG_SERVICE.Service_ID,
-            $defaultLocalTagServiceName: DEFAULT_LOCAL_TAG_SERVICE.Service_Name,
-            $reservedServiceID: 0xFFFF
-        }),
+        `, [
+            SYSTEM_LOCAL_TAG_SERVICE.Service_ID,
+            SYSTEM_LOCAL_TAG_SERVICE.Service_Name,
+            DEFAULT_LOCAL_TAG_SERVICE.Service_ID,
+            DEFAULT_LOCAL_TAG_SERVICE.Service_Name,
+            0xFFFF
+        ]),
         dbsqlcommand(`
             INSERT INTO Local_Tag_Services(
                 Local_Tag_Service_ID,
                 Service_ID,
                 User_Editable
             ) VALUES (
-                $systemLocalTagLocalTagServiceID,
-                $systemLocalTagServiceID,
+                ?,
+                ?,
                 0
             ), (
-                $defaultLocalTagLocalTagServiceID,
-                $defaultLocalTagServiceID,
+                ?,
+                ?,
                 1
             );
-        `, {
-            $systemLocalTagLocalTagServiceID: SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
-            $systemLocalTagServiceID: SYSTEM_LOCAL_TAG_SERVICE.Service_ID,
-            $defaultLocalTagLocalTagServiceID: DEFAULT_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
-            $defaultLocalTagServiceID: DEFAULT_LOCAL_TAG_SERVICE.Service_ID,
-        }),
+        `, [
+            SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
+            SYSTEM_LOCAL_TAG_SERVICE.Service_ID,
+            DEFAULT_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
+            DEFAULT_LOCAL_TAG_SERVICE.Service_ID,
+    ]),
         dbsqlcommand(`
             CREATE TABLE Tags(
                 Tag_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,22 +187,19 @@ export const MIGRATION = {
                 Service_ID,
                 Service_Name
             ) VALUES (
-                $defaultLocalTaggableServiceID,
-                $defaultLocalTaggableServiceName
+                ?,
+                ?
             );
-        `, {$defaultLocalTaggableServiceID: DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_ID, $defaultLocalTaggableServiceName: DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_Name}),
+        `, [DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_ID, DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_Name]),
         dbsqlcommand(`
             INSERT INTO Local_Taggable_Services(
                 Local_Taggable_Service_ID,
                 Service_ID
             ) VALUES (
-                $defaultLocalTaggableLocalTaggableServiceID,
-                $defaultLocalTaggableServiceID
+                ?,
+                ?
             );
-        `, {
-            $defaultLocalTaggableLocalTaggableServiceID: DEFAULT_LOCAL_TAGGABLE_SERVICE.Local_Taggable_Service_ID,
-            $defaultLocalTaggableServiceID: DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_ID,
-        }),
+        `, [DEFAULT_LOCAL_TAGGABLE_SERVICE.Local_Taggable_Service_ID, DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_ID]),
         dbsqlcommand(`
             CREATE TABLE Taggables(
                 Taggable_ID INTEGER PRIMARY KEY AUTOINCREMENT,

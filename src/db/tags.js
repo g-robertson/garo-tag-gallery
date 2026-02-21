@@ -17,11 +17,9 @@ export function insertSystemTag(systemTag) {
             INSERT INTO Tags(
                 Tag_ID
             ) VALUES (
-                $systemTagID
+                ?
             );
-        `, {
-            $systemTagID: Number(systemTag.Tag_ID),
-        }),
+        `, [Number(systemTag.Tag_ID)]),
         dbsqlcommand(`
             INSERT INTO Local_Tags(
                 Tag_ID,
@@ -31,21 +29,21 @@ export function insertSystemTag(systemTag) {
                 Local_Tags_PK_Hash,
                 Display_Name
             ) VALUES (
-                $systemTagID,
-                $systemLocalTagServiceID,
-                $systemTagLookupName,
-                $systemTagSourceName,
-                $systemTagPKHash,
-                $systemTagDisplayName
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?
             );
-        `, {
-            $systemTagID: Number(systemTag.Tag_ID),
-            $systemLocalTagServiceID: SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
-            $systemTagLookupName: systemTag.Lookup_Name,
-            $systemTagSourceName: systemTag.Source_Name,
-            $systemTagPKHash: localTagsPKHash(systemTag.Lookup_Name, systemTag.Source_Name),
-            $systemTagDisplayName: systemTag.Display_Name,
-        })
+        `, [
+            Number(systemTag.Tag_ID),
+            SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
+            systemTag.Lookup_Name,
+            systemTag.Source_Name,
+            localTagsPKHash(systemTag.Lookup_Name, systemTag.Source_Name),
+            systemTag.Display_Name,
+        ])
     ];
 }
 
@@ -67,6 +65,13 @@ export class LocalTagServices {
      * @param {number[]} localTagIDs
      */
     static async selectManyByLocalTagIDs(dbs, localTagIDs) {
+        if (localTagIDs.length === 0) {
+            return {
+                allLocalTagsExist: true,
+                localTagServices: []
+            };
+        }
+
         /** @type {number} */
         const localTagIDsPresent = (await dbget(dbs, `
                 SELECT COUNT(1) AS Count
@@ -184,8 +189,8 @@ export class LocalTagServices {
                     SELECT LTS.Local_Tag_Service_ID, SUP.Permission
                       FROM Local_Tag_Services LTS
                       JOIN Services_Users_Permissions SUP ON LTS.Service_ID = SUP.Service_ID
-                     WHERE SUP.User_ID = $userID;
-                `, {$userID: user.id()});
+                     WHERE SUP.User_ID = ?;
+                `, [user.id()]);
             },
             "Local_Tag_Service_ID",
             permissionsToCheck
@@ -210,11 +215,9 @@ export class LocalTagServices {
             INSERT INTO Local_Tag_Services(
                 Service_ID
             ) VALUES (
-                $serviceID
+                ?
             ) RETURNING Local_Tag_Service_ID;
-        `, {
-            $serviceID: serviceID
-        })).Local_Tag_Service_ID;
+        `, [serviceID])).Local_Tag_Service_ID;
 
         await dbEndTransaction(dbs);
 
@@ -245,7 +248,7 @@ export class LocalTagServices {
 
         const localTagServiceTags = await LocalTags.selectManyByLocalTagServiceID(dbs, localTagServiceID);
         await LocalTags.deleteMany(dbs, localTagServiceTags);
-        await dbrun(dbs, "DELETE FROM Local_Tag_Services WHERE Local_Tag_Service_ID = $localTagServiceID;", { $localTagServiceID: localTagServiceID });
+        await dbrun(dbs, "DELETE FROM Local_Tag_Services WHERE Local_Tag_Service_ID = ?;", [localTagServiceID]);
 
         await dbEndTransaction(dbs);
     }
@@ -394,6 +397,10 @@ export class UserFacingLocalTags {
      * @param {string=} tagCountSearchCriteria
      */
     static async selectManyByLocalTagServiceIDs(dbs, localTagServiceIDs, tagCountSearchCriteria) {
+        if (localTagServiceIDs.length === 0) {
+            return [];
+        }
+
         /** @type {Omit<UserFacingLocalTag, "Namespaces" | "Tag_Name">[]} */
         const dbUserFacingLocalTags = await dballselect(dbs, `
             SELECT Tag_ID, Local_Tag_ID, Display_Name, Lookup_Name, Source_Name, Local_Tag_Service_ID
@@ -590,7 +597,7 @@ export class LocalTags {
      */
     static async selectManyByLocalTagServiceID(dbs, localTagServiceID) {
         /** @type {DBLocalTag[]} */
-        const dbLocalTags = await dballselect(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = $localTagServiceID`, { $localTagServiceID: localTagServiceID});
+        const dbLocalTags = await dballselect(dbs, `SELECT * FROM Local_Tags WHERE Local_Tag_Service_ID = ?;`, [localTagServiceID]);
         return dbLocalTags.map(mapDBLocalTag);
     }
 

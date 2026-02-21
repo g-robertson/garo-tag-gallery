@@ -32,7 +32,7 @@ export async function checkPermissions(dbs, req, res, apiPermissions) {
             if (!localTagServicesToAdd.allLocalTagsExist) {
                 return {
                     success: false,
-                    message: "Local Tag ID requested did nto exist and cannot have permissions granted"
+                    message: "Local Tag ID requested did not exist and cannot have permissions granted"
                 };
             }
             for (const localTagService of localTagServicesToAdd.localTagServices) {
@@ -162,7 +162,7 @@ export async function checkPermissions(dbs, req, res, apiPermissions) {
         }
 
         if (localMetricServiceIDsToCheck.size !== 0) {
-            const userLocalMetricServices = await LocalMetricServices.userSelectManyByIDs(dbs, req.user, localMetricServicesPermissionsRequired, localMetricServiceIDsToCheck);
+            const userLocalMetricServices = await LocalMetricServices.userSelectManyByIDs(dbs, req.user, localMetricServicesPermissionsRequired, [...localMetricServiceIDsToCheck]);
             if (localMetricServiceIDsToCheck.size !== userLocalMetricServices.length) {
                 return {
                     success: false,

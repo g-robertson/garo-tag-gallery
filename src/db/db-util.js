@@ -1,4 +1,4 @@
-import sqlite3 from "sqlite3";
+import sqlite3 from "better-sqlite3";
 import crypto from "crypto";
 import PerfTags from "../perf-binding/perf-tags.js";
 import { FileStorage } from "./file-storage.js";
@@ -27,31 +27,41 @@ export const TMP_FOLDER = path.join(DATABASE_DIR, "_tmp");
  * @property {CursorManager} cursorManager
  */
 
+function mapParams(params) {
+    return params.map(param => {
+        if (typeof param === "boolean") {
+            return param ? 1 : 0;
+        } else {
+            return param;
+        }
+    })
+}
+
 /**
  * @param {Databases} dbs
  * @param {string} sql
  * @param {any} params
  */
 export async function dbrun(dbs, sql, params) {
+    params ??= [];
     if (dbs.inTransaction === 0) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
 
-    const err = await new Promise(resolve => {
-        dbs.sqlite3.run(sql, params, err => {
-            resolve(err);
-        });
-    });
+    try {
+        const stmt = dbs.sqlite3.prepare(sql);
+        stmt.run(...mapParams(params));
+    } catch (err) {
+        if (err !== null) {
+            Error.captureStackTrace(err);
+            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+        }
+    }
 
     dbs.sqlMutex.release();
     if (dbs.inTransaction === 0) {
         dbs.sqlTransactionMutex.release();
-    }
-
-    if (err !== null) {
-        Error.captureStackTrace(err);
-        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
     }
 
     return;
@@ -64,20 +74,21 @@ export async function dbrun(dbs, sql, params) {
  * @param {any} params
  */
 export async function dbgetselect(dbs, sql, params) {
+    params ??= [];
     await dbs.sqlMutex.acquire();
 
-    const {err, row} = await new Promise(resolve => {
-        dbs.sqlite3.get(sql, params, (err, row) => {
-            resolve({err, row});
-        });
-    });
+    let row;
+    try {
+        const stmt = dbs.sqlite3.prepare(sql);
+        row = stmt.get(...mapParams(params));
+    } catch (err) {
+        if (err !== null) {
+            Error.captureStackTrace(err);
+            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+        }
+    }
 
     dbs.sqlMutex.release();
-
-    if (err !== null) {
-        Error.captureStackTrace(err);
-        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
-    }
 
     return row;
 }
@@ -88,25 +99,26 @@ export async function dbgetselect(dbs, sql, params) {
  * @param {any} params
  */
 export async function dbget(dbs, sql, params) {
+    params ??= [];
     if (dbs.inTransaction === 0) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
 
-    const {err, row} = await new Promise(resolve => {
-        dbs.sqlite3.get(sql, params, (err, row) => {
-            resolve({err, row});
-        });
-    });
+    let row;
+    try {
+        const stmt = dbs.sqlite3.prepare(sql);
+        row = stmt.get(...mapParams(params));
+    } catch (err) {
+        if (err !== null) {
+            Error.captureStackTrace(err);
+            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+        }
+    }
 
     dbs.sqlMutex.release();
     if (dbs.inTransaction === 0) {
         dbs.sqlTransactionMutex.release();
-    }
-
-    if (err !== null) {
-        Error.captureStackTrace(err);
-        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
     }
 
     return row;
@@ -118,20 +130,21 @@ export async function dbget(dbs, sql, params) {
  * @param {any} params 
  */
 export async function dballselect(dbs, sql, params) {
+    params ??= [];
     await dbs.sqlMutex.acquire();
 
-    const {err, rows} = await new Promise(resolve => {
-        dbs.sqlite3.all(sql, params, (err, rows) => {
-            resolve({err, rows});
-        });
-    });
+    let rows;
+    try {
+        const stmt = dbs.sqlite3.prepare(sql);
+        rows = stmt.all(...mapParams(params));
+    } catch (err) {
+        if (err !== null) {
+            Error.captureStackTrace(err);
+            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+        }
+    }
 
     dbs.sqlMutex.release();
-
-    if (err !== null) {
-        Error.captureStackTrace(err);
-        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
-    }
 
     return rows;
 }
@@ -142,25 +155,26 @@ export async function dballselect(dbs, sql, params) {
  * @param {any} params
  */
 export async function dball(dbs, sql, params) {
+    params ??= [];
     if (dbs.inTransaction === 0) {
         await dbs.sqlTransactionMutex.acquire();
     }
     await dbs.sqlMutex.acquire();
 
-    const {err, rows} = await new Promise(resolve => {
-        dbs.sqlite3.all(sql, params, (err, rows) => {
-            resolve({err, rows});
-        });
-    });
+    let rows;
+    try {
+        const stmt = dbs.sqlite3.prepare(sql);
+        rows = stmt.all(...mapParams(params));
+    } catch (err) {
+        if (err !== null) {
+            Error.captureStackTrace(err);
+            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+        }
+    }
 
     dbs.sqlMutex.release();
     if (dbs.inTransaction === 0) {
         dbs.sqlTransactionMutex.release();
-    }
-
-    if (err !== null) {
-        Error.captureStackTrace(err);
-        throw `Error in sql call originating from "${sql.slice(0, 10000)}": ${err} at ${err.stack}`;
     }
 
     return rows;
@@ -170,6 +184,10 @@ export async function dball(dbs, sql, params) {
  * @param {number} rows 
  */
 export function dbvariablelist(rows) {
+    if (rows < 1) {
+        throw new Error("dbvariablelist was called with no rows");
+    }
+
     let list = "(?";
     for (let i = 1; i < rows; ++i) {
         list += ",?";
@@ -240,31 +258,6 @@ export function dbsqlcommand(sql, params) {
         sql,
         params: params ?? []
     };
-}
-
-/**
- * @param {string} tableName 
- * @param {number} reserveSequenceCount 
- */
-export function dbreserveseq(tableName, reserveSequenceCount) {
-    return [
-        dbsqlcommand(
-            `UPDATE sqlite_sequence SET seq = $reserveSequenceCount WHERE name = $tableName`,
-            {
-                $reserveSequenceCount: reserveSequenceCount,
-                $tableName: tableName
-            }
-        ),
-        dbsqlcommand(
-            `INSERT INTO sqlite_sequence (name,seq) SELECT $tableName, $reserveSequenceCount WHERE NOT EXISTS 
-             (SELECT changes() AS change FROM sqlite_sequence WHERE change <> 0);
-            `,
-            {
-                $reserveSequenceCount: reserveSequenceCount,
-                $tableName: tableName
-            }
-        )
-    ];
 }
 
 function dbGenerateCryptoText(length) {

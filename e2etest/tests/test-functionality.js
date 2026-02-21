@@ -14,12 +14,6 @@ export const FUNCTIONAL_TESTS = [
     {name: "Tags", tests: TAGS_TESTS},
     {name: "Taggables", tests: TAGGABLES_TESTS},
     {name: "Metrics", tests: METRICS_TESTS},
-    {name: "Generators", tests: {
-        priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
-        noticeability: BUG_NOTICES.ONLY_DEV,
-        impact: BUG_IMPACTS.ASSUMED_WORKING,
-        expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR
-    }},
     {name: "Parsers", tests: {
         priority: BUG_PRIORITIES.NEXT_WORK,
         noticeability: BUG_NOTICES.ONLY_DEV,

@@ -33,23 +33,23 @@ export function insertSystemMetric(systemMetric) {
                 Local_Metric_Precision,
                 Local_Metric_Type
             ) VALUES (
-                $systemLocalMetricID,
-                $systemLocalMetricServiceID,
-                $systemLocalMetricName,
-                $systemLocalMetricLowerBound,
-                $systemLocalMetricUpperBound,
-                $systemLocalMetricPrecision,
-                $systemLocalMetricType 
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ? 
             );
-        `, {
-            $systemLocalMetricID: systemMetric.Local_Metric_ID,
-            $systemLocalMetricServiceID: SYSTEM_LOCAL_METRIC_SERVICE.Local_Metric_Service_ID,
-            $systemLocalMetricName: systemMetric.Local_Metric_Name,
-            $systemLocalMetricLowerBound: systemMetric.Local_Metric_Lower_Bound,
-            $systemLocalMetricUpperBound: systemMetric.Local_Metric_Upper_Bound,
-            $systemLocalMetricPrecision: systemMetric.Local_Metric_Precision,
-            $systemLocalMetricType: systemMetric.Local_Metric_Type
-        })
+        `, [
+            systemMetric.Local_Metric_ID,
+            SYSTEM_LOCAL_METRIC_SERVICE.Local_Metric_Service_ID,
+            systemMetric.Local_Metric_Name,
+            systemMetric.Local_Metric_Lower_Bound,
+            systemMetric.Local_Metric_Upper_Bound,
+            systemMetric.Local_Metric_Precision,
+            systemMetric.Local_Metric_Type
+        ])
     ];
 }
 
@@ -109,6 +109,10 @@ export class LocalMetricServices {
      * @param {number[]} localMetricIDs
      */
     static async selectManyByLocalMetricIDs(dbs, localMetricIDs) {
+        if (localMetricIDs.length === 0) {
+            return [];
+        }
+
         return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT DISTINCT LMS.*, S.*
               FROM Local_Metric_Services LMS
@@ -132,12 +136,16 @@ export class LocalMetricServices {
      * @param {number[]} localMetricServiceIDs
      */
     static async selectManyByIDs(dbs, localMetricServiceIDs) {
+        if (localMetricServiceIDs.length === 0) {
+            return [];
+        }
+
         return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT *
               FROM Local_Metric_Services LMS
               JOIN Services S ON LMS.Service_ID = S.Service_ID
               WHERE LMS.Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)};`,
-            ...localMetricServiceIDs
+            localMetricServiceIDs
         ));
     }
     /**
@@ -213,8 +221,8 @@ export class LocalMetricServices {
                     SELECT LMS.Local_Metric_Service_ID, SUP.Permission
                       FROM Local_Metric_Services LMS
                       JOIN Services_Users_Permissions SUP ON LMS.Service_ID = SUP.Service_ID
-                     WHERE SUP.User_ID = $userID;
-                `, {$userID: user.id()});
+                     WHERE SUP.User_ID = ?;
+                `, [user.id()]);
             },
             "Local_Metric_Service_ID",
             permissionsToCheck
@@ -238,12 +246,10 @@ export class LocalMetricServices {
                 Service_ID,
                 User_Editable
             ) VALUES (
-                $serviceID,
+                ?,
                 1 
             ) RETURNING Local_Metric_Service_ID;
-        `, {
-            $serviceID: serviceID
-        })).Local_Metric_Service_ID;
+        `, [serviceID])).Local_Metric_Service_ID;
         
         await LocalTags.insertSystemTag(dbs, createInLocalMetricServiceLookupName(localMetricServiceID));
 
@@ -276,7 +282,7 @@ export class LocalMetricServices {
         await Services.deleteByID(dbs, localMetricService.Service_ID);
         await LocalMetrics.deleteManyByIDs(dbs, localMetricService.Local_Metrics.map(localMetric => localMetric.Local_Metric_ID));
         await LocalTags.deleteSystemTag(dbs, createInLocalMetricServiceLookupName(localMetricServiceID));
-        await dbrun(dbs, "DELETE FROM Local_Metric_Services WHERE Local_Metric_Service_ID = $localMetricServiceID;", { $localMetricServiceID: localMetricServiceID });
+        await dbrun(dbs, "DELETE FROM Local_Metric_Services WHERE Local_Metric_Service_ID = ?;", [localMetricServiceID]);
 
         await dbEndTransaction(dbs);
     }
@@ -381,6 +387,10 @@ export class AppliedMetrics {
      * @param {number[]} localMetricIDs 
      */
     static async userSelectManyByLocalMetricIDs(dbs, userID, localMetricIDs) {
+        if (localMetricIDs.length === 0) {
+            return [];
+        }
+
         /** @type {DBAppliedMetric[]} */
         const dbAppliedMetrics = await dballselect(dbs,
             `SELECT * FROM Local_Applied_Metrics WHERE User_ID = ? AND Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)};`,
@@ -708,6 +718,10 @@ export class LocalMetrics {
      * @param {number[]} localMetricIDs 
      */
     static async selectManyByIDs(dbs, localMetricIDs) {
+        if (localMetricIDs.length === 0) {
+            return [];
+        }
+
         /** @type {DBLocalMetric[]} */
         const dbLocalMetrics = await dballselect(dbs, `
             SELECT *
@@ -732,6 +746,10 @@ export class LocalMetrics {
      * @param {number[]} localMetricServiceIDs
      */
     static async selectManyByLocalMetricServiceIDs(dbs, localMetricServiceIDs) {
+        if (localMetricServiceIDs.length === 0) {
+            return [];
+        }
+
         /** @type {DBLocalMetric[]} */
         const dbLocalMetrics = await dballselect(dbs, `
             SELECT *
@@ -768,21 +786,21 @@ export class LocalMetrics {
                 Local_Metric_Precision,
                 Local_Metric_Type
             ) VALUES (
-                $localMetricServiceID,
-                $localMetricName,
-                $localMetricLowerBound,
-                $localMetricUpperBound,
-                $localMetricPrecision,
-                $localMetricType
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?
             ) RETURNING Local_Metric_ID;
-        `, {
-            $localMetricServiceID: localMetricServiceID,
-            $localMetricName: preInsertLocalMetric.Local_Metric_Name,
-            $localMetricLowerBound: preInsertLocalMetric.Local_Metric_Lower_Bound,
-            $localMetricUpperBound: preInsertLocalMetric.Local_Metric_Upper_Bound,
-            $localMetricPrecision: preInsertLocalMetric.Local_Metric_Precision,
-            $localMetricType: preInsertLocalMetric.Local_Metric_Type
-        })).Local_Metric_ID;
+        `, [
+            localMetricServiceID,
+            preInsertLocalMetric.Local_Metric_Name,
+            preInsertLocalMetric.Local_Metric_Lower_Bound,
+            preInsertLocalMetric.Local_Metric_Upper_Bound,
+            preInsertLocalMetric.Local_Metric_Precision,
+            preInsertLocalMetric.Local_Metric_Type
+        ])).Local_Metric_ID;
 
         await LocalTags.insertSystemTag(dbs, createLocalMetricLookupName(localMetricID));
 
@@ -807,20 +825,20 @@ export class LocalMetrics {
 
         await dbrun(dbs, `
             UPDATE Local_Metrics
-               SET Local_Metric_Name = $localMetricName,
-                   Local_Metric_Lower_Bound = $localMetricLowerBound,
-                   Local_Metric_Upper_Bound = $localMetricUpperBound,
-                   Local_Metric_Precision = $localMetricPrecision,
-                   Local_Metric_Type = $localMetricType
-             WHERE Local_Metric_ID = $localMetricID;
-        `, {
-            $localMetricID: localMetricID,
-            $localMetricName: preInsertLocalMetric.Local_Metric_Name,
-            $localMetricLowerBound: preInsertLocalMetric.Local_Metric_Lower_Bound,
-            $localMetricUpperBound: preInsertLocalMetric.Local_Metric_Upper_Bound,
-            $localMetricPrecision: preInsertLocalMetric.Local_Metric_Precision,
-            $localMetricType: preInsertLocalMetric.Local_Metric_Type
-        });
+               SET Local_Metric_Name = ?,
+                   Local_Metric_Lower_Bound = ?,
+                   Local_Metric_Upper_Bound = ?,
+                   Local_Metric_Precision = ?,
+                   Local_Metric_Type = ?
+             WHERE Local_Metric_ID = ?;
+        `, [
+            preInsertLocalMetric.Local_Metric_Name,
+            preInsertLocalMetric.Local_Metric_Lower_Bound,
+            preInsertLocalMetric.Local_Metric_Upper_Bound,
+            preInsertLocalMetric.Local_Metric_Precision,
+            preInsertLocalMetric.Local_Metric_Type,
+            localMetricID,
+        ]);
     }
 
     /**

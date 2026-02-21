@@ -1,7 +1,7 @@
 import express from 'express';
 import serveStatic from 'serve-static';
 import cookieParser from 'cookie-parser';
-import sqlite3 from 'sqlite3';
+import sqlite3 from 'better-sqlite3';
 import migrate from "./src/migrations/migrate.js";
 import { Users } from './src/db/user.js';
 import path, { dirname } from 'path';
@@ -33,11 +33,7 @@ mkdirSync(TMP_FOLDER, {recursive: true});
 async function main() {
     const dbs = {
         inTransaction: 0,
-        sqlite3: new sqlite3.Database(path.join(DATABASE_DIR, "garo.db"), err => {
-            if (err) {
-                throw `Database failed to initialize: ${err.message}`;
-            }
-        }),
+        sqlite3: new sqlite3(path.join(DATABASE_DIR, "garo.db")),
         sqlMutex: new Mutex(),
         sqlTransactionMutex: new Mutex(),
         // .\perf\perftags\perftags.exe database/perftags-write-input.txt database/perftags-write-output.txt database/perftags-read-input.txt database/perftags-read-output.txt database/perftags
