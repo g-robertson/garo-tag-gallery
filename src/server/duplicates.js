@@ -18,7 +18,7 @@ export async function exactDuplicateHash(imagePath) {
         return null;
     }
 
-    return sha256(img.raw().ensureAlpha().toBuffer());
+    return sha256(await img.raw().ensureAlpha().toBuffer());
 }
 
 class DepthedRandomImagePoses {

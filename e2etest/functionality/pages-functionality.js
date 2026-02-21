@@ -375,6 +375,9 @@ export async function adjustDuplicateSearchDistance(driver, distance) {
     await duplicateSearchDistanceElement.sendKeys(distance);
 }
 
+export async function duplicateSetAllSmallerExactDuplicatesAsBetter(driver) {
+    await driver.findElement(xpathHelper({type: "input", attrEq: {value: "Set all smaller exact pixel duplicates as better"}})).click();
+}
 
 /**
  * @param {ThenableWebDriver} driver 

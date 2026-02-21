@@ -30,9 +30,11 @@ async function compareFiles(dbs, existingPHashedFilesExactBitmapHashMap, existin
 
     for (const fileToCompare of filesToCompare) {
         try {
-            fileToCompare.Exact_Bitmap_Hash = await exactDuplicateHash(fileName);
+            fileToCompare.Exact_Bitmap_Hash = await exactDuplicateHash(Files.getLocation(dbs, fileToCompare));
         // Empty catch, some files just cant be exact compared (videos, mainly)
-        } catch {}
+        } catch (e){
+            console.log(e);
+        }
         fileToCompare.Perceptual_Hash = hashMap.get(fileToCompare.File_ID);
         fileToCompare.Perceptual_Hash_Version = CURRENT_PERCEPTUAL_HASH_VERSION;
 
@@ -136,7 +138,6 @@ export class FileComparisons {
             // Get all already hashed files
             const existingPHashedFiles = await Files.selectAllWithPerceptualHashVersion(dbs, CURRENT_PERCEPTUAL_HASH_VERSION);
             // Assign the hashes to perfimg
-
             await dbs.perfImg.assignHashes(HASH_ALGORITHMS.OCV_MARR_HILDRETH_HASH, new Map(existingPHashedFiles.map(file => [
                 file.File_ID,
                 file.Perceptual_Hash

@@ -15,6 +15,7 @@ import { Page} from "../pages.js";
 import { ConstState, PersistentState, State } from '../../js/state.js';
 import { FetchCache } from '../../js/fetch-cache.js';
 import { commitDedupeGalleryState, dedupeGalleryStateHasComparisons } from '../../components/lazy-dedupe-gallery.jsx';
+import commitFileRelations from '../../../api/client-get/commit-file-relations.js';
 
 /** @import {DBFileComparison} from "../../../db/duplicates.js" */
 /** @import {SearchObject} from "../../components/tags-selector.jsx" */
@@ -235,7 +236,14 @@ const DuplicatesProcessingPage = ({page}) => {
                 </div>
                 <div style={{marginTop: 4}}>
                     Exact pixel duplicates processed: {ExactDuplicateComparisonsMadeCount.react(<span></span>)}/{ExactDuplicateFileCount.react(<span></span>)}
-                    <input type="button" value="Set all smaller exact pixel duplicates as better" style={{marginLeft: 4, marginTop: -2}} />
+                    <input type="button" value="Set all smaller exact pixel duplicates as better" style={{marginLeft: 4, marginTop: -2}} onClick={async () => {
+                        const exactDuplicateFileComparisonsPending = potentialDuplicateFileComparisonsPendingConstState.get().filter(fileComparison => fileComparison.Perceptual_Hash_Distance === IS_EXACT_DUPLICATE_DISTANCE);
+                        await commitFileRelations(exactDuplicateFileComparisonsPending.map(fileComparison => ({
+                            type: "duplicates-with-same-quality-trash-larger",
+                            File_ID_1: fileComparison.File_ID_1,
+                            File_ID_2: fileComparison.File_ID_2
+                        })));
+                    }}/>
                 </div>
                 <div style={{marginTop: 4}}>
                     Potential duplicate pairs processed: {PotentialDuplicateComparisonsMadeCount.react(<span></span>)}/{PotentialDuplicateFileCount.react(<span></span>)}

@@ -9,7 +9,8 @@ export const BUG_PRIORITIES = /** @type {const} */ ({
 /** @typedef {(typeof BUG_PRIORITIES)[keyof typeof BUG_PRIORITIES]} BugPriority */
 
 export const BUG_NOTICES = /** @type {const} */ ({
-    ASSUMED_WORKING: "0 - Assumed Working",
+    // Will only be noticed by dev, as it is completely inconsequential
+    ONLY_DEV: "0 - Only Dev Will Notice",
     // Will only be noticed by few users of the application and has an intuitive workaround
     MINOR: "1 - Minor",
     // Will be noticed by many users of the application and has an intuitive workaround

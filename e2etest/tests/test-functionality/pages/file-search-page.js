@@ -267,10 +267,10 @@ export const FILE_SEARCH_PAGE_TESTS = [
             await driver.wait(until.elementsLocated(BySelectableTag(TEST_TAG_5)), DEFAULT_TIMEOUT_TIME);
         }},
         {name: "TagFilterShouldStayConsistentBetweenPageSwitch", tests: {
-            expectedDifficulty: "0 - Under an hour",
-            "impact": "1 - Cosmetic",
-            "noticeability": "1 - Minor",
-            "priority": "2 - Next Work"
+            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
+            "impact": BUG_IMPACTS.COSMETIC,
+            "noticeability": BUG_NOTICES.MINOR,
+            "priority": BUG_PRIORITIES.NEXT_WORK
         }},
         {name: "OrGroupsWork", tests: [
             {name: "DoesOrGroupModalWork", tests: async (driver) => {
@@ -605,7 +605,7 @@ export const FILE_SEARCH_PAGE_TESTS = [
             priority: BUG_PRIORITIES.BACKLOGGED_FOR_LATER,
             noticeability: BUG_NOTICES.MEDIUM,
             impact: BUG_IMPACTS.COSMETIC,
-            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY
+            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_WEEK
         }}
     ]},
 ]

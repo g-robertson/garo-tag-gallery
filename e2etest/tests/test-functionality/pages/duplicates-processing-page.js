@@ -1,5 +1,5 @@
 import { Key, until } from "selenium-webdriver";
-import { adjustDuplicateSearchDistance, applyTagFilter, beginDatabaseProcessingFiles, beginFilteringPotentialDuplicates, duplicateCommitChanges, duplicateCommitChangesFromDialog, createNewDuplicatesProcessingPage, createNewFileSearchPage, duplicateAlternates, duplicateCurrentIsBetter, duplicateCurrentIsBetterTrashOther, duplicateDiscardUncommitted, duplicateFalsePositive, duplicateGoBack, duplicateReopenUncommitted, duplicateSameQuality, duplicateSameQualityTrashLarger, duplicateSkip, selectTagFromLocalTagSelector, selectTagFromTagSearchQuery, duplicateDiscardChanges } from "../../../functionality/pages-functionality.js";
+import { adjustDuplicateSearchDistance, applyTagFilter, beginDatabaseProcessingFiles, beginFilteringPotentialDuplicates, duplicateCommitChanges, duplicateCommitChangesFromDialog, createNewDuplicatesProcessingPage, createNewFileSearchPage, duplicateAlternates, duplicateCurrentIsBetter, duplicateCurrentIsBetterTrashOther, duplicateDiscardUncommitted, duplicateFalsePositive, duplicateGoBack, duplicateReopenUncommitted, duplicateSameQuality, duplicateSameQualityTrashLarger, duplicateSkip, selectTagFromLocalTagSelector, selectTagFromTagSearchQuery, duplicateDiscardChanges, duplicateSetAllSmallerExactDuplicatesAsBetter } from "../../../functionality/pages-functionality.js";
 import { BY_DEDUPE_PREVIEW_GALLERY_IMAGE, BY_THUMBNAIL_GALLERY_IMAGE, closeDialog, closeModal, closePage, DEFAULT_TIMEOUT_TIME, findDedupeGalleryImage, findDedupePreviewGalleryImage, modClick, scroll, selectPage, sendKeys, UNTIL_JOB_BEGIN, UNTIL_JOB_END, untilCountElementsLocated, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
 import { BUG_IMPACTS, BUG_NOTICES, BUG_PRIORITIES, IMPLEMENTATION_DIFFICULTIES } from "../../../unimplemented-test-info.js";
 import { importFilesFromHydrus } from "../../../functionality/file-functionality.js";
@@ -19,6 +19,7 @@ const TEST_TAG_FALSE_POSITIVE = "false-positive-test";
 
 const TEST_TAG_DUPLICATE_IS_TRANSITIVE = "duplicate-is-transitive-test";
 const TEST_TAG_ALTERNATE_SHOULD_NOT_BE_MARKED_AS_COMPARED = "transitive-alternates-should-not-be-marked-compared-test";
+const TEST_TAG_EXACT_DUPLICATES = "exact-duplicates-test";
 
 /** @type {TestSuite[]} */
 export const DUPLICATES_PROCESSING_PAGE_TESTS = [
@@ -46,7 +47,7 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
             expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
             priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
             impact: BUG_IMPACTS.DEV_IMPEDIMENT,
-            noticeability: BUG_NOTICES.MEDIUM,
+            noticeability: BUG_NOTICES.ONLY_DEV,
         }},
         {name: "TestTagSearchWorks", tests: async (driver) => {
             await applyTagFilter(driver, TEST_TAG_UNMARKED_PAIR);
@@ -59,13 +60,17 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
             expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
             priority: BUG_PRIORITIES.NEXT_WORK,
             impact: BUG_IMPACTS.ASSUMED_WORKING,
-            noticeability: BUG_NOTICES.ASSUMED_WORKING
+            noticeability: BUG_NOTICES.ONLY_DEV
         }},
-        {name: "SetAllSmallerExactPixelDuplicatesAsBetterWorks", tests: {
-            expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
-            priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
-            impact: BUG_IMPACTS.PARTIALLY_UNUSABLE,
-            noticeability: BUG_NOTICES.MINOR
+        {name: "SetAllSmallerExactPixelDuplicatesAsBetterWorks", tests: async (driver) => {
+            await applyTagFilter(driver, TEST_TAG_EXACT_DUPLICATES);
+            await selectTagFromLocalTagSelector(driver, TEST_TAG_EXACT_DUPLICATES);
+            await driver.wait(untilCountElementsLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE, 1), DEFAULT_TIMEOUT_TIME);
+            await duplicateSetAllSmallerExactDuplicatesAsBetter(driver);
+
+            await driver.wait(untilElementsNotLocated(BY_DEDUPE_PREVIEW_GALLERY_IMAGE), DEFAULT_TIMEOUT_TIME);
+
+            await selectTagFromTagSearchQuery(driver, TEST_TAG_EXACT_DUPLICATES);
         }},
         {name: "DedupeGallery", tests: [
             {name: "BeginFilteringPotentialDuplicatesWorks", tests: async (driver) => {
@@ -181,19 +186,19 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
                 priority: BUG_PRIORITIES.CURRENT_WORK,
                 impact: BUG_IMPACTS.ASSUMED_WORKING,
-                noticeability: BUG_NOTICES.MINOR
+                noticeability: BUG_NOTICES.ONLY_DEV
             }},
             {name: "DedupeGalleryAlternateIsTransitiveThroughDuplicate", tests: {
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_AN_HOUR,
                 priority: BUG_PRIORITIES.CURRENT_WORK,
                 impact: BUG_IMPACTS.ASSUMED_WORKING,
-                noticeability: BUG_NOTICES.MINOR
+                noticeability: BUG_NOTICES.ONLY_DEV
             }},
             {name: "DedupeGalleryTransitivityWorksThroughNonSelectedFileComparisons", tests: {
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
                 priority: BUG_PRIORITIES.CURRENT_WORK,
                 impact: BUG_IMPACTS.COSMETIC,
-                noticeability: BUG_NOTICES.MINOR
+                noticeability: BUG_NOTICES.ONLY_DEV
             }},
             {name: "DedupeGalleryTransitiveAlternatesShouldNotBeMarkedAsCompared", tests: async (driver) => {
                 await applyTagFilter(driver, TEST_TAG_ALTERNATE_SHOULD_NOT_BE_MARKED_AS_COMPARED);
@@ -294,7 +299,7 @@ export const DUPLICATES_PROCESSING_PAGE_TESTS = [
                 expectedDifficulty: IMPLEMENTATION_DIFFICULTIES.UNDER_A_DAY,
                 priority: BUG_PRIORITIES.INTEND_FOR_THIS_RELEASE,
                 impact: BUG_IMPACTS.COSMETIC,
-                noticeability: BUG_NOTICES.MEDIUM
+                noticeability: BUG_NOTICES.ONLY_DEV
             }}
         ]},
     ]}
