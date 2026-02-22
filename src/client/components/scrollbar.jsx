@@ -33,10 +33,10 @@ const Scrollbar = ({
     alternativeScrollingElements ??= [];
     scrollbarIntervalConstState ??= new State(1, {name: "Scrollbar.scrollbarIntervalConstState"});
     scrollbarIncrementConstState ??= new State(4, {name: "Scrollbar.scrollbarIncrementConstState"});
+    /** @type {number | null} */
+    let preClickItemPosition = null;
     /** @type {State<number | null>} */
-    const preClickitemPositionState = new State(null, {name: "Scrollbar.preClickitemPositionState"});
-    /** @type {State<number | null>} */
-    const clickedCursorPosState = new State(null, {name: "Scrollbar.clickedCursorPosState"});
+    let clickedCursorPos = null;
     /** @type {State<number | null>} */
     const clickedScrollbarPosState = new State(null, {name: "Scrollbar.clickedScrollbarPosState"});
     const lastPossibleScrollPositionState = State.tupleTransform([totalItemsConstState, itemsDisplayedConstState, scrollbarIntervalConstState], () => {
@@ -142,22 +142,23 @@ const Scrollbar = ({
 
         const mouseMoveListener = (e) => {
             if (clickedScrollbarPosState.get() !== null) {
-                scrollbarMove(e.clientY);
+                scrollbarMove(e.pageY);
+                return;
             }
-            if (clickedCursorPosState.get() === null || scrollBarTravelDistanceState.get() === 0) {
+            if (clickedCursorPos === null || scrollBarTravelDistanceState.get() === 0) {
                 return;
             }
 
-            const pixelDelta = e.pageY - clickedCursorPosState.get();
+            const pixelDelta = e.pageY - clickedCursorPos;
             const traveledIndices = Math.floor((pixelDelta / scrollBarTravelDistanceState.get()) * lastPossibleScrollPositionState.get());
-            itemPositionState.set(getClampedItemPosition(preClickitemPositionState.get() + traveledIndices));
+            itemPositionState.set(getClampedItemPosition(preClickItemPosition + traveledIndices));
         };
         window.addEventListener("mousemove", mouseMoveListener);
         addToCleanup.push(() => window.removeEventListener("mousemove", mouseMoveListener));
 
         const mouseUpListener = () => {
             clickedScrollbarPosState.set(null);
-            clickedCursorPosState.set(null);  
+            clickedCursorPos = null;
         };
         window.addEventListener("mouseup", mouseUpListener);
         addToCleanup.push(() => window.removeEventListener("mouseup", mouseUpListener));
@@ -177,8 +178,8 @@ const Scrollbar = ({
             {ScrollCursor.react(<div className="scroll-cursor"
                  style={{width: "100%"}}
                  onMouseDown={(e) => {
-                    preClickitemPositionState.set(itemPositionState.get());
-                    clickedCursorPosState.set(e.pageY);
+                    preClickItemPosition = itemPositionState.get();
+                    clickedCursorPos = e.pageY;
                  }}>&#8801;</div>)}
         </div>
     )

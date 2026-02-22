@@ -1,6 +1,6 @@
 import { Key, until } from "selenium-webdriver";
 import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, FINISH_HYDRUS_JOB_TIMEOUT, modClick, modDoubleClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, UNTIL_JOB_BEGIN, UNTIL_JOB_END, UNTIL_MODAL_CLOSE, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
-import { addConditionalExpressionListUnionType, EXPRESSION_LIST_UNION_CONDITION_TYPES, CONDITIONAL_EXPRESSION_LIST_UNION_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, enterTagFilter, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveModifyTaggablesChanges, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../../functionality/pages-functionality.js";
+import { addConditionalExpressionListUnionType, EXPRESSION_LIST_UNION_CONDITION_TYPES, CONDITIONAL_EXPRESSION_LIST_UNION_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../../functionality/pages/file-search-pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../../../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../../functionality/metrics-functionality.js";
 import { BUG_IMPACTS, BUG_NOTICES, BUG_PRIORITIES, IMPLEMENTATION_DIFFICULTIES } from "../../../unimplemented-test-info.js";
@@ -21,7 +21,7 @@ const TEST_TAG_SERVICE_RENAME_1 = "TAG SERVICE RENAMED";
 const TEST_TAG_1 = "1girl";
 const TEST_TAG_2 = "meta:highres";
 const TEST_TAG_3 = "solo";
-const TEST_TAG_4 = "meta:spoilers";
+const TEST_TAG_4 = "long hair";
 const TEST_TAG_5 = "meta:commentary";
 
 const SERIES_TAG_1 = "series:toaru majutsu no index";

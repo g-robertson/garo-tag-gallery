@@ -21,6 +21,15 @@ export async function deleteBackupedFiles() {
     await rm(path.join(process.env.DATABASE_DIR, "garo.db-wal"), {force: true});
     await rm(path.join(process.env.DATABASE_DIR, "perftags"), {force: true, recursive: true});
 }
+
+export function spawnMockDataWebServer() {
+    const mdws = spawn("node", ["./e2etest/web-data/mock-web-server.js"]);
+    mdws.stdout.on('data', (chunk) => {
+        chunk = chunk.toString();
+        console.log(`Mock Web Data Server stdout: ${chunk}`);
+    });
+}
+
 /** @type {ReturnType<typeof spawn>} */
 let server;
 
@@ -44,7 +53,6 @@ export async function spawnServer() {
             console.log(`Server stderr: ${chunk.toString()}`);
         });
     });
-    
 }
 
 export async function killServer() {

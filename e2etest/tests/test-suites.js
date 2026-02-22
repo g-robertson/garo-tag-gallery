@@ -1,6 +1,6 @@
 /** @import {ThenableWebDriver} from "selenium-webdriver" */
 
-import { deleteAll, killServer, spawnServer } from "../server.js";
+import { deleteAll, killServer, spawnMockDataWebServer, spawnServer } from "../server.js";
 import { authenticate } from "./authenticate.js";
 import { NAVIGATION_TESTS } from "./test-navigation.js";
 import { POPULATE_DATA_TESTS } from "./populate-data.js";
@@ -61,6 +61,7 @@ const ONLY_ENABLE_TESTS = new Set([
     // "Tests.Functional.Files.ImportFilesFromHydrus",
     // "Tests.Functional.Pages.FileSearchPage",
     // "Tests.Functional.Pages.DuplicatesProcessingPage",
+    // "Tests.Functional.Pages.DownloaderPage",
     // "Tests.Functional.Tags",
     // "Tests.Functional.Taggables",
     // "Tests.Functional.Metrics",
@@ -171,6 +172,7 @@ async function executeTestSuite_(testSuite, previousContext, driver, required, e
 export async function executeTestSuite(driver, logs) {
     await deleteAll();
     const accessKey = await spawnServer();
+    spawnMockDataWebServer();
     await authenticate(driver, process.env.PORT, accessKey);
     await executeTestSuite_(TESTS, "", driver);
     //After all done, check the log for any errors not caught by testing

@@ -2,7 +2,6 @@ import { existsSync } from "fs";
 import { readFile, rm } from "fs/promises";
 import path from "path";
 import {Button, By, Key, Origin, until} from "selenium-webdriver";
-import { navigateToModifyTaggableServices } from "./navigation/taggables-navigation.js";
 import { deleteTagService } from "./functionality/tags-functionality.js";
 import { deleteTaggableService } from "./functionality/taggables-functionality.js";
 

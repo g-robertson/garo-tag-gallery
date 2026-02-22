@@ -129,12 +129,12 @@ function LazySelector({
     const realizedValuesState = new State(new RealizationMap(), {name: "LazySelector.realizedValuesState"});
     const shownStartIndexState = new State(initialLastClickedIndex ?? 0, {name: "LazySelector.shownStartIndexState"});
 
-    /** @type {State<Set<number> | null>} */
-    const preShiftClickIndicesState = new State(null, {name: "LazySelector.preShiftClickIndicesState"});
+    /** @type {Set<number> | null} */
+    let preShiftClickIndices = null;
     /** @type {State<Set<number>>} */
     const selectedIndicesState = new State(new Set(), {name: "LazySelector.selectedIndicesState"});
 
-    const isClickFocusedState = new State(false, {name: "LazySelector.isClickFocusedState"});
+    let isClickFocused = false;
 
     const fullItemWidthState = widthAvailableState.asTransform(widthAvailable => {
         if (typeof itemProperties.width === "number") {
@@ -308,7 +308,7 @@ function LazySelector({
         shownStartIndexState.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, addToCleanup, {requireChangeForUpdate: true});
 
         const onValuesChange = () => {
-            preShiftClickIndicesState.set(null);
+            preShiftClickIndices = null;
             selectedIndicesState.set(new Set());
             lastClickedIndexState.set(null);
             valuesRealizationSyncState.set(valuesRealizationSyncState.get() + 1);
@@ -353,7 +353,7 @@ function LazySelector({
         rowItemElementsState.addOnUpdateCallback(onRowItemsSelectedChanged, addToCleanup);
         
         const onLastClickedIndexChanged = () => {
-            preShiftClickIndicesState.set(null);
+            preShiftClickIndices = null;
 
             if (lastClickedIndexState.get() === null) {
                 return;
@@ -435,11 +435,11 @@ function LazySelector({
                                             selectedIndicesState.forceUpdate();
                                         } else if (e.shiftKey) {
                                             // Maintains prior state from before shift click
-                                            if (preShiftClickIndicesState.get() === null) {
-                                                preShiftClickIndicesState.set(new Set(selectedIndices));
+                                            if (preShiftClickIndices === null) {
+                                                preShiftClickIndices = new Set(selectedIndices);
                                                 newSelectedIndices = selectedIndices;
                                             } else {
-                                                newSelectedIndices = new Set(preShiftClickIndicesState.get());
+                                                newSelectedIndices = new Set(preShiftClickIndices);
                                             }
 
                                             let from = lastClickedIndexState.get();
@@ -546,10 +546,10 @@ function LazySelector({
                 }
                 parent = parent.parentElement;
             } while (parent !== null && parent !== undefined);
-            isClickFocusedState.set(false);
+            isClickFocused = false;
         }
         RootElement.dom.addEventListener("click", () => {
-            isClickFocusedState.set(true);
+            isClickFocused = true;
         });
         window.addEventListener("click", onClickFocusOutListener);
         addToCleanup.push(() => window.removeEventListener("click", onClickFocusOutListener));
@@ -577,7 +577,7 @@ function LazySelector({
 
         if (allowKeyboardInput) {
             const onKeyDown = (e) => {
-                if (!isClickFocusedState.get() && elementsSelectable) {
+                if (!isClickFocused && elementsSelectable) {
                     return;
                 }
 
@@ -602,8 +602,8 @@ function LazySelector({
 
     const SCROLLABLE_ELEMENTS = [SelectableContents];
 
-    return RootElement.react(
-        <div onAdd={onAdd} style={{position: "absolute"}} className="lazy-select">
+    return <div style={{position: "relative", width: "100%", height: "100%"}}>
+        {RootElement.react(<div onAdd={onAdd} style={{position: "absolute", right: 0}} className="lazy-select">
             <div style={{width: "100%", height: "100%"}}>
                 {SelectableContents.react(
                     <div className="lazy-selector-selectable-contents" style={{width: `calc(100% - ${scrollbarWidth}px)`, height: "100%", float: "left", flexDirection: "column"}}>
@@ -625,8 +625,8 @@ function LazySelector({
                     /> : <></>
                 }
             </div>
-        </div>
-    );
+        </div>)}
+    </div>;
 };
 
 export default LazySelector;

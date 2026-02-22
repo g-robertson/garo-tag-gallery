@@ -10,6 +10,7 @@ import { PersistentState, State, ConstState } from '../../js/state.js';
 import { Modals } from '../../modal/modals.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 import { FetchCache } from '../../js/fetch-cache.js';
+import AdjustableWidgets from '../../components/adjustable-widgets.jsx';
 
 /** 
  * @param {{
@@ -53,60 +54,72 @@ const FileSearchPageElement = ({page}) => {
 
     return (
         <div style={{width: "100%", height: "100%"}} onAdd={onAdd}>
-            <div style={{flex: 1, height: "100%"}}>
-                <TagsSelector
-                    taggableCursorConstState={taggableCursorConstState}
-                    onSearchChanged={(clientSearchQuery, localTagServiceIDs) => {
-                        clientSearchQueryState.set(clientSearchQuery);
-                        localTagServiceIDsState.set(localTagServiceIDs);
-                    }}
-                    persistentState={page.persistentState.registerState("tagsSelector", new PersistentState(), {addToCleanup})}
-                />
-            </div>
-            <div style={{width: "auto", flex: 3, flexDirection: "column", height: "100%"}}>
-                <div>
-                    {ModifySelectedTaggablesButton.react(<input type="button" value="Modify selected taggables" onClick={() => {
-                        Modals.Global().pushModal(ModifyTaggablesModal({
-                            taggableCursorConstState,
-                            taggableIDsConstState: selectedTaggableIDsState.asConst(),
-                        }));
-                    }} />)}
-                    {TrashSelectedTaggablesButton.react(<input type="button" value="Trash selected taggables" onClick={() => {
-                        const confirm = window.confirm("Are you sure you want to trash these taggables, they will be sent to trash can where they can either be restored or deleted permanently.");
-                        if (!confirm) {
-                            return;
-                        }
-
-                        trashTaggables(selectedTaggableIDsState.get());
-                    }} />)}
-                </div>
-                <div style={{flex: 1}}>
-                    <LazyThumbnailGallery
-                        taggableIDsConstState={taggableIDsConstState}
-                        onValuesSelected={(_, indices) => {
-                            selectedTaggableIDsState.set(indices.map(index => taggableIDsConstState.get()[index]));
-                        }}
-                        onValuesDoubleClicked={(_, indices, indexClicked) => {
-                            const taggableIDs = taggableIDsConstState.get();
-                            if (indices.length > 1) {
-                                const indicesSet = new Set(indices);
-                                const taggableIDsToShow = taggableIDs.filter((_, index) => indicesSet.has(index));
-                                const initialTaggableIndex = taggableIDsToShow.findIndex(taggable => taggable === taggableIDs[indexClicked]);
-
-                                Modals.Global().pushModal(GalleryModal({
-                                    taggableIDs: taggableIDsToShow,
-                                    initialTaggableIndex
-                                }));
-                            } else if (indices.length === 1) {
-                                Modals.Global().pushModal(GalleryModal({
-                                    taggableIDs: taggableIDs,
-                                    initialTaggableIndex: indexClicked
-                                }));
-                            }
-                        }}
-                    />
-                </div>
-            </div>
+            <AdjustableWidgets
+                persistentState={page.persistentState.registerState("adjustableWidgets", new PersistentState(), {addToCleanup})}
+                widgets={[
+                    {
+                        element: <TagsSelector
+                            taggableCursorConstState={taggableCursorConstState}
+                            onSearchChanged={(clientSearchQuery, localTagServiceIDs) => {
+                                clientSearchQueryState.set(clientSearchQuery);
+                                localTagServiceIDsState.set(localTagServiceIDs);
+                            }}
+                            persistentState={page.persistentState.registerState("tagsSelector", new PersistentState(), {addToCleanup})}
+                        />,
+                        defaultFlex: 1,
+                        minFlex: 0.3
+                    },
+                    {
+                        element: <div style={{width: "100%", flexDirection: "column", height: "100%"}}>
+                            <div>
+                                {ModifySelectedTaggablesButton.react(<input type="button" value="Modify selected taggables" onClick={() => {
+                                    Modals.Global().pushModal(ModifyTaggablesModal({
+                                        taggableCursorConstState,
+                                        taggableIDsConstState: selectedTaggableIDsState.asConst(),
+                                    }));
+                                }} />)}
+                                {TrashSelectedTaggablesButton.react(<input type="button" value="Trash selected taggables" onClick={() => {
+                                    const confirm = window.confirm("Are you sure you want to trash these taggables, they will be sent to trash can where they can either be restored or deleted permanently.");
+                                    if (!confirm) {
+                                        return;
+                                    }
+                                
+                                    trashTaggables(selectedTaggableIDsState.get());
+                                }} />)}
+                            </div>
+                            <div style={{flex: 1}}>
+                                <LazyThumbnailGallery
+                                    taggableIDsConstState={taggableIDsConstState}
+                                    onValuesSelected={(_, indices) => {
+                                        selectedTaggableIDsState.set(indices.map(index => taggableIDsConstState.get()[index]));
+                                    }}
+                                    onValuesDoubleClicked={(_, indices, indexClicked) => {
+                                        const taggableIDs = taggableIDsConstState.get();
+                                        if (indices.length > 1) {
+                                            const indicesSet = new Set(indices);
+                                            const taggableIDsToShow = taggableIDs.filter((_, index) => indicesSet.has(index));
+                                            const initialTaggableIndex = taggableIDsToShow.findIndex(taggable => taggable === taggableIDs[indexClicked]);
+                                        
+                                            Modals.Global().pushModal(GalleryModal({
+                                                taggableIDs: taggableIDsToShow,
+                                                initialTaggableIndex
+                                            }));
+                                        } else if (indices.length === 1) {
+                                            Modals.Global().pushModal(GalleryModal({
+                                                taggableIDs: taggableIDs,
+                                                initialTaggableIndex: indexClicked
+                                            }));
+                                        }
+                                    }}
+                                />
+                            </div>
+                        </div>,
+                        defaultFlex: 3,
+                        minFlex: 1
+                    }
+                ]}
+                flexDirection="row"
+            />
         </div>
     );
 };

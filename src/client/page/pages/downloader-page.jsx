@@ -10,6 +10,10 @@ import { PersistentState, State, ConstState } from '../../js/state.js';
 import { Modals } from '../../modal/modals.js';
 import { executeFunctions, ReferenceableReact } from '../../js/client-util.js';
 import { FetchCache } from '../../js/fetch-cache.js';
+import { User } from '../../js/user.js';
+import LazyTextObjectSelector from '../../components/lazy-text-object-selector.jsx';
+import NumericInput from '../../components/numeric-input.jsx';
+import AdjustableWidgets, { EXPANDABLE_EXPANSION_AREA, EXPANSION_AREA } from '../../components/adjustable-widgets.jsx';
 
 /** 
  * @param {{
@@ -20,18 +24,18 @@ const DownloaderPageElement = ({page}) => {
     /** @type {(() => void)[]} */
     const addToCleanup = [];
 
+    const URLClassMatched = ReferenceableReact();
     const ModifySelectedTaggablesButton = ReferenceableReact();
     const TrashSelectedTaggablesButton = ReferenceableReact();
 
-    /** @type {State<number[]>} */
+    const fileCountLimitState = new State(2000);
     const selectedTaggableIDsState = new State([], {name: "FileSearchPage.selectedTaggableIDsState"});
     const clientSearchQueryState = new State(null, {name: "FileSearchPage.clientSearchQueryState"});
-    const localTagServiceIDsState = new State([], {name: "FileSearchPage.localTagServiceIDsState"});
     const searchTaggablesResultState = FetchCache.Global().searchTaggablesConstState(
         clientSearchQueryState,
         ConstState.instance("Taggable"),
         ConstState.instance("Taggable_ID"),
-        localTagServiceIDsState,
+        User.Global().localTagServicesAvailableState(addToCleanup),
         addToCleanup
     );
     const [taggableCursorConstState, taggableIDsConstState] = searchTaggablesResultState.asAtomicTransforms([
@@ -53,15 +57,44 @@ const DownloaderPageElement = ({page}) => {
 
     return (
         <div style={{width: "100%", height: "100%"}} onAdd={onAdd}>
-            <div style={{flex: 1, height: "100%"}}>
-                <TagsSelector
-                    taggableCursorConstState={taggableCursorConstState}
-                    onSearchChanged={(clientSearchQuery, localTagServiceIDs) => {
-                        clientSearchQueryState.set(clientSearchQuery);
-                        localTagServiceIDsState.set(localTagServiceIDs);
-                    }}
-                    persistentState={page.persistentState.registerState("tagsSelector", new PersistentState(), {addToCleanup})}
-                />
+            <div style={{flex: 1, height: "100%", }}>
+                <div style={{margin: 4, flexDirection: "column"}}>
+                    <AdjustableWidgets
+                        persistentState={page.persistentState.registerState("adjustableWidgets", new PersistentState(), {addToCleanup})}
+                        flexDirection="column"
+                        widgets={[
+                            {
+                                element: (<div style={{flexDirection: "column", marginBottom: 4}}>
+                                    <div style={{marginTop: 4}}>Enter a URL: <input style={{marginLeft: 4}} type="text" /></div>
+                                    <div style={{marginTop: 4}}>Or use a URL generator: <input style={{marginLeft: 4}} type="button" value="Generate URL" /></div>
+                                    <div style={{marginTop: 4}}>URL Classifier matched: {URLClassMatched.react(<span style={{marginLeft: 2, color: "red"}}>No URL classifier matched</span>)}</div>
+                                    <div style={{marginTop: 2, borderBottom: "1px solid white"}}></div>
+                                    <div style={{marginTop: 4}}><input type="button" value="Download from URL" /><input style={{marginLeft: 4}} type="button" value="Watch URL" /></div>
+                                </div>),
+                                defaultFlex: 0
+                            },
+                            {
+                                element: (<LazyTextObjectSelector
+                                    textObjectsConstState={ConstState.instance(["downloader1 - 123 items - Done", "downloader2 - 123 items - Done", "downloader3 - 123 items - Done"])}
+                                    customItemComponent={({realizedValue}) => <>{realizedValue}</>}
+                                    multiSelect={false}
+                                />),
+                                defaultFlex: 1,
+                                minFlex: 0.7
+                            },
+                            EXPANSION_AREA,
+                            {
+                                element: (<div style={{flexDirection: "column"}}>
+                                    <div style={{marginTop: 4}}>File count limit: <span style={{marginLeft: 4}}><NumericInput selectedNumberState={fileCountLimitState} minValue={1} maxValue={Infinity} /></span></div>
+                                    <div style={{marginTop: 4}}><input type="button" value="View selected query's log" /></div>
+                                    <div style={{marginTop: 4}}><input type="button" value="Retry selected query's failed items" /></div>
+                                </div>),
+                                defaultFlex: 0
+                            }
+                        ]}
+                        defaultAfterFlex={4}
+                    />
+                </div>
             </div>
             <div style={{width: "auto", flex: 3, flexDirection: "column", height: "100%"}}>
                 <div>

@@ -5,6 +5,7 @@ import { Modals } from "../modal/modals.js";
 import { PersistentState, State, ConstState } from "../js/state.js";
 import { executeFunctions, mapUnion } from "../js/client-util.js";
 import { FetchCache } from "../js/fetch-cache.js";
+import AdjustableWidgets, { EXPANSION_AREA } from "./adjustable-widgets.jsx";
 
 /** @import {DBPermissionedLocalTagService} from "../../db/tags.js" */
 /** @import {ClientQueryTag} from "../../api/client-get/tags-from-local-tag-services.js" */
@@ -172,84 +173,103 @@ const LocalTagsSelector = ({
 
     return (
         <div onAdd={onAdd} class="local-tags-selector" style={{flexDirection: "column", width: "100%"}}>
-            <div>Tag services to view/add from:</div>
-            <div className="tag-service-selector" style={{flex: 1, overflowY: "auto"}}>
-                <MultiSelect
-                    optionsConstState={localTagServicesConstState.asTransform(localTagServices => localTagServices.map(localTagService => ({
-                        value: localTagService.Local_Tag_Service_ID,
-                        displayName: localTagService.Service_Name
-                    })), addToCleanup)}
-                    selectedOptionsState={selectedLocalTagServiceIDsState}
-                />
-            </div>
-            {tagSelectionTitle}:
-            <div><input class="tag-filter-input" type="text" onKeyUp={(e) => {
-                if (e.key === "Enter") {
-                    let displayName = e.currentTarget.value;
-                    if (displayName === "") {
-                        return;
+            <AdjustableWidgets
+                persistentState={persistentState.registerState("adjustableWidgets", new PersistentState(), {addToCleanup})}
+                flexDirection="column"
+                widgets={[
+                    {
+                        element: <div>Tag services to view/add from:</div>,
+                        defaultFlex: 0
+                    },
+                    {
+                        element: <div className="tag-service-selector" style={{overflowY: "auto"}}>
+                            <MultiSelect
+                                optionsConstState={localTagServicesConstState.asTransform(localTagServices => localTagServices.map(localTagService => ({
+                                    value: localTagService.Local_Tag_Service_ID,
+                                    displayName: localTagService.Service_Name
+                                })), addToCleanup)}
+                                selectedOptionsState={selectedLocalTagServiceIDsState}
+                            />
+                        </div>,
+                        defaultFlex: 1,
+                        minFlex: 0.5
+                    },
+                    EXPANSION_AREA,
+                    {
+                        element: <span>{tagSelectionTitle}:
+                            <div><input class="tag-filter-input" type="text" onKeyUp={(e) => {
+                                if (e.key === "Enter") {
+                                    let displayName = e.currentTarget.value;
+                                    if (displayName === "") {
+                                        return;
+                                    }
+                                
+                                    const lastColonIndex = displayName.lastIndexOf(":");
+
+                                    let excludeFromTag = false;
+                                    if (displayName[0] === '-') {
+                                        excludeFromTag = true;
+                                        displayName = displayName.slice(1);
+                                    }
+                                
+                                    let namespaces = [];
+                                    let tagName = displayName;
+                                
+                                
+                                    if (lastColonIndex !== -1) {
+                                        namespaces = displayName.slice(0, lastColonIndex).split(":");
+                                        tagName = displayName.slice(lastColonIndex + 1);
+                                    }
+                                
+                                    const isExcludeOn = isExcludeOnState.get();
+                                    const foundSameTag = tagsState.get().find(tag => tag.tagName === displayName);
+                                    if (foundSameTag !== undefined) {
+                                        onTagsSelected([foundSameTag], Boolean(isExcludeOn ^ excludeFromTag));
+                                    } else {
+                                        /** @type {ClientQueryTag} */
+                                        const enteredClientTag = {
+                                            displayName,
+                                            tagName,
+                                            namespaces,
+                                            tagCount: Infinity,
+                                            type: "tagByLookup",
+                                            Lookup_Name: tagName
+                                        };
+                                    
+                                        onTagsSelected([enteredClientTag], Boolean(isExcludeOn ^ excludeFromTag), selectedLocalTagServiceIDsState.get());
+                                    }
+                                
+                                    tagFilterValueState.set("");
+                                    e.currentTarget.value = "";
+                                }
+                            }} onInput={(e) => {
+                                tagFilterValueState.set(e.currentTarget.value);
+                            }}/></div>
+                            {excludeable
+                                ? <div>Exclude: <input class="exclude-checkbox" type="checkbox" checked={isExcludeOnState.get()} onChange={(e) => {
+                                    isExcludeOnState.set(e.currentTarget.checked);
+                                }}/></div>
+                                : <></>
+                            }
+                        </span>,
+                        defaultFlex: 0
+                    },
+                    {
+                        element: <LazyTextObjectSelector
+                            textObjectsConstState={tagsState.asConst()}
+                            onValuesDoubleClicked={async (valuesSelected) => {
+                                const mappedValues = await valueMappingFunction(valuesSelected);
+                                onTagsSelected(mappedValues, isExcludeOnState.get(), selectedLocalTagServiceIDsState.get());
+                            }}
+                            customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== Infinity ? ` (${realizedValue.tagCount})` : ""}</>}
+                            customTitleRealizer={(realizedValue) => realizedValue.displayName}
+                            multiSelect={multiSelect}
+                        />,
+                        defaultFlex: 5,
+                        minFlex: 1
                     }
-
-                    const lastColonIndex = displayName.lastIndexOf(":");
-                    
-                    let excludeFromTag = false;
-                    if (displayName[0] === '-') {
-                        excludeFromTag = true;
-                        displayName = displayName.slice(1);
-                    }
-
-                    let namespaces = [];
-                    let tagName = displayName;
-
-
-                    if (lastColonIndex !== -1) {
-                        namespaces = displayName.slice(0, lastColonIndex).split(":");
-                        tagName = displayName.slice(lastColonIndex + 1);
-                    }
-
-                    const isExcludeOn = isExcludeOnState.get();
-                    const foundSameTag = tagsState.get().find(tag => tag.tagName === displayName);
-                    if (foundSameTag !== undefined) {
-                        onTagsSelected([foundSameTag], Boolean(isExcludeOn ^ excludeFromTag));
-                    } else {
-                        /** @type {ClientQueryTag} */
-                        const enteredClientTag = {
-                            displayName,
-                            tagName,
-                            namespaces,
-                            tagCount: Infinity,
-                            type: "tagByLookup",
-                            Lookup_Name: tagName
-                        };
-
-                        onTagsSelected([enteredClientTag], Boolean(isExcludeOn ^ excludeFromTag), selectedLocalTagServiceIDsState.get());
-                    }
-
-                    tagFilterValueState.set("");
-                    e.currentTarget.value = "";
-                }
-            }} onInput={(e) => {
-                tagFilterValueState.set(e.currentTarget.value);
-            }}/></div>
-            {excludeable
-                ? <div>Exclude: <input class="exclude-checkbox" type="checkbox" checked={isExcludeOnState.get()} onChange={(e) => {
-                    isExcludeOnState.set(e.currentTarget.checked);
-                }}/></div>
-                : <></>
-            }
-            
-            <div style={{flex: 5}}>
-                {<LazyTextObjectSelector
-                    textObjectsConstState={tagsState.asConst()}
-                    onValuesDoubleClicked={async (valuesSelected) => {
-                        const mappedValues = await valueMappingFunction(valuesSelected);
-                        onTagsSelected(mappedValues, isExcludeOnState.get(), selectedLocalTagServiceIDsState.get());
-                    }}
-                    customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== Infinity ? ` (${realizedValue.tagCount})` : ""}</>}
-                    customTitleRealizer={(realizedValue) => realizedValue.displayName}
-                    multiSelect={multiSelect}
-                />}
-            </div>
+                ]}
+            />
         </div>
     );
 }

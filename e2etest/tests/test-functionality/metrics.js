@@ -1,5 +1,5 @@
 import { until } from "selenium-webdriver";
-import { createNewFileSearchPage, modifyTaggables } from "../../functionality/pages-functionality.js";
+import { createNewFileSearchPage, modifyTaggables } from "../../functionality/pages/file-search-pages-functionality.js";
 import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, closeModal, closePage, DEFAULT_TIMEOUT_TIME, doubleClick, findThumbnailGalleryImage, untilCountElementsLocated, untilElementsNotLocated, xpathHelper } from "../../helpers.js";
 import { changeTagToMetric, createNewMetric, createNewMetricService, deleteMetric, deleteMetricService, METRIC_TYPES, modifyMetric, modifyMetricService } from "../../functionality/metrics-functionality.js";
 import { navigateToChangeTagToMetric } from "../../navigation/metrics-navigation.js";

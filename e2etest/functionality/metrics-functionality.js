@@ -1,7 +1,7 @@
 import { closeModal, DEFAULT_TIMEOUT_TIME, realClear, UNTIL_MODAL_CLOSE, xpathHelper } from "../helpers.js";
 import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
 import {By, Key, until} from "selenium-webdriver"
-import { applyTagFilter, selectTagFromLocalTagSelector } from "./pages-functionality.js";
+import { applyTagFilter, selectTagFromLocalTagSelector } from "./pages/file-search-pages-functionality.js";
 
 /** @import {ThenableWebDriver} from "selenium-webdriver" */
 

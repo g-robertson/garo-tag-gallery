@@ -757,6 +757,7 @@ export function ReferenceableReact() {
     let reactRef = undefined;
 
     return {
+        /** @type {HTMLElement} */
         get dom() {
             return document.querySelector(`[data-react-ref=${reactRef}]`);
         },

@@ -1,4 +1,4 @@
-import { createNewFileSearchPage } from "../functionality/pages-functionality.js";
+import { createNewFileSearchPage } from "../functionality/pages/file-search-pages-functionality.js";
 import { ByModal, closeModal, closePage, DEFAULT_TIMEOUT_TIME, findPages, rmDownloadedFile, selectPage, xpathHelper } from "../helpers.js";
 import { navigateToBackup, navigateToHydrusImport, navigateToImportMappingsFromBackup } from "../navigation/file-navigation.js";
 import { navigateToChangeTagToMetric, navigateToCreateMetricService, navigateToCreateNewMetric, navigateToModifyMetric, navigateToModifyMetricServices } from "../navigation/metrics-navigation.js";
