@@ -40,7 +40,7 @@ function mapParams(params) {
 /**
  * @param {Databases} dbs
  * @param {string} sql
- * @param {any} params
+ * @param {any[]} params
  */
 export async function dbrun(dbs, sql, params) {
     params ??= [];
@@ -55,7 +55,7 @@ export async function dbrun(dbs, sql, params) {
     } catch (err) {
         if (err !== null) {
             Error.captureStackTrace(err);
-            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+            throw new Error(`Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`);
         }
     }
 
@@ -71,7 +71,7 @@ export async function dbrun(dbs, sql, params) {
 /**
  * @param {Databases} dbs
  * @param {string} sql 
- * @param {any} params
+ * @param {any[]} params
  */
 export async function dbgetselect(dbs, sql, params) {
     params ??= [];
@@ -84,7 +84,7 @@ export async function dbgetselect(dbs, sql, params) {
     } catch (err) {
         if (err !== null) {
             Error.captureStackTrace(err);
-            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+            throw new Error(`Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`);
         }
     }
 
@@ -96,7 +96,7 @@ export async function dbgetselect(dbs, sql, params) {
 /**
  * @param {Databases} dbs
  * @param {string} sql 
- * @param {any} params
+ * @param {any[]} params
  */
 export async function dbget(dbs, sql, params) {
     params ??= [];
@@ -112,7 +112,7 @@ export async function dbget(dbs, sql, params) {
     } catch (err) {
         if (err !== null) {
             Error.captureStackTrace(err);
-            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+            throw new Error(`Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`);
         }
     }
 
@@ -127,7 +127,7 @@ export async function dbget(dbs, sql, params) {
 /**
  * @param {Databases} dbs 
  * @param {string} sql 
- * @param {any} params 
+ * @param {any[]} params 
  */
 export async function dballselect(dbs, sql, params) {
     params ??= [];
@@ -140,7 +140,7 @@ export async function dballselect(dbs, sql, params) {
     } catch (err) {
         if (err !== null) {
             Error.captureStackTrace(err);
-            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+            throw new Error(`Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`);
         }
     }
 
@@ -152,7 +152,7 @@ export async function dballselect(dbs, sql, params) {
 /**
  * @param {Databases} dbs
  * @param {string} sql 
- * @param {any} params
+ * @param {any[]} params
  */
 export async function dball(dbs, sql, params) {
     params ??= [];
@@ -168,7 +168,7 @@ export async function dball(dbs, sql, params) {
     } catch (err) {
         if (err !== null) {
             Error.captureStackTrace(err);
-            throw `Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`;
+            throw new Error(`Error in sql call originating from "${sql.slice(0, 10000)} with parameters ${params}": ${err} at ${err.stack}`);
         }
     }
 
@@ -253,6 +253,10 @@ export async function dbEndTransaction(dbs) {
     };
 }
 
+/**
+ * @param {string} sql 
+ * @param {any[]} params 
+ */
 export function dbsqlcommand(sql, params) {
     return {
         sql,

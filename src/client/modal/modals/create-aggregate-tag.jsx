@@ -67,7 +67,7 @@ export default function CreateConditionalExpressionListUnionType() {
             An conditional expression list union selects from a union of all of the expressions in a certain selected expression list that meets a specified condition
             <div style={{flex: 4}}>
                 <TagGroupsSelector
-                    multiSelect={false}
+                    multiHighlight={false}
                     onTagGroupsSelected={(expressionLists) => {
                         expressionListState.set(expressionLists[0]);
                     }} />
@@ -79,7 +79,7 @@ export default function CreateConditionalExpressionListUnionType() {
                 <div style={{marginTop: 4}}>Where the tags within the group must follow any selected conditions below</div>
                 <div style={{marginTop: 4}}>Conditions selected:</div>
                 <div style={{height: 100, marginTop: 4}}>
-                    <LazyTextObjectSelector textObjectsConstState={conditionsState} multiSelect={false} onValuesDoubleClicked={(_, indicesSelected) => {
+                    <LazyTextObjectSelector textObjectsConstState={conditionsState} multiHighlight={false} onValuesSelected={(_, indicesSelected) => {
                         conditionsState.get().splice(indicesSelected[0], 1);
                         conditionsState.forceUpdate();
                     }} />

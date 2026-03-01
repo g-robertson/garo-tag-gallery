@@ -200,6 +200,18 @@ export class State {
     /**
      * @param {T} value 
      */
+    quietSet(value) {
+        if (!this.isValid()) {
+            throw new Error(`Setting value on invalid state ${this.#stateRef.name} without setting validity`);
+        }
+        
+        this.#stateRef.previousValidValue = this.#stateRef.value;
+        this.#stateRef.value = value;
+    }
+
+    /**
+     * @param {T} value 
+     */
     setWithValidity(value) {
         const previousValueOptions = this.#getValueOptions();
 
@@ -387,7 +399,7 @@ export class State {
      **/
 
     /**
-     * @template T, R1, R2, R3, R4, R5, R6, R7
+     * @template R1, R2, R3, R4, R5, R6, R7
      * @type {AsAtomicTransformFunction<T, R1, R2, R3, R4, R5, R6, R7>}
      **/
     asAtomicTransforms(transforms, addToCleanup, options) {
@@ -574,7 +586,7 @@ export class ConstState {
     }
     
     /**
-     * @template T, R1, R2, R3, R4, R5, R6, R7
+     * @template R1, R2, R3, R4, R5, R6, R7
      * @type {AsAtomicTransformFunction<T, R1, R2, R3, R4, R5, R6, R7>}
      **/
     asAtomicTransforms(transforms, addToCleanup, options) {

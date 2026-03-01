@@ -14,17 +14,17 @@ const THUMB_HEIGHT = THUMB_WIDTH * (THUMB_ORIGINAL_HEIGHT / THUMB_ORIGINAL_WIDTH
 /**
  * @param {{
  *  taggableIDsConstState: ConstState<number[]>
- *  onValuesSelected?: (valuesSelected: DBUserFacingTaggableFile[], indices: number[]) => void
- *  onValuesDoubleClicked?: (valuesSelected: DBUserFacingTaggableFile[], indices: number[], indexClicked: number) => void
+ *  onValuesHighlighted?: (valuesSelected: DBUserFacingTaggableFile[], indices: number[]) => void
+ *  onValuesSelected?: (valuesSelected: DBUserFacingTaggableFile[], indices: number[], indexClicked: number) => void
  * }} param0
  */
-const LazyThumbnailGallery = ({taggableIDsConstState, onValuesSelected, onValuesDoubleClicked}) => {
+const LazyThumbnailGallery = ({taggableIDsConstState, onValuesHighlighted, onValuesSelected}) => {
+    onValuesHighlighted ??= () => {};
     onValuesSelected ??= () => {};
-    onValuesDoubleClicked ??= () => {};
 
     return <LazySelector
         valuesConstState={taggableIDsConstState}
-        realizeSelectedValues={false}
+        realizeHighlightedValues={false}
         valuesRealizer={async (values) => {
             const response = await fetch("/api/post/select-user-facing-taggables", {
                 body: JSON.stringify({
@@ -61,8 +61,8 @@ const LazyThumbnailGallery = ({taggableIDsConstState, onValuesSelected, onValues
                 />
             </div>
         }}
-        onValuesDoubleClicked={onValuesDoubleClicked}
         onValuesSelected={onValuesSelected}
+        onValuesHighlighted={onValuesHighlighted}
         customTitleRealizer={(realizedValue) => realizedValue.Tags.sort((a, b) => {
             if (a < b) {
                 return -1;

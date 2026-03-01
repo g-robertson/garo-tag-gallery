@@ -17,17 +17,17 @@ const DISTANCE_HEIGHT = 0;
 /**
  * @param {{
  *  fileComparisonPairsConstState: ConstState<DBFileComparison[]>
- *  onValuesDoubleClicked?: (valuesSelected: any, indices: number[], indexClicked: number) => void
- *  onValuesSelected?: (valuesSelected: any, indices: number[]) => void
+ *  onValuesSelected?: (valuesSelected: any, indices: number[], indexClicked: number) => void
+ *  onValuesHighlighted?: (valuesSelected: any, indices: number[]) => void
  * }} param0
  */
-const LazyDedupePreviewGallery = ({fileComparisonPairsConstState, onValuesDoubleClicked, onValuesSelected}) => {
-    onValuesDoubleClicked ??= () => {};
+const LazyDedupePreviewGallery = ({fileComparisonPairsConstState, onValuesSelected, onValuesHighlighted}) => {
     onValuesSelected ??= () => {};
+    onValuesHighlighted ??= () => {};
 
     return <LazySelector
         valuesConstState={fileComparisonPairsConstState}
-        realizeSelectedValues={false}
+        realizeHighlightedValues={false}
         valuesRealizer={async (values) => {
             /** @type {Set<number>} */
             const filesSet = new Set();
@@ -85,8 +85,8 @@ const LazyDedupePreviewGallery = ({fileComparisonPairsConstState, onValuesDouble
                 </div>
             </div>
         }}
-        onValuesDoubleClicked={onValuesDoubleClicked}
         onValuesSelected={onValuesSelected}
+        onValuesHighlighted={onValuesHighlighted}
         valueRealizationDelay={25}
         valueRealizationRange={2}
         realizeMinimumCount={30}

@@ -3,9 +3,9 @@ import { AUDIO_DIMENSIONS_METRIC, AUDIO_SAMPLE_RATE_METRIC, AUDIO_SIZE_METRIC, D
 import { createFileExtensionLookupName, createHasFileHashLookupName, createHasURLTagLookupName, createURLAssociationTagLookupName, isURLAssociationTagLookupName, normalizeFileExtension,revertURLAssociationTagLookupName } from "../client/js/tags.js";
 import { PERMISSIONS } from "../client/js/user.js";
 import PerfTags from "../perf-binding/perf-tags.js";
-import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbtuples, dbvariablelist, TMP_FOLDER} from "./db-util.js";
+import {asyncDataSlicer, dball, dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbsqlcommand, dbtuples, dbvariablelist, TMP_FOLDER} from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
-import { LocalTags, UserFacingLocalTags } from "./tags.js";
+import { insertSystemTag, LocalTags, UserFacingLocalTags } from "./tags.js";
 import { AppliedMetrics } from "./metrics.js";
 import { extractMetadataWithFFProbe, extractNthSecondWithFFMPEG, sha256 } from "../util.js";
 import { readFile, rm } from "fs/promises";
@@ -26,17 +26,38 @@ import { mapNullCoalesce } from "../client/js/client-util.js";
 /**
  * @typedef {Object} DBLocalTaggableService
  * @property {number} Local_Taggable_Service_ID
- */
-
-/**
+ * 
  * @typedef {DBLocalTaggableService & DBService} DBJoinedLocalTaggableService
- */
+ * @typedef {DBJoinedLocalTaggableService & {In_Local_Taggable_Service_Tag: DBLocalTag}} TagMappedDBJoinedLocalTaggableService
+ * @typedef {TagMappedDBJoinedLocalTaggableService & {Permissions: Set<string>}} DBPermissionedLocalTaggableService
+ **/
+
 
 /**
- * @typedef {DBJoinedLocalTaggableService & {In_Local_Taggable_Service_Tag: DBLocalTag}} TagMappedDBJoinedLocalTaggableService
+ * @param {TagMappedDBJoinedLocalTaggableService} systemLocalTaggableService
  */
-
-/** @typedef {DBJoinedLocalTaggableService & {Permissions: Set<string>}} DBPermissionedLocalTaggableService */
+export function insertSystemLocalTaggableService(systemLocalTaggableService) {
+    return [
+        ...insertSystemTag(systemLocalTaggableService.In_Local_Taggable_Service_Tag),
+        dbsqlcommand(`INSERT INTO Services(
+                Service_ID,
+                Service_Name
+            ) VALUES (
+                ?,
+                ?
+            );
+        `, [systemLocalTaggableService.Service_ID, systemLocalTaggableService.Service_Name]),
+        dbsqlcommand(`
+            INSERT INTO Local_Taggable_Services(
+                Local_Taggable_Service_ID,
+                Service_ID
+            ) VALUES (
+                ?,
+                ?
+            );
+        `, [systemLocalTaggableService.Local_Taggable_Service_ID, systemLocalTaggableService.Service_ID])
+    ];
+}
 
 export class LocalTaggableServices {
     /**

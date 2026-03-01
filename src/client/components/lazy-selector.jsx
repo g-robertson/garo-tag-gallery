@@ -48,11 +48,12 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  * @template R
  * @param {{
  *  valuesConstState: ConstState<T[]>
- *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[], indices: number[]) => void
- *  onValuesDoubleClicked?: (realizedValuesSelected: Awaited<R>[], indices: number[], indexClicked: number) => void
+ *  onValuesHighlighted?: (realizedValuesHighlighted: Awaited<R>[], indices: number[]) => void
+ *  onValuesSelected?: (realizedValuesSelected: Awaited<R>[], indices: number[], indexClicked: number) => void
  *  valuesRealizer: ((values: T[]) => Promise<R[]>) | ((values: T[]) => R[])
  *  onValuesRangeRealized?: (realizedValues: R[]) => void
- *  onSelectedPastEnd?: () => void
+ *  onHighlightedPastEnd?: () => void
+ *  realizeHighlightedValues?: boolean
  *  realizeSelectedValues?: boolean
  *  valueRealizationRange?: number
  *  valueRealizationDelay?: number
@@ -64,7 +65,9 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  *  initialLastClickedIndex?: number
  *  scrollbarWidth?: number
  *  elementsSelectable?: boolean
+ *  multiHighlight?: boolean
  *  multiSelect?: boolean
+ *  styleSelectedValues?: boolean
  *  allowScrollInput?: boolean
  *  allowKeyboardInput?: boolean
  *  externalIncrementerConstState?: ConstState<number>
@@ -72,11 +75,12 @@ function clampShownStartIndex(shownStartIndex, lastPossibleShownStartIndex, colu
  */
 function LazySelector({
     valuesConstState,
+    onValuesHighlighted,
     onValuesSelected,
-    onValuesDoubleClicked,
     valuesRealizer,
     onValuesRangeRealized,
-    onSelectedPastEnd,
+    onHighlightedPastEnd,
+    realizeHighlightedValues,
     realizeSelectedValues,
     valueRealizationRange,
     valueRealizationDelay,
@@ -87,7 +91,9 @@ function LazySelector({
     scrollbarIncrement,
     initialLastClickedIndex,
     scrollbarWidth,
+    multiHighlight,
     multiSelect,
+    styleSelectedValues,
     elementsSelectable,
     allowScrollInput,
     allowKeyboardInput,
@@ -97,11 +103,12 @@ function LazySelector({
     /** @type {(() => void)[]} */
     const addToCleanup = [() => { isDisposed = true; }];
 
-    onValuesDoubleClicked ??= () => {};
+    onValuesHighlighted ??= () => {};
     onValuesSelected ??= () => {};
-    realizeSelectedValues ??= true;
+    realizeHighlightedValues ??= true;
+    realizeSelectedValues ??= realizeHighlightedValues;
     onValuesRangeRealized ??= () => {};
-    onSelectedPastEnd ??= () => {};
+    onHighlightedPastEnd ??= () => {};
     valueRealizationRange ??= 5;
     valueRealizationDelay ??= 200;
     realizeMinimumCount ??= 0;
@@ -112,7 +119,9 @@ function LazySelector({
     scrollbarIncrement ??= 4;
     initialLastClickedIndex ??= null;
     scrollbarWidth ??= 17;
-    multiSelect ??= true;
+    multiHighlight ??= true;
+    multiSelect ??= multiHighlight;
+    styleSelectedValues ??= false;
     elementsSelectable ??= true;
     allowScrollInput ??= true;
     allowKeyboardInput ??= true;
@@ -131,6 +140,8 @@ function LazySelector({
 
     /** @type {Set<number> | null} */
     let preShiftClickIndices = null;
+    /** @type {State<Set<number>>} */
+    const highlightedIndicesState = new State(new Set(), {name: "LazySelector.highlightedIndicesState"});
     /** @type {State<Set<number>>} */
     const selectedIndicesState = new State(new Set(), {name: "LazySelector.selectedIndicesState"});
 
@@ -265,6 +276,12 @@ function LazySelector({
         
         const forcedIndices = new Set();
 
+        if (realizeHighlightedValues) {
+            for (const index of highlightedIndicesState.get()) {
+                forcedIndices.add(index);
+                allIndices.add(index);
+            }
+        }
         if (realizeSelectedValues) {
             for (const index of selectedIndicesState.get()) {
                 forcedIndices.add(index);
@@ -302,14 +319,17 @@ function LazySelector({
             }
         }
         
-        selectedIndicesState.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, addToCleanup);
+        highlightedIndicesState.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, addToCleanup);
         columnCountAvailableState.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, addToCleanup, {requireChangeForUpdate: true});
         rowCountAvailableState.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, addToCleanup, {requireChangeForUpdate: true});
         shownStartIndexState.addOnUpdateCallback(() => {onRealizationUpdateNeeded()}, addToCleanup, {requireChangeForUpdate: true});
 
         const onValuesChange = () => {
             preShiftClickIndices = null;
-            selectedIndicesState.set(new Set());
+            highlightedIndicesState.set(new Set());
+            if (selectedIndicesState.get().size !== 0) {
+                selectedIndicesState.set(new Set());
+            }
             lastClickedIndexState.set(null);
             valuesRealizationSyncState.set(valuesRealizationSyncState.get() + 1);
             onRealizationUpdateNeeded(new RealizationMap());
@@ -317,7 +337,47 @@ function LazySelector({
         onValuesChange();
         valuesConstState.addOnUpdateCallback(onValuesChange, addToCleanup, {name: "LazySelector.onValuesChange", whenInvalidSubstitute: "no-update"});
         
+        const onRowItemsHighlightedChanged = () => {
+            for (const rowItemElement of rowItemElementsState.get().values()) {
+                if (rowItemElement.dom) {
+                    rowItemElement.dom.classList.remove("highlighted");
+                }
+            }
+
+            for (const index of highlightedIndicesState.get()) {
+                const rowItemElement = rowItemElementsState.get().get(index)?.dom;
+                if (rowItemElement) {
+                    rowItemElement.classList.add("highlighted");
+                }
+            }
+        }
+        const onHighlightedIndicesChanged = async () => {
+            const realizedValues = realizedValuesState.get();
+            /** @type {R[]} */
+            const realizedValuesHighlighted = [];
+
+            if (realizeHighlightedValues) {
+                for (const index of highlightedIndicesState.get()) {
+                    realizedValuesHighlighted.push(await realizedValues.get(index));
+                }
+            } else {
+                for (const index of highlightedIndicesState.get()) {
+                    realizedValuesHighlighted.push(realizedValues.getOrUndefined(index));
+                }
+            }
+
+            onValuesHighlighted(realizedValuesHighlighted, [...highlightedIndicesState.get()].sort(NumericAscendingSort));
+        };
+        highlightedIndicesState.addOnUpdateCallback(onHighlightedIndicesChanged, addToCleanup);
+        highlightedIndicesState.addOnUpdateCallback(onRowItemsHighlightedChanged, addToCleanup);
+        rowItemElementsState.addOnUpdateCallback(onRowItemsHighlightedChanged, addToCleanup);
+
+        
         const onRowItemsSelectedChanged = () => {
+            if (!styleSelectedValues) {
+                return;
+            }
+
             for (const rowItemElement of rowItemElementsState.get().values()) {
                 if (rowItemElement.dom) {
                     rowItemElement.dom.classList.remove("selected");
@@ -346,7 +406,7 @@ function LazySelector({
                 }
             }
 
-            onValuesSelected(realizedValuesSelected, [...selectedIndicesState.get()].sort(NumericAscendingSort));
+            onValuesSelected(realizedValuesSelected, [...selectedIndicesState.get()].sort(NumericAscendingSort), lastClickedIndexState.get());
         };
         selectedIndicesState.addOnUpdateCallback(onSelectedIndicesChanged, addToCleanup);
         selectedIndicesState.addOnUpdateCallback(onRowItemsSelectedChanged, addToCleanup);
@@ -411,85 +471,83 @@ function LazySelector({
                     } else {
                         rowItems.push(
                             rowItemElement.react(<div className={`lazy-selector-selectable-item${elementsSelectable ? " selectable" : ""}`}
-                                    title={customTitleRealizer(realizedValue)}
-                                    style={{
-                                        width: itemProperties.width,
-                                        lineHeight: `${itemProperties.height}px`,
-                                        height: itemProperties.height,
-                                        marginTop: itemProperties.verticalMargin,
-                                        marginBottom: itemProperties.verticalMargin,
-                                        marginLeft: itemProperties.horizontalMargin,
-                                        marginRight: itemProperties.horizontalMargin
-                                    }}
-                                    onClick={e => {
-                                        if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
-                                            return;
-                                        }
-                                        const selectedIndices = selectedIndicesState.get();
-                                        let newSelectedIndices;
+                                title={customTitleRealizer(realizedValue)}
+                                style={{
+                                    width: itemProperties.width,
+                                    lineHeight: `${itemProperties.height}px`,
+                                    height: itemProperties.height,
+                                    marginTop: itemProperties.verticalMargin,
+                                    marginBottom: itemProperties.verticalMargin,
+                                    marginLeft: itemProperties.horizontalMargin,
+                                    marginRight: itemProperties.horizontalMargin
+                                }}
+                                onClick={e => {
+                                    if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
+                                        return;
+                                    }
+                                    const highlightedIndices = highlightedIndicesState.get();
+                                    let newHighlightedIndices;
 
-                                        if (!multiSelect) {
-                                            lastClickedIndexState.set(itemIndex);
-                                            selectedIndices.clear();
-                                            selectedIndices.add(itemIndex);
-                                            selectedIndicesState.forceUpdate();
-                                        } else if (e.shiftKey) {
-                                            // Maintains prior state from before shift click
-                                            if (preShiftClickIndices === null) {
-                                                preShiftClickIndices = new Set(selectedIndices);
-                                                newSelectedIndices = selectedIndices;
-                                            } else {
-                                                newSelectedIndices = new Set(preShiftClickIndices);
-                                            }
-
-                                            let from = lastClickedIndexState.get();
-                                            let to = itemIndex;
-                                            if (from > to) {
-                                                const tmp = from;
-                                                from = to;
-                                                to = tmp;
-                                            }
-
-                                            for (; from <= to; ++from) {
-                                                newSelectedIndices.add(from);
-                                            }
-                                        } else if (e.ctrlKey) {
-                                            lastClickedIndexState.set(itemIndex);
-                                            newSelectedIndices = selectedIndices;
-                                            setToggle(newSelectedIndices, itemIndex);
-                                        } else if (!selectedIndices.has(itemIndex)) {
-                                            lastClickedIndexState.set(itemIndex);
-                                            newSelectedIndices = new Set([itemIndex]);
-                                        }
-
-                                        if (newSelectedIndices !== undefined) {
-                                            selectedIndicesState.set(newSelectedIndices);
-                                        }
-                                    }}
-                                    onDoubleClick={async (e) => {
-                                        if (e.ctrlKey) {
-                                            setToggle(selectedIndicesState.get(), itemIndex);
-                                            selectedIndicesState.forceUpdate();
-                                        }
-                                        
-                                        if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
-                                            return;
-                                        }
-
-                                        /** @type {R[]} */
-                                        const realizedValuesDoubleClicked = [];
-                                        if (realizeSelectedValues) {
-                                            for (const index of selectedIndicesState.get()) {
-                                                realizedValuesDoubleClicked.push(await realizedValues.get(index));
-                                            }
+                                    if (!multiHighlight) {
+                                        lastClickedIndexState.set(itemIndex);
+                                        highlightedIndices.clear();
+                                        highlightedIndices.add(itemIndex);
+                                        highlightedIndicesState.forceUpdate();
+                                    } else if (e.shiftKey && lastClickedIndexState.get() !== null) {
+                                        // Maintains prior state from before shift click
+                                        if (preShiftClickIndices === null) {
+                                            preShiftClickIndices = new Set(highlightedIndices);
+                                            newHighlightedIndices = highlightedIndices;
                                         } else {
-                                            for (const index of selectedIndicesState.get()) {
-                                                realizedValuesDoubleClicked.push(realizedValues.getOrUndefined(index));
-                                            }
+                                            newHighlightedIndices = new Set(preShiftClickIndices);
                                         }
 
-                                        onValuesDoubleClicked(realizedValuesDoubleClicked, [...selectedIndicesState.get()], itemIndex);
-                                    }}
+                                        let from = lastClickedIndexState.get();
+                                        let to = itemIndex;
+                                        if (from > to) {
+                                            const tmp = from;
+                                            from = to;
+                                            to = tmp;
+                                        }
+
+                                        for (; from <= to; ++from) {
+                                            newHighlightedIndices.add(from);
+                                        }
+                                    } else if (e.ctrlKey) {
+                                        lastClickedIndexState.set(itemIndex);
+                                        newHighlightedIndices = highlightedIndices;
+                                        setToggle(newHighlightedIndices, itemIndex);
+                                    } else if (!highlightedIndices.has(itemIndex)) {
+                                        lastClickedIndexState.set(itemIndex);
+                                        newHighlightedIndices = new Set([itemIndex]);
+                                    }
+
+                                    if (newHighlightedIndices !== undefined) {
+                                        highlightedIndicesState.set(newHighlightedIndices);
+                                    }
+                                }}
+                                onDoubleClick={async (e) => {
+                                    if (!e.target.classList.contains("lazy-selector-selectable-item") && !e.target.classList.contains("lazy-selector-selectable-item-portion")) {
+                                        return;
+                                    }
+                                    
+                                    const selectedIndices = selectedIndicesState.get();
+
+                                    if (!multiSelect) {
+                                        lastClickedIndexState.set(itemIndex);
+                                        selectedIndices.clear();
+                                        selectedIndices.add(itemIndex);
+                                        selectedIndicesState.forceUpdate();
+                                        return;
+                                    }
+
+                                    if (e.ctrlKey) {
+                                        setToggle(highlightedIndicesState.get(), itemIndex);
+                                        highlightedIndicesState.forceUpdate();
+                                    }
+                                    
+                                    selectedIndicesState.set(new Set(highlightedIndicesState.get()));
+                                }}
                             >
                                 {customItemComponent({realizedValue, index: itemIndex, setRealizedValue: (realizedValue) => {
                                     realizedValues.set(itemIndex, realizedValue);
@@ -563,13 +621,13 @@ function LazySelector({
             const newIndex = clamp(attemptedNewIndex, 0, valuesConstState.get().length - 1);
             if (newIndex !== lastClickedIndex) {
                 lastClickedIndexState.set(newIndex);
-                const selectedIndices = selectedIndicesState.get();
-                selectedIndices.clear();
-                selectedIndices.add(newIndex);
-                selectedIndicesState.forceUpdate();
+                const highlightedIndices = highlightedIndicesState.get();
+                highlightedIndices.clear();
+                highlightedIndices.add(newIndex);
+                highlightedIndicesState.forceUpdate();
             }
             if (attemptedNewIndex > newIndex) {
-                onSelectedPastEnd();        
+                onHighlightedPastEnd();        
             }
         }
 

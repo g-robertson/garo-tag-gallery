@@ -12,8 +12,6 @@ import { executeFunctions } from '../js/client-util.js';
  * @param {{
  *  items: T[]
  *  selectedItemsState: State<Set<T>>
- *  initialSelectedItemIndices?: number[]
- *  onSelectionChanged?: (selectedItems: T) => void
  *  customItemSelectedComponent: (param0: {realizedValue: T, index: number}) => JSX.Element
  *  itemSelectorHeaderComponent?: JSX.Element
  *  customItemSelectorComponent: (param0: {realizedValue: T, index: number}) => JSX.Element
@@ -44,14 +42,14 @@ const DualListboxLazyTextObjectSelector = ({
             <div style={{flex: 1}}>
                 {<LazyTextObjectSelector
                     textObjectsConstState={selectedItemsState.asTransform(selectedItems => [...selectedItems], addToCleanup)}
-                    onValuesDoubleClicked={((items) => {
+                    onValuesSelected={((items) => {
                         const selectedItems = selectedItemsState.get();
                         for (const item of items) {
                             selectedItems.delete(item);
                         }
                         selectedItemsState.forceUpdate();
                     })}
-                    multiSelect={true}
+                    multiHighlight={true}
                     customItemComponent={({realizedValue, index}) => customItemSelectedComponent({realizedValue, index})}
                     customTitleRealizer={customTitleRealizer}
                 />}
@@ -60,7 +58,7 @@ const DualListboxLazyTextObjectSelector = ({
             <div style={{marginTop: 8, flex: 3}}>
                 {<LazyTextObjectSelector
                     textObjectsConstState={ConstState.instance(items)}
-                    onValuesDoubleClicked={(items) => {
+                    onValuesSelected={(items) => {
                         const selectedItems = selectedItemsState.get();
                         for (const item of items) {
                             if (selectedItems.has(item)) {
@@ -71,7 +69,7 @@ const DualListboxLazyTextObjectSelector = ({
                         }
                         selectedItemsState.forceUpdate();
                     }}
-                    multiSelect={true}
+                    multiHighlight={true}
                     customItemComponent={customItemSelectorComponent}
                     customTitleRealizer={customTitleRealizer}
                 />}

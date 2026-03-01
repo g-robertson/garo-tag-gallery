@@ -48,10 +48,34 @@ export function insertSystemTag(systemTag) {
 }
 
 /**
+ * @param {DBJoinedLocalTagService} systemLocalTagService
+ */
+export function insertSystemLocalTagService(systemLocalTagService) {
+    return [
+        dbsqlcommand(`INSERT INTO Services(
+                Service_ID,
+                Service_Name
+            ) VALUES (
+                ?,
+                ?
+            );
+        `, [systemLocalTagService.Service_ID, systemLocalTagService.Service_Name]),
+        dbsqlcommand(`
+            INSERT INTO Local_Tag_Services(
+                Local_Tag_Service_ID,
+                Service_ID
+            ) VALUES (
+                ?,
+                ?
+            );
+        `, [systemLocalTagService.Local_Tag_Service_ID, systemLocalTagService.Service_ID])
+    ];
+}
+
+/**
  * @typedef {Object} DBLocalTagService
  * @property {number} Local_Tag_Service_ID
  * @property {number} Tag_Service_ID
- * @property {number} User_Editable
  */
 
 /**
@@ -196,7 +220,7 @@ export class LocalTagServices {
             permissionsToCheck
         );
 
-        return userSelectedPermissionedLocalTagServices.filter(dbLocalTagService => dbLocalTagService.User_Editable !== 0);
+        return userSelectedPermissionedLocalTagServices.filter(dbLocalTagService => dbLocalTagService.Local_Tag_Service_ID !== SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID);
     }
     
     /**

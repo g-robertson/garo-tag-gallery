@@ -1,23 +1,71 @@
-import { createFromLocalDownloaderLookupName, createFromLocalDownloaderServiceLookupName } from "../client/js/downloaders.js";
+import { createFromLocalDownloaderServiceLookupName } from "../client/js/downloaders.js";
 import { PERMISSIONS } from "../client/js/user.js";
-import { dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun } from "./db-util.js";
+import { dballselect, dbBeginTransaction, dbEndTransaction, dbget, dbrun, dbsqlcommand, dbvariablelist } from "./db-util.js";
 import { Services, ServicesUsersPermissions, userSelectAllSpecificTypedServicesHelper } from "./services.js";
-import { LocalTags } from "./tags.js";
+import { insertSystemTag, LocalTags } from "./tags.js";
+import { LocalURLParsers } from "./parsers.js";
+import { SYSTEM_LOCAL_DOWNLOADER_SERVICE } from "../client/js/defaults.js";
 
 /** @import {DBService} from "./services.js" */
 /** @import {Databases} from "./db-util.js" */
 /** @import {User} from "../client/js/user.js" */
+/** @import {DBLocalTag} from "./tags.js" */
+/** @import {DBLocalURLParser} from "./parsers.js" */
 
 /**
  * @typedef {Object} DBLocalDownloaderService
  * @property {number} Local_Downloader_Service_ID
- * @property {bigint} From_Local_LOCAL_DOWNLOADER_Tag_ID
- */
+ * 
+ * @typedef {DBLocalDownloaderService & DBService} DBJoinedLocalDownloaderService
+ * @typedef {DBJoinedLocalDownloaderService & {From_Local_Downloader_Service_Tag: DBLocalTag, Local_URL_Parsers: DBLocalURLParser[]}} TagMappedDBJoinedLocalDownloaderService
+ * @typedef {TagMappedDBJoinedLocalDownloaderService & {Permissions: Set<string>}} DBPermissionedLocalDownloaderService
+ **/
 
 /**
- * @typedef {DBLocalDownloaderService & DBService} DBJoinedLocalDownloaderService
+ * @param {TagMappedDBJoinedLocalDownloaderService} systemLocalDownloaderService
  */
-/** @typedef {DBJoinedLocalDownloaderService & {Permissions: Set<string>}} DBPermissionedLocalDownloaderService */
+export function insertSystemLocalDownloaderService(systemLocalDownloaderService) {
+    return [
+        ...insertSystemTag(systemLocalDownloaderService.From_Local_Downloader_Service_Tag),
+        dbsqlcommand(`INSERT INTO Services(
+                Service_ID,
+                Service_Name
+            ) VALUES (
+                ?,
+                ?
+            );
+        `, [systemLocalDownloaderService.Service_ID, systemLocalDownloaderService.Service_Name]),
+        dbsqlcommand(`
+            INSERT INTO Local_Downloader_Services(
+                Local_Downloader_Service_ID,
+                Service_ID
+            ) VALUES (
+                ?,
+                ?
+            );
+        `, [systemLocalDownloaderService.Local_Downloader_Service_ID, systemLocalDownloaderService.Service_ID])
+    ];
+}
+
+/**
+ * @param {Databases} dbs
+ * @param {DBJoinedLocalDownloaderService[]} localDownloaderServices
+ */
+async function mapLocalDownloaderServices(dbs, localDownloaderServices) {
+    const localURLParsers = await LocalURLParsers.selectManyByLocalDownloaderServiceIDs(dbs, localDownloaderServices.map(localDownloaderService => localDownloaderService.Local_Downloader_Service_ID));
+    const tagMappings = await LocalDownloaderServices.selectTagMappings(dbs, localDownloaderServices.map(localDownloaderService => localDownloaderService.Local_Downloader_Service_ID));
+    /** @type {Map<number, DBLocalURLParser[]>} */
+    const localDownloaderServiceToLocalURLParsersMap = new Map(localDownloaderServices.map(localDownloaderService => [localDownloaderService.Local_Downloader_Service_ID, []]));
+    for (const localURLParser of localURLParsers) {
+        localDownloaderServiceToLocalURLParsersMap.get(localURLParser.Local_Downloader_Service_ID).push(localURLParser);
+    }
+
+    return localDownloaderServices.map((localDownloaderService, i) => ({
+        ...localDownloaderService,
+        From_Local_Downloader_Service_Tag: tagMappings[i],
+        Local_URL_Parsers: localDownloaderServiceToLocalURLParsersMap.get(localDownloaderService.Local_Downloader_Service_ID)
+    }));
+}
 
 export class LocalDownloaderServices {
     /**
@@ -38,6 +86,33 @@ export class LocalDownloaderServices {
 
     /**
      * @param {Databases} dbs 
+     * @param {number[]} localURLParserIDs
+     */
+    static async selectManyByLocalDownloaderIDs(dbs, localURLParserIDs) {
+        if (localURLParserIDs.length === 0) {
+            return [];
+        }
+
+        return await mapLocalDownloaderServices(dbs, await dballselect(dbs, `
+            SELECT DISTINCT LDS.*, S.*
+            FROM Local_Downloader_Services LDS
+            JOIN Services S ON LDS.Service_ID = S.Service_ID
+            JOIN Local_URL_Parsers LUP ON LDS.Local_Downloader_Service_ID = LUP.Local_Downloader_Service_ID
+            WHERE Local_URL_Parser_ID IN ${dbvariablelist(localURLParserIDs.length)}
+            `, localURLParserIDs
+        ));
+    }
+    
+    /**
+     * @param {Databases} dbs 
+     * @param {number} localURLParserID
+     */
+    static async selectByLocalDownloaderID(dbs, localURLParserID) {
+        return (await LocalDownloaderServices.selectManyByLocalDownloaderIDs(dbs, [localURLParserID]))[0];
+    }
+
+    /**
+     * @param {Databases} dbs 
      * @param {number[]} localDownloaderServiceIDs
      */
     static async selectManyByIDs(dbs, localDownloaderServiceIDs) {
@@ -45,31 +120,30 @@ export class LocalDownloaderServices {
             return [];
         }
 
-        /** @type {DBJoinedLocalDownloaderService[]} */
-        const localDownloaderServices = await dballselect(dbs, `
-            SELECT *
-              FROM Local_Downloader_Services LUGS
-              JOIN Services S ON LUGS.Service_ID = S.Service_ID
-              WHERE LUGS.Local_Downloader_Service_ID IN ${dbvariablelist(localDownloaderServiceIDs.length)};`, localDownloaderServiceIDs
-        );
-
-        return localDownloaderServices;
+        return await mapLocalDownloaderServices(dbs, await dballselect(dbs, `
+            SELECT LDS.*, S.*
+            FROM Local_Downloader_Services LDS
+            JOIN Services S ON LDS.Service_ID = S.Service_ID
+            WHERE LDS.Local_Downloader_Service_ID IN ${dbvariablelist(localDownloaderServiceIDs.length)};`,
+            localDownloaderServiceIDs
+        ));
     }
-
     /**
      * @param {Databases} dbs 
+     * @param {number} localDownloaderServiceID
      */
-    static async selectAll(dbs) {
-        /** @type {DBJoinedLocalDownloaderService[]} */
-        const localDownloaderServices = await dballselect(dbs, `
-            SELECT *
-              FROM Local_Downloader_Services LUGS
-              JOIN Services S ON LUGS.Service_ID = S.Service_ID;
-        `);
-        return localDownloaderServices;
+    static async selectByID(dbs, localDownloaderServiceID) {
+        return (await LocalDownloaderServices.selectManyByIDs(dbs, [localDownloaderServiceID]))[0];
     }
 
-    
+    static async selectAll(dbs) {
+        return await mapLocalDownloaderServices(dbs, await dballselect(dbs, `
+            SELECT LDS.*, S.*
+            FROM Local_Downloader_Services LDS
+            JOIN Services S ON LDS.Service_ID = S.Service_ID;
+        `));
+    }
+
     /**
      * @param {Databases} dbs 
      * @param {User} user
@@ -77,39 +151,31 @@ export class LocalDownloaderServices {
      * @param {number[]} localDownloaderServiceIDs
      */
     static async userSelectManyByIDs(dbs, user, permissionsToCheck, localDownloaderServiceIDs) {
-        if (localDownloaderServiceIDs.length === 0) {
-            return [];
-        }
-
         if (user.isSudo() || user.hasPermissions(permissionsToCheck)) {
             return await LocalDownloaderServices.selectManyByIDs(dbs, localDownloaderServiceIDs);
         }
 
-        /** @type {DBJoinedLocalDownloaderService[]} */
-        const localDownloaderServices = await dballselect(dbs, `
-            SELECT LUGS.*, S.*
-            FROM Local_Downloader_Services LUGS
-            JOIN Services_Users_Permissions SUP ON LUGS.Service_ID = SUP.Service_ID
-            JOIN Services S ON LUGS.Service_ID = S.Service_ID
+        return await mapLocalDownloaderServices(dbs, await dballselect(dbs, `
+            SELECT LDS.*, S.*
+            FROM Local_Downloader_Services LDS
+            JOIN Services_Users_Permissions SUP ON LDS.Service_ID = SUP.Service_ID
+            JOIN Services S ON LDS.Service_ID = S.Service_ID
             WHERE (
                 SELECT COUNT(1)
                 FROM Services_Users_Permissions SUP
-                WHERE LMS.Service_ID = SUP.Service_ID
+                WHERE LDS.Service_ID = SUP.Service_ID
                 AND SUP.User_ID = ?
                 AND SUP.Permission IN ${dbvariablelist(permissionsToCheck.length)}
             ) = ?
-            AND LUGS.Local_Downloader_Service_ID IN ${dbvariablelist(localDownloaderServiceIDs.length)};
+            AND LDS.Local_Downloader_Service_ID IN ${dbvariablelist(localDownloaderServiceIDs.length)}
         `, [
             user.id(),
-            permissionsToCheck,
+            ...permissionsToCheck,
             permissionsToCheck.length,
             ...localDownloaderServiceIDs
-        ]);
-
-        return localDownloaderServices;
+        ]));
     }
 
-    
     /**
      * @param {Databases} dbs 
      * @param {User} user 
@@ -119,40 +185,40 @@ export class LocalDownloaderServices {
     static async userSelectByID(dbs, user, permissionsToCheck, localDownloaderServiceID) {
         return (await LocalDownloaderServices.userSelectManyByIDs(dbs, user, permissionsToCheck, [localDownloaderServiceID]))[0];
     }
-    
+
     /**
-     * @param {Databases} dbs 
+     * @param {Databases} dbs
      * @param {User} user 
-     * @param {string[]=} permissionsToCheck
+     * @param {=} permissionsToCheck
      */
     static async userSelectAll(dbs, user, permissionsToCheck) {
-        return await userSelectAllSpecificTypedServicesHelper(
+        return (await userSelectAllSpecificTypedServicesHelper(
             dbs,
             user,
             LocalDownloaderServices.selectAll,
             async () => {
                 return await dballselect(dbs, `
-                    SELECT LUGS.Local_Downloader_Service_ID, SUP.Permission
-                      FROM Local_Downloader_Services LUGS
-                      JOIN Services_Users_Permissions SUP ON LUGS.Service_ID = SUP.Service_ID
-                     WHERE SUP.User_ID = ?;
+                    SELECT LDS.Local_Downloader_Service_ID, SUP.Permission
+                    FROM Local_Downloader_Services LDS
+                    JOIN Services_Users_Permissions SUP ON LDS.Service_ID = SUP.Service_ID
+                    WHERE SUP.User_ID = ?;
                 `, [user.id()]);
             },
             "Local_Downloader_Service_ID",
             permissionsToCheck
-        );
+        )).filter(localDownloaderService => localDownloaderService.Local_Downloader_Service_ID !== SYSTEM_LOCAL_DOWNLOADER_SERVICE.Local_Downloader_Service_ID);
     }
-    
+
     /**
      * @param {Databases} dbs
-     * @param {User} user
+     * @param {number} user
      * @param {string} serviceName
      */
-    static async userInsert(dbs, user, serviceName) {
+    static async userInsert(dbs, userID, serviceName) {
         dbs = await dbBeginTransaction(dbs);
 
         const serviceID = await Services.insert(dbs, serviceName);
-        await ServicesUsersPermissions.insertMany(dbs, serviceID, user.id(), Object.values(PERMISSIONS.LOCAL_DOWNLOADER_SERVICES).map(permission => permission.name));
+        await ServicesUsersPermissions.insertMany(dbs, serviceID, userID, Object.values(PERMISSIONS.LOCAL_METRIC_SERVICES).map(permission => permission.name));
 
         /** @type {number} */
         const localDownloaderServiceID = (await dbget(dbs, `
@@ -166,55 +232,35 @@ export class LocalDownloaderServices {
         await LocalTags.insertSystemTag(dbs, createFromLocalDownloaderServiceLookupName(localDownloaderServiceID));
 
         await dbEndTransaction(dbs);
+
+        return localDownloaderServiceID;
     }
-}
 
-/**
- * @typedef {Object} PreInsertLocalDownloader
- * @property {string} Local_LOCAL_DOWNLOADER_Name
- * @property {string} Local_LOCAL_DOWNLOADER_JSON
- */
+    /**
+     * @param {Databases} dbs
+     * @param {number} localDownloaderServiceID
+     * @param {string} serviceName
+     */
+    static async update(dbs, localDownloaderServiceID, serviceName) {
+        const localDownloaderService = await LocalDownloaderServices.selectByID(dbs, localDownloaderServiceID);
+        await Services.update(dbs, localDownloaderService.Service_ID, serviceName);
 
-export class LocalDownloader {
-    static async update(dbs, localDownloaderID, preInsertLocalDownloader) {
-        await dbrun(dbs, `
-            UPDATE Local_LOCAL_DOWNLOADERs
-               SET Local_LOCAL_DOWNLOADER_Name = ?,
-                   Local_LOCAL_DOWNLOADER_JSON = ?
-             WHERE Local_LOCAL_DOWNLOADER_ID = ?;
-        `, [
-            preInsertLocalDownloader.Local_LOCAL_DOWNLOADER_Name,
-            preInsertLocalDownloader.Local_LOCAL_DOWNLOADER_JSON,
-            localDownloaderID
-        ])
+        return localDownloaderServiceID;
     }
 
     /**
      * @param {Databases} dbs 
-     * @param {PreInsertLocalDownloader} preInsertLocalDownloader 
      * @param {number} localDownloaderServiceID 
      */
-    static async insert(dbs, preInsertLocalDownloader, localDownloaderServiceID) {
+    static async deleteByID(dbs, localDownloaderServiceID) {
         dbs = await dbBeginTransaction(dbs);
 
-        /** @type {number} */
-        const localDownloaderID = (await dbget(dbs, `
-            INSERT INTO Local_LOCAL_DOWNLOADERs(
-                Local_Downloader_Service_ID,
-                Local_LOCAL_DOWNLOADER_Name,
-                Local_LOCAL_DOWNLOADER_JSON
-            ) VALUES (
-                $localDownloaderServiceID,
-                $localDownloaderName,
-                $localDownloaderJSON
-            ) RETURNING Local_LOCAL_DOWNLOADER_ID;
-        `, [
-            preInsertLocalDownloader.Local_LOCAL_DOWNLOADER_Name,
-            preInsertLocalDownloader.Local_LOCAL_DOWNLOADER_JSON,
-            localDownloaderServiceID,
-        ])).Local_LOCAL_DOWNLOADER_ID;
-        
-        await LocalTags.insertSystemTag(dbs, createFromLocalDownloaderLookupName(localDownloaderID));
+        const localDownloaderService = await LocalDownloaderServices.selectByID(dbs, localDownloaderServiceID);
+
+        await Services.deleteByID(dbs, localDownloaderService.Service_ID);
+        await LocalURLParsers.deleteManyByIDs(dbs, localDownloaderService.Local_URL_Parsers.map(localURLParser => localURLParser.Local_URL_Parser_ID));
+        await LocalTags.deleteSystemTag(dbs, createFromLocalDownloaderServiceLookupName(localDownloaderServiceID));
+        await dbrun(dbs, "DELETE FROM Local_Downloader_Services WHERE Local_Downloader_Service_ID = ?;", [localDownloaderServiceID]);
 
         await dbEndTransaction(dbs);
     }

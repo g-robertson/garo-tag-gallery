@@ -255,10 +255,10 @@ const DuplicatesProcessingPage = ({page}) => {
                 <div style={{flex: 1}}>
                     <LazyDedupePreviewGallery
                         fileComparisonPairsConstState={potentialDuplicateFileComparisonsPendingConstState}
-                        onValuesSelected={(_, indices) => {
+                        onValuesHighlighted={(_, indices) => {
                             potentialDuplicateIndicesSelectedState.set(indices);
                         }}
-                        onValuesDoubleClicked={openNewDedupeGallery}
+                        onValuesSelected={openNewDedupeGallery}
                     />
                 </div>
             </div>

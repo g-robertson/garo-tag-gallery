@@ -6,31 +6,39 @@ import LazySelector from "./lazy-selector.jsx";
  * @template T
  * @param {{
  *  textObjectsConstState: ConstState<T[]>
+ *  onValuesHighlighted?: (valuesSelected: T[], indicesSelected: number[]) => void
  *  onValuesSelected?: (valuesSelected: T[], indicesSelected: number[]) => void
- *  onValuesDoubleClicked?: (valuesSelected: T[], indicesSelected: number[]) => void
  *  customItemComponent?: (param0: {realizedValue: T, index: number}) => JSX.Element
  *  customTitleRealizer?: (value: T) => string
+ *  multiHighlight?: boolean
  *  multiSelect?: boolean
+ *  styleSelectedValues?: boolean
  *  elementsSelectable?: boolean
  *  scrollbarWidth?: number
  * }} param0
  */
 const LazyTextObjectSelector = ({
     textObjectsConstState,
+    onValuesHighlighted,
     onValuesSelected,
-    onValuesDoubleClicked,
     customItemComponent,
     customTitleRealizer,
+    multiHighlight,
     multiSelect,
+    styleSelectedValues,
     elementsSelectable,
     scrollbarWidth
 }) => {
+    multiHighlight ??= false;
+    multiSelect ??= multiHighlight;
+    styleSelectedValues ??= false;
+    elementsSelectable ??= true;
     scrollbarWidth ??= 17;
     customItemComponent ??= ({realizedValue}) => (<>{realizedValue.displayName}</>);
     return <LazySelector
         valuesConstState={textObjectsConstState}
-        onValuesDoubleClicked={onValuesDoubleClicked}
         onValuesSelected={onValuesSelected}
+        onValuesHighlighted={onValuesHighlighted}
         customItemComponent={customItemComponent}
         valuesRealizer={(values) => values}
         valueRealizationRange={Infinity}
@@ -40,8 +48,10 @@ const LazyTextObjectSelector = ({
             width: "100%",
             height: 20
         }}
-        multiSelect={multiSelect ?? false}
-        elementsSelectable={elementsSelectable ?? true}
+        multiHighlight={multiHighlight}
+        multiSelect={multiSelect}
+        styleSelectedValues={styleSelectedValues}
+        elementsSelectable={elementsSelectable}
         scrollbarWidth={scrollbarWidth}
     />
 }

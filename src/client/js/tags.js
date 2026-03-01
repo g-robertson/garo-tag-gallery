@@ -45,8 +45,8 @@ export function normalizeFileExtension(fileExtension) {
     if (fileExtension === ".jpeg") {
         return ".jpg";
     }
-    if (fileExtension === ".tif") {
-        return ".tiff";
+    if (fileExtension === ".tiff") {
+        return ".tif";
     }
 
     return fileExtension;

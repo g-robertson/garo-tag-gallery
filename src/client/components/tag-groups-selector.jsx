@@ -20,14 +20,14 @@ import MultiSelect from "./multi-select.jsx";
 
 /**
  * @param {{
- *  multiSelect?: boolean
+ *  multiHighlight?: boolean
  *  onTagGroupsSelected?: (tagGroups: DisplayClientExpressionList[]) => void
  * }} param0
  */
-const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
+const TagGroupsSelector = ({multiHighlight, onTagGroupsSelected}) => {
     /** @type {(() => {})[]} */
     const addToCleanup = [];
-    multiSelect ??= true;
+    multiHighlight ??= true;
     onTagGroupsSelected ??= () => {};
     const NAMESPACES_SELECTED = 0;
     const METRIC_RATINGS_SELECTED = 1;
@@ -89,12 +89,12 @@ const TagGroupsSelector = ({multiSelect, onTagGroupsSelected}) => {
             <div style={{flex: 5}}>
                 {<LazyTextObjectSelector
                     textObjectsConstState={tagGroupsConstState}
-                    onValuesDoubleClicked={(valuesSelected) => {
+                    onValuesSelected={(valuesSelected) => {
                         onTagGroupsSelected(valuesSelected);
                     }}
                     customItemComponent={({realizedValue}) => <>{realizedValue.displayName}</>}
                     customTitleRealizer={(realizedValue) => realizedValue.displayName}
-                    multiSelect={multiSelect}
+                    multiHighlight={multiHighlight}
                 />}
             </div>
         </div>

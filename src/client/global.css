@@ -8,12 +8,16 @@
     --hover-background: #555;
 
     --background-layered: #444;
-    --hover-background-layered: #222;
+    --hover-background-layered: #999;
 
     --foreground-layered: #fff;
-    --foreground-layered-alt: #fff;
+    --foreground-layered-alt: #ddd;
+    --foreground-gold-layered: #c6ba18;
+    --foreground-gold-layered-alt: #918910;
+    --foreground-light-gold-layered: #cac359;
+    --foreground-light-gold-layered-alt: #9f9a4b;
 
-    --background-layered-alt: #666;
+    --background-layered-alt: #333;
     --hover-background-layered-alt: #888;
 
     --accent-background-layered: #6e6b4a;
@@ -229,25 +233,41 @@ div {
     cursor: pointer;
 }
 
-.lazy-selector-selectable-item:nth-child(even) {
+:nth-child(even) > .lazy-selector-selectable-item {
     background-color: var(--background-layered);
 }
-.lazy-selector-selectable-item.selectable:nth-child(even):hover {
+:nth-child(even) > .lazy-selector-selectable-item.selectable:hover {
     background-color: var(--hover-background-layered);
 }
-.lazy-selector-selectable-item:nth-child(even).selectable.selected {
+:nth-child(even) > .lazy-selector-selectable-item.selectable.highlighted {
     background-color: var(--foreground-layered);
     color: var(--background-layered);
 }
+:nth-child(even) > .lazy-selector-selectable-item.selectable.selected {
+    background-color: var(--foreground-gold-layered);
+    color: var(--background-layered);
+}
+:nth-child(even) > .lazy-selector-selectable-item.selectable.highlighted.selected {
+    background-color: var(--foreground-light-gold-layered);
+    color: var(--background-layered);
+}
 
-.lazy-selector-selectable-item:nth-child(odd) {
+:nth-child(odd) > .lazy-selector-selectable-item {
     background-color: var(--background-layered-alt);
 }
-.lazy-selector-selectable-item.selectable:nth-child(odd):hover {
+:nth-child(odd) > .lazy-selector-selectable-item.selectable:hover {
     background-color: var(--hover-background-layered-alt);
 }
-.lazy-selector-selectable-item:nth-child(odd).selectable.selected {
+:nth-child(odd) > .lazy-selector-selectable-item.selectable.highlighted {
     background-color: var(--foreground-layered-alt);
+    color: var(--background-layered-alt);
+}
+:nth-child(odd) > .lazy-selector-selectable-item.selectable.selected {
+    background-color: var(--foreground-gold-layered-alt);
+    color: var(--background-layered-alt);
+}
+:nth-child(odd) > .lazy-selector-selectable-item.selectable.highlighted.selected {
+    background-color: var(--foreground-light-gold-layered);
     color: var(--background-layered-alt);
 }
 

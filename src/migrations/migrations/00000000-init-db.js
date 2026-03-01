@@ -1,9 +1,12 @@
 import {dbGenerateAccessKey, dbsqlcommand} from "../../db/db-util.js"
 import { DEFAULT_ADMINISTRATOR_PERMISSION_ID, DEFAULT_ADMINISTRATOR_USER_ID } from "../../db/user.js";
-import { insertSystemTag } from "../../db/tags.js";
-import { DEFAULT_LOCAL_TAG_SERVICE, DEFAULT_LOCAL_TAGGABLE_SERVICE, SYSTEM_LOCAL_TAG_SERVICE, DEFAULT_TAGS, DEFAULT_LOCAL_METRICS } from "../../client/js/defaults.js";
+import { insertSystemLocalTagService, insertSystemTag } from "../../db/tags.js";
+import { DEFAULT_LOCAL_TAG_SERVICE, DEFAULT_LOCAL_TAGGABLE_SERVICE, SYSTEM_LOCAL_TAG_SERVICE, SYSTEM_LOCAL_DOWNLOADER_SERVICE, SYSTEM_LOCAL_METRIC_SERVICE, __MIGRATE_DEFAULT_LOCAL_URL_PARSERS, __MIGRATE_DEFAULT_LOCAL_METRICS, __MIGRATE_DEFAULT_TAGS } from "../../client/js/defaults.js";
 import { PERMISSIONS } from "../../client/js/user.js";
-import { insertSystemMetric } from "../../db/metrics.js";
+import { insertSystemLocalMetricService, insertSystemMetric } from "../../db/metrics.js";
+import { insertSystemURLParser } from "../../db/parsers.js";
+import { insertSystemLocalTaggableService } from "../../db/taggables.js";
+import { insertSystemLocalDownloaderService } from "../../db/downloaders.js";
 
 const accessKey = dbGenerateAccessKey();
 
@@ -99,51 +102,11 @@ export const MIGRATION = {
         dbsqlcommand(`
             CREATE TABLE Local_Tag_Services(
                 Local_Tag_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Service_ID INTEGER NOT NULL,
-                User_Editable INTEGER NOT NULL DEFAULT 1
+                Service_ID INTEGER NOT NULL
             );
         `),
-        dbsqlcommand(`
-            INSERT INTO Services(
-                Service_ID,
-                Service_Name
-            ) VALUES (
-                ?,
-                ?
-            ), (
-                ?,
-                ?
-            ), (
-                ?,
-                'system:reserved:user should not see'
-            );
-        `, [
-            SYSTEM_LOCAL_TAG_SERVICE.Service_ID,
-            SYSTEM_LOCAL_TAG_SERVICE.Service_Name,
-            DEFAULT_LOCAL_TAG_SERVICE.Service_ID,
-            DEFAULT_LOCAL_TAG_SERVICE.Service_Name,
-            0xFFFF
-        ]),
-        dbsqlcommand(`
-            INSERT INTO Local_Tag_Services(
-                Local_Tag_Service_ID,
-                Service_ID,
-                User_Editable
-            ) VALUES (
-                ?,
-                ?,
-                0
-            ), (
-                ?,
-                ?,
-                1
-            );
-        `, [
-            SYSTEM_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
-            SYSTEM_LOCAL_TAG_SERVICE.Service_ID,
-            DEFAULT_LOCAL_TAG_SERVICE.Local_Tag_Service_ID,
-            DEFAULT_LOCAL_TAG_SERVICE.Service_ID,
-    ]),
+        ...insertSystemLocalTagService(SYSTEM_LOCAL_TAG_SERVICE),
+        ...insertSystemLocalTagService(DEFAULT_LOCAL_TAG_SERVICE),
         dbsqlcommand(`
             CREATE TABLE Tags(
                 Tag_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,7 +124,7 @@ export const MIGRATION = {
                 Display_Name TEXT NOT NULL
             );
         `),
-        ...DEFAULT_TAGS.map(insertSystemTag).flat(),
+        ...__MIGRATE_DEFAULT_TAGS.map(insertSystemTag).flat(),
         dbsqlcommand(`
             CREATE TABLE Namespaces(
                 Namespace_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,23 +146,7 @@ export const MIGRATION = {
                 Service_ID INTEGER NOT NULL
             );
         `),
-        dbsqlcommand(`INSERT INTO Services(
-                Service_ID,
-                Service_Name
-            ) VALUES (
-                ?,
-                ?
-            );
-        `, [DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_ID, DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_Name]),
-        dbsqlcommand(`
-            INSERT INTO Local_Taggable_Services(
-                Local_Taggable_Service_ID,
-                Service_ID
-            ) VALUES (
-                ?,
-                ?
-            );
-        `, [DEFAULT_LOCAL_TAGGABLE_SERVICE.Local_Taggable_Service_ID, DEFAULT_LOCAL_TAGGABLE_SERVICE.Service_ID]),
+        ...insertSystemLocalTaggableService(DEFAULT_LOCAL_TAGGABLE_SERVICE),
         dbsqlcommand(`
             CREATE TABLE Taggables(
                 Taggable_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -305,10 +252,10 @@ export const MIGRATION = {
         dbsqlcommand(`
             CREATE TABLE Local_Metric_Services(
                 Local_Metric_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Service_ID INTEGER NOT NULL,
-                User_Editable INTEGER NOT NULL
+                Service_ID INTEGER NOT NULL
             ); 
         `),
+        ...insertSystemLocalMetricService(SYSTEM_LOCAL_METRIC_SERVICE),
         dbsqlcommand(`
             CREATE TABLE Local_Metrics(
                 Local_Metric_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -329,28 +276,31 @@ export const MIGRATION = {
                 Applied_Value REAL NOT NULL
             );
         `),
-        ...DEFAULT_LOCAL_METRICS.map(insertSystemMetric).flat(),
+        ...__MIGRATE_DEFAULT_LOCAL_METRICS.map(insertSystemMetric).flat(),
         dbsqlcommand(`
             CREATE TABLE Local_Downloader_Services(
                 Local_Downloader_Service_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Service_ID INTEGER NOT NULL
             );
         `),
+        ...insertSystemLocalDownloaderService(SYSTEM_LOCAL_DOWNLOADER_SERVICE),
         dbsqlcommand(`
             CREATE TABLE Local_URL_Parsers(
-                Local_URL_Parsers_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Local_URL_Parser_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Local_Downloader_Service_ID INTEGER NOT NULL,
                 Local_URL_Parser_Name TEXT NOT NULL,
-                LocaL_URL_Parser_URL_Classifier_JSON TEXT NOT NULL,
-                LocaL_URL_Parser_Content_Parser_JSON TEXT NOT NULL
+                Local_URL_Parser_URL_Classifier_JSON TEXT NOT NULL,
+                Local_URL_Parser_Content_Parser_JSON TEXT NOT NULL, 
+                Local_URL_Parser_Priority INTEGER NOT NULL
             );
         `),
+        ...__MIGRATE_DEFAULT_LOCAL_URL_PARSERS.map(insertSystemURLParser).flat(),
         dbsqlcommand(`
-            CREATE TABLE Local_LOCAL_DOWNLOADERs(
-                Local_LOCAL_DOWNLOADERs_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE URL_Generators(
+                URL_Generators_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Local_Downloader_Service_ID INTEGER NOT NULL,
-                Local_LOCAL_DOWNLOADER_Name TEXT NOT NULL,
-                LocaL_LOCAL_DOWNLOADER_URL_Pattern_JSON TEXT NOT NULL
+                URL_Generator_Name TEXT NOT NULL,
+                URL_Generator_URL_Pattern_JSON TEXT NOT NULL
             );
         `)
     ]

@@ -137,9 +137,9 @@ export function BySelectableTag(tag) {
     }});
 }
 
-export function BySelectedTag() {
+export function ByHighlightedTag() {
     return xpathHelper({attrContains: {"class": "local-tags-selector"}, descendent: {
-        attrContains: {"class": ["lazy-selector-selectable-item", "selected"]},
+        attrContains: {"class": ["lazy-selector-selectable-item", "highlighted"]},
         attrExists: ["title"],
     }});
 }

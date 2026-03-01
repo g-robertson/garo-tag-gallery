@@ -51,7 +51,7 @@ export default function ChangeTagToMetricModal() {
                 <LocalTagsSelector
                     localTagServicesConstState={localTagServicesConstState}
                     selectedLocalTagServiceIDsState={selectedLocalTagServiceIDsState}
-                    multiSelect={false}
+                    multiHighlight={false}
                     excludeable={false}
                     onTagsSelected={(tags) => {
                         tagState.set(tags[0]);

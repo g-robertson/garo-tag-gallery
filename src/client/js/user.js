@@ -150,9 +150,10 @@ export class User {
     #localTagServices = new State();
     /** @type {State<DBJoinedUser['Local_Taggable_Services']} */
     #localTaggableServices = new State();
-    #localDownloaderServices;
     /** @type {State<DBJoinedUser['Local_Metric_Services']} */
     #localMetricServices = new State();
+    /** @type {State<DBJoinedUser['Local_Downloader_Services']} */
+    #localDownloaderServices = new State();
 
     #pages;
 
@@ -171,8 +172,7 @@ export class User {
         this.#localTagServices.set(json.Local_Tag_Services ?? []);
         this.#localTaggableServices.set(json.Local_Taggable_Services ?? []);
         this.#localMetricServices.set(json.Local_Metric_Services ?? []);
-        this.#localDownloaderServices = json.Local_Downloader_Services ?? [];
-
+        this.#localDownloaderServices.set(json.Local_Downloader_Services ?? []);
         this.#pages = json.JSON_Pages;
         this.#permissions = new Set(json.Permissions);
     }
@@ -195,6 +195,7 @@ export class User {
         User.#Gl_User.#localTagServices.consume(oldGlobal.#localTagServices);
         User.#Gl_User.#localTaggableServices.consume(oldGlobal.#localTaggableServices);
         User.#Gl_User.#localMetricServices.consume(oldGlobal.#localMetricServices);
+        User.#Gl_User.#localDownloaderServices.consume(oldGlobal.#localDownloaderServices);
     }
 
     static async refreshGlobal() {
@@ -276,7 +277,7 @@ export class User {
      * @param {ReturnType<typeof this.localTaggableServices>} localTaggableServices 
      */
     setLocalTaggableServices(localTaggableServices) {
-        this.#localTaggableServices = localTaggableServices;
+        this.#localTaggableServices.set(localTaggableServices);
     }
 
     localMetricServices() {
@@ -295,14 +296,18 @@ export class User {
     }
 
     localDownloaderServices() {
-        return this.#localDownloaderServices;
+        return this.#localDownloaderServices.get();
+    }
+
+    localDownloaderServicesState() {
+        return this.#localDownloaderServices.asConst();
     }
 
     /**
      * @param {ReturnType<typeof this.localDownloaderServices>} localDownloaderServices 
      */
     setLocalDownloaderServices(localDownloaderServices) {
-        this.#localDownloaderServices = localDownloaderServices;
+        this.#localDownloaderServices.set(localDownloaderServices);
     }
 
     pages() {
@@ -352,9 +357,9 @@ export class User {
             Is_Administrator: this.#isAdmin,
 
             Local_Tag_Services: this.#localTagServices.get(),
-            Local_Taggable_Services: this.#localTaggableServices,
+            Local_Taggable_Services: this.#localTaggableServices.get(),
             Local_Metric_Services: this.#localMetricServices.get(),
-            Local_Downloader_Services: this.#localDownloaderServices,
+            Local_Downloader_Services: this.#localDownloaderServices.get(),
 
             JSON_Pages: this.#pages,
             Permissions: [...this.#permissions]

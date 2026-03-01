@@ -57,7 +57,6 @@ const LazyGallery = ({taggableIDs, initialTaggableIndex}) => {
                 {MetricsElement.react(<div style={{position: "absolute", top: "3vh", right: "0", flexDirection: "column"}} onAdd={() => {
                     /** @type {(() => void)[]} */
                     const addToCleanup = [];
-
                     const metricsValuesMapState = new State(new Map(realizedValue.Metrics.map(metric => [metric.Local_Metric_ID, metric])));
                     const metricStarsHoveredState = new State({localMetricID: -1, starsHovered: -1})
 

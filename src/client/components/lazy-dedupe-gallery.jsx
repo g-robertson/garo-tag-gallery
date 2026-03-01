@@ -162,7 +162,7 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
         {imagePreloader.reactElement()}
         <LazySelector
             valuesConstState={ConstState.instance(fileComparisons)}
-            realizeSelectedValues={false}
+            realizeHighlightedValues={false}
             valuesRealizer={async (values) => {
                 /** @type {Set<number>} */
                 const filesSet = new Set();
@@ -190,7 +190,7 @@ const LazyDedupeGallery = ({fileComparisons, initialFileComparisonIndex, persist
 
                 imagePreloader.setPreload(preloadImages);
             }}
-            onSelectedPastEnd={async () => {
+            onHighlightedPastEnd={async () => {
                 const OPTION_COMMIT_CHANGES = 1;
                 const OPTION_GO_BACK = 2;
 

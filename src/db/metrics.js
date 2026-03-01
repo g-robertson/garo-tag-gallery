@@ -54,22 +54,44 @@ export function insertSystemMetric(systemMetric) {
 }
 
 /**
- * @typedef {Object} DBLocalMetricService
- * @property {number} Local_Metric_Service_ID
- * @property {number} Service_ID
- * @property {DBLocalMetric[]} Local_Metrics
+ * @param {TagMappedDBJoinedLocalMetricService} systemLocalMetricService
  */
+export function insertSystemLocalMetricService(systemLocalMetricService) {
+    return [
+        ...insertSystemTag(systemLocalMetricService.Has_Metric_From_Local_Metric_Service_Tag),
+        dbsqlcommand(`INSERT INTO Services(
+                Service_ID,
+                Service_Name
+            ) VALUES (
+                ?,
+                ?
+            );
+        `, [systemLocalMetricService.Service_ID, systemLocalMetricService.Service_Name]),
+        dbsqlcommand(`
+            INSERT INTO Local_Metric_Services(
+                Local_Metric_Service_ID,
+                Service_ID
+            ) VALUES (
+                ?,
+                ?
+            );
+        `, [systemLocalMetricService.Local_Metric_Service_ID, systemLocalMetricService.Service_ID])
+    ];
+}
+
 
 /**
- * @typedef {DBLocalMetricService & DBService & {
- *     Has_Metric_From_Local_Metric_Service_Tag: DBLocalTag
- * }} DBJoinedLocalMetricService
- */
-/** @typedef {DBJoinedLocalMetricService & {Permission: Set<string>}} DBPermissionedLocalMetricService */
+ * @typedef {Object} DBLocalMetricService
+ * @property {number} Local_Metric_Service_ID
+ * 
+ * @typedef {DBLocalMetricService & DBService} DBJoinedLocalMetricService
+ * @typedef {DBJoinedLocalMetricService & {Has_Metric_From_Local_Metric_Service_Tag: DBLocalTag, Local_Metrics: DBLocalMetric[]}} TagMappedDBJoinedLocalMetricService
+ * @typedef {TagMappedDBJoinedLocalMetricService & {Permissions: Set<string>}} DBPermissionedLocalMetricService
+ **/
 
 /**
  * @param {Databases} dbs
- * @param {Omit<DBJoinedLocalMetricService, "Local_Metrics" | "Has_Metric_From_Local_Metric_Service_Tag_ID">[]} localMetricServices
+ * @param {DBJoinedLocalMetricService[]} localMetricServices
  */
 async function mapLocalMetricServices(dbs, localMetricServices) {
     const localMetrics = await LocalMetrics.selectManyByLocalMetricServiceIDs(dbs, localMetricServices.map(localMetricService => localMetricService.Local_Metric_Service_ID));
@@ -115,10 +137,10 @@ export class LocalMetricServices {
 
         return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT DISTINCT LMS.*, S.*
-              FROM Local_Metric_Services LMS
-              JOIN Services S ON LMS.Service_ID = S.Service_ID
-              JOIN Local_Metrics LM ON LMS.Local_Metric_Service_ID = LM.Local_Metric_Service_ID
-              WHERE Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)}
+            FROM Local_Metric_Services LMS
+            JOIN Services S ON LMS.Service_ID = S.Service_ID
+            JOIN Local_Metrics LM ON LMS.Local_Metric_Service_ID = LM.Local_Metric_Service_ID
+            WHERE Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)}
             `, localMetricIDs
         ));
     }
@@ -142,9 +164,9 @@ export class LocalMetricServices {
 
         return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT *
-              FROM Local_Metric_Services LMS
-              JOIN Services S ON LMS.Service_ID = S.Service_ID
-              WHERE LMS.Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)};`,
+            FROM Local_Metric_Services LMS
+            JOIN Services S ON LMS.Service_ID = S.Service_ID
+            WHERE LMS.Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)};`,
             localMetricServiceIDs
         ));
     }
@@ -159,8 +181,8 @@ export class LocalMetricServices {
     static async selectAll(dbs) {
         return await mapLocalMetricServices(dbs, await dballselect(dbs, `
             SELECT *
-              FROM Local_Metric_Services LMS
-              JOIN Services S ON LMS.Service_ID = S.Service_ID;
+            FROM Local_Metric_Services LMS
+            JOIN Services S ON LMS.Service_ID = S.Service_ID;
         `));
     }
 
@@ -212,21 +234,21 @@ export class LocalMetricServices {
      * @param {=} permissionsToCheck
      */
     static async userSelectAll(dbs, user, permissionsToCheck) {
-        return await userSelectAllSpecificTypedServicesHelper(
+        return (await userSelectAllSpecificTypedServicesHelper(
             dbs,
             user,
             LocalMetricServices.selectAll,
             async () => {
                 return await dballselect(dbs, `
                     SELECT LMS.Local_Metric_Service_ID, SUP.Permission
-                      FROM Local_Metric_Services LMS
-                      JOIN Services_Users_Permissions SUP ON LMS.Service_ID = SUP.Service_ID
-                     WHERE SUP.User_ID = ?;
+                    FROM Local_Metric_Services LMS
+                    JOIN Services_Users_Permissions SUP ON LMS.Service_ID = SUP.Service_ID
+                    WHERE SUP.User_ID = ?;
                 `, [user.id()]);
             },
             "Local_Metric_Service_ID",
             permissionsToCheck
-        );
+        )).filter(localMetricService => localMetricService.Local_Metric_Service_ID !== SYSTEM_LOCAL_METRIC_SERVICE.Local_Metric_Service_ID);
     }
 
     /**
@@ -243,11 +265,9 @@ export class LocalMetricServices {
         /** @type {number} */
         const localMetricServiceID = (await dbget(dbs, `
             INSERT INTO Local_Metric_Services(
-                Service_ID,
-                User_Editable
+                Service_ID
             ) VALUES (
-                ?,
-                1 
+                ?
             ) RETURNING Local_Metric_Service_ID;
         `, [serviceID])).Local_Metric_Service_ID;
         
@@ -725,8 +745,8 @@ export class LocalMetrics {
         /** @type {DBLocalMetric[]} */
         const dbLocalMetrics = await dballselect(dbs, `
             SELECT *
-              FROM Local_Metrics
-             WHERE Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)}
+            FROM Local_Metrics
+            WHERE Local_Metric_ID IN ${dbvariablelist(localMetricIDs.length)}
             ;`, localMetricIDs
         );
 
@@ -753,8 +773,8 @@ export class LocalMetrics {
         /** @type {DBLocalMetric[]} */
         const dbLocalMetrics = await dballselect(dbs, `
             SELECT *
-              FROM Local_Metrics
-             WHERE Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)}
+            FROM Local_Metrics
+            WHERE Local_Metric_Service_ID IN ${dbvariablelist(localMetricServiceIDs.length)}
             ;`, localMetricServiceIDs
         );
 
@@ -825,12 +845,12 @@ export class LocalMetrics {
 
         await dbrun(dbs, `
             UPDATE Local_Metrics
-               SET Local_Metric_Name = ?,
-                   Local_Metric_Lower_Bound = ?,
-                   Local_Metric_Upper_Bound = ?,
-                   Local_Metric_Precision = ?,
-                   Local_Metric_Type = ?
-             WHERE Local_Metric_ID = ?;
+            SET Local_Metric_Name = ?,
+                Local_Metric_Lower_Bound = ?,
+                Local_Metric_Upper_Bound = ?,
+                Local_Metric_Precision = ?,
+                Local_Metric_Type = ?
+            WHERE Local_Metric_ID = ?;
         `, [
             preInsertLocalMetric.Local_Metric_Name,
             preInsertLocalMetric.Local_Metric_Lower_Bound,

@@ -8,6 +8,8 @@
  * }} param0  
  */
 const HoverInfo = ({children, hoverText}) => {
+    children ??= <></>;
+
     return <>
         <span style={{whiteSpace: "pre"}}> <span title={hoverText}>{children}<sub><sub>?</sub></sub></span> </span>
     </>

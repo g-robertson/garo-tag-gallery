@@ -1,5 +1,5 @@
 import { Key, until } from "selenium-webdriver";
-import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, BySelectedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, FINISH_HYDRUS_JOB_TIMEOUT, modClick, modDoubleClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, UNTIL_JOB_BEGIN, UNTIL_JOB_END, UNTIL_MODAL_CLOSE, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
+import { BY_THUMBNAIL_GALLERY_IMAGE, ByMultiSelectOption, ByPage, BySearchQueryTagService, BySearchTag, BySelectableTag, ByHighlightedTag, closeModal, closePage, DEFAULT_SLEEP_TIME, DEFAULT_TIMEOUT_TIME, doubleClick, drag, findThumbnailGalleryImage, findThumbnailGalleryImages, FINISH_HYDRUS_JOB_TIMEOUT, modClick, modDoubleClick, scroll, selectPage, sendKeys, UNTIL_GALLERY_OPEN, UNTIL_JOB_BEGIN, UNTIL_JOB_END, UNTIL_MODAL_CLOSE, untilCountElementsLocated, untilCountElementsLocatedNotEquals, untilElementsNotLocated, xpathHelper } from "../../../helpers.js";
 import { addConditionalExpressionListUnionType, EXPRESSION_LIST_UNION_CONDITION_TYPES, CONDITIONAL_EXPRESSION_LIST_UNION_TYPES, applyTagFilter, assignMetricStar, clickModifyTaggablesButton, COMPARATORS, createNewFileSearchPage, fileSearchMetricTag, selectTagFromTagSearchQuery, selectTagFromLocalTagSelector, generateHasMetricComparisonGTETagName, generateHasMetricComparisonGTTagName, generateHasMetricComparisonLTETagName, generateHasMetricComparisonLTTagName, generateHasMetricInMetricServiceTagName, generateHasMetricTagName, hoverMetricStar, METRIC_TAG_SEARCH_TYPES, modifyTaggables, saveOrTag, selectOrTag, toggleExcludeCheckbox, trashTaggables } from "../../../functionality/pages/file-search-pages-functionality.js";
 import { createNewTagService, deleteTagService, modifyTagService } from "../../../functionality/tags-functionality.js";
 import { createNewMetric, createNewMetricService, deleteMetricService, METRIC_TYPES } from "../../../functionality/metrics-functionality.js";
@@ -93,15 +93,15 @@ export const FILE_SEARCH_PAGE_TESTS = [
             {name: "ArrowKeyNavigationWorks", tests: async (driver) => {
                 await driver.findElement(xpathHelper({attrEq: {"title": TEST_TAG_1}})).click();
 
-                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "highlighted"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
                 await sendKeys(driver, Key.ARROW_DOWN);
-                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"class": "highlighted"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
                 await sendKeys(driver, Key.ARROW_UP);
-                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "highlighted"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
                 await sendKeys(driver, Key.ARROW_RIGHT);
-                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilElementsNotLocated(xpathHelper({attrContains: {"class": "highlighted"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
                 await sendKeys(driver, Key.ARROW_LEFT);
-                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "highlighted"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "ArrowKeyNavigationJumpsToItemPosition", tests: async (driver) => {
                 await driver.findElement(xpathHelper({attrEq: {"title": TEST_TAG_1}})).click();
@@ -110,7 +110,7 @@ export const FILE_SEARCH_PAGE_TESTS = [
                 await scroll(driver, selectableContents, 10, 100);
                 await sendKeys(driver, Key.ARROW_DOWN);
                 await sendKeys(driver, Key.ARROW_UP);
-                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "highlighted"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "RemovingFromBottomUpdatesTagPosition", tests: async (driver) => {
                 const scrollCursor = await driver.findElement(xpathHelper({attrContains: {"class": "local-tags-selector"}, descendent: {attrContains: {"class": "scroll-cursor"}}}));
@@ -141,7 +141,7 @@ export const FILE_SEARCH_PAGE_TESTS = [
                 const selectableContents = await driver.findElement(xpathHelper({attrEq: {"class": "local-tags-selector"}, descendent: {attrEq: {"class": "lazy-selector-selectable-contents"}}}));
                 await scroll(driver, selectableContents, 10, 1);
                 await scroll(driver, selectableContents, -10, 1);
-                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "selected"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(until.elementLocated(xpathHelper({attrContains: {"class": "highlighted"}, attrEq: {"title": TEST_TAG_1}})), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "ShiftClickTagsWorksCorrectly", tests: async (driver) => {
                 await applyTagFilter(driver, "CLEAR SELECTION");
@@ -149,9 +149,9 @@ export const FILE_SEARCH_PAGE_TESTS = [
 
                 await driver.findElement(BySelectableTag(TEST_TAG_1)).click();
                 await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_3)), {shift: true});
-                await driver.wait(untilCountElementsLocated(BySelectedTag(), 5), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilCountElementsLocated(ByHighlightedTag(), 5), DEFAULT_TIMEOUT_TIME);
                 await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_2)), {shift: true});
-                await driver.wait(untilCountElementsLocated(BySelectedTag(), 2), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilCountElementsLocated(ByHighlightedTag(), 2), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "CtrlClickTagsWorksCorrectly", tests: async (driver) => {
                 await applyTagFilter(driver, "CLEAR SELECTION");
@@ -159,9 +159,9 @@ export const FILE_SEARCH_PAGE_TESTS = [
                 
                 await driver.findElement(BySelectableTag(TEST_TAG_1)).click();
                 await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_3)), {ctrl: true});
-                await driver.wait(untilCountElementsLocated(BySelectedTag(), 2), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilCountElementsLocated(ByHighlightedTag(), 2), DEFAULT_TIMEOUT_TIME);
                 await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_2)), {ctrl: true});
-                await driver.wait(untilCountElementsLocated(BySelectedTag(), 3), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilCountElementsLocated(ByHighlightedTag(), 3), DEFAULT_TIMEOUT_TIME);
             }},
             {name: "CtrlShiftClickTagsShiftHasPrecedence", tests: async (driver) => {
                 await applyTagFilter(driver, "CLEAR SELECTION");
@@ -169,11 +169,11 @@ export const FILE_SEARCH_PAGE_TESTS = [
 
                 await driver.findElement(BySelectableTag(TEST_TAG_1)).click();
                 await modClick(driver, await driver.findElement(BySelectableTag(TEST_TAG_3)), {ctrl: true, shift: true});
-                await driver.wait(untilCountElementsLocated(BySelectedTag(), 5), DEFAULT_TIMEOUT_TIME);
+                await driver.wait(untilCountElementsLocated(ByHighlightedTag(), 5), DEFAULT_TIMEOUT_TIME);
                 
                 await applyTagFilter(driver, "CLEAR SELECTION");
                 await applyTagFilter(driver, "");
-            }},
+            }}
         ]},
         {name: "TagSearchPersistsUponDoubleReload", tests: async (driver) => {
             await selectTagFromLocalTagSelector(driver, TEST_TAG_1);
@@ -599,6 +599,9 @@ export const FILE_SEARCH_PAGE_TESTS = [
             await hoverMetricStar(driver, TEST_METRIC_1_NAME, 7);
             await driver.wait(untilCountElementsLocated(xpathHelper({attrContains: {"class": ["metric-star", "hovered"]}}), 7), DEFAULT_TIMEOUT_TIME);
             await driver.wait(untilCountElementsLocated(xpathHelper({attrContains: {"class": ["metric-star", "selected"]}}), 4), DEFAULT_TIMEOUT_TIME);
+
+            // TODO: Add onmouseleave case should unhover star
+
             await closeModal(driver);
         }},
         {name: "BackButtonShouldNavigateBackwards", tests: {

@@ -19,6 +19,7 @@
   "dependencies": {
     "@dotenvx/dotenvx": "^1.51.1",
     "@types/express": "^5.0.2",
+    "@xmldom/xmldom": "^0.8.11",
     "async-mutex": "^0.5.0",
     "better-sqlite3": "^12.6.2",
     "cookie-parser": "^1.4.7",
@@ -31,6 +32,7 @@
     "selenium-webdriver": "^4.38.0",
     "serve-static": "^2.2.0",
     "sharp": "^0.34.2",
+    "xpath": "^0.0.34",
     "zod": "^3.25.67"
   },
   "devDependencies": {

@@ -67,7 +67,7 @@ const TagsSelector = ({initialSelectedTags, taggableCursorConstState, onSearchCh
                         element: <div class="tag-search-query" style={{width: "100%"}}>
                             <LazyTextObjectSelector
                                 textObjectsConstState={clientSearchQueryState.asConst()}
-                                onValuesDoubleClicked={((_, indices) => {
+                                onValuesSelected={((_, indices) => {
                                     const clientSearchQuery = clientSearchQueryState.get();
                                     for (const index of indices.sort((a, b) => b - a)) {
                                         clientSearchQuery.splice(index, 1);

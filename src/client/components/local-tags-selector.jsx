@@ -49,7 +49,7 @@ export async function MAP_TO_CLIENT_SEARCH_QUERY(clientTags) {
  *  taggableIDsConstState?: ConstState<number[]>
  *  tagsToRemoveConstState?: ConstState<Map<number, Set<string>>>
  *  tagsToAddConstState?: ConstState<Map<number, Map<string, ClientQueryTag>>>
- *  multiSelect?: boolean
+ *  multiHighlight?: boolean
  *  excludeable?: boolean
  *  tagSelectionTitle?: string
  *  valueMappingFunction?: (tags: ClientQueryTag[]) => Promise<T[]>
@@ -64,7 +64,7 @@ const LocalTagsSelector = ({
     taggableCursorConstState,
     tagsToRemoveConstState,
     tagsToAddConstState,
-    multiSelect,
+    multiHighlight,
     excludeable,
     tagSelectionTitle,
     valueMappingFunction,
@@ -96,7 +96,7 @@ const LocalTagsSelector = ({
         addToCleanup,
         {updateOnCreate: true}
     );
-    multiSelect ??= true;
+    multiHighlight ??= true;
     excludeable ??= true;
     tagSelectionTitle ??= "Select tags";
     valueMappingFunction ??= MAP_TO_CLIENT_TAGS;
@@ -257,13 +257,13 @@ const LocalTagsSelector = ({
                     {
                         element: <LazyTextObjectSelector
                             textObjectsConstState={tagsState.asConst()}
-                            onValuesDoubleClicked={async (valuesSelected) => {
+                            onValuesSelected={async (valuesSelected) => {
                                 const mappedValues = await valueMappingFunction(valuesSelected);
                                 onTagsSelected(mappedValues, isExcludeOnState.get(), selectedLocalTagServiceIDsState.get());
                             }}
                             customItemComponent={({realizedValue}) => <>{realizedValue.displayName}{realizedValue.tagCount !== Infinity ? ` (${realizedValue.tagCount})` : ""}</>}
                             customTitleRealizer={(realizedValue) => realizedValue.displayName}
-                            multiSelect={multiSelect}
+                            multiHighlight={multiHighlight}
                         />,
                         defaultFlex: 5,
                         minFlex: 1

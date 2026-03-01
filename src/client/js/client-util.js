@@ -735,8 +735,9 @@ export const T_SECOND = 1000;
 export const T_MINUTE = T_SECOND * 60;
 export const T_HOUR = T_MINUTE * 60;
 export const T_DAY = T_HOUR * 24;
-
-export const VIDEO_FILE_EXTENSIONS = new Set(".mp4", ".webm");
+export const VIDEO_FILE_EXTENSIONS = new Set([".mp4", ".webm", ".mkv"]);
+export const IMAGE_FILE_EXTENSIONS = new Set([".jpg", ".jpeg", ".tif", ".tiff", ".png", ".gif", ".bmp", ".svg", ".webp", ".raw", ".kra", ".psd", ".xcf", ".avif", ".jxl"]);
+export const SUPPORTED_FILE_EXTENSIONS = new Set([...VIDEO_FILE_EXTENSIONS, ...IMAGE_FILE_EXTENSIONS]);
 
 export const preloadImg = (image) => {
     const preloadElem = document.createElement("link");
